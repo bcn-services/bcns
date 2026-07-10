@@ -1,0 +1,25 @@
+/**
+ * Central place for site-wide constants and marketing copy.
+ * TODO(rename): update `name`, `domain`, and `email` once the business name is
+ * chosen (these also feed metadata and the footer).
+ */
+export const siteConfig = {
+  name: "Acme Labs",
+  // TODO: replace with real production domain once purchased.
+  domain: "acme-labs.com",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  tagline: "Custom software for local businesses — built to fit how you already work.",
+  description:
+    "Acme Labs designs and builds custom software for local small businesses — the tools that don't exist off the shelf, cost too much from enterprise vendors, or never quite fit your workflow. You own what we build.",
+  // TODO: replace with a real inbox before launch.
+  email: "hello@acme-labs.com",
+  nav: [
+    { label: "Problems", href: "#problems" },
+    { label: "How it works", href: "#how-it-works" },
+    { label: "Delivery", href: "#delivery" },
+    { label: "Examples", href: "#examples" },
+    { label: "Contact", href: "#contact" },
+  ],
+} as const;
+
+export type SiteConfig = typeof siteConfig;
