@@ -1,31 +1,26 @@
-# acme-labs
+# bcns
 
-Monorepo for **Acme Labs** — a software studio that builds custom software for
+Monorepo for **bcns** — a software studio that builds custom software for
 local small businesses. This repo currently contains the marketing website; it's
 scaffolded so client apps and shared code can be added later without rework.
-
-> **Placeholder name:** `acme-labs` / `Acme Labs` is a stand-in. See
-> [`RENAME.md`](./RENAME.md) for every place the name appears and how to
-> find-and-replace it once the real business name is chosen.
 
 ---
 
 ## What's in here
 
 ```
-acme-labs/
+bcns/
 ├─ apps/
 │  └─ web/            # The landing website (Next.js App Router + TS + Tailwind)
 ├─ packages/
-│  ├─ ui/             # Shared React component library (@acme-labs/ui)
-│  └─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@acme-labs/config)
+│  ├─ ui/             # Shared React component library (@bcns/ui)
+│  └─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@bcns/config)
 ├─ templates/         # Reserved for future app starters (not a workspace yet)
 ├─ package.json       # Root scripts + workspace dev dependencies
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
 ├─ vercel.json        # Vercel deploy config
 ├─ .nvmrc             # Node version (22)
-└─ RENAME.md          # Every place the placeholder name appears
 ```
 
 ### Tech stack
@@ -34,8 +29,8 @@ acme-labs/
 - **[Next.js](https://nextjs.org/) 14 (App Router) + TypeScript (strict)** — the site.
 - **[Tailwind CSS](https://tailwindcss.com/)** with dark-mode-ready HSL theme tokens.
 - **shadcn/ui-style components** + **[Lucide](https://lucide.dev/) icons**, with
-  shared primitives living in `@acme-labs/ui`.
-- **ESLint (flat config) + Prettier**, shared from `@acme-labs/config` and
+  shared primitives living in `@bcns/ui`.
+- **ESLint (flat config) + Prettier**, shared from `@bcns/config` and
   runnable from the repo root via Turbo.
 
 ---
@@ -135,7 +130,7 @@ lean.)
 ## Adding a client app later
 
 1. Create `apps/<client-name>/` (it's auto-picked-up by the workspace glob).
-2. Depend on the shared packages: `"@acme-labs/ui": "workspace:*"` and
-   `"@acme-labs/config": "workspace:*"`.
+2. Depend on the shared packages: `"@bcns/ui": "workspace:*"` and
+   `"@bcns/config": "workspace:*"`.
 3. Extend the shared configs (see how `apps/web` wires up `tsconfig`, `eslint`,
    `tailwind`, and `prettier`).

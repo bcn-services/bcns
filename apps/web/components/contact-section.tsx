@@ -1,5 +1,5 @@
 import { Mail, MessageSquare, Clock } from "lucide-react";
-import { Container, SectionHeading } from "@acme-labs/ui";
+import { Container, SectionHeading } from "@bcns/ui";
 import { ContactForm } from "@/components/contact-form";
 import { siteConfig } from "@/lib/site";
 

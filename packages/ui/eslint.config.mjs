@@ -1,3 +1,3 @@
-import { base } from "@acme-labs/config/eslint/base";
+import { base } from "@bcns/config/eslint/base";
 
 export default base;

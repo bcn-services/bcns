@@ -1,4 +1,4 @@
-import { next } from "@acme-labs/config/eslint/next";
+import { next } from "@bcns/config/eslint/next";
 
 export default [
   ...next,

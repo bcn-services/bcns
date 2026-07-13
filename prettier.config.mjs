@@ -1,2 +1,2 @@
-// Root Prettier config re-exports the shared config from @acme-labs/config.
-export { default } from "@acme-labs/config/prettier";
+// Root Prettier config re-exports the shared config from @bcns/config.
+export { default } from "@bcns/config/prettier";

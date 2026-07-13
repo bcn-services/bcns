@@ -7,7 +7,7 @@ import {
   CardTitle,
   Container,
   SectionHeading,
-} from "@acme-labs/ui";
+} from "@bcns/ui";
 
 const problems = [
   {

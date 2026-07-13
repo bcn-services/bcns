@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@acme-labs/ui";
+import { cn } from "@bcns/ui";
 
 export type LabelProps = React.LabelHTMLAttributes<HTMLLabelElement>;
 

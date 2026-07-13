@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Boxes } from "lucide-react";
-import { Container } from "@acme-labs/ui";
+import { Container } from "@bcns/ui";
 import { siteConfig } from "@/lib/site";
 
 // TODO: replace placeholder legal links with real pages before launch.

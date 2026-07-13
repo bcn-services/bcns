@@ -7,7 +7,7 @@ Nothing lives here yet. The intent is that each subdirectory becomes a
 copy-pasteable starting point for a common delivery shape, for example:
 
 - `templates/web-app/` — an installable web app (Next.js) preconfigured with the
-  shared `@acme-labs/config` and `@acme-labs/ui` packages.
+  shared `@bcns/config` and `@bcns/ui` packages.
 - `templates/desktop-app/` — a downloadable desktop app shell.
 - `templates/dashboard/` — an internal-tools / admin dashboard starter.
 

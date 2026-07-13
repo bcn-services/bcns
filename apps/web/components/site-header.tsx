@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Boxes } from "lucide-react";
-import { buttonVariants, Container } from "@acme-labs/ui";
+import { buttonVariants, Container } from "@bcns/ui";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/site";
 

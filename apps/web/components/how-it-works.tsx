@@ -1,5 +1,5 @@
 import { Search, Hammer, Rocket } from "lucide-react";
-import { Container, SectionHeading } from "@acme-labs/ui";
+import { Container, SectionHeading } from "@bcns/ui";
 
 const steps = [
   {

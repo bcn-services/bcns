@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-import preset from "@acme-labs/config/tailwind";
+import preset from "@bcns/config/tailwind";
 
 export default {
   presets: [preset],

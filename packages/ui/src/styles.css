@@ -1,5 +1,5 @@
 /*
- * Optional stylesheet entry for @acme-labs/ui.
+ * Optional stylesheet entry for @bcns/ui.
  * Components are styled with Tailwind utility classes that are compiled by the
  * consuming app (which includes this package in its Tailwind `content` globs),
  * so this file is intentionally empty. Add global component CSS here if needed.

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
-import { Button } from "@acme-labs/ui";
+import { Button } from "@bcns/ui";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";

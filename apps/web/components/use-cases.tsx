@@ -7,7 +7,7 @@ import {
   CardTitle,
   Container,
   SectionHeading,
-} from "@acme-labs/ui";
+} from "@bcns/ui";
 
 // TODO: swap these placeholder examples for real case studies / screenshots
 // once we've shipped a few client projects.

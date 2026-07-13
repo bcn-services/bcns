@@ -1,5 +1,5 @@
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { Badge, buttonVariants, Container } from "@acme-labs/ui";
+import { Badge, buttonVariants, Container } from "@bcns/ui";
 import { siteConfig } from "@/lib/site";
 
 const proofPoints = [

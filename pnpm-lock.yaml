@@ -20,7 +20,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@acme-labs/ui':
+      '@bcns/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       class-variance-authority:
@@ -48,7 +48,7 @@ importers:
         specifier: ^2.5.4
         version: 2.6.1
     devDependencies:
-      '@acme-labs/config':
+      '@bcns/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/node':
@@ -125,7 +125,7 @@ importers:
         specifier: ^2.5.4
         version: 2.6.1
     devDependencies:
-      '@acme-labs/config':
+      '@bcns/config':
         specifier: workspace:*
         version: link:../config
       '@types/react':
