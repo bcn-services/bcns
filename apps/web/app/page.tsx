@@ -4,6 +4,11 @@ import { ProblemSolution } from "@/components/problem-solution";
 import { HowItWorks } from "@/components/how-it-works";
 import { DeliveryModels } from "@/components/delivery-models";
 import { UseCases } from "@/components/use-cases";
+import { PastWork } from "@/components/past-work";
+import { Reviews } from "@/components/reviews";
+import { Pricing } from "@/components/pricing";
+import { Faq } from "@/components/faq";
+import { AboutFounder } from "@/components/about-founder";
 import { ContactSection } from "@/components/contact-section";
 import { SiteFooter } from "@/components/site-footer";
 
@@ -17,6 +22,11 @@ export default function HomePage() {
         <HowItWorks />
         <DeliveryModels />
         <UseCases />
+        <PastWork />
+        <Reviews />
+        <Pricing />
+        <Faq />
+        <AboutFounder />
         <ContactSection />
       </main>
       <SiteFooter />

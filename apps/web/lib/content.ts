@@ -83,6 +83,66 @@ export interface ContactSectionContent {
   highlights: [ContactHighlightItem, ContactHighlightItem, ContactHighlightItem];
 }
 
+export interface PastWorkItem {
+  title: string;
+  outcome: string;
+  link: string;
+}
+
+export interface PastWorkContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  items: PastWorkItem[];
+}
+
+export interface ReviewItem {
+  quote: string;
+  author: string;
+  role: string;
+  company: string;
+}
+
+export interface ReviewsContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  items: ReviewItem[];
+}
+
+export interface PricingTier {
+  name: string;
+  price: string;
+  description: string;
+  features: string[];
+}
+
+export interface PricingContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  tiers: PricingTier[];
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+export interface FaqContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  items: FaqItem[];
+}
+
+export interface AboutFounderContent {
+  eyebrow: string;
+  title: string;
+  bio: string;
+  credentials: string[];
+}
+
 export interface SiteContent {
   hero: HeroContent;
   problemSolution: ProblemSolutionContent;
@@ -90,6 +150,11 @@ export interface SiteContent {
   deliveryModels: DeliveryModelsContent;
   useCases: UseCasesContent;
   contactSection: ContactSectionContent;
+  pastWork: PastWorkContent;
+  reviews: ReviewsContent;
+  pricing: PricingContent;
+  faq: FaqContent;
+  aboutFounder: AboutFounderContent;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +283,113 @@ export const siteContent: SiteContent = {
         title: "[SLOT: contact/highlight-3-title]",
         description: "[SLOT: contact/highlight-3-description]",
       },
+    ],
+  },
+
+  pastWork: {
+    eyebrow: "[SLOT: past-work/eyebrow]",
+    title: "[SLOT: past-work/title]",
+    description: "[SLOT: past-work/description]",
+    items: [
+      {
+        title: "[SLOT: past-work/item-1-title]",
+        outcome: "[SLOT: past-work/item-1-outcome]",
+        link: "[SLOT: past-work/item-1-link]",
+      },
+      {
+        title: "[SLOT: past-work/item-2-title]",
+        outcome: "[SLOT: past-work/item-2-outcome]",
+        link: "[SLOT: past-work/item-2-link]",
+      },
+    ],
+  },
+
+  reviews: {
+    eyebrow: "[SLOT: reviews/eyebrow]",
+    title: "[SLOT: reviews/title]",
+    description: "[SLOT: reviews/description]",
+    items: [
+      {
+        quote: "[SLOT: reviews/item-1-quote]",
+        author: "[SLOT: reviews/item-1-author]",
+        role: "[SLOT: reviews/item-1-role]",
+        company: "[SLOT: reviews/item-1-company]",
+      },
+      {
+        quote: "[SLOT: reviews/item-2-quote]",
+        author: "[SLOT: reviews/item-2-author]",
+        role: "[SLOT: reviews/item-2-role]",
+        company: "[SLOT: reviews/item-2-company]",
+      },
+    ],
+  },
+
+  pricing: {
+    eyebrow: "[SLOT: pricing/eyebrow]",
+    title: "[SLOT: pricing/title]",
+    description: "[SLOT: pricing/description]",
+    tiers: [
+      {
+        name: "[SLOT: pricing/tier-1-name]",
+        price: "[SLOT: pricing/tier-1-price]",
+        description: "[SLOT: pricing/tier-1-description]",
+        features: [
+          "[SLOT: pricing/tier-1-feature-1]",
+          "[SLOT: pricing/tier-1-feature-2]",
+          "[SLOT: pricing/tier-1-feature-3]",
+        ],
+      },
+      {
+        name: "[SLOT: pricing/tier-2-name]",
+        price: "[SLOT: pricing/tier-2-price]",
+        description: "[SLOT: pricing/tier-2-description]",
+        features: [
+          "[SLOT: pricing/tier-2-feature-1]",
+          "[SLOT: pricing/tier-2-feature-2]",
+          "[SLOT: pricing/tier-2-feature-3]",
+        ],
+      },
+      {
+        name: "[SLOT: pricing/tier-3-name]",
+        price: "[SLOT: pricing/tier-3-price]",
+        description: "[SLOT: pricing/tier-3-description]",
+        features: [
+          "[SLOT: pricing/tier-3-feature-1]",
+          "[SLOT: pricing/tier-3-feature-2]",
+          "[SLOT: pricing/tier-3-feature-3]",
+        ],
+      },
+    ],
+  },
+
+  faq: {
+    eyebrow: "[SLOT: faq/eyebrow]",
+    title: "[SLOT: faq/title]",
+    description: "[SLOT: faq/description]",
+    items: [
+      {
+        question: "[SLOT: faq/item-1-question]",
+        answer: "[SLOT: faq/item-1-answer]",
+      },
+      {
+        question: "[SLOT: faq/item-2-question]",
+        answer: "[SLOT: faq/item-2-answer]",
+      },
+      {
+        question: "[SLOT: faq/item-3-question]",
+        answer: "[SLOT: faq/item-3-answer]",
+      },
+    ],
+  },
+
+  aboutFounder: {
+    eyebrow: "[SLOT: about/eyebrow]",
+    title: "[SLOT: about/title]",
+    bio: "[SLOT: about/bio]",
+    credentials: [
+      "[SLOT: about/credential-1]",
+      "[SLOT: about/credential-2]",
+      "[SLOT: about/credential-3]",
     ],
   },
 };
