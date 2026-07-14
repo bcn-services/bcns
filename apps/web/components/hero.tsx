@@ -45,8 +45,8 @@ export function Hero() {
         </div>
 
         <ul className="mt-10 flex flex-col flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground animate-fade-up sm:flex-row">
-          {proofPoints.map((point) => (
-            <li key={point} className="flex items-center gap-2">
+          {proofPoints.map((point, index) => (
+            <li key={index} className="flex items-center gap-2">
               <CheckCircle2 className="size-4 text-primary" aria-hidden />
               {point}
             </li>

@@ -26,9 +26,10 @@ export function UseCases() {
 
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {items.map(({ tag, title: caseTitle, description: caseDescription }, index) => {
-            const Icon = useCaseIcons[index]!;
+            const Icon = useCaseIcons[index];
+            if (!Icon) return null;
             return (
-              <Card key={caseTitle} className="group h-full transition-shadow hover:shadow-md">
+              <Card key={index} className="group h-full transition-shadow hover:shadow-md">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-transform group-hover:-translate-y-0.5">

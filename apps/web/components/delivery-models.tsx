@@ -26,9 +26,10 @@ export function DeliveryModels() {
 
         <div className="mt-14 grid gap-6 md:grid-cols-3">
           {items.map(({ title: modelTitle, description: modelDescription }, index) => {
-            const Icon = deliveryIcons[index]!;
+            const Icon = deliveryIcons[index];
+            if (!Icon) return null;
             return (
-              <Card key={modelTitle} className="h-full bg-gradient-to-b from-card to-muted/30">
+              <Card key={index} className="h-full bg-gradient-to-b from-card to-muted/30">
                 <CardHeader>
                   <span className="mb-2 flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Icon className="size-5" aria-hidden />

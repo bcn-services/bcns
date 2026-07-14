@@ -21,9 +21,10 @@ export function ContactSection() {
             />
             <ul className="flex flex-col gap-6">
               {highlights.map(({ title: highlightTitle, description: highlightDescription }, index) => {
-                const Icon = highlightIcons[index]!;
+                const Icon = highlightIcons[index];
+                if (!Icon) return null;
                 return (
-                  <li key={highlightTitle} className="flex gap-4">
+                  <li key={index} className="flex gap-4">
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                       <Icon className="size-5" aria-hidden />
                     </span>

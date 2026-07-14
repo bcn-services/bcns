@@ -18,9 +18,10 @@ export function HowItWorks() {
 
         <ol className="mt-14 grid gap-8 md:grid-cols-3">
           {items.map(({ step, title: stepTitle, description: stepDescription }, index) => {
-            const Icon = stepIcons[index]!;
+            const Icon = stepIcons[index];
+            if (!Icon) return null;
             return (
-              <li key={step} className="relative flex flex-col gap-4">
+              <li key={index} className="relative flex flex-col gap-4">
                 <div className="flex items-center gap-4">
                   <span className="flex size-12 items-center justify-center rounded-xl border border-border bg-background text-primary shadow-sm">
                     <Icon className="size-6" aria-hidden />

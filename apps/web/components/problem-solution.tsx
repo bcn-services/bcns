@@ -26,9 +26,10 @@ export function ProblemSolution() {
 
         <div className="mt-14 grid gap-6 md:grid-cols-3">
           {items.map(({ problem, solution }, index) => {
-            const Icon = problemIcons[index]!;
+            const Icon = problemIcons[index];
+            if (!Icon) return null;
             return (
-              <Card key={problem} className="h-full transition-shadow hover:shadow-md">
+              <Card key={index} className="h-full transition-shadow hover:shadow-md">
                 <CardHeader>
                   <span className="mb-2 flex size-11 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                     <Icon className="size-5" aria-hidden />
