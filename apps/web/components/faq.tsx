@@ -13,7 +13,7 @@ export function Faq() {
   const { eyebrow, title, description, items } = siteContent.faq;
 
   return (
-    <section id="faq" className="border-t border-border/60 bg-muted/40 py-24 sm:py-28">
+    <section id="faq" className="border-t border-border/60 bg-secondary/70 py-24 sm:py-28">
       <Container>
         <SectionHeading
           eyebrow={eyebrow}

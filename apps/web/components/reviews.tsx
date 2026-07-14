@@ -13,7 +13,7 @@ export function Reviews() {
   const { eyebrow, title, description, items } = siteContent.reviews;
 
   return (
-    <section id="reviews" className="border-t border-border/60 bg-muted/40 py-24 sm:py-28">
+    <section id="reviews" className="border-t border-border/60 bg-secondary/70 py-24 sm:py-28">
       <Container>
         <SectionHeading
           eyebrow={eyebrow}
