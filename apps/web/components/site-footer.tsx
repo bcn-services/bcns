@@ -3,10 +3,9 @@ import { Boxes } from "lucide-react";
 import { Container } from "@bcns/ui";
 import { siteConfig } from "@/lib/site";
 
-// TODO: replace placeholder legal links with real pages before launch.
 const legalLinks = [
-  { label: "Privacy", href: "#" },
-  { label: "Terms", href: "#" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
   { label: "Contact", href: "#contact" },
 ];
 
