@@ -8,22 +8,22 @@ export function Hero() {
 
   return (
     <section id="top" className="relative overflow-hidden">
-      {/* Gradient / grid background — no image assets. */}
+      {/* Brand atmosphere: faint grid + pastel-blue glow anchored at top */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--primary)/0.14),transparent_70%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_50%_at_50%_0%,hsl(var(--primary)/0.20),transparent_70%)]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_75%)] bg-[linear-gradient(to_right,hsl(var(--border)/0.5)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.5)_1px,transparent_1px)] bg-[size:44px_44px]"
+        className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_80%)] bg-[linear-gradient(to_right,hsl(var(--border)/0.6)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.6)_1px,transparent_1px)] bg-[size:44px_44px]"
       />
 
-      <Container className="flex flex-col items-center py-24 text-center sm:py-32">
+      <Container className="flex flex-col items-center py-20 text-center sm:py-28">
         <Badge className="animate-fade-up">
           {badge}
         </Badge>
 
-        <h1 className="mt-6 max-w-4xl text-balance text-4xl font-bold tracking-tight animate-fade-up sm:text-6xl">
+        <h1 className="mt-6 max-w-4xl text-balance font-display text-4xl font-bold tracking-tight animate-fade-up sm:text-6xl">
           {headline}
         </h1>
 
