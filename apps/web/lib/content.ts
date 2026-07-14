@@ -86,7 +86,7 @@ export interface ContactSectionContent {
 export interface PastWorkItem {
   title: string;
   outcome: string;
-  link: string;
+  link?: string;
 }
 
 export interface PastWorkContent {
@@ -139,6 +139,9 @@ export interface FaqContent {
 export interface AboutFounderContent {
   eyebrow: string;
   title: string;
+  description?: string;
+  cardTitleBio: string;
+  cardTitleCredentials: string;
   bio: string;
   credentials: string[];
 }
@@ -385,6 +388,9 @@ export const siteContent: SiteContent = {
   aboutFounder: {
     eyebrow: "[SLOT: about/eyebrow]",
     title: "[SLOT: about/title]",
+    description: "[SLOT: about/description]",
+    cardTitleBio: "[SLOT: about/card-title-bio]",
+    cardTitleCredentials: "[SLOT: about/card-title-credentials]",
     bio: "[SLOT: about/bio]",
     credentials: [
       "[SLOT: about/credential-1]",

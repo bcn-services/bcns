@@ -30,7 +30,14 @@ export function PastWork() {
               <CardContent>
                 <CardDescription className="leading-relaxed">{outcome}</CardDescription>
                 {link && (
-                  <p className="mt-3 text-sm text-muted-foreground">{link}</p>
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                  >
+                    {link}
+                  </a>
                 )}
               </CardContent>
             </Card>
