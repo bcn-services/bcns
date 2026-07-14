@@ -1,14 +1,11 @@
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Badge, buttonVariants, Container } from "@bcns/ui";
-import { siteConfig } from "@/lib/site";
-
-const proofPoints = [
-  "You own the software and the data",
-  "Fixed-scope quotes, no enterprise pricing",
-  "Built around your workflow, not the other way around",
-];
+import { siteContent } from "@/lib/content";
 
 export function Hero() {
+  const { badge, headline, subheadline, ctaPrimary, ctaSecondary, proofPoints } =
+    siteContent.hero;
+
   return (
     <section id="top" className="relative overflow-hidden">
       {/* Gradient / grid background — no image assets. */}
@@ -23,29 +20,27 @@ export function Hero() {
 
       <Container className="flex flex-col items-center py-24 text-center sm:py-32">
         <Badge className="animate-fade-up">
-          Software studio for local small businesses
+          {badge}
         </Badge>
 
         <h1 className="mt-6 max-w-4xl text-balance text-4xl font-bold tracking-tight animate-fade-up sm:text-6xl">
-          Custom software that fits how your business already works.
+          {headline}
         </h1>
 
         <p className="mt-6 max-w-2xl text-pretty text-lg text-muted-foreground animate-fade-up sm:text-xl">
-          {siteConfig.name} builds the tools local businesses can&apos;t buy off the shelf —
-          without the enterprise price tag or the year-long rollout. You keep full ownership of
-          everything we ship.
+          {subheadline}
         </p>
 
         <div className="mt-9 flex flex-col gap-3 animate-fade-up sm:flex-row">
           <a href="#contact" className={buttonVariants({ size: "lg" })}>
-            Book a free consult
+            {ctaPrimary}
             <ArrowRight aria-hidden />
           </a>
           <a
             href="#examples"
             className={buttonVariants({ variant: "outline", size: "lg" })}
           >
-            See what we build
+            {ctaSecondary}
           </a>
         </div>
 
