@@ -53,22 +53,22 @@
 > (`dt-engineer` builds → QA gates tests+behavioral → review → fix) to DONE or
 > BLOCKED. Structural only — no visuals.
 
-### A1 — Content-model data layer · `status: not started` · `track: full`
+### A1 — Content-model data layer · `status: done` · `track: full`
 
 - **task:** Introduce a typed, per-section content registry that drives the site. Extend `apps/web/lib/site.ts` (or add `apps/web/lib/content.ts`) with a structured object per section. Refactor the 6 existing sections (`hero`, `problem-solution`, `how-it-works`, `delivery-models`, `use-cases`, `contact-section`) to render entirely from the registry. Replace hardcoded marketing sentences in component bodies with labeled `[SLOT: …]` placeholders in the registry. Do not restyle anything.
 - **done when:** `pnpm lint && pnpm typecheck && pnpm build` green; all 6 existing sections render from the registry; no hardcoded marketing sentence remains in any component body; every content field is either a labeled `[SLOT: …]` placeholder or a neutral structural default; no visual/styling changes in the diff.
 
-### A2 — Scaffold the missing sections · `status: not started` · `track: full`
+### A2 — Scaffold the missing sections · `status: done` · `track: full`
 
 - **task:** Add the 5 missing sections as data-driven components reading from the registry: **Past work**, **Reviews**, **Pricing**, **FAQ**, **About/founder**. Each collection-style section (Past work, Reviews, Pricing tiers, FAQ items) uses an **array of entry slots** so entries are addable by data edit alone. Wire each section into `app/page.tsx` and the nav in `site.ts`. Seed 1–2 **labeled example entries** for Past work and Reviews (e.g. `[PAST WORK 1: title / one-line outcome / link]`) — placeholders, not invented facts. Structural markup only; no styling beyond what already exists.
 - **done when:** build green; all 5 new sections present on the page and in nav; each collection section supports add-an-entry-by-data (verified by the registry shape); Past work + Reviews carry labeled example-entry slots; no fabricated content; no visual design work in the diff.
 
-### A3 — CONTENT.md spec + slot audit · `status: not started` · `track: light`
+### A3 — CONTENT.md spec + slot audit · `status: done` · `track: light`
 
 - **task:** Author `apps/web/CONTENT.md` (or repo-root `CONTENT.md`): every section, every slot, mirrored 1:1 from the data registry, each with **purpose / suggested tone / length guidance**. Add a short "How to fill a slot" and "How to add a section or a collection entry" guide. Verify no drift — every registry slot appears in `CONTENT.md` and vice versa.
 - **done when:** `CONTENT.md` covers every registry slot 1:1 (no orphans either direction); includes fill + extend instructions; build green.
 
-### A4 — Legal pages + config scaffolding · `status: not started` · `track: light`
+### A4 — Legal pages + config scaffolding · `status: done` · `track: light`
 
 - **task:** Create real routed `app/privacy/page.tsx` and `app/terms/page.tsx` pages whose bodies are **labeled slots** (`[PRIVACY POLICY BODY: …]`), not real legal text. Point the footer's Privacy/Terms links at them (kill the dead `#`). Confirm `site.ts` `name: "bcns"`; keep `domain`/`email`/`url` as clearly-commented placeholder constants (single source). Ensure `sitemap.ts` includes the new routes and metadata reads from config.
 - **done when:** `/privacy` and `/terms` render with labeled slots; footer links resolve to them; `name` wired as `bcns`; `domain`/`email`/`url` remain single-source placeholder constants; sitemap includes both routes; build green. No real legal text (Needs-Nate).

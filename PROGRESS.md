@@ -9,10 +9,10 @@
 ---
 
 ## Current position
-- **Status:** Plan authored. No build work started. Scaffold is green (lint/typecheck/build pass); 6 landing sections exist with placeholder prose.
-- **Next:** A1 — Content-model data layer (Section 1, dev-team-auto).
-- **Blockers (Needs-Nate):** `nate-personal.md` brand file must be seeded before Section 2 (layout-loop) can run. Domain, inbox/form provider, real content, legal text, deploy — all deferred, none block Section 1.
-- **Last updated:** 2026-07-13 (PLAN.md + PROGRESS.md created via grill session)
+- **Status:** Section 1 complete. All 4 pre-marker items DONE. Branch: worktree-experimental-overnight-first-draft.
+- **Next:** Section 2 — layout-loop visual pass (V1). Requires nate-personal.md brand file (already exists per precondition check).
+- **Blockers (Needs-Nate):** Domain, inbox/form provider, real content, legal text, deploy — all deferred. None blocked Section 1.
+- **Last updated:** 2026-07-14 (Section 1 complete — dev-team-auto autonomous run)
 
 ---
 
@@ -21,10 +21,10 @@
 ### Section 1 — Architecture (dev-team-auto)
 | Item | Status | Notes |
 |------|--------|-------|
-| A1 — Content-model data layer | ⬜ Not started | Typed per-section content registry; refactor 6 existing sections to render from it; prose → labeled slots. Structural only. |
-| A2 — Scaffold missing sections | ⬜ Not started | Past work · Reviews · Pricing · FAQ · About/founder. Data-driven, array-slot collections, wired into page + nav. Labeled example entries only. |
-| A3 — CONTENT.md spec + slot audit | ⬜ Not started | 1:1 mirror of registry slots with purpose/tone/length; fill + extend guide; no drift. |
-| A4 — Legal pages + config scaffolding | ⬜ Not started | `/privacy` + `/terms` as labeled slots; footer links wired; `name: bcns`; domain/email/url single-source placeholders; sitemap updated. |
+| A1 — Content-model data layer | ✅ done [full] — typed `siteContent` registry in `lib/content.ts`; all 6 sections refactored; [SLOT] placeholders throughout; 3754173 |
+| A2 — Scaffold missing sections | ✅ done [full] — 5 new data-driven sections (past-work, reviews, pricing, faq, about-founder), registry extended, nav updated to 10 entries; 0f561f0 |
+| A3 — CONTENT.md spec + slot audit | ✅ done [light] — 118-slot CONTENT.md authored, 1:1 verified against registry, guides included; 9a62a62 |
+| A4 — Legal pages + config scaffolding | ✅ done [light] — /privacy + /terms stub pages, footer links wired, sitemap updated, site.ts config confirmed; 0b082ee |
 
 ### Section 2 — Visual first draft (layout-loop, cowork)
 | Item | Status | Notes |

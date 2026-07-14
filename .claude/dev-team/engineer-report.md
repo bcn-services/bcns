@@ -1,39 +1,25 @@
 ---
 # Engineer Report
-**Task:** A1 — Content-model data layer for bcns web app
+**Task:** A4 — Legal pages + config scaffolding
 **Branch:** worktree-experimental-overnight-first-draft
-**Date:** 2026-07-13
+**Date:** 2026-07-14
 
 ## Design Decisions
-- Added `apps/web/lib/content.ts` as the single export (`siteContent`) with one typed interface per section — clean module boundary, callers import one symbol
-- Section interfaces use flat scalar fields + fixed-length tuple arrays (e.g. `[string, string, string]`) to enforce count parity with component icon arrays at the type level
-- Icons stay in component files as parallel `const` arrays indexed by position; accessed with non-null assertion (`icons[index]!`) because tuple lengths are statically matched
-- All copy fields set to `[SLOT: section/field-name]` placeholder strings — no marketing copy in the registry
-- Step numbers (`"01"`, `"02"`, `"03"`) kept as neutral structural defaults, not SLOT placeholders — they are ordinal structure, not copy
-- `siteConfig` in `site.ts` unchanged — name/domain/email remain single-source there; contact highlight-3-description becomes a SLOT (no runtime email interpolation in registry)
-- No new library dependencies introduced
+- No new architecture boundaries needed; legal pages are pure static Next.js App Router pages — no data fetching, no new API surface
+- Pages import `siteConfig` from `@/lib/site` for the `name` field only — keeps pages decoupled from any future config splits
+- Sitemap entries use `changeFrequency: "yearly"` and `priority: 0.3` — appropriate for rarely-updated legal stub pages
+- No new dependencies; `@bcns/ui` Container and Next.js `Metadata` type already available
 
 ## Files Changed
-- `apps/web/lib/content.ts` — new file; exports `SiteContent` + six section interfaces + `siteContent` registry with SLOT placeholders
-- `apps/web/components/hero.tsx` — imports `siteContent.hero`; removed local `proofPoints` array and hardcoded badge/h1/p/CTA strings
-- `apps/web/components/problem-solution.tsx` — imports `siteContent.problemSolution`; removed local `problems` array; icons mapped by index
-- `apps/web/components/how-it-works.tsx` — imports `siteContent.howItWorks`; removed local `steps` array; icons mapped by index
-- `apps/web/components/delivery-models.tsx` — imports `siteContent.deliveryModels`; removed local `models` array; icons mapped by index
-- `apps/web/components/use-cases.tsx` — imports `siteContent.useCases`; removed local `useCases` array; icons mapped by index
-- `apps/web/components/contact-section.tsx` — imports `siteContent.contactSection`; removed local `highlights` array + `siteConfig.email` interpolation; icons mapped by index
-
-## Done-When Criteria
-- [x] `pnpm lint` green
-- [x] `pnpm typecheck` green
-- [x] `pnpm build` green
-- [x] All 6 sections render from `siteContent` (no hardcoded marketing sentences in component bodies)
-- [x] Every content field is a `[SLOT: …]` placeholder or neutral structural default (step numbers)
-- [x] No visual/styling changes — zero className or JSX structure edits
+- `apps/web/app/privacy/page.tsx` — new: static page with labeled slot `[PRIVACY POLICY BODY: …]` and `title: "Privacy Policy"` metadata
+- `apps/web/app/terms/page.tsx` — new: static page with labeled slot `[TERMS OF SERVICE BODY: …]` and `title: "Terms of Service"` metadata
+- `apps/web/app/sitemap.ts` — added `/privacy` and `/terms` entries with `changeFrequency: "yearly"`, `priority: 0.3`
+- `apps/web/components/site-footer.tsx` — updated `legalLinks` Privacy and Terms hrefs from `"#"` to `"/privacy"` and `"/terms"`; removed stale TODO comment
 
 ## Deferred / Out of Scope
-- `site-header.tsx` CTA "Book a free consult" and `site-footer.tsx` legalLinks array not in task scope — left as-is
-- `siteConfig.tagline` / `siteConfig.description` (used in layout.tsx metadata) not moved to content registry — out of scope per task spec
+- Real legal text — intentionally omitted; slots are clearly labeled for manual replacement before launch
+- `siteConfig.name` was already `"bcns"` and `domain`/`email`/`url` already had TODO comments — confirmed correct, no changes made
 
 ## Flags for Reviewer
-- Icon index lookup uses `!` assertion — safe because tuple lengths match, but future maintainers adding items must keep icon arrays in sync
+- None — all pages are fully static with no runtime data fetching or external dependencies
 ---
