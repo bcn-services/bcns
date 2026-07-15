@@ -9,10 +9,10 @@
 ---
 
 ## Current position
-- **Status:** Combined overnight branch. B1–B4 done (site restructure). V1–V5 done (layout-loop visual pass). C1 DONE (voice/content pass). P1–P6 NOT STARTED (DeLuca's pizza app).
-- **Next:** P1–P6 (DeLuca's pizza app) — dev-team-auto. Then both layout-loop visual passes in cowork.
-- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy. None block P1–P6.
-- **Last updated:** 2026-07-15 (C1 voice/content pass complete — 419a05f)
+- **Status:** Combined overnight branch. B1–B4 done. V1–V5 done. C1 DONE. P1–P6 ALL DONE. Reached STOP HERE marker. Both layout-loop visual passes next (cowork sessions).
+- **Next:** layout-loop visual pass — bcns website (branch off overnight-combined); then layout-loop DeLuca's visual pass (separate cowork session). Then Section 3–4 Needs-Nate items.
+- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy; DeLuca's: Nate installs + configures on client laptop (Section 4).
+- **Last updated:** 2026-07-15 (P6 settings/backup/first-run done — d0c88c3; STOP HERE reached)
 
 ---
 
@@ -48,6 +48,16 @@
 | V4 — `/about` visual pass | ✅ done — name text-xl, role accent, credential dot bullets, whyBcns centered; 965a5ab |
 | V5 — `/work` visual pass | ✅ done — both holding states promoted to bordered panels with icons; 953a7ab |
 
+### Part III — DeLuca's pizza app (dev-team-auto)
+| Item | Status | Notes |
+|------|--------|-------|
+| P1 — App scaffold: Electron + renderer/shell split | ✅ done [full] — Electron 29 + React+TS renderer, typed IPC bridge, mock bridge, import-boundary test, sandbox:true; dac99cc |
+| P2 — Data model + P&L core | ✅ done [full] — SQLite schema (WAL mode), typed migrations, pure P&L module, recurring materializer (transactional), IPC boundary hardened (2 Critical + 4 Important fixed); 15ab594 |
+| P3 — Ingestion framework + manual + drag-and-drop sources | ✅ done [full] — IngestionSource interface, runner (dedup+run report), manual/recurring/dragdrop sources, LLM module (mock bypass, 30s timeout, module-scope client), path containment, date validation; 70c2532 |
+| P4 — Email (IMAP) ingestion source | ✅ done [full] — imapflow (CJS, DI-mockable), 50-msg batch cap, 20MB attachment cap, vendor→category mapping, review queue (in-memory), startup-after-window, NaN port guard; a617a07 |
+| P5 — Dashboard (the product) | ✅ done [full] — two-tab dashboard (headline/chart/categories/strip/banners + add&fix tab), TransactionList edit/delete, MonthNav, RentRuleEditor, custom SVG chart; updateRecurringRule hardened; ed05659 |
+| P6 — Settings, backup, first-run | ✅ done [full] — Settings screen (IMAP/Anthropic/backup/vendor map), backup module (daily trigger, quit trigger, 30-file rotation, safe rotation order), EmptyState first-run, electron-builder (Mac DMG + Win NSIS unsigned, asarUnpack .node); d0c88c3 |
+
 Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 
 ---
@@ -62,6 +72,18 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-15** — ✅ **P6 settings/backup/first-run done** (full track, 1 build attempt + review/fix pass). Built Settings tab (IMAP/Anthropic key/backup folder/vendor mapping editor), backup module (daily trigger comparing ISO date strings, quit backup via before-quit, 30-file rotation, safe sequential rotation after copy), EmptyState first-run screen, electron-builder config (Mac DMG unsigned + Windows NSIS, asarUnpack .node). Mac DMG artifact produced at release/. Review found 1 Critical (settings:set no allowlist) + 2 Important (rotation ran before copy succeeded, triggerNow stale status). All fixed. 133 tests. Commit: d0c88c3. STOP HERE marker reached.
+
+- **2026-07-15** — ✅ **P5 dashboard done** (full track, 1 build attempt + review/fix pass). Built two-tab dashboard: Dashboard tab (HeadlineNumbers, ProfitBarChart custom SVG, CategoryBars, IngestionStrip, BannerList dismissible-but-returns) + Add & Fix tab (ManualEntryForm, DragDropZone, ReviewQueue, TransactionList inline edit/delete, RentRuleEditor). MonthNav prev/next. 6 new IPC channels. Review found 0 Critical / 3 Important (updateRecurringRule SQL injection via raw keys, getTransactionsForMonth inconsistent return type, BannerList dep array) / 2 Minor. All fixed. 113 tests. Commit: ed05659.
+
+- **2026-07-15** — ✅ **P4 IMAP ingestion done** (full track, 1 build attempt + review/fix pass). Built imapflow-based EmailSource with DI mock factory, 50-message batch cap, 20MB attachment byte cap, startup-after-window, vendor→category mapping, in-memory review queue. Review found 2 Critical + 3 Important. All fixed. 91 tests. Commit: a617a07.
+
+- **2026-07-15** — ✅ **P3 ingestion framework done** (full track, 1 build attempt + review/fix pass). Built IngestionSource interface, runner (dedup by source_ref, per-run report), manual/recurring/dragdrop sources, LLM extraction module (Anthropic SDK, mock bypass, 30s timeout, module-scope client), PDF→image via pdfjs-dist+@napi-rs/canvas. Review found 2 Critical (LLM timeout, file path containment) + 4 Important (date validation, PDF memory leak). All fixed. 68 tests passing. Commit: 70c2532.
+
+- **2026-07-15** — ✅ **P2 data model + P&L core done** (full track, 1 build attempt + review/fix pass). Built SQLite schema (5 tables, WAL mode), idempotent migration runner, typed query functions, pure-function P&L module (bucketing/compute/12-month series/summary sentences), idempotent recurring materializer. Review found 2 Critical (IPC input validation missing on db:query and insertTransaction) + 4 Important (unbounded query, non-atomic materializer, settings coercion, month format injection). All fixed. 43 tests passing. Commit: 15ab594.
+
+- **2026-07-15** — ✅ **P1 app scaffold done** (full track, 1 build attempt + 1 fix pass). Created `apps/delucas/` Electron 29 + React+TS renderer app: typed IPC bridge, mock bridge for browser dev, preload contextBridge, Vite config (port 3001), electron-vite config, import-boundary test. Review found 2 Important issues (sandbox:false, boundary scan missed bridge/ dir) + 3 Minor — fix agent resolved all. Build green across all 4 packages. Commit: dac99cc. Branch: feat/delucas-p1-scaffold.
 
 - **2026-07-15** — ✅ **C1 voice + content pass done** (light track, 2 attempts). Rewrote `apps/web/lib/content.ts` per the copy brief: zero em-dashes, zero buzzwords, ownership reframe ("Use it forever, free"), all pricing/turnaround/support/meta slots filled with resolved values (Standard build $2,000–$5,000, Advanced build $5,000–$15,000, AI consulting $800/day, 30-day tweaks + 1-year bug-fix support model). About section: builder-first bios, no fabricated portfolio, honest founding story in whyBcns. Reviews holding state updated to "No reviews yet. That changes with our first client." FK grade 4.4 (well under 8.0 threshold). B3 spot-check tests updated and passing. CONTENT.md mirrors registry 1:1. Build green. Commit: 419a05f.
 

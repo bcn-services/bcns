@@ -320,32 +320,32 @@ Tier naming rationale (do not surface on the site): the split is **how hard it i
 
 ## Section 1 — Architecture + function (dev-team-auto)
 
-### P1 — App scaffold: Electron + renderer/shell split · `status: todo` · `track: full`
+### P1 — App scaffold: Electron + renderer/shell split · `status: done` · `track: full`
 
 - **task:** Create `apps/delucas/` in the workspace: Electron main process (`src/shell-electron/`), React+TS renderer (`src/renderer/`, Vite dev server), typed IPC bridge (`src/bridge/` — one interface file defining every shell capability the renderer may call: db queries, ingestion trigger, file dialogs). Depends on `@bcns/ui`/`@bcns/config` via `workspace:*`. `pnpm dev` runs the renderer in a browser at localhost with a mock bridge; `pnpm dev:electron` runs the real shell. App README with taxonomy frontmatter (`type: workflow-app`, `delivery: local-electron`).
 - **done when:** renderer loads in a plain browser via `pnpm dev` with the mock bridge; Electron window opens via `pnpm dev:electron`; an import-boundary test proves `src/renderer/` imports nothing from `electron`/`node:*`; build green.
 
-### P2 — Data model + P&L core · `status: todo` · `track: full`
+### P2 — Data model + P&L core · `status: done` · `track: full`
 
 - **task:** SQLite schema (via `better-sqlite3`, migrations run on app start): `transactions` (id, date, amount_cents, direction: revenue|expense, category: food|beverage|utilities|rent|labor|other, vendor, source: email|dragdrop|manual|recurring, source_ref, created_at), `recurring_rules` (rent), `processed_emails` (message-id dedupe), `settings`. Pure-function P&L module: bucket transactions into calendar months; compute per-month revenue, expenses (total + by category), profit; 12-month series; plain-English summary sentence generator ("You made $X more than you spent in <month>"). Recurring materializer: rent rule → one transaction per month, idempotent.
 - **done when:** unit tests cover month bucketing (incl. year boundaries, timezone-safe date handling), P&L math with mixed transactions, category totals, recurring idempotency (running twice creates no duplicates), summary sentence for profit/loss/zero cases; schema migrates from empty; build green.
 
-### P3 — Ingestion framework + manual + drag-and-drop sources · `status: todo` · `track: full`
+### P3 — Ingestion framework + manual + drag-and-drop sources · `status: done` · `track: full`
 
 - **task:** Define `IngestionSource` interface + `NormalizedTransaction` type; ingestion runner that executes sources, dedupes (by source_ref), writes transactions, and records a per-run report (found/imported/failed) for the UI. Implement: **manual-entry source** (renderer form: direction, date, amount, category, vendor — big inputs, no jargon); **recurring source** (rent, from P2); **drag-and-drop source** (drop zone accepts PDF → pdf-to-image → LLM extraction module → prefilled confirm card the user approves/edits before save; on LLM failure, same card with empty amount for manual fill). LLM extraction module: one function, Anthropic API via stable alias, strict JSON schema out `{is_invoice, vendor, date, amount, confidence}`; fully mockable.
 - **done when:** unit tests: runner dedupe (same source_ref twice → one transaction), each source normalizes to identical `NormalizedTransaction` shape, LLM module returns parsed fixture JSON and surfaces malformed-response errors; behavioral check on dev server: manual entry creates a transaction that appears in the dashboard; drag-and-drop with a fixture PDF + mocked LLM shows the confirm card and saves on approve; build green.
 
-### P4 — Email (IMAP) ingestion source · `status: todo` · `track: full`
+### P4 — Email (IMAP) ingestion source · `status: done` · `track: full`
 
 - **task:** IMAP source using `imapflow`: on app open (and via a "Check now" button), connect with host/user/app-password from settings, find emails with PDF attachments not in `processed_emails`, run each through the P3 LLM extraction; `is_invoice: true` + confidence high → import with vendor/category mapping (vendor string → category via a small editable mapping table, default `other`); low confidence → queue as a review card (same confirm card as P3). Record message-ids processed regardless of outcome. Failure handling per the fallback chain: connection/auth failure sets a status the UI renders as the plain-English banner; never crashes; drag-and-drop unaffected.
 - **done when:** tests against a mocked IMAP server/fixtures: new invoice email → transaction imported once (re-run imports nothing); non-invoice PDF (fixture menu) → classified out, no transaction; low-confidence → lands in review queue; auth failure → status flag set, no crash; vendor→category mapping applied; build green.
 
-### P5 — Dashboard (the product) · `status: todo` · `track: full`
+### P5 — Dashboard (the product) · `status: done` · `track: full`
 
 - **task:** Main screen, monthly grain: (1) headline — current month Revenue / Expenses / Profit as three large figures, profit green/red, plain-English sentence beneath (from P2); (2) 12-month profit bar chart; (3) current-month expense breakdown by category (bars, not pie); (4) "Since you last opened" strip listing newly imported items from the last ingestion run report ("3 new invoices: Napoli $840 …"); (5) any active failure banners (email/LLM status from P4) — one line, plain English, dismissible-but-returns-while-broken. Second tab **"Add & fix"**: manual entry form, drag-and-drop zone, review queue, transaction list for the current month with edit/delete, rent rule editor. Month navigation (prev/next). Plain functional styling only.
 - **done when:** behavioral checks on dev server with seeded fixture data: headline numbers equal P2-computed values for the seeded month; sentence matches profit sign; 12 bars render with correct values; category bars match seeded totals; newly-imported strip reflects a simulated ingestion run; editing a transaction updates the headline; banner renders when email status is failed; build green.
 
-### P6 — Settings, backup, first-run · `status: todo` · `track: full`
+### P6 — Settings, backup, first-run · `status: done` · `track: full`
 
 - **task:** Settings screen (intended for Nate at handoff, not the client): email host/user/app-password, Anthropic key, backup folder path, vendor→category mapping editor. Backup: on app quit and once per calendar day on open, copy the SQLite file to `<backup folder>/delucas-backup-<date>.db`, keep last 30, surface last-backup date subtly on the dashboard; backup failure → the standard banner. First-run: empty-state dashboard with a friendly "no data yet" state (no crash on zero transactions). electron-builder config for Mac `.dmg` + Windows NSIS (unsigned).
 - **done when:** unit tests: backup rotation keeps 30, daily-on-open triggers at most once per day, settings round-trip persist; behavioral: empty DB renders the empty state, settings edits persist across renderer reload; `pnpm package` (or equivalent) produces both installers locally; build green.

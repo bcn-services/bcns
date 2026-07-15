@@ -1,5 +1,47 @@
 # Dev-team memory log
 
+## 2026-07-15 — dev-team-auto — P6 Settings, backup, first-run
+- **Outcome:** DONE — 1 build attempt + review/fix pass (full track, branch feat/delucas-p1-scaffold, commit d0c88c3)
+- **What happened:** Engineer built Settings tab, backup module, EmptyState, electron-builder config (Mac DMG produced). QA PASS 133/133. Review found 1 Critical (settings:set no key allowlist) + 2 Important (rotation before copy succeeded, triggerNow stale status). Fix agent resolved all in one pass.
+- **What worked:** `asarUnpack: ["**/*.node"]` is the correct electron-builder config for native addons like better-sqlite3. Safe rotation order (rotate AFTER copy succeeds, never before) is the right pattern for any backup rotation logic.
+- **What failed:** settings:set lacked an allowlist — same input-validation gap pattern as every prior IPC handler. LESSON: every IPC handler that accepts a key/value pair needs an explicit ALLOWED_KEYS set. Engineer should build this in from the start, not wait for review.
+- **Remember next run:** P1–P6 ALL DONE. STOP HERE marker reached. Next steps: (1) layout-loop visual pass for bcns website on overnight-combined; (2) layout-loop DeLuca's visual pass on a separate cowork branch; (3) Needs-Nate Section 3–4 items (client laptop handoff). better-sqlite3 needs electron-rebuild for the Electron ABI before packaging — done automatically by electron-builder during `pnpm package` but unit tests need system Node rebuild afterward.
+
+## 2026-07-15 — dev-team-auto — P5 Dashboard (the product)
+- **Outcome:** DONE — 1 build attempt + review/fix pass (full track, branch feat/delucas-p1-scaffold, commit ed05659)
+- **What happened:** Engineer built full dashboard: two-tab shell (Dashboard | Add & fix), HeadlineNumbers, ProfitBarChart (custom SVG), CategoryBars, BannerList, TransactionList (inline edit/delete), MonthNav, RentRuleEditor. QA PASS 23/23. Review found 0 Critical / 3 Important (updateRecurringRule SQL injection gap via raw keys, getTransactionsForMonth {ok,error} inconsistency, BannerList dep array) / 2 Minor. Fix pass running.
+- **What worked:** Pure-function P&L hooks testable without browser — all 23 behavioral checks ran as Node.js unit tests. Custom SVG chart avoids recharts dependency.
+- **What failed:** Engineer left one IPC handler (updateRecurringRule) without field allowlist — same recurring IPC injection gap pattern as P2/P3/P4. Pattern: every new IPC handler that accepts `updates: Record<string, unknown>` needs an explicit allowlist before queries.ts.
+- **Remember next run:** P6 (settings/backup/first-run) needs to: (1) add Settings page reading/writing settings table (already has IPC handlers from P2); (2) backup module in src/shell-electron/backup.ts — copies SQLite file, rotates to 30, fires on quit via app.on('before-quit') and once per day on open; (3) electron-builder config for Mac dmg + Windows NSIS (unsigned); (4) first-run empty state — Dashboard shows "no data yet" when all P&L values are 0.
+
+## 2026-07-15 — dev-team-auto — P4 Email (IMAP) ingestion source
+- **Outcome:** DONE — 1 build attempt + review/fix pass (full track, branch feat/delucas-p1-scaffold, commit a617a07)
+- **What happened:** Engineer built EmailSource using imapflow with DI mock factory. QA PASS. Review found 2 Critical (no attachment byte cap → OOM, unbounded fetchAll → UI freeze on full mailbox) + 3 Important (NaN port, startup IMAP before window open, missing in-memory state docs). Fix agent resolved all.
+- **What worked:** DI factory pattern (`imapFactory` param) cleanly separates real imapflow from test fixtures. 50-message batch cap + 20MB attachment cap are the right safety envelope for a pizza business inbox.
+- **What failed:** Engineer omitted OOM protection on attachment downloads and didn't cap the fetchAll range. The startup-before-window ordering bug is easy to miss when code is sequential.
+- **Remember next run:** imapflow IS CJS (not ESM — team memory was wrong). `require('imapflow')` works directly, no dynamic import needed. P5 IPC channels for ingestion/email-status all wired and working.
+
+## 2026-07-15 — dev-team-auto — P3 Ingestion framework + manual + drag-and-drop sources
+- **Outcome:** DONE — 1 build attempt + review/fix pass (full track, branch feat/delucas-p1-scaffold, commit 70c2532)
+- **What happened:** Engineer built full ingestion stack: IngestionSource interface, runner, 3 sources, LLM module, PDF pipeline, renderer components, 5 IPC channels, 62 initial tests. QA exported validateLLMResult and added 6 malformed-response tests (68 total). Review found 2 Critical + 4 Important. Fix agent resolved all in one pass.
+- **What worked:** LLM `mock?` parameter pattern is clean and QA-safe. pdfjs-dist + @napi-rs/canvas works without build toolchain (pre-built ARM64 binaries). Home-dir path containment (`startsWith(app.getPath("home") + sep)`) is the right file access policy for Electron apps.
+- **What failed:** Engineer omitted LLM timeout, PDF document cleanup, and date format validation on IPC boundary. Same recurring IPC validation gap.
+- **Remember next run:** P4 (IMAP) uses imapflow CJS. The `processed_emails` table is already in schema. LLM module from P3 is already wired; P4 feeds emails through the same pipeline.
+
+## 2026-07-15 — dev-team-auto — P2 Data model + P&L core
+- **Outcome:** DONE — 1 build attempt + review/fix pass (full track, branch feat/delucas-p1-scaffold, commit 15ab594)
+- **What happened:** Engineer built SQLite schema (5 tables, WAL mode), idempotent migration runner, pure-function P&L module, recurring materializer. 43 tests passed QA. Review found 2 Critical + 4 Important IPC boundary issues. Fix agent resolved all in one pass.
+- **What worked:** Pure-function P&L in src/shared/pnl.ts is fully headlessly testable. Date-as-string YYYY-MM-DD + string slice for month bucketing is TZ-safe. day_of_month constrained to 1–28 to handle Feb.
+- **What failed:** Engineer missed IPC input validation on all handlers — renderer-supplied data reached SQLite unchecked. Systematic pattern: Electron IPC handlers must validate all inputs.
+- **Remember next run:** P3 needs LLM module in src/shell-electron/. IPC bridge already has dialog:openFile for drag-and-drop. db:insertTransaction validates and returns {ok, error} — ingestion runner should check ok.
+
+## 2026-07-15 — dev-team-auto — P1 App scaffold: Electron + renderer/shell split
+- **Outcome:** DONE — 1 build attempt + review/fix pass (full track, branch feat/delucas-p1-scaffold, commit dac99cc)
+- **What happened:** Engineer created apps/delucas/ from scratch: Electron 29, React+TS renderer (port 3001), typed IPC bridge, mockBridge, preload contextBridge, electron-vite config, import-boundary test. QA PASS on first build. Review found 2 Important + 3 Minor. Fix agent resolved all in one pass.
+- **What worked:** analyze agent correctly flagged Electron 29 (node 20) requirement. Import-boundary test as pure Node ESM static-analysis script (no test framework) was fast and CI-safe.
+- **What failed:** Engineer left sandbox:false in webPreferences (review caught it). Import boundary scan covered only src/renderer/ — missed src/bridge/ (review caught it).
+- **Remember next run:** apps/delucas/ on branch feat/delucas-p1-scaffold. better-sqlite3 and imapflow are NOT installed yet — P2 adds better-sqlite3, P4 adds imapflow. IPC bridge in src/bridge/BridgeInterface.ts already defines db, ingestion, dialog, settings stubs.
+
 ## 2026-07-15 — dev-team-auto — C1 Voice + content pass
 - **Outcome:** DONE — 2 attempts (light track, branch worktree-agent-afb098493a86a56c1, commit 419a05f)
 - **What happened:** Rewrote content.ts for voice/copy pass. Engineer missed the second `$` inside en-dash price ranges ("$2,000–5,000" instead of "$2,000–$5,000"). QA caught it on first pass. Bug Fixer patched in one step. QA re-gate PASS. FK readability grade 4.4 (threshold 8.0). Readability check script committed at apps/web/scripts/readability-check.py.
