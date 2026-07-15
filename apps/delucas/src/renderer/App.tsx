@@ -40,8 +40,8 @@ export default function App(): React.JSX.Element {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* App header */}
-      <header className="border-b border-border px-6 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-foreground">DeLuca&apos;s</h1>
+      <header className="border-b border-border px-6 py-3 flex items-center justify-between bg-card">
+        <h1 className="text-lg font-bold text-primary tracking-tight">DeLuca&apos;s</h1>
         <nav className="flex" role="tablist" aria-label="Main navigation">
           <TabButton
             label="Dashboard"

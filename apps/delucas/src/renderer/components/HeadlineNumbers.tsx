@@ -33,14 +33,28 @@ function formatCents(cents: number): string {
 interface StatCardProps {
   label: string;
   value: string;
+  /** When true, this card is visually dominant — larger type, accent-tinted background */
+  dominant?: boolean;
   colorClass?: string;
 }
 
-function StatCard({ label, value, colorClass = "text-foreground" }: StatCardProps): React.JSX.Element {
+function StatCard({ label, value, dominant = false, colorClass }: StatCardProps): React.JSX.Element {
+  if (dominant) {
+    return (
+      <div className="flex-1 rounded-xl bg-card border border-border shadow-sm px-6 py-5 flex flex-col gap-1 ring-1 ring-border/60">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
+        <p className={`text-5xl font-extrabold tabular-nums leading-none mt-1 ${colorClass ?? "text-foreground"}`}>
+          {value}
+        </p>
+      </div>
+    );
+  }
   return (
-    <div className="flex-1 border border-border rounded-lg p-4">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-3xl font-bold tabular-nums ${colorClass}`}>{value}</p>
+    <div className="flex-1 rounded-xl bg-card border border-border shadow-sm px-5 py-4 flex flex-col gap-1">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
+      <p className={`text-4xl font-bold tabular-nums leading-none mt-1 ${colorClass ?? "text-foreground"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -48,15 +62,13 @@ function StatCard({ label, value, colorClass = "text-foreground" }: StatCardProp
 export function HeadlineNumbers({ pnl, summary, loading, transactionCount }: HeadlineNumbersProps): React.JSX.Element {
   if (loading || pnl === null) {
     return (
-      <div className="space-y-3">
-        <div className="flex gap-4">
-          {["Revenue", "Expenses", "Profit"].map((label) => (
-            <div key={label} className="flex-1 border border-border rounded-lg p-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-              <p className="text-3xl font-bold text-muted-foreground/40">—</p>
-            </div>
-          ))}
-        </div>
+      <div className="flex gap-3">
+        {["Money in", "Spent", "Profit"].map((label) => (
+          <div key={label} className="flex-1 rounded-xl bg-card border border-border shadow-sm px-5 py-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
+            <p className="text-4xl font-bold text-muted-foreground/30 mt-1">—</p>
+          </div>
+        ))}
       </div>
     );
   }
@@ -74,20 +86,24 @@ export function HeadlineNumbers({ pnl, summary, loading, transactionCount }: Hea
 
   const profitColor =
     pnl.profit_cents > 0
-      ? "text-green-600 dark:text-green-400"
+      ? "text-green-700"
       : pnl.profit_cents < 0
-      ? "text-red-600 dark:text-red-400"
+      ? "text-red-700"
       : "text-foreground";
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-4">
-        <StatCard label="Revenue" value={formatCents(pnl.revenue_cents)} />
-        <StatCard label="Expenses" value={formatCents(pnl.expense_cents)} />
+      <div className="flex gap-3">
+        {/* Money in — left */}
+        <StatCard label="Money in" value={formatCents(pnl.revenue_cents)} />
+        {/* Spent — center */}
+        <StatCard label="Spent" value={formatCents(pnl.expense_cents)} />
+        {/* Profit — dominant, right — the number that matters most */}
         <StatCard
           label="Profit"
-          value={(pnl.profit_cents < 0 ? "-" : "") + formatCents(pnl.profit_cents)}
+          value={(pnl.profit_cents < 0 ? "−" : "") + formatCents(pnl.profit_cents)}
           colorClass={profitColor}
+          dominant
         />
       </div>
       {summary !== "" && (
