@@ -23,6 +23,12 @@ import {
 import { materializeRecurring } from "./recurring";
 import { compute12MonthSeries, computeMonthPnl, generateSummary } from "../shared/pnl";
 import type { NewTransaction } from "../shared/types";
+import { ManualSource } from "./ingestion/sources/manual";
+import { RecurringSource } from "./ingestion/sources/recurring";
+import { DragDropSource } from "./ingestion/sources/dragdrop";
+import { runSources, getLastRunReport } from "./ingestion/runner";
+import { extractFromPdfImage } from "./ingestion/llm";
+import { pdfFirstPageToBase64 } from "./ingestion/pdf";
 
 // ---------------------------------------------------------------------------
 // Database setup
@@ -67,6 +73,14 @@ function createWindow(): BrowserWindow {
 // ---------------------------------------------------------------------------
 // IPC handlers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Ingestion source instances (one per app lifetime; single-shot sources reset
+// themselves after pull())
+// ---------------------------------------------------------------------------
+
+const manualSource = new ManualSource();
+const dragDropSource = new DragDropSource();
 
 function registerIpcHandlers(db: Database.Database): void {
   // ------------------------------------------------------------------
@@ -236,10 +250,98 @@ function registerIpcHandlers(db: Database.Database): void {
   });
 
   // ------------------------------------------------------------------
-  // ingestion — stub (implemented in P3/P4)
+  // ingestion — P3 implementation
   // ------------------------------------------------------------------
+
+  // Legacy stub (kept for back-compat with any existing callers)
   ipcMain.handle("ingestion:triggerPoll", async () => {
     return;
+  });
+
+  // Run all sources: recurring (current month) + any staged manual/dragdrop entries
+  ipcMain.handle("ingestion:runSources", async () => {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
+    const recurringSource = new RecurringSource(db, currentMonth);
+    try {
+      return await runSources(db, [recurringSource, manualSource, dragDropSource]);
+    } catch (err) {
+      console.error("[main] ingestion:runSources failed", err);
+      throw err;
+    }
+  });
+
+  // Submit a manual transaction: stage it and run immediately
+  ipcMain.handle("ingestion:submitManual", async (_event, tx: NewTransaction) => {
+    // Validate at IPC boundary
+    const VALID_DIRECTIONS = new Set(["revenue", "expense"]);
+    const VALID_CATEGORIES = new Set(["food", "beverage", "utilities", "rent", "labor", "other"]);
+    if (
+      typeof tx !== "object" ||
+      tx === null ||
+      typeof tx.date !== "string" ||
+      typeof tx.vendor !== "string" ||
+      !Number.isInteger(tx.amount_cents) ||
+      tx.amount_cents <= 0 ||
+      !VALID_DIRECTIONS.has(tx.direction) ||
+      !VALID_CATEGORIES.has(tx.category)
+    ) {
+      throw new Error("ingestion:submitManual: invalid transaction fields");
+    }
+    manualSource.stage(tx);
+    try {
+      return await runSources(db, [manualSource]);
+    } catch (err) {
+      console.error("[main] ingestion:submitManual failed", err);
+      throw err;
+    }
+  });
+
+  // Return the last ingestion run report (in-memory, survives until next run)
+  ipcMain.handle("ingestion:getLastRunReport", () => {
+    return getLastRunReport();
+  });
+
+  // Process a PDF: pdf→image→LLM extraction, return structured result to renderer
+  ipcMain.handle("ingestion:processPdf", async (_event, filePath: string) => {
+    if (typeof filePath !== "string" || filePath.length === 0) {
+      throw new Error("ingestion:processPdf: filePath must be a non-empty string");
+    }
+    try {
+      const base64Image = await pdfFirstPageToBase64(filePath);
+      return await extractFromPdfImage(base64Image);
+    } catch (err) {
+      console.error("[main] ingestion:processPdf failed", err);
+      throw err;
+    }
+  });
+
+  // Confirm and save an LLM-extracted + user-reviewed transaction
+  ipcMain.handle("ingestion:confirmImport", async (_event, tx: NewTransaction) => {
+    // Validate at IPC boundary
+    const VALID_DIRECTIONS = new Set(["revenue", "expense"]);
+    const VALID_CATEGORIES = new Set(["food", "beverage", "utilities", "rent", "labor", "other"]);
+    const VALID_SOURCES = new Set(["email", "dragdrop", "manual", "recurring"]);
+    if (
+      typeof tx !== "object" ||
+      tx === null ||
+      typeof tx.date !== "string" ||
+      typeof tx.vendor !== "string" ||
+      !Number.isInteger(tx.amount_cents) ||
+      tx.amount_cents <= 0 ||
+      !VALID_DIRECTIONS.has(tx.direction) ||
+      !VALID_CATEGORIES.has(tx.category) ||
+      !VALID_SOURCES.has(tx.source)
+    ) {
+      throw new Error("ingestion:confirmImport: invalid transaction fields");
+    }
+    dragDropSource.stage(tx);
+    try {
+      return await runSources(db, [dragDropSource]);
+    } catch (err) {
+      console.error("[main] ingestion:confirmImport failed", err);
+      throw err;
+    }
   });
 
   // ------------------------------------------------------------------

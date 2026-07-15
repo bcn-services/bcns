@@ -8,7 +8,7 @@
  * plain browser context.
  */
 
-import type { BridgeAPI, DialogOptions } from "./BridgeInterface";
+import type { BridgeAPI, DialogOptions, IngestionRunReportBridge, LLMExtractResultBridge } from "./BridgeInterface";
 import type { NewTransaction, MonthPnl } from "../shared/types";
 
 const EMPTY_PNL: MonthPnl = {
@@ -85,6 +85,37 @@ export const mockBridge: BridgeAPI = {
   ingestion: {
     triggerPoll: async (): Promise<void> => {
       console.warn("[mockBridge] ingestion.triggerPoll called — no-op in browser mode");
+    },
+
+    runSources: async (): Promise<IngestionRunReportBridge> => {
+      console.warn("[mockBridge] ingestion.runSources — returning empty report");
+      return { found: 0, imported: 0, failed: 0, ran_at: new Date().toISOString() };
+    },
+
+    submitManual: async (_tx: NewTransaction): Promise<IngestionRunReportBridge> => {
+      console.warn("[mockBridge] ingestion.submitManual — no-op in browser mode");
+      return { found: 1, imported: 1, failed: 0, ran_at: new Date().toISOString() };
+    },
+
+    getLastRunReport: async (): Promise<IngestionRunReportBridge | null> => {
+      console.warn("[mockBridge] ingestion.getLastRunReport — returning null");
+      return null;
+    },
+
+    processPdf: async (_filePath: string): Promise<LLMExtractResultBridge> => {
+      console.warn("[mockBridge] ingestion.processPdf — returning mock extract result");
+      return {
+        is_invoice: true,
+        vendor: "Mock Vendor Co.",
+        date: new Date().toISOString().slice(0, 10),
+        amount: 5000,
+        confidence: "high",
+      };
+    },
+
+    confirmImport: async (_tx: NewTransaction): Promise<IngestionRunReportBridge> => {
+      console.warn("[mockBridge] ingestion.confirmImport — no-op in browser mode");
+      return { found: 1, imported: 1, failed: 0, ran_at: new Date().toISOString() };
     },
   },
 

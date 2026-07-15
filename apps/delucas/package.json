@@ -9,16 +9,19 @@
     "build": "electron-vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
-    "test": "node tests/import-boundary.test.mjs && tsx tests/pnl.test.mjs && tsx tests/db.test.mjs",
+    "test": "node tests/import-boundary.test.mjs && tsx tests/pnl.test.mjs && tsx tests/db.test.mjs && tsx tests/ingestion.test.mjs",
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@bcns/ui": "workspace:*",
+    "@napi-rs/canvas": "^1.0.2",
     "better-sqlite3": "^9.6.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "electron": "^29.4.6",
     "lucide-react": "^0.454.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.4"

@@ -9,7 +9,7 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
-import type { BridgeAPI, DialogOptions } from "./BridgeInterface";
+import type { BridgeAPI, DialogOptions, IngestionRunReportBridge, LLMExtractResultBridge } from "./BridgeInterface";
 import type { NewTransaction } from "../shared/types";
 
 const bridge: BridgeAPI = {
@@ -49,7 +49,23 @@ const bridge: BridgeAPI = {
   },
 
   ingestion: {
-    triggerPoll: (): Promise<void> => ipcRenderer.invoke("ingestion:triggerPoll"),
+    triggerPoll: (): Promise<void> =>
+      ipcRenderer.invoke("ingestion:triggerPoll"),
+
+    runSources: (): Promise<IngestionRunReportBridge> =>
+      ipcRenderer.invoke("ingestion:runSources"),
+
+    submitManual: (tx: NewTransaction): Promise<IngestionRunReportBridge> =>
+      ipcRenderer.invoke("ingestion:submitManual", tx),
+
+    getLastRunReport: (): Promise<IngestionRunReportBridge | null> =>
+      ipcRenderer.invoke("ingestion:getLastRunReport"),
+
+    processPdf: (filePath: string): Promise<LLMExtractResultBridge> =>
+      ipcRenderer.invoke("ingestion:processPdf", filePath),
+
+    confirmImport: (tx: NewTransaction): Promise<IngestionRunReportBridge> =>
+      ipcRenderer.invoke("ingestion:confirmImport", tx),
   },
 
   dialog: {

@@ -41,3 +41,53 @@
 - `materializeRecurring` on every startup: O(rules × months) but trivially fast for <100 rules; no pagination needed at this scale
 - `db:query` SELECT-only guard is a string prefix check (`trimStart().toUpperCase().startsWith("SELECT")`) — acceptable for a single-user local app, but not SQL injection-proof for adversarial input; satisfactory given renderer sandbox + no network exposure
 - `getTransactions` returns all rows with no pagination: will grow unbounded; QA/P5 should add a date-range param before the 12-month series call loads full history
+
+---
+
+# Engineer Report — P3
+**Task:** P3 — Ingestion framework, manual/recurring/drag-and-drop sources, LLM extraction
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+
+## Design Decisions
+- `NormalizedTransaction = NewTransaction` alias — same shape, no duplication; `IngestionSource` and `IngestionRunReport` live in `src/shell-electron/ingestion/types.ts` (not shared, since they belong to main-process context)
+- Runner holds last-run report in module-level memory (not SQLite) — simple, sufficient for single-window desktop app; loses state on restart (acceptable, UI shows "no data yet")
+- `ManualSource` and `DragDropSource` are single-shot singletons: `stage(tx)` then next `pull()` yields and clears; safe because IPC is sequential and one transaction at a time
+- `RecurringSource` returns `[]` — `materializeRecurring` is idempotent and owns its writes; returning those rows would risk double-counting in `found/imported` stats
+- `null source_ref` on manual entries intentionally skips dedup — each manual submission is explicit user intent, not a dedup-able document
+- PDF-to-image: `pdfjs-dist` (ESM v4) + `@napi-rs/canvas` (ships ARM64 macOS prebuilts, no pkg-config) — rejected `canvas@2.11.2` (requires pixman/Cairo native build, fails without pkg-config on dev machine)
+- LLM: `@anthropic-ai/sdk` with `claude-3-5-sonnet-latest`, strict JSON validation in `validateLLMResult()`, mock bypass via `mock?` param — zero live API in tests
+- Bridge mirror types (`LLMExtractResultBridge`, `IngestionRunReportBridge`) in `BridgeInterface.ts` — duplicate of main-process types but import-safe for renderer (no node:* deps)
+- IPC validation: all ingestion handlers validate at the boundary consistent with existing `db:insertTransaction` pattern
+
+## Files Changed
+- `src/shell-electron/ingestion/types.ts` — `NormalizedTransaction`, `IngestionSource`, `IngestionRunReport` types
+- `src/shell-electron/ingestion/runner.ts` — source executor, dedup by source_ref, in-memory last-run report
+- `src/shell-electron/ingestion/sources/manual.ts` — single-shot manual entry source
+- `src/shell-electron/ingestion/sources/recurring.ts` — wraps `materializeRecurring()` as IngestionSource
+- `src/shell-electron/ingestion/sources/dragdrop.ts` — single-shot drag-and-drop source
+- `src/shell-electron/ingestion/llm.ts` — Anthropic SDK extraction, `LLMExtractResult`, strict JSON validation, mock bypass
+- `src/shell-electron/ingestion/pdf.ts` — PDF-first-page-to-base64 via pdfjs-dist + @napi-rs/canvas
+- `src/shell-electron/db/queries.ts` — added `getTransactionBySourceRef(db, sourceRef)` for runner dedup
+- `src/shell-electron/main.ts` — singleton source instances; 5 new IPC handlers; all ingestion imports
+- `src/bridge/BridgeInterface.ts` — added bridge mirror types; expanded `ingestion` namespace with 5 new methods
+- `src/bridge/preload.ts` — wired 5 new ingestion methods via `ipcRenderer.invoke`
+- `src/bridge/mockBridge.ts` — mock stubs for 5 new ingestion methods
+- `src/renderer/components/ManualEntryForm.tsx` — plain-English entry form with direction toggle, date, amount, vendor, category
+- `src/renderer/components/ConfirmCard.tsx` — editable LLM-result review card with approve/reject
+- `src/renderer/components/DragDropZone.tsx` — drop zone + browse; calls processPdf; shows ConfirmCard; falls back on LLM error
+- `src/renderer/components/IngestionStrip.tsx` — "Since last sync" status strip, fetches getLastRunReport on mount
+- `package.json` — added `@anthropic-ai/sdk`, `@napi-rs/canvas`, `pdfjs-dist`; updated test script
+- `tests/ingestion.test.mjs` — 19 unit tests: runner dedup, source normalization, LLM mock/null/bypass
+
+## Deferred / Out of Scope
+- Renderer components not wired to App.tsx routing — P5 will compose the dashboard
+- `IngestionStrip` will be placed in P5 dashboard header
+- PDF pipeline integration-tested via Electron dev mode only; no fixture PDF in tests (avoids real client docs)
+- LLM malformed-JSON path not unit-tested via real SDK response — mock bypass is the test seam; testing the real path requires either a live API call or deeply mocked SDK internals
+
+## Flags for Reviewer
+- `pdfFirstPageToBase64` uses `import("pdfjs-dist")` dynamic ESM — verify electron-vite's main bundle handles this correctly or add it to `external` in `electron-vite.config.ts`
+- `@napi-rs/canvas` is a native addon — must be in `external` list for electron-vite main build to avoid bundling failure
+- `ingestion:runSources` computes `currentMonth` at call time — will lag at month rollover if app runs for many days; consider computing in `app.whenReady` and updating on a daily timer
+- Runner `found` count excludes recurring transactions (RecurringSource returns `[]`) — IngestionStrip will show `found=0` for recurring-only runs; consider a note in the strip label

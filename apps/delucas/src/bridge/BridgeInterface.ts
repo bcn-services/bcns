@@ -17,6 +17,29 @@ import type {
 
 export type { Transaction, NewTransaction, RecurringRule, MonthPnl };
 
+// ---------------------------------------------------------------------------
+// Ingestion types exposed through the bridge
+// (mirrors LLMExtractResult in shell-electron/ingestion/llm.ts — must be
+//  importable by the renderer without any node:* deps)
+// ---------------------------------------------------------------------------
+
+export interface LLMExtractResultBridge {
+  is_invoice: boolean;
+  vendor: string | null;
+  /** YYYY-MM-DD or null */
+  date: string | null;
+  /** Amount in cents (integer) or null */
+  amount: number | null;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface IngestionRunReportBridge {
+  found: number;
+  imported: number;
+  failed: number;
+  ran_at: string;
+}
+
 export interface DialogOptions {
   filters?: Array<{ name: string; extensions: string[] }>;
 }
@@ -43,9 +66,26 @@ export interface BridgeAPI {
     markEmailProcessed: (messageId: string) => Promise<void>;
   };
 
-  /** Email ingestion — implemented in P3/P4 */
+  /** Ingestion — P3 */
   ingestion: {
+    /** Legacy stub — kept for back-compat */
     triggerPoll: () => Promise<void>;
+    /** Run all ingestion sources (recurring + any staged manual/dragdrop) */
+    runSources: () => Promise<IngestionRunReportBridge>;
+    /** Submit a manually entered transaction */
+    submitManual: (tx: NewTransaction) => Promise<IngestionRunReportBridge>;
+    /** Return the last run report (null if no run yet) */
+    getLastRunReport: () => Promise<IngestionRunReportBridge | null>;
+    /**
+     * Process a PDF file: pdf→image→LLM extraction.
+     * Returns the extracted invoice data or throws on failure.
+     */
+    processPdf: (filePath: string) => Promise<LLMExtractResultBridge>;
+    /**
+     * Confirm and save an extracted transaction.
+     * `tx` is the user-edited version of what LLM extracted.
+     */
+    confirmImport: (tx: NewTransaction) => Promise<IngestionRunReportBridge>;
   };
 
   /** Native file dialogs */

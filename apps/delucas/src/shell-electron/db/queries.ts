@@ -52,6 +52,17 @@ export function getTransactionsInRange(
     .all(from, to);
 }
 
+export function getTransactionBySourceRef(
+  db: Database.Database,
+  sourceRef: string
+): Transaction | undefined {
+  return db
+    .prepare<[string], Transaction>(
+      "SELECT * FROM transactions WHERE source_ref = ? LIMIT 1"
+    )
+    .get(sourceRef);
+}
+
 export function insertTransaction(
   db: Database.Database,
   tx: NewTransaction
