@@ -1,12 +1,12 @@
 /**
- * Typed content registry — single source of truth for all section copy.
+ * Typed content registry. Single source of truth for all section copy.
  *
  * Rules:
- * - Strings with "[INPUT: …]" are real copy — Nate fills them; they render as-is.
+ * - Strings with "[INPUT: ...]" are real copy. Nate fills them; they render as-is.
  * - Icons stay in component files, mapped by array index.
  * - siteConfig (site.ts) remains the source for name / domain / email.
  * - problemSolution and deliveryModels interfaces are kept for type safety but
- *   their registry entries are removed — those sections are cut from all pages.
+ *   their registry entries are removed. Those sections are cut from all pages.
  */
 
 // ---------------------------------------------------------------------------
@@ -185,12 +185,12 @@ export const siteContent: SiteContent = {
     badge: "Custom software for local businesses",
     headline: "Software built around how your business already works",
     subheadline:
-      "Off-the-shelf tools make you change your process. We build tools that fit it — scoped, quoted, and delivered.",
+      "Off-the-shelf tools make you change your process. We build tools that fit it. Scoped, quoted, and delivered.",
     ctaPrimary: "Book a free consult",
     ctaSecondary: "See what we build",
     proofPoints: [
       "Fixed quote before work starts",
-      "You own everything we build",
+      "Use it forever, free",
       "Free 30-minute consult",
     ],
   },
@@ -216,7 +216,7 @@ export const siteContent: SiteContent = {
         step: "03",
         title: "Build & handoff",
         description:
-          "We build it, walk your team through it, and include [INPUT: support window] of fixes. You own the result.",
+          "We build it, walk your team through it, then give you 30 days to use it and tell us what needs fixing or tweaking. We handle those, no questions asked.",
       },
     ],
   },
@@ -225,13 +225,13 @@ export const siteContent: SiteContent = {
     eyebrow: "What we build",
     title: "Tools shaped to your business, not the other way around",
     description:
-      "Four kinds of problems we solve most — if yours isn't here, ask anyway.",
+      "Four kinds of problems we solve most. If yours isn't here, ask anyway.",
     items: [
       {
         tag: "Bookings",
         title: "Scheduling & booking systems",
         description:
-          "Take appointments the way you already do — deposits, reminders, and a calendar that matches your real workflow.",
+          "Take appointments the way you already do, with deposits, reminders, and a calendar that matches your real workflow.",
       },
       {
         tag: "Operations",
@@ -243,7 +243,7 @@ export const siteContent: SiteContent = {
         tag: "Insight",
         title: "Dashboards & reporting",
         description:
-          "One screen that shows how the business is doing — sales, costs, trends — without exporting anything.",
+          "One screen that shows how the business is doing. Sales, costs, trends. No exporting anything.",
       },
       {
         tag: "AI",
@@ -258,7 +258,7 @@ export const siteContent: SiteContent = {
     eyebrow: "Get in touch",
     title: "Tell us what's slowing you down",
     description:
-      "Send a few sentences about your business and the problem. We'll reply within [INPUT: response-time promise] with next steps — and honest advice, even if that advice is \"you don't need custom software.\"",
+      "Send a few sentences about your business and the problem. We'll reply within one business day with next steps, and honest advice, even if that advice is you don't need custom software.",
     highlights: [
       {
         title: "Free consult",
@@ -270,9 +270,9 @@ export const siteContent: SiteContent = {
         description: "You approve the exact price before any work starts.",
       },
       {
-        title: "You own it",
+        title: "Yours to use",
         description:
-          "Code, accounts, and data are yours, working with us or not.",
+          "Your data and accounts stay yours. It keeps running whether we work together or not.",
       },
     ],
   },
@@ -284,7 +284,7 @@ export const siteContent: SiteContent = {
     items: [],
     holdingState: {
       title: "Our first builds are in progress",
-      body: "We're building for our first clients right now. Case studies land here as projects wrap — each covering the problem, what we built, and what changed.",
+      body: "We're building for our first clients right now. Case studies land here as projects wrap. Each one covers the problem, what we built, and what changed.",
       ctaLabel: "Want to be one of them? Book a free consult.",
       ctaHref: "/#contact",
     },
@@ -296,8 +296,8 @@ export const siteContent: SiteContent = {
     description: "What our clients say.",
     items: [],
     holdingState: {
-      title: "Reviews will live here too",
-      body: "Real names, real businesses, unedited — as soon as our first clients have something to say.",
+      title: "No reviews yet. That changes with our first client.",
+      body: "Real names, real businesses, unedited. As soon as our first clients have something to say.",
       ctaLabel: "Want to be one of them? Book a free consult.",
       ctaHref: "/#contact",
     },
@@ -305,35 +305,37 @@ export const siteContent: SiteContent = {
 
   pricing: {
     eyebrow: "Pricing",
-    title: "Two build sizes, one day rate — quoted before we start",
+    title: "Two build sizes, one day rate. Quoted before we start.",
     description:
-      "Every project gets a fixed quote up front. The tiers show typical scope; your quote depends on the consult.",
+      "Every project gets a fixed quote up front. The tiers show typical scope. Your quote depends on the consult.",
     tiers: [
       {
-        name: "Starter build",
-        price: "[INPUT: starter price range]",
+        name: "Standard build",
+        price: "$2,000–5,000",
         description:
           "A single-purpose tool: a booking page, a report generator, one automation.",
         features: [
           "One core workflow, built end to end",
-          "Delivered in [INPUT: starter turnaround]",
-          "[INPUT: support window] of included fixes",
+          "Delivered in about a week",
+          "30 days of fixes and tweaks included",
+          "One year of bug fixes, free",
         ],
       },
       {
-        name: "Full build",
-        price: "[INPUT: full-build price range]",
+        name: "Advanced build",
+        price: "$5,000–15,000",
         description:
           "A system your business runs on: multiple workflows, logins, data that stays in sync.",
         features: [
           "Multiple connected workflows",
-          "Delivered in [INPUT: full-build turnaround]",
-          "[INPUT: support window] of included fixes",
+          "Delivered in two to three weeks",
+          "30 days of fixes and tweaks included",
+          "One year of bug fixes, free",
         ],
       },
       {
         name: "AI consulting",
-        price: "[INPUT: day rate] / day",
+        price: "$800 / day",
         description:
           "Working sessions to find and set up AI where it pays for itself.",
         features: [
@@ -348,22 +350,22 @@ export const siteContent: SiteContent = {
   faq: {
     eyebrow: "FAQ",
     title: "The questions we'd ask too",
-    description: "Anything else — ask in the form and we'll answer straight.",
+    description: "Anything else, ask in the form and we'll answer straight.",
     items: [
       {
         question: "How much will my project cost?",
         answer:
-          "Every project gets a fixed quote after the free consult. Typical starter builds run [INPUT: starter range]; full builds [INPUT: full range]. The quote is the price — no hourly surprises.",
+          "Every project gets a fixed quote after the free consult. Standard builds run $2,000 to $5,000. Advanced builds run $5,000 to $15,000. The quote is the price. No hourly surprises.",
       },
       {
         question: "How long does a build take?",
         answer:
-          "[INPUT: typical turnaround summary]. You get a delivery date with the quote, and we tell you immediately if anything threatens it.",
+          "Most single tools ship in about a week. Larger connected systems take two to three weeks. You get a delivery date with the quote, and we tell you right away if anything threatens it.",
       },
       {
         question: "What happens if something breaks after delivery?",
         answer:
-          "Every build includes [INPUT: support window] of fixes at no charge. After that, we're a message away.",
+          "For the first 30 days, tell us anything that needs fixing or refining and we handle it, no questions asked. After that, genuine bugs in what we built stay free to fix for a year. New features, or changes to things that already work, are quoted separately.",
       },
       {
         question: "Do I need to be technical to work with you?",
@@ -376,33 +378,31 @@ export const siteContent: SiteContent = {
   about: {
     eyebrow: "About",
     title: "The people behind bcns",
-    description: "Two founders — one builds, one makes sure it's worth building.",
+    description: "Two founders. One builds, one makes sure it's worth building.",
     founders: [
       {
         name: "Nate Seluga",
         roleLine: "Engineering",
         photo: "[INPUT: photo]",
-        bio: "what he builds and why custom tools for small businesses; [INPUT: 1-2 notable projects with concrete outcomes]; builder-first — school is a credential, not the lead.",
+        bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after handoff. Computer science at Harvey Mudd College.",
         credentials: [
           "Computer science, Harvey Mudd College",
-          "[INPUT: credential 2]",
-          "[INPUT: credential 3]",
         ],
       },
       {
         name: "Brandon Chung",
         roleLine: "Business & clients",
         photo: "[INPUT: photo]",
-        bio: "[INPUT: business experience summary]; owns scoping, communication, and making sure every build serves the business.",
+        bio: "[INPUT: business experience summary]. Brandon owns scoping, communication, and making sure every build earns its cost. He's the reason we don't build things clients don't need.",
         credentials: [
-          "[INPUT: NYU program] , New York University",
+          "[INPUT: NYU program], New York University",
           "[INPUT: credential 2]",
           "[INPUT: credential 3]",
         ],
       },
     ],
     whyBcns:
-      "[INPUT: 2-3 sentences — why you two started bcns and what you want it to be]",
+      "Small businesses get two bad options. Software that doesn't fit, or a price only big companies can pay. We build the third one. Custom tools, built lean, straight from the two of us.",
   },
 
   navCards: {
@@ -410,7 +410,7 @@ export const siteContent: SiteContent = {
       {
         title: "What we build",
         description:
-          "Booking systems, dashboards, automations, and AI consulting — the problems we solve and how.",
+          "Booking systems, dashboards, automations, and AI consulting. The problems we solve and how.",
         href: "/services",
       },
       {
@@ -422,13 +422,13 @@ export const siteContent: SiteContent = {
       {
         title: "Pricing",
         description:
-          "Two build sizes and a day rate for AI consulting — and how quoting works.",
+          "Two build sizes and a day rate for AI consulting. And how quoting works.",
         href: "/pricing",
       },
       {
         title: "About",
         description:
-          "Two founders — one builds, one makes sure it's worth building.",
+          "Two founders. One builds, one makes sure it's worth building.",
         href: "/about",
       },
     ],
@@ -436,24 +436,29 @@ export const siteContent: SiteContent = {
 
   pageMeta: {
     home: {
-      title: "[INPUT: meta/home-title]",
-      description: "[INPUT: meta/home-description]",
+      title: "bcns: Custom Software for Local Businesses",
+      description:
+        "bcns builds custom software for local businesses. Fixed quotes, fast turnaround, and tools built around how you already work. Book a free 30-minute consult.",
     },
     services: {
-      title: "[INPUT: meta/services-title]",
-      description: "[INPUT: meta/services-description]",
+      title: "What We Build | bcns",
+      description:
+        "Booking systems, inventory tools, dashboards, and AI consulting for local businesses. Four problem types, one studio that builds to fit your workflow.",
     },
     work: {
-      title: "[INPUT: meta/work-title]",
-      description: "[INPUT: meta/work-description]",
+      title: "Past Work | bcns",
+      description:
+        "Case studies from bcns client builds. Each one covers the problem, what we built, and what changed. First projects in progress now.",
     },
     pricing: {
-      title: "[INPUT: meta/pricing-title]",
-      description: "[INPUT: meta/pricing-description]",
+      title: "Pricing | bcns",
+      description:
+        "Standard builds from $2,000 to $5,000. Advanced builds from $5,000 to $15,000. AI consulting at $800 per day. Fixed quotes, no hourly surprises.",
     },
     about: {
-      title: "[INPUT: meta/about-title]",
-      description: "[INPUT: meta/about-description]",
+      title: "About bcns | Two Founders, Custom Software",
+      description:
+        "Nate builds. Brandon makes sure it's worth building. Two founders who left generic tools behind to build custom software that fits local businesses.",
     },
   },
 };

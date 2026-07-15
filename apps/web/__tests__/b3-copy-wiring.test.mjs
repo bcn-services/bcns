@@ -34,34 +34,15 @@ function assert(label, condition, detail = "") {
 // ---------------------------------------------------------------------------
 // Appendix-defined [INPUT: tokens — every INPUT on a rendered page must be one of these
 // ---------------------------------------------------------------------------
+// C1 pass: these resolved slots are now filled. Only Needs-Nate slots remain.
 const APPENDIX_INPUT_TOKENS = new Set([
-  "[INPUT: support window]",
-  "[INPUT: response-time promise]",
-  "[INPUT: starter price range]",
-  "[INPUT: starter turnaround]",
-  "[INPUT: full-build price range]",
-  "[INPUT: full-build turnaround]",
-  "[INPUT: day rate]",
-  "[INPUT: starter range]",
-  "[INPUT: full range]",
-  "[INPUT: typical turnaround summary]",
+  // C1 pass: all pricing/turnaround/response-time/meta slots are now filled.
+  // Only Needs-Nate slots remain as [INPUT: ...].
   "[INPUT: photo]",
-  "[INPUT: 1-2 notable projects with concrete outcomes]",
   "[INPUT: credential 2]",
   "[INPUT: credential 3]",
   "[INPUT: business experience summary]",
   "[INPUT: NYU program]",
-  "[INPUT: 2-3 sentences — why you two started bcns and what you want it to be]",
-  "[INPUT: meta/home-title]",
-  "[INPUT: meta/home-description]",
-  "[INPUT: meta/services-title]",
-  "[INPUT: meta/services-description]",
-  "[INPUT: meta/work-title]",
-  "[INPUT: meta/work-description]",
-  "[INPUT: meta/pricing-title]",
-  "[INPUT: meta/pricing-description]",
-  "[INPUT: meta/about-title]",
-  "[INPUT: meta/about-description]",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -164,13 +145,13 @@ assert(
 // Pricing card names
 const tierNames = siteContent.pricing.tiers.map((t) => t.name);
 assert(
-  'pricing.tiers[0].name === "Starter build"',
-  tierNames[0] === "Starter build",
+  'pricing.tiers[0].name === "Standard build"',
+  tierNames[0] === "Standard build",
   `got: "${tierNames[0]}"`
 );
 assert(
-  'pricing.tiers[1].name === "Full build"',
-  tierNames[1] === "Full build",
+  'pricing.tiers[1].name === "Advanced build"',
+  tierNames[1] === "Advanced build",
   `got: "${tierNames[1]}"`
 );
 assert(
@@ -241,8 +222,8 @@ try {
   assert("pricing.html readable", false);
 }
 if (pricingHtml) {
-  assert('pricing.html contains "Starter build"', pricingHtml.includes("Starter build"));
-  assert('pricing.html contains "Full build"', pricingHtml.includes("Full build"));
+  assert('pricing.html contains "Standard build"', pricingHtml.includes("Standard build"));
+  assert('pricing.html contains "Advanced build"', pricingHtml.includes("Advanced build"));
   assert('pricing.html contains "AI consulting"', pricingHtml.includes("AI consulting"));
   assert(
     'pricing.html contains FAQ q1',
