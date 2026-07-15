@@ -223,7 +223,7 @@ url: http://localhost:3000
 ---
 ---
 
-# Part III — First product: revenue tracker (client: pizza business — real name TBD, folder placeholder `apps/pizza/`)
+# Part III — First product: revenue tracker (client: DeLuca's, pizza business — `apps/delucas/`)
 
 > A single local desktop app where a non-technical pizza-shop owner opens one
 > window and immediately sees how his business is doing. Install once, leave
@@ -263,7 +263,7 @@ url: http://localhost:3000
 
 ### P1 — App scaffold: Electron + renderer/shell split · `status: todo` · `track: full`
 
-- **task:** Create `apps/pizza/` in the workspace: Electron main process (`src/shell-electron/`), React+TS renderer (`src/renderer/`, Vite dev server), typed IPC bridge (`src/bridge/` — one interface file defining every shell capability the renderer may call: db queries, ingestion trigger, file dialogs). Depends on `@bcns/ui`/`@bcns/config` via `workspace:*`. `pnpm dev` runs the renderer in a browser at localhost with a mock bridge; `pnpm dev:electron` runs the real shell. App README with taxonomy frontmatter (`type: workflow-app`, `delivery: local-electron`).
+- **task:** Create `apps/delucas/` in the workspace: Electron main process (`src/shell-electron/`), React+TS renderer (`src/renderer/`, Vite dev server), typed IPC bridge (`src/bridge/` — one interface file defining every shell capability the renderer may call: db queries, ingestion trigger, file dialogs). Depends on `@bcns/ui`/`@bcns/config` via `workspace:*`. `pnpm dev` runs the renderer in a browser at localhost with a mock bridge; `pnpm dev:electron` runs the real shell. App README with taxonomy frontmatter (`type: workflow-app`, `delivery: local-electron`).
 - **done when:** renderer loads in a plain browser via `pnpm dev` with the mock bridge; Electron window opens via `pnpm dev:electron`; an import-boundary test proves `src/renderer/` imports nothing from `electron`/`node:*`; build green.
 
 ### P2 — Data model + P&L core · `status: todo` · `track: full`
@@ -288,7 +288,7 @@ url: http://localhost:3000
 
 ### P6 — Settings, backup, first-run · `status: todo` · `track: full`
 
-- **task:** Settings screen (intended for Nate at handoff, not the client): email host/user/app-password, Anthropic key, backup folder path, vendor→category mapping editor. Backup: on app quit and once per calendar day on open, copy the SQLite file to `<backup folder>/pizza-backup-<date>.db`, keep last 30, surface last-backup date subtly on the dashboard; backup failure → the standard banner. First-run: empty-state dashboard with a friendly "no data yet" state (no crash on zero transactions). electron-builder config for Mac `.dmg` + Windows NSIS (unsigned).
+- **task:** Settings screen (intended for Nate at handoff, not the client): email host/user/app-password, Anthropic key, backup folder path, vendor→category mapping editor. Backup: on app quit and once per calendar day on open, copy the SQLite file to `<backup folder>/delucas-backup-<date>.db`, keep last 30, surface last-backup date subtly on the dashboard; backup failure → the standard banner. First-run: empty-state dashboard with a friendly "no data yet" state (no crash on zero transactions). electron-builder config for Mac `.dmg` + Windows NSIS (unsigned).
 - **done when:** unit tests: backup rotation keeps 30, daily-on-open triggers at most once per day, settings round-trip persist; behavioral: empty DB renders the empty state, settings edits persist across renderer reload; `pnpm package` (or equivalent) produces both installers locally; build green.
 
 ---
@@ -322,7 +322,7 @@ brand: TBD (client brand profile — pizza-shop warmth; define at session start)
 - [ ] Check his inbox for Slice summary emails → if present, plan revenue automation as v1.1 (new `IngestionSource`).
 - [ ] On his laptop: install correct-OS build; enable 2FA + generate email app password; create his Anthropic account (his card, ~$5 spend cap); configure settings; point backup at his synced folder and watch one backup sync.
 - [ ] Watch real invoices import; correct vendor→category mappings live.
-- [ ] Rename `apps/pizza/` → real business name; update README frontmatter.
+- [ ] Rename `apps/delucas/` → real business name; update README frontmatter.
 - [ ] Tag `<business>-v1.0-shipped`; commit lockfile.
 - [ ] Walk him through it: open app → read numbers. That's the whole tutorial.
 - [ ] **Done** when he reads this month's profit on his own machine without help.
