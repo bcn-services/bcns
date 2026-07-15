@@ -157,8 +157,8 @@ url: http://localhost:3000
 
 ### /pricing
 - **eyebrow:** Pricing · **title:** Two build sizes, one day rate — quoted before we start · **description:** Every project gets a fixed quote up front. The tiers show typical scope; your quote depends on the consult.
-- **Card 1 — Standard build** *(was "Starter build")* · price: $2,000–5,000 · A single-purpose tool: a booking page, a report generator, one automation. Features: One core workflow, built end to end / Delivered in about a week / 30 days of fixes and tweaks included / One year of bug fixes, free
-- **Card 2 — Advanced build** *(was "Full build")* · price: $5,000–15,000 · A system your business runs on: multiple workflows, logins, data that stays in sync. Features: Multiple connected workflows / Delivered in two to three weeks / 30 days of fixes and tweaks included / One year of bug fixes, free
+- **Card 1 — Standard build** *(was "Starter build")* · price: $2,000–$5,000 · A single-purpose tool: a booking page, a report generator, one automation. Features: One core workflow, built end to end / Delivered in about a week / 30 days of fixes and tweaks included / One year of bug fixes, free
+- **Card 2 — Advanced build** *(was "Full build")* · price: $5,000–$15,000 · A system your business runs on: multiple workflows, logins, data that stays in sync. Features: Multiple connected workflows / Delivered in two to three weeks / 30 days of fixes and tweaks included / One year of bug fixes, free
 - **Card 3 — AI consulting** · price: $800 / day · Working sessions to find and set up AI where it pays for itself. Features: Audit of where AI fits your operation / Hands-on setup, not a slide deck / Plain-English handoff notes
 
 ### /pricing — FAQ

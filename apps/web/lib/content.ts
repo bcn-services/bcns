@@ -311,7 +311,7 @@ export const siteContent: SiteContent = {
     tiers: [
       {
         name: "Standard build",
-        price: "$2,000–5,000",
+        price: "$2,000–$5,000",
         description:
           "A single-purpose tool: a booking page, a report generator, one automation.",
         features: [
@@ -323,7 +323,7 @@ export const siteContent: SiteContent = {
       },
       {
         name: "Advanced build",
-        price: "$5,000–15,000",
+        price: "$5,000–$15,000",
         description:
           "A system your business runs on: multiple workflows, logins, data that stays in sync.",
         features: [

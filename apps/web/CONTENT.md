@@ -526,7 +526,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[0].price
 - **Field:** `pricing.tiers[0].price`
-- **Purpose:** Price string. Currently `$2,000–5,000`.
+- **Purpose:** Price string. Currently `$2,000–$5,000`.
 - **Tone:** N/A (formatted value)
 - **Length:** ≤20 chars
 
@@ -556,7 +556,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[1].price
 - **Field:** `pricing.tiers[1].price`
-- **Purpose:** Price string. Currently `$5,000–15,000`.
+- **Purpose:** Price string. Currently `$5,000–$15,000`.
 - **Length:** ≤20 chars
 
 #### tiers[1].description

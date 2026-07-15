@@ -1,23 +1,28 @@
 ---
-# Fix Report — B2: Registry rework
-**Date:** 2026-07-14
-**Findings addressed:** 5 of 5 review findings (0 QA failures + 5 review findings)
+# Fix Report — C1: Price string formatting
+**Date:** 2026-07-15
+**Branch:** worktree-agent-afb098493a86a56c1
+**Files changed:** apps/web/lib/content.ts, apps/web/CONTENT.md, PLAN.md
+**Findings addressed:** 1 of 1: 1 QA bug (C5)
 
 ## Changes Made
-- `content-registry.test.mjs:49-57` — replaced `parentKey` propagation + `STRUCTURAL_KEYS` Set with path-suffix check (`path.endsWith('.href') || path.endsWith('.photo')`) inside `collectStrings`; removed now-unused `STRUCTURAL_KEYS` const — review Important
-- `content.ts:168-172` + `past-work.tsx:30` + `reviews.tsx:30` — added `ctaHref: string` to `HoldingState` interface; added `[SLOT: past-work/holding-cta-href]` and `[SLOT: reviews/holding-cta-href]` in siteContent; both components now read `holdingState.ctaHref` instead of hardcoded `"/#contact"` — review Important
-- `about-founder.tsx:26` — replaced `key={index}` with `key={founder.name}` on founders map — review Minor
-- `past-work.tsx:39` — replaced `key={index}` with `key={workTitle}` on items map — review Minor
-- `reviews.tsx:39` — replaced `key={index}` with `` key={`${author}-${company}`} `` on items map — review Minor
-- `content-registry.test.mjs:71-78` — expanded `REQUIRED_KEYS` from 6 to 13 keys (added `pastWork`, `reviews`, `pricing`, `faq`, `about`, `navCards`, `pageMeta`) — review Minor
-- `b2-registry-rework.test.mjs:204` — removed unused `injectedItems` variable (lint error surfaced by the above changes) — collateral lint fix
 
-## Build Status
-`pnpm lint && pnpm typecheck && pnpm build` — all green. `content-registry.test.mjs` 188/188 passed; `b2-registry-rework.test.mjs` 77/77 passed.
+- `apps/web/lib/content.ts:314` — `pricing.tiers[0].price` `"$2,000–5,000"` → `"$2,000–$5,000"` — QA bug C5
+- `apps/web/lib/content.ts:326` — `pricing.tiers[1].price` `"$5,000–15,000"` → `"$5,000–$15,000"` — QA bug C5
+- `apps/web/CONTENT.md:529` — "Currently" description updated to `$2,000–$5,000` to keep files in sync — QA bug C5
+- `apps/web/CONTENT.md:559` — "Currently" description updated to `$5,000–$15,000` to keep files in sync — QA bug C5
+- `PLAN.md:160` — Card 1 price reference updated to `$2,000–$5,000` to keep files in sync — QA bug C5
+- `PLAN.md:161` — Card 2 price reference updated to `$5,000–$15,000` to keep files in sync — QA bug C5
+
+**FAQ pricing text verified:** content.ts:358 uses "to" not en-dash ranges — no $ issue; text matches brief exactly.
+
+**Build:** `pnpm lint && pnpm typecheck && pnpm build` — all green.
 
 ## Disputed
+
 None.
 
 ## Deferred
+
 None.
 ---
