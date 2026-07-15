@@ -1,4 +1,74 @@
 ---
+# QA Report — P3
+**Task:** P3 — Ingestion framework + manual + drag-and-drop sources
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+**Gate mode:** tests+behavioral
+
+## VERDICT: PASS
+
+## Criteria Checked
+- C1 Runner dedup — same source_ref twice → one DB row — `runSources deduplicates by source_ref` + `dragdrop tx dedupes on second import` — PASS
+- C2 Source normalization — manual/recurring/dragdrop each produce a `NormalizedTransaction` — 4 ManualSource tests, 4 DragDropSource tests, 2 RecurringSource tests — PASS
+- C3 LLM mock bypass — `extractFromPdfImage` returns parsed fixture when `mock?` supplied — 4 mock-path tests — PASS
+- C4 LLM malformed-response errors — `validateLLMResult` throws on bad JSON structure, invalid date, negative/non-integer amount, invalid confidence — 6 new tests via exported `validateLLMResult` — PASS
+- C5 Behavioral: ManualEntryForm.tsx exists, calls `ingestion.submitManual`, import-boundary clean — confirmed; mockBridge has `ingestion.submitManual` stub — PASS
+- C6 Behavioral: ConfirmCard.tsx exists with correct props (`extracted: LLMExtractResultBridge`, `filePath`, `onConfirm`, `onReject`); mockBridge has `ingestion.confirmImport` — PASS
+- C7 Renderer boundary — `src/renderer/` imports nothing from `electron`/`node:*` — import-boundary.test.mjs: 8 files, 0 violations — PASS
+- C8 `pnpm lint && pnpm typecheck && pnpm build` green — all three ran clean — PASS
+
+## Failures
+none
+
+## Tests Added
+- `apps/delucas/tests/ingestion.test.mjs` — removed unused import (lint fix); added `validateLLMResult` import; added 6 malformed-response error tests (C4)
+- `apps/delucas/src/shell-electron/ingestion/llm.ts` — exported `validateLLMResult` for testability
+
+## Notes
+- `externalizeDepsPlugin` auto-externalizes all `package.json` deps — `@napi-rs/canvas` and `pdfjs-dist` are covered without an explicit list entry.
+- Behavioral headless check for drag-and-drop (C6) confirmed via component existence + prop shape + mockBridge stubs; full renderer interaction skipped (headless per skill instructions).
+
+## Not Verifiable
+none
+
+---
+# QA Report — P2
+**Task:** P2 — SQLite schema, P&L module, recurring materializer, typed IPC handlers
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+**Gate mode:** tests+behavioral
+
+## VERDICT: PASS
+
+## Criteria Checked
+
+- **1 — Month bucketing (incl. year boundaries, TZ-safe):** `bucketByMonth` tests (4): groups by YYYY-MM, Dec 2023 vs Jan 2024 split, empty input, date sliced as string (no `new Date()`) — PASS
+- **2 — P&L math with mixed transactions:** `computeMonthPnl` tests (7): revenue-only, expense-only, mixed (revenue $1000 - expenses $600 = profit $400) — PASS
+- **3 — Category totals:** `computeMonthPnl` category test: food $150, rent $200, utilities $75 accumulate correctly; revenue does not pollute category buckets — PASS
+- **4 — Recurring idempotency (run twice, no duplicates):** `materializeRecurring` called twice → still 3 txns; extend to 5 months → exactly 5 txns — PASS
+- **5 — Summary sentences for profit/loss/zero:** `generateSummary` tests (5): profit, loss, breakeven, cents format, large round dollar — exact string matches — PASS
+- **6 — Schema migrates from empty DB:** `runMigrations` on `:memory:` creates all 5 tables; second run idempotent (1 version row, no error) — PASS
+- **7 — `pnpm lint && pnpm typecheck && pnpm build` green:** all 3 commands clean, 0 errors — PASS
+- **Renderer boundary — `src/shared/pnl.ts` + `src/shared/types.ts` pure:** grep finds 0 `electron` / `node:*` imports — PASS
+- **Renderer boundary — `src/renderer/` clean:** import-boundary.test.mjs: 4 files checked, 0 violations — PASS
+
+## Failures
+
+none
+
+## Tests Added
+
+- `tests/pnl.test.mjs` (engineer-authored, 22 tests) — bucketByMonth, computeMonthPnl, compute12MonthSeries, generateSummary; ran and verified all pass
+- `tests/db.test.mjs` (engineer-authored, 21 tests) — migrations, transaction queries, email dedup, settings, recurring materializer idempotency
+- `tests/import-boundary.test.mjs` (engineer-authored, static analysis) — renderer/bridge source files checked for forbidden electron/node: imports
+
+No new test infra created; engineer provided complete suite.
+
+## Not Verifiable
+
+- Electron ABI / packaged app smoke pass: `better-sqlite3` compiled against system Node 22, not Electron ABI; a real packaged Electron run would require `electron-rebuild`. Deferred per engineer (P6/deploy phase) — not a P2 criterion.
+
+---
 # QA Report — P1
 **Task:** P1 — App scaffold: Electron + renderer/shell split for apps/delucas/
 **Branch:** feat/delucas-p1-scaffold
