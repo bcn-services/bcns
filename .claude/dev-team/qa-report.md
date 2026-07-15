@@ -1,4 +1,39 @@
 ---
+# QA Report — P4
+**Task:** P4 — Email (IMAP) ingestion source
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+**Gate mode:** tests+behavioral
+
+## VERDICT: PASS
+
+## Criteria Checked
+
+- **AC1 — New invoice email → imported once; re-run imports nothing**: "new invoice email → transaction imported once" + "re-run with same message-id imports nothing (dedup)" — PASS (imported=1 first run, imported=0 second run, 1 DB row)
+- **AC2 — Non-invoice PDF → classified out, no transaction**: "non-invoice PDF (menu fixture) → no transaction, message marked processed" — PASS (0 transactions, message-id still recorded)
+- **AC3 — Low-confidence → review queue, not auto-imported**: "low-confidence invoice → lands in review queue, no auto-import" + "medium-confidence invoice → lands in review queue" — PASS (capturedReviewItems.length=1, 0 transactions)
+- **AC4 — Auth failure → error flag set, no crash, drag-and-drop unaffected**: "auth failure → emailStatus.error set, no crash, no transaction" — PASS (connected=false, error="Authentication failed", 0 transactions, no throw; drag-and-drop path is independent by design — structurally verified)
+- **AC5 — Vendor→category mapping applied**: "vendor mapping applied to high-confidence import" with map {sysco→food} and vendor "Sysco Foods" → txs[0].category="food" — PASS
+- **AC6 — Build green**: `pnpm lint && pnpm typecheck && pnpm build` — all tasks successful, 0 errors — PASS
+- **Renderer boundary**: import-boundary test — PASS (11 renderer files checked, 0 violations)
+- **IMAP never called in tests**: all tests inject `makeMockImap()` or `makeAuthFailImap()` via `imapFactory` DI param; no direct `imapflow` import in any test file — PASS
+- **processed_emails populated regardless of is_invoice**: "message-id recorded even for non-invoice PDF" + "message-id recorded for low-confidence items" — PASS; "auth failure → message-id NOT recorded" — PASS
+- **emailStatus.error + connected=false on failure**: verified via `getEmailStatus()` return value assertions — PASS
+- **Full suite: 90 tests green**: import-boundary PASS + pnl 22 + db 21 + ingestion 25 + email 22 = 91 total (boundary test counts as pass-verdict, not numeric) — PASS
+
+## Failures
+
+none
+
+## Tests Added
+
+- No new files written. `apps/delucas/tests/email.test.mjs` was authored by the Engineer; 22 tests covering all P4 criteria. Verified all pass.
+
+## Not Verifiable
+
+- **Drag-and-drop unaffected by auth failure (live render)**: renderer dev server not started; confirmed structurally — `EmailSource.pull()` catches and returns `[]`, other sources are unaffected by design. Acceptable per headless-QA guardrail.
+
+---
 # QA Report — P3
 **Task:** P3 — Ingestion framework + manual + drag-and-drop sources
 **Branch:** feat/delucas-p1-scaffold
