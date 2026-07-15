@@ -1,28 +1,23 @@
 ---
-# Fix Report — C1: Price string formatting
+# Fix Report — P1 App Scaffold
 **Date:** 2026-07-15
-**Branch:** worktree-agent-afb098493a86a56c1
-**Files changed:** apps/web/lib/content.ts, apps/web/CONTENT.md, PLAN.md
-**Findings addressed:** 1 of 1: 1 QA bug (C5)
+**Findings addressed:** 5 of 5: 0 QA failures + 5 review findings (2 Important + 3 Minor)
 
 ## Changes Made
-
-- `apps/web/lib/content.ts:314` — `pricing.tiers[0].price` `"$2,000–5,000"` → `"$2,000–$5,000"` — QA bug C5
-- `apps/web/lib/content.ts:326` — `pricing.tiers[1].price` `"$5,000–15,000"` → `"$5,000–$15,000"` — QA bug C5
-- `apps/web/CONTENT.md:529` — "Currently" description updated to `$2,000–$5,000` to keep files in sync — QA bug C5
-- `apps/web/CONTENT.md:559` — "Currently" description updated to `$5,000–$15,000` to keep files in sync — QA bug C5
-- `PLAN.md:160` — Card 1 price reference updated to `$2,000–$5,000` to keep files in sync — QA bug C5
-- `PLAN.md:161` — Card 2 price reference updated to `$5,000–$15,000` to keep files in sync — QA bug C5
-
-**FAQ pricing text verified:** content.ts:358 uses "to" not en-dash ranges — no $ issue; text matches brief exactly.
-
-**Build:** `pnpm lint && pnpm typecheck && pnpm build` — all green.
+- `apps/delucas/src/shell-electron/main.ts:26` — `sandbox: false` → `sandbox: true`; Chromium process sandbox restored — review Important
+- `apps/delucas/src/shell-electron/main.ts:32,34` — replaced `void win.loadURL/loadFile(...)` with `.catch(err => console.error('[main] load failed', err))` to surface load failures — review Minor
+- `apps/delucas/src/shell-electron/main.ts:86-107` — wrapped `createWindow()` in try/catch inside `app.whenReady` and `activate` handlers; calls `app.quit()` with logged error on failure — review Minor
+- `apps/delucas/tests/import-boundary.test.mjs:15-16,41-44` — extended scan to also cover `src/bridge/` (excluding `preload.ts`); now catches forbidden imports in `mockBridge.ts` and `BridgeInterface.ts` — review Important
+- `apps/delucas/src/bridge/BridgeInterface.ts:19` — added comment on `db.query` flagging that ipcMain handler must use parameterized queries only and must never pass raw client SQL to SQLite — review Minor
 
 ## Disputed
-
 None.
 
 ## Deferred
-
 None.
+
+## Verification
+- `pnpm --filter @delucas/app typecheck` — PASS
+- `pnpm --filter @delucas/app lint` — PASS
+- `node apps/delucas/tests/import-boundary.test.mjs` — PASS (4 files checked, 0 violations)
 ---
