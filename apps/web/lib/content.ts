@@ -370,11 +370,6 @@ export const siteContent: SiteContent = {
         answer:
           "No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.",
       },
-      {
-        question: "Who owns what you build?",
-        answer:
-          "You do — code, accounts, and data. If we stop working together, everything keeps running and it's yours.",
-      },
     ],
   },
 
