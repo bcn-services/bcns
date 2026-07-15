@@ -18,12 +18,12 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 
 import { runMigrations } from "../src/shell-electron/db/migrations.ts";
-import { getTransactions, getTransactionBySourceRef } from "../src/shell-electron/db/queries.ts";
+import { getTransactions } from "../src/shell-electron/db/queries.ts";
 import { runSources, getLastRunReport } from "../src/shell-electron/ingestion/runner.ts";
 import { ManualSource } from "../src/shell-electron/ingestion/sources/manual.ts";
 import { RecurringSource } from "../src/shell-electron/ingestion/sources/recurring.ts";
 import { DragDropSource } from "../src/shell-electron/ingestion/sources/dragdrop.ts";
-import { extractFromPdfImage } from "../src/shell-electron/ingestion/llm.ts";
+import { extractFromPdfImage, validateLLMResult } from "../src/shell-electron/ingestion/llm.ts";
 
 // ---------------------------------------------------------------------------
 // Test harness
@@ -347,6 +347,66 @@ await test("mock bypass skips validation — even a low-confidence mock is retur
   // When mock is provided, returned verbatim
   const result = await extractFromPdfImage("img", weakMock);
   assert.equal(result.date, "bad-date"); // passed through, not validated
+});
+
+// ---------------------------------------------------------------------------
+// LLM validation — malformed-response error surface (criterion 4)
+// ---------------------------------------------------------------------------
+
+console.log("\nLLM validation (malformed responses):");
+
+await test("validateLLMResult throws on non-object input", async () => {
+  assert.throws(() => validateLLMResult("not an object"), /not an object/);
+  assert.throws(() => validateLLMResult(null), /not an object/);
+  assert.throws(() => validateLLMResult(42), /not an object/);
+});
+
+await test("validateLLMResult throws when is_invoice is missing or non-boolean", async () => {
+  assert.throws(
+    () => validateLLMResult({ vendor: "X", date: null, amount: null, confidence: "high" }),
+    /is_invoice/
+  );
+  assert.throws(
+    () => validateLLMResult({ is_invoice: "yes", vendor: "X", date: null, amount: null, confidence: "high" }),
+    /is_invoice/
+  );
+});
+
+await test("validateLLMResult throws on bad date format", async () => {
+  assert.throws(
+    () => validateLLMResult({ is_invoice: true, vendor: "X", date: "Jan 15 2025", amount: null, confidence: "high" }),
+    /date/
+  );
+  assert.throws(
+    () => validateLLMResult({ is_invoice: true, vendor: "X", date: "01/15/2025", amount: null, confidence: "high" }),
+    /date/
+  );
+});
+
+await test("validateLLMResult throws on negative or non-integer amount", async () => {
+  assert.throws(
+    () => validateLLMResult({ is_invoice: true, vendor: "X", date: null, amount: -100, confidence: "high" }),
+    /amount/
+  );
+  assert.throws(
+    () => validateLLMResult({ is_invoice: true, vendor: "X", date: null, amount: 12.5, confidence: "high" }),
+    /amount/
+  );
+});
+
+await test("validateLLMResult throws on invalid confidence value", async () => {
+  assert.throws(
+    () => validateLLMResult({ is_invoice: true, vendor: "X", date: null, amount: null, confidence: "certain" }),
+    /confidence/
+  );
+});
+
+await test("validateLLMResult returns typed result for valid input", async () => {
+  const valid = { is_invoice: true, vendor: "Sysco", date: "2025-01-15", amount: 12000, confidence: "high" };
+  const result = validateLLMResult(valid);
+  assert.equal(result.vendor, "Sysco");
+  assert.equal(result.amount, 12000);
+  assert.equal(result.confidence, "high");
 });
 
 // ---------------------------------------------------------------------------

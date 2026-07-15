@@ -112,7 +112,8 @@ export async function extractFromPdfImage(
 // Validation
 // ---------------------------------------------------------------------------
 
-function validateLLMResult(raw: unknown): LLMExtractResult {
+/** Exported for unit testing only — validates and narrows an unknown LLM response. */
+export function validateLLMResult(raw: unknown): LLMExtractResult {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("LLM result is not an object");
   }
