@@ -26,11 +26,14 @@ export function Pricing() {
           {tiers.map(({ name, price, description: tierDescription, features }, index) => {
             const isConsulting = index === 2;
             return (
-              <Card key={index} className={`h-full${isConsulting ? " border-primary/40 bg-primary/[0.04]" : ""}`}>
+              <Card key={index} className={`h-full${isConsulting ? " border-t-2 border-t-primary border-primary/30 bg-secondary/60" : ""}`}>
                 <CardHeader>
                   {isConsulting && (
-                    <div className="mb-3 flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Sparkles className="size-4" aria-hidden />
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-primary">
+                        <Sparkles className="size-4" aria-hidden />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-primary/70">Day rate</span>
                     </div>
                   )}
                   <CardTitle>{name}</CardTitle>
