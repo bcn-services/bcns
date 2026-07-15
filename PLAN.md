@@ -7,15 +7,14 @@
 > copy. Anything unknown (prices, turnaround, founder specifics, past work) stays
 > an explicit `[INPUT: …]` slot.
 >
-> **Two sections split by the `⚠️ AUTONOMOUS RUN — STOP HERE` marker:**
-> `dev-team-auto` runs Section 1 (restructure + copy wiring) and stops;
-> `layout-loop` runs Section 2 (visual pass on the new pages) in cowork.
-> Same complementary edit fences as v1 — dev-team-auto owns structure/data/copy,
-> layout-loop is presentation-only.
+> **Combined overnight run.** `dev-team-auto` runs Section 1 (B1–B4, already done),
+> Section 3 (C1 — voice/content pass), and Part III Section 1 (P1–P6 — DeLuca's pizza app),
+> then halts at the single `⚠️ AUTONOMOUS RUN — STOP HERE` marker.
+> `layout-loop` handles both visual passes (bcns website + pizza app) in separate cowork sessions after.
+> dev-team-auto owns structure/data/copy/function; layout-loop is presentation-only.
 >
-> **Base branch:** run from `layout-loop/nate-personal-first-draft` (contains all
-> v1 architecture + the visual first draft). Work on a new experimental branch
-> off it; never merge to main without Nate's sign-off.
+> **Base branch:** `overnight-combined` (branched from `repo-pizza-plan`, which contains
+> all B1–B4 work + V1–V5 layout-loop + Parts II–III). Never merge to main without Nate's sign-off.
 
 ---
 
@@ -68,42 +67,102 @@
 
 ---
 
-> **⚠️ AUTONOMOUS RUN — STOP HERE**
+## Section 3 — Voice + content pass (dev-team-auto)
 
-_dev-team-auto halts here. Section 2 runs via the `layout-loop` skill in a
-cowork session; Needs-Nate items are Nate's._
+> This run **replaces and tightens the copy** in `apps/web/lib/content.ts` — it does the opposite of Section 1's "wire verbatim" rule: here the agent rewrites toward the voice spec and fills every resolved `[INPUT: …]` slot with the real values below. Only the Nate-only slots in **Needs-Nate** stay `[INPUT: …]`. No new facts beyond what the copy brief supplies. All checks are headlessly verifiable.
+
+### C1 — Voice + content pass · `status: not started` · `track: light`
+
+- **task:** Rewrite every string in `apps/web/lib/content.ts` to match the **Copy
+  brief** below, then update `apps/web/CONTENT.md` to mirror the result 1:1. Four
+  jobs, all in the content registry (no component/logic edits): **(1) Fill resolved
+  slots** with the exact values in the brief — pricing names + ranges, day rate,
+  turnaround, the 30-day / 1-year support model, one-business-day response.
+  **(2) Apply the ownership reframe** — strike every claim that the client owns the
+  code; lead with "use it forever, free" and "your data is yours"; stay silent on
+  IP; do not re-add the removed ownership FAQ. **(3) Voice sweep** — remove every
+  em-dash (`—`) in the file, delete banned buzzwords, kill "we help X" and any
+  "SaaS" framing, and tighten all copy to the voice rules (short, concrete,
+  Hormozi discipline without the hype). **(4) Rewrite the About + holding states**
+  per the brief (builder-first bios with no fabricated portfolio, honest founding
+  story, firmed-up holding states). Write real page-meta titles/descriptions from
+  the positioning. Because tier names, holding-state titles, and several copy
+  strings change, **update the Copy appendix in this PLAN.md and any verbatim
+  spot-check tests from B3 to the new approved strings** so they keep passing.
+- **done when:**
+  - `grep -c "—" apps/web/lib/content.ts` returns `0` (no em-dashes; en dashes are allowed **only** inside numeric ranges like `$2,000–$5,000`).
+  - `grep -riE "leverage|empower|utilize|synergy|seamless|cutting-edge|world-class|best-in-class|robust|unlock|supercharge|elevate|revolutioniz|game-chang|we help|software as a service|saas" apps/web/lib/content.ts` returns zero matches.
+  - No ownership-of-code claim remains: the hero proof point reads `Use it forever, free`, the contact "you own it" highlight no longer contains the word "code", and there is no FAQ about who owns the build.
+  - Every `[INPUT: …]` remaining in `content.ts` is one of the enumerated **Needs-Nate** slots (founder photos, Brandon's NYU program, Brandon's experience summary, any extra credential lines). All pricing, turnaround, support-window, response-time, and page-meta slots are filled with the brief's real values — a grep for `INPUT: (starter|full|day rate|support window|turnaround|response-time|meta/)` returns zero.
+  - Pricing renders three cards named `Standard build` ($2,000–$5,000), `Advanced build` ($5,000–$15,000), and `AI consulting` ($800 / day); each build tier lists both `30 days of fixes and tweaks included` and `One year of bug fixes, free`.
+  - Readability: the concatenated body copy scores Flesch-Kincaid grade level ≤ 8 (verify with a committed one-off script, e.g. `textstat`), matching the third-to-eighth-grade target.
+  - `CONTENT.md` mirrors the new registry 1:1 (no orphans either direction) and its `[INPUT: …]` section lists only the remaining Needs-Nate slots.
+  - The B3 verbatim spot-check tests are updated to the new strings and pass; existing holding-state and no-`[SLOT:` tests still pass; `pnpm lint && pnpm typecheck && pnpm build` green.
 
 ---
 
-## Section 2 — Visual pass on the new pages (layout-loop, cowork)
+### Copy brief (C1 executes against this)
 
-brand: nate-personal
-launch: pnpm --filter web dev
-url: http://localhost:3000
+#### Voice rules (hard constraints)
 
-> Presentation only — never edit copy, data, props, logic, or routing. Isolated
-> branch, one focused change per pass, morning report, never auto-merged.
-> `[INPUT: …]` strings are content, not styling bugs — style them as normal text.
+- **Short, direct sentences.** One idea per sentence. If a sentence has two ideas, split it.
+- **No em-dashes anywhere.** Replace with a period or comma. En dashes only inside numeric ranges (`$2,000–$5,000`).
+- **No "we help X achieve Y"** constructions. Say what you do or what they get, not that you "help."
+- **No buzzwords:** leverage, empower, utilize, synergy, seamless, cutting-edge, world-class, best-in-class, robust, unlock, supercharge, elevate, revolutionize, game-changing.
+- **Not "SaaS" / "software as a service."** bcns is a custom software studio — bespoke builds per client, not one product rented to many.
+- **Third-grade-to-eighth-grade reading level.** Copy should take zero brainpower to parse. Active voice. No adverbs. Cut every redundant word.
+- **Precision over sentiment (the engine of this pass).** Replace every vague claim with an observable fact. Not "we're reliable" — say "one-year bug warranty" or "you approve the exact price before we start." The facts do the persuading.
+- **Register: Hormozi's discipline, not his volume.** Borrow the mechanics — short declaratives, concrete numbers, contrast lines, sets of three, risk-reversal, second-person "you/your." Leave the theatrics — no hype, urgency, scarcity, bravado, or grand claims. bcns sounds confident and calm, not loud and salesy.
 
-- page: /
-  notes: thin home — hero + 3 nav cards + contact must feel complete, not sparse; nav cards are the primary interaction, make them obviously clickable
-  status: not started
+#### Approved phrases / cadence (keep or echo these)
 
-- page: /services
-  notes: 4 use-case cards (incl. AI consulting) + 3-step process; keep the AI card visually peer to the others, not an afterthought
-  status: not started
+- Contrast line (hero): "Off-the-shelf tools make you change your process. We build tools that fit it." *(strip the em-dash that currently trails it.)*
+- Honest-advice line (keep, it's the most credible thing on the site): "We'll tell you if you don't need custom software."
+- "No pitch, no obligation."
+- "You approve the exact price before any work starts."
+- Founder line (strip the em-dash): "Two founders. One builds, one makes sure it's worth building."
+- Value-prop angle to work in where it fits: **custom software without hiring a dev team**, and **stable** (reliability is a real, unclaimed differentiator).
+- Founding-client invitation (holding states): "Want to be one of them? Book a free consult."
 
-- page: /pricing
-  notes: 3 cards where card 3 is a day-rate, not a tier — differentiate it; [INPUT: …] price strings must not break the card rhythm
-  status: not started
+#### Resolved values (fill these exactly)
 
-- page: /about
-  notes: two equal founder cards; builder-first hierarchy — names and roles before schools
-  status: not started
+| Slot | Value |
+|---|---|
+| Pricing tier 1 name | `Standard build` |
+| Pricing tier 1 price | `$2,000–$5,000` |
+| Pricing tier 2 name | `Advanced build` |
+| Pricing tier 2 price | `$5,000–$15,000` |
+| Pricing tier 3 price | `$800 / day` |
+| Standard turnaround | `Delivered in about a week` |
+| Advanced turnaround | `Delivered in two to three weeks` |
+| Support model (both build tiers) | two bullets: `30 days of fixes and tweaks included` · `One year of bug fixes, free` |
+| Response-time promise (contact) | `one business day` |
+| FAQ pricing answer | "Every project gets a fixed quote after the free consult. Standard builds run $2,000 to $5,000. Advanced builds run $5,000 to $15,000. The quote is the price. No hourly surprises." |
+| FAQ turnaround answer | "Most single tools ship in about a week. Larger connected systems take two to three weeks. You get a delivery date with the quote, and we tell you right away if anything threatens it." |
+| FAQ "what if it breaks" answer | "For the first 30 days, tell us anything that needs fixing or refining and we handle it, no questions asked. After that, genuine bugs in what we built stay free to fix for a year. New features, or changes to things that already work, are quoted separately." |
 
-- page: /work
-  notes: holding state must look intentional and confident, not empty — this page is linked from a home nav card
-  status: not started
+Tier naming rationale (do not surface on the site): the split is **how hard it is for us to build**, not how much there is. A single very complex tool can be an Advanced build.
+
+#### Section-by-section notes (what to change and why)
+
+- **Hero.** Keep the badge ("Custom software for local businesses" — accurate, not SaaS). Keep the headline. Subheadline: strip the trailing em-dash; keep the off-the-shelf contrast line. Proof points: `Fixed quote before work starts` / **`Use it forever, free`** (replaces "You own everything we build") / `Free 30-minute consult`. Optionally work the "without hiring a dev team" angle into the subhead.
+- **How it works — step 3.** Rewrite to the support model: "We build it, walk your team through it, then give you 30 days to use it and tell us what needs fixing or tweaking. We handle those, no questions asked."
+- **Use cases.** Keep the four cards. Strip every em-dash in the descriptions (e.g. "Take appointments the way you already do, with deposits, reminders, and a calendar that matches your real workflow.").
+- **Contact section.** Rewrite the description without the em-dash and quote marks: "Send a few sentences about your business and the problem. We'll reply within one business day with next steps, and honest advice, even if that advice is you don't need custom software." Highlight 3: drop the code-ownership claim. Title `Yours to use`, body "Your data and accounts stay yours. It keeps running whether we work together or not."
+- **Pricing.** Rename tiers to Standard/Advanced; fill ranges and day rate; split the support line into the two bullets above. Keep the AI consulting card as a day rate, visually and verbally distinct from the two build tiers.
+- **FAQ.** Fill the three answers above. Keep the "Do I need to be technical" answer. Do **not** add a bug-vs-feature FAQ. Do **not** re-add an ownership FAQ.
+- **About.** Description: "Two founders. One builds, one makes sure it's worth building." **Nate bio:** builder-first, no fabricated portfolio and no cited projects (nothing is published or in real use yet). Frame how he thinks — fast, simple, stable — with Harvey Mudd CS as a credential line, not the headline. Remove the `[INPUT: notable projects]` beat entirely. **Brandon bio:** the business/people half — has worked inside small businesses, owns scoping, communication, and making sure every build earns its cost. **whyBcns:** honest founding story, e.g. "Small businesses get two bad options. Software that doesn't fit, or a price only big companies can pay. We build the third one. Custom tools, built lean, straight from the two of us." Credentials: keep only true lines (Harvey Mudd CS for Nate); leave Brandon's NYU program and any extra lines as Needs-Nate slots.
+- **Holding states (content is right — only scrub the AI-writing tells).** Strip em-dashes. Past-work body: "...as projects wrap. Each one covers the problem, what we built, and what changed." Reviews title: replace the limp "Reviews will live here too" with **"No reviews yet. That changes with our first client."** Reviews body: "Real names, real businesses, unedited. As soon as our first clients have something to say." Keep both CTAs. Optionally add one founding-client line (early clients get our full attention).
+- **Page meta.** Write real SEO titles (50–60 chars) and descriptions (140–160 chars) for all five pages from the positioning above. No Nate input needed.
+
+#### Needs-Nate (stay `[INPUT: …]` after C1)
+
+- [ ] **Founder photos** — both Nate and Brandon (`about.founders[n].photo`).
+- [ ] **Brandon's NYU program** and any specific credential lines (`[INPUT: NYU program]`, `[INPUT: credential 2/3]`).
+- [ ] **Brandon's experience summary** — the specifics of which small businesses / roles, if he wants them named beyond "worked inside small businesses."
+- [ ] **Any extra credential lines for Nate** beyond Harvey Mudd CS — if none, the pass drops the empty slots.
+- [ ] **First real past-work entry + review** — a data edit that flips /work off the holding state (not part of this copy pass).
+- [ ] **Contract-only facts** (not site copy): bcns retains IP while the client gets perpetual free use; warranty excludes third-party/outside changes and client edits; hosting, API, and infrastructure costs are always the client's responsibility.
 
 ---
 
@@ -295,12 +354,44 @@ url: http://localhost:3000
 
 > **⚠️ AUTONOMOUS RUN — STOP HERE**
 
-_dev-team-auto halts here. Section 2 runs via the `layout-loop` skill in a
-cowork session against the renderer dev server; Sections 3–4 are Needs-Nate._
+_dev-team-auto halts here. C1 (website voice pass) and P1–P6 (pizza app) are complete. Visual passes for both projects run via `layout-loop` in cowork; Sections 3–4 are Needs-Nate._
 
 ---
 
-## Section 2 — Visual pass (layout-loop, cowork)
+## Post-overnight — Visual passes (layout-loop, cowork)
+
+### bcns website — Visual pass
+
+brand: nate-personal
+launch: pnpm --filter web dev
+url: http://localhost:3000
+
+> Presentation only — never edit copy, data, props, logic, or routing. Isolated
+> branch, one focused change per pass, morning report, never auto-merged.
+> `[INPUT: …]` strings are content, not styling bugs — style them as normal text.
+> Run this pass AFTER C1 completes — the copy will have changed (new tier names, holding-state rewrites, bios).
+
+- page: /
+  notes: thin home — hero + 3 nav cards + contact must feel complete, not sparse; nav cards are the primary interaction, make them obviously clickable
+  status: not started
+
+- page: /services
+  notes: 4 use-case cards (incl. AI consulting) + 3-step process; keep the AI card visually peer to the others, not an afterthought
+  status: not started
+
+- page: /pricing
+  notes: 3 cards where card 3 is a day-rate, not a tier — differentiate it; price strings like `$2,000–$5,000` must not break the card rhythm
+  status: not started
+
+- page: /about
+  notes: two equal founder cards; builder-first hierarchy — names and roles before schools
+  status: not started
+
+- page: /work
+  notes: holding state must look intentional and confident, not empty — this page is linked from a home nav card
+  status: not started
+
+### DeLuca's app — Visual pass
 
 brand: TBD (client brand profile — pizza-shop warmth; define at session start)
 

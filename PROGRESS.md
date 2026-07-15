@@ -9,11 +9,10 @@
 ---
 
 ## Current position
-- **Status:** Section 1 + Section 2 complete. B1–B4 DONE on experimental-v2. Layout-loop passes V1–V5 DONE on branch layout-loop/bcns-section-2 (awaiting Nate review + merge).
-- **Next:** Nate reviews layout-loop branch and merges to experimental-v2. Then: fill [INPUT:] slots (prices, turnaround, founder specifics), deploy to Vercel, set up domain + contact form.
-- **Blockers (Needs-Nate):** Fill [INPUT: …] slots (prices, turnaround, founder bios/photos/credentials, whyBcns), first real past-work entry, domain + deploy. None block Section 2.
-- **Blockers (Needs-Nate):** Domain, inbox/form provider, real content (INPUT slots), legal text, deploy — all deferred. None block Section 1.
-- **Last updated:** 2026-07-14 (v2 plan started — dev-team-auto run)
+- **Status:** Combined overnight branch. B1–B4 done (site restructure). V1–V5 done (layout-loop visual pass, on layout-loop/bcns-section-2). C1 NOT STARTED (voice/content pass). P1–P6 NOT STARTED (DeLuca's pizza app).
+- **Next:** Run dev-team-auto on this branch — it will execute C1 then P1–P6 in order, then halt at the STOP HERE. Both layout-loop visual passes (website + pizza) run in cowork after.
+- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy. None block the overnight run.
+- **Last updated:** 2026-07-15 (overnight-combined branch created — C1 + P1–P6 queued)
 
 ---
 
