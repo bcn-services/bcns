@@ -188,3 +188,142 @@ url: http://localhost:3000
 - Registry and `CONTENT.md` update together, always 1:1.
 - No invented facts. Copy comes from the appendix; unknowns stay `[INPUT: …]`.
 - `pnpm lint && pnpm typecheck && pnpm build` green after every item.
+
+---
+---
+
+# Part II — Repo setup plan (client apps)
+
+> Locked in the 2026-07-14 repo/pizza grilling session. Governs how all client
+> apps are structured in this monorepo from here on. The reusable template is
+> **extracted after the first client app ships** — nothing here is speculative
+> scaffolding.
+
+## Decisions locked
+
+| Area | Decision |
+| --- | --- |
+| **Client apps live in the monorepo** | `apps/<business-name>/` (Option A over separate repos). Folder name = the business's name, always. No product-type suffixes. |
+| **Shipped = frozen** | The delivered artifact is a packaged binary — repo churn can never reach a client's machine. Rebuildability is protected by: (1) **git tag at ship** (`<business>-v1.0-shipped`) capturing the whole workspace, (2) committed lockfile. |
+| **Shared packages are additive-only** | `@bcns/ui` / `@bcns/config` never break existing APIs. Incompatible change needed → add a new component, don't mutate the old one. |
+| **Product taxonomy lives in app READMEs, not folders** | Each `apps/<business>/README.md` carries frontmatter: `type: dashboard \| workflow-app`, `delivery: local-electron \| hosted-web \| …`, `data_sources: […]`. Dashboard-vs-app is a template axis, not a folder axis. |
+| **No premature package extraction** | All app logic stays app-local for the first build. `packages/` gains nothing new until a shipped app proves what's reusable. Expected first graduates (post-ship): ingestion interface, Electron shell scaffold, packaging config. |
+| **Renderer/shell separation (mobile insurance)** | Every client app splits `src/renderer/` (React web app — all UI + product logic, **never imports Electron APIs**) from `src/shell-electron/` (window, polling, file access), talking through one typed IPC bridge. Mobile later = new shell (Capacitor/hosted) around the same renderer, zero rewrite. |
+| **Template extraction (post-ship)** | After the first client ships: copy `apps/<business>/` → `templates/local-app/`, strip client specifics into config/slots. Future taxonomy (`templates/hosted-dashboard/`, …) earns its way in from shipped apps only. |
+| **Delivery-shape decision framework (future clients)** | Ask in order: (1) Who looks at it — one person / one machine? → local app, no auth. Multiple people/devices? → hosted. (2) Must anything run when no one is using it? → needs a host or poll-on-open redesign. (3) What's the 3-year zero-touch failure surface? Every dependency is scored: subscription that can lapse, token that can expire, service that can go down, API that can deprecate. Fewest wins. (4) Does the client pay for hosting knowingly, or is $0/forever required? |
+
+## Conventions for every client app
+
+- Extends `@bcns/ui` + `@bcns/config` via `workspace:*` (per root CLAUDE.md).
+- Fail visible, degrade manual: every automation, on failure, shows one plain-English banner while the rest of the app keeps working via manual paths. Automation failure never bricks the product.
+- All money/date business math in pure-function modules, separate from UI — unit-testable headlessly.
+- Client credentials/config live only on the client machine (gitignored `.env`/app-data), populated at handoff. Test fixtures are always fabricated, never real client documents.
+- App must run its renderer as a browser dev server (`pnpm dev` → localhost) — required by the two-phase build cycle (dev-team-auto QA + layout-loop both drive the browser, not the packaged binary). Packaging happens after both phases.
+
+---
+---
+
+# Part III — First product: revenue tracker (client: pizza business — real name TBD, folder placeholder `apps/pizza/`)
+
+> A single local desktop app where a non-technical pizza-shop owner opens one
+> window and immediately sees how his business is doing. Install once, leave
+> alone: $0/month, no server, no subscription, no OAuth. Two-phase build:
+> **dev-team-auto** builds Section 1 (architecture + function, plain UI) and
+> stops at the marker; **layout-loop** runs Section 2 (design pass) in cowork;
+> packaging + handoff are Needs-Nate items after both.
+
+## Decisions locked (2026-07-14 grilling)
+
+| Area | Decision |
+| --- | --- |
+| **Shape** | Electron desktop app (over Tauri: TS everywhere, Node ecosystem for IMAP/SQLite, bundled rendering engine frozen at ship — system-webview drift can't touch it). React + TypeScript renderer. electron-builder producing **both** Mac `.dmg` and Windows installer — client's laptop OS unknown; pick at handoff. Installers are unsigned (Nate installs in person; do not buy signing certs). |
+| **Users/auth** | One user, his personal laptop, monitoring-only. **No auth, no login screen.** |
+| **Storage** | Local SQLite (`better-sqlite3`) in Electron's app-data dir. Persists across sessions automatically. |
+| **Backup** | Zero-touch: on every app close (and daily on open), copy the SQLite file to a cloud-synced folder on his machine (Google Drive/iCloud/OneDrive — whichever exists, detected/configured at handoff). Most likely 3-year failure is his laptop dying, not any API. |
+| **Ingestion — invoices (Napoli Foods, Foxon Park/Pepsi, utilities)** | Automatic: on app open, IMAP-poll his email, pull **every unprocessed email with a PDF attachment** (classify, don't filter by sender — vendor lists rot), send PDF→image→LLM, extract `{is_invoice, vendor, date, amount}` JSON. Store confirmed invoices; show them in a "newly imported" strip. Poll-on-open only — **no background daemon**; IMAP catches up on everything missed. |
+| **Email access** | IMAP + app-specific password (no OAuth — token expiry is the #1 leave-alone killer). Provider TBD: Gmail/ISP = fine; **Outlook/M365 = problem (Microsoft killed basic-auth IMAP)** — if Outlook, drag-and-drop becomes primary and email polling is dropped. Confirm provider before handoff; build assumes generic IMAP (`imapflow`). |
+| **LLM** | Anthropic API, stable alias (not a pinned dated model). **Client's own account + his card, set up entirely by Nate at handoff, hard spend cap (~$5/mo).** Failure = visible banner + manual fallback, fixable by phone call; never a code update. All LLM calls go through one module, mocked in all tests — QA never hits the live API. |
+| **Ingestion — revenue (Slice POS)** | v1: manual entry (period + amount). **First investigation when his login arrives: Slice's daily/weekly summary emails** — if they exist, revenue rides the existing email+LLM pipeline and manual entry drops to fallback. Slice API = later slot. |
+| **Ingestion — labor (unknown employee app)** | v1: manual entry. Integration slot reserved. |
+| **Rent** | Recurring fixed cost: entered once with start date + amount, auto-materializes monthly. Editable. |
+| **Extensibility slot** | Single app-local `IngestionSource` interface — `{ name, fetch(), parse() } → NormalizedTransaction[]`. Email+LLM, drag-and-drop, manual entry, recurring-rent are the v1 implementations. Slice API / labor app later = one new file each; nothing else changes. **Not** a `packages/` module yet. |
+| **Fallback chain** | Every automated source degrades: email fails → banner + drag-and-drop PDF (same parser); LLM fails → banner + drag-and-drop with manual amount fields; everything fails → manual entry tab still works. |
+| **Reporting grain** | **Monthly.** (Week toggle deferred; revisit after he uses it.) |
+| **Done** | Two milestones: **RC (ready-to-ship)** = end of Section 3 below — installers built, tests green, demo data correct. **Done** = working on his machine with his real accounts (Section 4 handoff checklist complete). |
+
+## Guardrails (Section 1 / dev-team-auto)
+
+- Function and structure only — plain-but-correct UI; **no visual design, no `dt-ui`**. Section 2 (layout-loop) owns look-and-feel.
+- Every `done when:` headlessly verifiable: pure unit tests for parsing, P&L math, date bucketing, recurring materialization; behavioral checks against the **renderer dev server** (localhost), never the packaged binary.
+- No live network in tests: IMAP mocked with fixture mailboxes; LLM mocked with fixture responses; fixture invoices are fabricated.
+- Renderer never imports Electron/Node APIs — typed IPC bridge only (enforced by lint rule or import test).
+- `pnpm lint && pnpm typecheck && pnpm build` green after every item.
+
+## Section 1 — Architecture + function (dev-team-auto)
+
+### P1 — App scaffold: Electron + renderer/shell split · `status: todo` · `track: full`
+
+- **task:** Create `apps/pizza/` in the workspace: Electron main process (`src/shell-electron/`), React+TS renderer (`src/renderer/`, Vite dev server), typed IPC bridge (`src/bridge/` — one interface file defining every shell capability the renderer may call: db queries, ingestion trigger, file dialogs). Depends on `@bcns/ui`/`@bcns/config` via `workspace:*`. `pnpm dev` runs the renderer in a browser at localhost with a mock bridge; `pnpm dev:electron` runs the real shell. App README with taxonomy frontmatter (`type: workflow-app`, `delivery: local-electron`).
+- **done when:** renderer loads in a plain browser via `pnpm dev` with the mock bridge; Electron window opens via `pnpm dev:electron`; an import-boundary test proves `src/renderer/` imports nothing from `electron`/`node:*`; build green.
+
+### P2 — Data model + P&L core · `status: todo` · `track: full`
+
+- **task:** SQLite schema (via `better-sqlite3`, migrations run on app start): `transactions` (id, date, amount_cents, direction: revenue|expense, category: food|beverage|utilities|rent|labor|other, vendor, source: email|dragdrop|manual|recurring, source_ref, created_at), `recurring_rules` (rent), `processed_emails` (message-id dedupe), `settings`. Pure-function P&L module: bucket transactions into calendar months; compute per-month revenue, expenses (total + by category), profit; 12-month series; plain-English summary sentence generator ("You made $X more than you spent in <month>"). Recurring materializer: rent rule → one transaction per month, idempotent.
+- **done when:** unit tests cover month bucketing (incl. year boundaries, timezone-safe date handling), P&L math with mixed transactions, category totals, recurring idempotency (running twice creates no duplicates), summary sentence for profit/loss/zero cases; schema migrates from empty; build green.
+
+### P3 — Ingestion framework + manual + drag-and-drop sources · `status: todo` · `track: full`
+
+- **task:** Define `IngestionSource` interface + `NormalizedTransaction` type; ingestion runner that executes sources, dedupes (by source_ref), writes transactions, and records a per-run report (found/imported/failed) for the UI. Implement: **manual-entry source** (renderer form: direction, date, amount, category, vendor — big inputs, no jargon); **recurring source** (rent, from P2); **drag-and-drop source** (drop zone accepts PDF → pdf-to-image → LLM extraction module → prefilled confirm card the user approves/edits before save; on LLM failure, same card with empty amount for manual fill). LLM extraction module: one function, Anthropic API via stable alias, strict JSON schema out `{is_invoice, vendor, date, amount, confidence}`; fully mockable.
+- **done when:** unit tests: runner dedupe (same source_ref twice → one transaction), each source normalizes to identical `NormalizedTransaction` shape, LLM module returns parsed fixture JSON and surfaces malformed-response errors; behavioral check on dev server: manual entry creates a transaction that appears in the dashboard; drag-and-drop with a fixture PDF + mocked LLM shows the confirm card and saves on approve; build green.
+
+### P4 — Email (IMAP) ingestion source · `status: todo` · `track: full`
+
+- **task:** IMAP source using `imapflow`: on app open (and via a "Check now" button), connect with host/user/app-password from settings, find emails with PDF attachments not in `processed_emails`, run each through the P3 LLM extraction; `is_invoice: true` + confidence high → import with vendor/category mapping (vendor string → category via a small editable mapping table, default `other`); low confidence → queue as a review card (same confirm card as P3). Record message-ids processed regardless of outcome. Failure handling per the fallback chain: connection/auth failure sets a status the UI renders as the plain-English banner; never crashes; drag-and-drop unaffected.
+- **done when:** tests against a mocked IMAP server/fixtures: new invoice email → transaction imported once (re-run imports nothing); non-invoice PDF (fixture menu) → classified out, no transaction; low-confidence → lands in review queue; auth failure → status flag set, no crash; vendor→category mapping applied; build green.
+
+### P5 — Dashboard (the product) · `status: todo` · `track: full`
+
+- **task:** Main screen, monthly grain: (1) headline — current month Revenue / Expenses / Profit as three large figures, profit green/red, plain-English sentence beneath (from P2); (2) 12-month profit bar chart; (3) current-month expense breakdown by category (bars, not pie); (4) "Since you last opened" strip listing newly imported items from the last ingestion run report ("3 new invoices: Napoli $840 …"); (5) any active failure banners (email/LLM status from P4) — one line, plain English, dismissible-but-returns-while-broken. Second tab **"Add & fix"**: manual entry form, drag-and-drop zone, review queue, transaction list for the current month with edit/delete, rent rule editor. Month navigation (prev/next). Plain functional styling only.
+- **done when:** behavioral checks on dev server with seeded fixture data: headline numbers equal P2-computed values for the seeded month; sentence matches profit sign; 12 bars render with correct values; category bars match seeded totals; newly-imported strip reflects a simulated ingestion run; editing a transaction updates the headline; banner renders when email status is failed; build green.
+
+### P6 — Settings, backup, first-run · `status: todo` · `track: full`
+
+- **task:** Settings screen (intended for Nate at handoff, not the client): email host/user/app-password, Anthropic key, backup folder path, vendor→category mapping editor. Backup: on app quit and once per calendar day on open, copy the SQLite file to `<backup folder>/pizza-backup-<date>.db`, keep last 30, surface last-backup date subtly on the dashboard; backup failure → the standard banner. First-run: empty-state dashboard with a friendly "no data yet" state (no crash on zero transactions). electron-builder config for Mac `.dmg` + Windows NSIS (unsigned).
+- **done when:** unit tests: backup rotation keeps 30, daily-on-open triggers at most once per day, settings round-trip persist; behavioral: empty DB renders the empty state, settings edits persist across renderer reload; `pnpm package` (or equivalent) produces both installers locally; build green.
+
+---
+
+> **⚠️ AUTONOMOUS RUN — STOP HERE**
+
+_dev-team-auto halts here. Section 2 runs via the `layout-loop` skill in a
+cowork session against the renderer dev server; Sections 3–4 are Needs-Nate._
+
+---
+
+## Section 2 — Visual pass (layout-loop, cowork)
+
+brand: TBD (client brand profile — pizza-shop warmth; define at session start)
+
+- Targets: dashboard screen, Add & fix tab, confirm/review cards, banners, empty state.
+- North star: a man who barely uses computers reads the headline in 3 seconds. Big type, high contrast, no chart junk, no jargon anywhere ("Money in", not "Revenue", if it reads better).
+- Presentation only — no logic, schema, or IPC changes. Isolated branch, no merge without Nate's sign-off.
+
+## Section 3 — Release candidate (Needs-Nate) — *milestone: ready to ship*
+
+- [ ] Review + merge Sections 1–2; tag nothing yet.
+- [ ] Load realistic demo data; eyeball every number against hand-computed P&L.
+- [ ] Live-fire test with real Anthropic key + a real test mailbox: send fixture invoices, confirm end-to-end import.
+- [ ] Build both installers; install on one of our machines from the artifact (not from dev) and re-verify.
+- [ ] **RC reached** when all above check out.
+
+## Section 4 — Handoff (Needs-Nate) — *milestone: done*
+
+- [ ] Get client's email provider (**if Outlook/M365 → decision point: drag-and-drop-primary variant**), Slice login, labor-app name.
+- [ ] Check his inbox for Slice summary emails → if present, plan revenue automation as v1.1 (new `IngestionSource`).
+- [ ] On his laptop: install correct-OS build; enable 2FA + generate email app password; create his Anthropic account (his card, ~$5 spend cap); configure settings; point backup at his synced folder and watch one backup sync.
+- [ ] Watch real invoices import; correct vendor→category mappings live.
+- [ ] Rename `apps/pizza/` → real business name; update README frontmatter.
+- [ ] Tag `<business>-v1.0-shipped`; commit lockfile.
+- [ ] Walk him through it: open app → read numbers. That's the whole tutorial.
+- [ ] **Done** when he reads this month's profit on his own machine without help.
+- [ ] Post-ship (bcns, not client): extract `templates/local-app/` from the shipped app.
