@@ -23,15 +23,15 @@ function createWindow(): BrowserWindow {
       preload: path.join(__dirname, "../preload/index.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
   if (process.env["ELECTRON_RENDERER_URL"] != null) {
     // electron-vite injects this in dev mode
-    void win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+    win.loadURL(process.env["ELECTRON_RENDERER_URL"]).catch(err => console.error("[main] load failed", err));
   } else {
-    void win.loadFile(path.join(__dirname, "../renderer/index.html"));
+    win.loadFile(path.join(__dirname, "../renderer/index.html")).catch(err => console.error("[main] load failed", err));
   }
 
   return win;
@@ -85,11 +85,21 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(() => {
   registerIpcHandlers();
-  createWindow();
+  try {
+    createWindow();
+  } catch (err) {
+    console.error("[main] createWindow failed", err);
+    app.quit();
+  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      try {
+        createWindow();
+      } catch (err) {
+        console.error("[main] createWindow failed", err);
+        app.quit();
+      }
     }
   });
 });

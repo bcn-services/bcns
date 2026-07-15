@@ -15,6 +15,12 @@ export interface DialogOptions {
 export interface BridgeAPI {
   /** DB operations — implemented in P2 */
   db: {
+    /**
+     * SECURITY: the ipcMain handler for "db:query" MUST use parameterized
+     * queries exclusively (e.g. db.prepare(sql).all(...params)).  It must
+     * never pass the client-supplied `sql` string directly to SQLite without
+     * an allowlist check — doing so would open a SQL injection vector.
+     */
     query: (sql: string, params?: unknown[]) => Promise<unknown[]>;
   };
 

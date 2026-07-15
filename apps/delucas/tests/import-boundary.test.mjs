@@ -13,6 +13,10 @@ import { fileURLToPath } from "url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const RENDERER_DIR = join(__dirname, "../src/renderer");
+const BRIDGE_DIR = join(__dirname, "../src/bridge");
+
+/** Files inside BRIDGE_DIR that are intentionally allowed to import from electron/node */
+const BRIDGE_EXCLUDED = new Set([join(BRIDGE_DIR, "preload.ts")]);
 
 /** Patterns that must never appear in renderer source */
 const FORBIDDEN_PATTERNS = [
@@ -38,7 +42,10 @@ function collectSourceFiles(dir) {
   return files;
 }
 
-const files = collectSourceFiles(RENDERER_DIR);
+const files = [
+  ...collectSourceFiles(RENDERER_DIR),
+  ...collectSourceFiles(BRIDGE_DIR).filter(f => !BRIDGE_EXCLUDED.has(f)),
+];
 const violations = [];
 
 for (const file of files) {
