@@ -42,7 +42,7 @@ function formatCents(cents: number): string {
 export function CategoryBars({ breakdown }: CategoryBarsProps): React.JSX.Element {
   if (breakdown === null) {
     return (
-      <div className="border border-border rounded-lg p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl bg-card border border-border shadow-sm p-4 text-sm text-muted-foreground">
         Loading expense breakdown…
       </div>
     );
@@ -53,15 +53,15 @@ export function CategoryBars({ breakdown }: CategoryBarsProps): React.JSX.Elemen
 
   if (total === 0) {
     return (
-      <div className="border border-border rounded-lg p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl bg-card border border-border shadow-sm p-4 text-sm text-muted-foreground">
         No expenses this month
       </div>
     );
   }
 
   return (
-    <div className="border border-border rounded-lg p-4 space-y-3">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+    <div className="rounded-xl bg-card border border-border shadow-sm p-5 space-y-3">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
         Expenses by category
       </p>
       {CATEGORY_ORDER.filter((k) => breakdown[k] > 0).map((key) => {

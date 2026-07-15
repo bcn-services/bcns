@@ -29,8 +29,8 @@ function shortMonth(monthKey: string): string {
 export function ProfitBarChart({ series }: ProfitBarChartProps): React.JSX.Element {
   if (series.length === 0) {
     return (
-      <div className="border border-border rounded-lg p-4 text-center text-sm text-muted-foreground h-[180px] flex items-center justify-center">
-        No data yet
+      <div className="rounded-xl bg-card border border-border shadow-sm p-4 h-[180px] flex items-center justify-center text-sm text-muted-foreground">
+        No data yet — profit chart will appear here
       </div>
     );
   }
@@ -44,8 +44,8 @@ export function ProfitBarChart({ series }: ProfitBarChartProps): React.JSX.Eleme
   const zeroY = TOP_PADDING + drawHeight / 2;
 
   return (
-    <div className="border border-border rounded-lg p-4">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+    <div className="rounded-xl bg-card border border-border shadow-sm p-4">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
         12-month profit
       </p>
       <svg
