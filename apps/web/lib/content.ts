@@ -2,10 +2,11 @@
  * Typed content registry — single source of truth for all section copy.
  *
  * Rules:
- * - Every string field is either a "[SLOT: …]" placeholder or a neutral
- *   structural default (step numbers, etc.).
+ * - Strings with "[INPUT: …]" are real copy — Nate fills them; they render as-is.
  * - Icons stay in component files, mapped by array index.
  * - siteConfig (site.ts) remains the source for name / domain / email.
+ * - problemSolution and deliveryModels interfaces are kept for type safety but
+ *   their registry entries are removed — those sections are cut from all pages.
  */
 
 // ---------------------------------------------------------------------------
@@ -21,18 +22,6 @@ export interface HeroContent {
   proofPoints: [string, string, string];
 }
 
-export interface ProblemItem {
-  problem: string;
-  solution: string;
-}
-
-export interface ProblemSolutionContent {
-  eyebrow: string;
-  title: string;
-  description: string;
-  items: [ProblemItem, ProblemItem, ProblemItem];
-}
-
 export interface StepItem {
   step: string;
   title: string;
@@ -44,18 +33,6 @@ export interface HowItWorksContent {
   title: string;
   description: string;
   items: [StepItem, StepItem, StepItem];
-}
-
-export interface DeliveryModelItem {
-  title: string;
-  description: string;
-}
-
-export interface DeliveryModelsContent {
-  eyebrow: string;
-  title: string;
-  description: string;
-  items: [DeliveryModelItem, DeliveryModelItem, DeliveryModelItem];
 }
 
 export interface UseCaseItem {
@@ -187,9 +164,7 @@ export interface PageMetaRegistry {
 
 export interface SiteContent {
   hero: HeroContent;
-  problemSolution: ProblemSolutionContent;
   howItWorks: HowItWorksContent;
-  deliveryModels: DeliveryModelsContent;
   useCases: UseCasesContent;
   contactSection: ContactSectionContent;
   pastWork: PastWorkContent;
@@ -207,262 +182,258 @@ export interface SiteContent {
 
 export const siteContent: SiteContent = {
   hero: {
-    badge: "[SLOT: hero/badge]",
-    headline: "[SLOT: hero/headline]",
-    subheadline: "[SLOT: hero/subheadline]",
-    ctaPrimary: "[SLOT: hero/cta-primary]",
-    ctaSecondary: "[SLOT: hero/cta-secondary]",
+    badge: "Custom software for local businesses",
+    headline: "Software built around how your business already works",
+    subheadline:
+      "Off-the-shelf tools make you change your process. We build tools that fit it — scoped, quoted, and delivered.",
+    ctaPrimary: "Book a free consult",
+    ctaSecondary: "See what we build",
     proofPoints: [
-      "[SLOT: hero/proof-point-1]",
-      "[SLOT: hero/proof-point-2]",
-      "[SLOT: hero/proof-point-3]",
-    ],
-  },
-
-  problemSolution: {
-    eyebrow: "[SLOT: problem-solution/eyebrow]",
-    title: "[SLOT: problem-solution/title]",
-    description: "[SLOT: problem-solution/description]",
-    items: [
-      {
-        problem: "[SLOT: problem-solution/item-1-problem]",
-        solution: "[SLOT: problem-solution/item-1-solution]",
-      },
-      {
-        problem: "[SLOT: problem-solution/item-2-problem]",
-        solution: "[SLOT: problem-solution/item-2-solution]",
-      },
-      {
-        problem: "[SLOT: problem-solution/item-3-problem]",
-        solution: "[SLOT: problem-solution/item-3-solution]",
-      },
+      "Fixed quote before work starts",
+      "You own everything we build",
+      "Free 30-minute consult",
     ],
   },
 
   howItWorks: {
-    eyebrow: "[SLOT: how-it-works/eyebrow]",
-    title: "[SLOT: how-it-works/title]",
-    description: "[SLOT: how-it-works/description]",
+    eyebrow: "The process",
+    title: "Three steps from first call to finished tool",
+    description: "You'll know the price and the plan before anything gets built.",
     items: [
       {
         step: "01",
-        title: "[SLOT: how-it-works/step-1-title]",
-        description: "[SLOT: how-it-works/step-1-description]",
+        title: "Free consult",
+        description:
+          "A 30-minute conversation about how your business runs and where the friction is. No jargon.",
       },
       {
         step: "02",
-        title: "[SLOT: how-it-works/step-2-title]",
-        description: "[SLOT: how-it-works/step-2-description]",
+        title: "Scope & quote",
+        description:
+          "We write up exactly what we'll build, what it costs, and when it lands. You approve first.",
       },
       {
         step: "03",
-        title: "[SLOT: how-it-works/step-3-title]",
-        description: "[SLOT: how-it-works/step-3-description]",
-      },
-    ],
-  },
-
-  deliveryModels: {
-    eyebrow: "[SLOT: delivery-models/eyebrow]",
-    title: "[SLOT: delivery-models/title]",
-    description: "[SLOT: delivery-models/description]",
-    items: [
-      {
-        title: "[SLOT: delivery-models/item-1-title]",
-        description: "[SLOT: delivery-models/item-1-description]",
-      },
-      {
-        title: "[SLOT: delivery-models/item-2-title]",
-        description: "[SLOT: delivery-models/item-2-description]",
-      },
-      {
-        title: "[SLOT: delivery-models/item-3-title]",
-        description: "[SLOT: delivery-models/item-3-description]",
+        title: "Build & handoff",
+        description:
+          "We build it, walk your team through it, and include [INPUT: support window] of fixes. You own the result.",
       },
     ],
   },
 
   useCases: {
-    eyebrow: "[SLOT: use-cases/eyebrow]",
-    title: "[SLOT: use-cases/title]",
-    description: "[SLOT: use-cases/description]",
+    eyebrow: "What we build",
+    title: "Tools shaped to your business, not the other way around",
+    description:
+      "Four kinds of problems we solve most — if yours isn't here, ask anyway.",
     items: [
       {
-        tag: "[SLOT: use-cases/item-1-tag]",
-        title: "[SLOT: use-cases/item-1-title]",
-        description: "[SLOT: use-cases/item-1-description]",
+        tag: "Bookings",
+        title: "Scheduling & booking systems",
+        description:
+          "Take appointments the way you already do — deposits, reminders, and a calendar that matches your real workflow.",
       },
       {
-        tag: "[SLOT: use-cases/item-2-tag]",
-        title: "[SLOT: use-cases/item-2-title]",
-        description: "[SLOT: use-cases/item-2-description]",
+        tag: "Operations",
+        title: "Inventory & back-office automation",
+        description:
+          "Replace the spreadsheet juggling: ordering, invoicing, and tracking that update themselves.",
       },
       {
-        tag: "[SLOT: use-cases/item-3-tag]",
-        title: "[SLOT: use-cases/item-3-title]",
-        description: "[SLOT: use-cases/item-3-description]",
+        tag: "Insight",
+        title: "Dashboards & reporting",
+        description:
+          "One screen that shows how the business is doing — sales, costs, trends — without exporting anything.",
       },
       {
-        tag: "[SLOT: use-cases/item-4-tag]",
-        title: "[SLOT: use-cases/item-4-title]",
-        description: "[SLOT: use-cases/item-4-description]",
+        tag: "AI",
+        title: "AI consulting",
+        description:
+          "A working session to find where AI actually saves you time, then set it up with you. Priced per day.",
       },
     ],
   },
 
   contactSection: {
-    eyebrow: "[SLOT: contact/eyebrow]",
-    title: "[SLOT: contact/title]",
-    description: "[SLOT: contact/description]",
+    eyebrow: "Get in touch",
+    title: "Tell us what's slowing you down",
+    description:
+      "Send a few sentences about your business and the problem. We'll reply within [INPUT: response-time promise] with next steps — and honest advice, even if that advice is \"you don't need custom software.\"",
     highlights: [
       {
-        title: "[SLOT: contact/highlight-1-title]",
-        description: "[SLOT: contact/highlight-1-description]",
+        title: "Free consult",
+        description:
+          "A 30-minute call about how your business runs. No pitch, no obligation.",
       },
       {
-        title: "[SLOT: contact/highlight-2-title]",
-        description: "[SLOT: contact/highlight-2-description]",
+        title: "Fixed quote",
+        description: "You approve the exact price before any work starts.",
       },
       {
-        title: "[SLOT: contact/highlight-3-title]",
-        description: "[SLOT: contact/highlight-3-description]",
+        title: "You own it",
+        description:
+          "Code, accounts, and data are yours, working with us or not.",
       },
     ],
   },
 
   pastWork: {
-    eyebrow: "[SLOT: past-work/eyebrow]",
-    title: "[SLOT: past-work/title]",
-    description: "[SLOT: past-work/description]",
+    eyebrow: "Past work",
+    title: "Past work",
+    description: "What we've built, and what it changed for the businesses using it.",
     items: [],
     holdingState: {
-      title: "[SLOT: past-work/holding-title]",
-      body: "[SLOT: past-work/holding-body]",
-      ctaLabel: "[SLOT: past-work/holding-cta]",
-      ctaHref: "[SLOT: past-work/holding-cta-href]",
+      title: "Our first builds are in progress",
+      body: "We're building for our first clients right now. Case studies land here as projects wrap — each covering the problem, what we built, and what changed.",
+      ctaLabel: "Want to be one of them? Book a free consult.",
+      ctaHref: "/#contact",
     },
   },
 
   reviews: {
-    eyebrow: "[SLOT: reviews/eyebrow]",
-    title: "[SLOT: reviews/title]",
-    description: "[SLOT: reviews/description]",
+    eyebrow: "Reviews",
+    title: "Reviews",
+    description: "What our clients say.",
     items: [],
     holdingState: {
-      title: "[SLOT: reviews/holding-title]",
-      body: "[SLOT: reviews/holding-body]",
-      ctaLabel: "[SLOT: reviews/holding-cta]",
-      ctaHref: "[SLOT: reviews/holding-cta-href]",
+      title: "Reviews will live here too",
+      body: "Real names, real businesses, unedited — as soon as our first clients have something to say.",
+      ctaLabel: "Want to be one of them? Book a free consult.",
+      ctaHref: "/#contact",
     },
   },
 
   pricing: {
-    eyebrow: "[SLOT: pricing/eyebrow]",
-    title: "[SLOT: pricing/title]",
-    description: "[SLOT: pricing/description]",
+    eyebrow: "Pricing",
+    title: "Two build sizes, one day rate — quoted before we start",
+    description:
+      "Every project gets a fixed quote up front. The tiers show typical scope; your quote depends on the consult.",
     tiers: [
       {
-        name: "[SLOT: pricing/tier-1-name]",
-        price: "[SLOT: pricing/tier-1-price]",
-        description: "[SLOT: pricing/tier-1-description]",
+        name: "Starter build",
+        price: "[INPUT: starter price range]",
+        description:
+          "A single-purpose tool: a booking page, a report generator, one automation.",
         features: [
-          "[SLOT: pricing/tier-1-feature-1]",
-          "[SLOT: pricing/tier-1-feature-2]",
-          "[SLOT: pricing/tier-1-feature-3]",
+          "One core workflow, built end to end",
+          "Delivered in [INPUT: starter turnaround]",
+          "[INPUT: support window] of included fixes",
         ],
       },
       {
-        name: "[SLOT: pricing/tier-2-name]",
-        price: "[SLOT: pricing/tier-2-price]",
-        description: "[SLOT: pricing/tier-2-description]",
+        name: "Full build",
+        price: "[INPUT: full-build price range]",
+        description:
+          "A system your business runs on: multiple workflows, logins, data that stays in sync.",
         features: [
-          "[SLOT: pricing/tier-2-feature-1]",
-          "[SLOT: pricing/tier-2-feature-2]",
-          "[SLOT: pricing/tier-2-feature-3]",
+          "Multiple connected workflows",
+          "Delivered in [INPUT: full-build turnaround]",
+          "[INPUT: support window] of included fixes",
         ],
       },
       {
-        name: "[SLOT: pricing/tier-3-name]",
-        price: "[SLOT: pricing/tier-3-price]",
-        description: "[SLOT: pricing/tier-3-description]",
+        name: "AI consulting",
+        price: "[INPUT: day rate] / day",
+        description:
+          "Working sessions to find and set up AI where it pays for itself.",
         features: [
-          "[SLOT: pricing/tier-3-feature-1]",
-          "[SLOT: pricing/tier-3-feature-2]",
-          "[SLOT: pricing/tier-3-feature-3]",
+          "Audit of where AI fits your operation",
+          "Hands-on setup, not a slide deck",
+          "Plain-English handoff notes",
         ],
       },
     ],
   },
 
   faq: {
-    eyebrow: "[SLOT: faq/eyebrow]",
-    title: "[SLOT: faq/title]",
-    description: "[SLOT: faq/description]",
+    eyebrow: "FAQ",
+    title: "The questions we'd ask too",
+    description: "Anything else — ask in the form and we'll answer straight.",
     items: [
       {
-        question: "[SLOT: faq/item-1-question]",
-        answer: "[SLOT: faq/item-1-answer]",
+        question: "How much will my project cost?",
+        answer:
+          "Every project gets a fixed quote after the free consult. Typical starter builds run [INPUT: starter range]; full builds [INPUT: full range]. The quote is the price — no hourly surprises.",
       },
       {
-        question: "[SLOT: faq/item-2-question]",
-        answer: "[SLOT: faq/item-2-answer]",
+        question: "How long does a build take?",
+        answer:
+          "[INPUT: typical turnaround summary]. You get a delivery date with the quote, and we tell you immediately if anything threatens it.",
       },
       {
-        question: "[SLOT: faq/item-3-question]",
-        answer: "[SLOT: faq/item-3-answer]",
+        question: "What happens if something breaks after delivery?",
+        answer:
+          "Every build includes [INPUT: support window] of fixes at no charge. After that, we're a message away.",
+      },
+      {
+        question: "Do I need to be technical to work with you?",
+        answer:
+          "No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.",
+      },
+      {
+        question: "Who owns what you build?",
+        answer:
+          "You do — code, accounts, and data. If we stop working together, everything keeps running and it's yours.",
       },
     ],
   },
 
   about: {
-    eyebrow: "[SLOT: about/eyebrow]",
-    title: "[SLOT: about/title]",
-    description: "[SLOT: about/description]",
+    eyebrow: "About",
+    title: "The people behind bcns",
+    description: "Two founders — one builds, one makes sure it's worth building.",
     founders: [
       {
-        name: "[SLOT: about/founder-1-name]",
-        roleLine: "[SLOT: about/founder-1-role]",
-        bio: "[SLOT: about/founder-1-bio]",
+        name: "Nate Seluga",
+        roleLine: "Engineering",
+        photo: "[INPUT: photo]",
+        bio: "what he builds and why custom tools for small businesses; [INPUT: 1-2 notable projects with concrete outcomes]; builder-first — school is a credential, not the lead.",
         credentials: [
-          "[SLOT: about/founder-1-credential-1]",
-          "[SLOT: about/founder-1-credential-2]",
-          "[SLOT: about/founder-1-credential-3]",
+          "Computer science, Harvey Mudd College",
+          "[INPUT: credential 2]",
+          "[INPUT: credential 3]",
         ],
       },
       {
-        name: "[SLOT: about/founder-2-name]",
-        roleLine: "[SLOT: about/founder-2-role]",
-        bio: "[SLOT: about/founder-2-bio]",
+        name: "Brandon Chung",
+        roleLine: "Business & clients",
+        photo: "[INPUT: photo]",
+        bio: "[INPUT: business experience summary]; owns scoping, communication, and making sure every build serves the business.",
         credentials: [
-          "[SLOT: about/founder-2-credential-1]",
-          "[SLOT: about/founder-2-credential-2]",
-          "[SLOT: about/founder-2-credential-3]",
+          "[INPUT: NYU program] , New York University",
+          "[INPUT: credential 2]",
+          "[INPUT: credential 3]",
         ],
       },
     ],
-    whyBcns: "[SLOT: about/why-bcns]",
+    whyBcns:
+      "[INPUT: 2-3 sentences — why you two started bcns and what you want it to be]",
   },
 
   navCards: {
     items: [
       {
-        title: "[SLOT: nav-cards/what-we-build-title]",
-        description: "[SLOT: nav-cards/what-we-build-description]",
+        title: "What we build",
+        description:
+          "Booking systems, dashboards, automations, and AI consulting — the problems we solve and how.",
         href: "/services",
       },
       {
-        title: "[SLOT: nav-cards/past-work-title]",
-        description: "[SLOT: nav-cards/past-work-description]",
+        title: "Past work",
+        description:
+          "What we've built, and what it changed for the businesses using it.",
         href: "/work",
       },
       {
-        title: "[SLOT: nav-cards/pricing-title]",
-        description: "[SLOT: nav-cards/pricing-description]",
+        title: "Pricing",
+        description:
+          "Two build sizes and a day rate for AI consulting — and how quoting works.",
         href: "/pricing",
       },
       {
-        title: "[SLOT: nav-cards/about-title]",
-        description: "[SLOT: nav-cards/about-description]",
+        title: "About",
+        description:
+          "Two founders — one builds, one makes sure it's worth building.",
         href: "/about",
       },
     ],
@@ -470,24 +441,24 @@ export const siteContent: SiteContent = {
 
   pageMeta: {
     home: {
-      title: "[SLOT: meta/home-title]",
-      description: "[SLOT: meta/home-description]",
+      title: "[INPUT: meta/home-title]",
+      description: "[INPUT: meta/home-description]",
     },
     services: {
-      title: "[SLOT: meta/services-title]",
-      description: "[SLOT: meta/services-description]",
+      title: "[INPUT: meta/services-title]",
+      description: "[INPUT: meta/services-description]",
     },
     work: {
-      title: "[SLOT: meta/work-title]",
-      description: "[SLOT: meta/work-description]",
+      title: "[INPUT: meta/work-title]",
+      description: "[INPUT: meta/work-description]",
     },
     pricing: {
-      title: "[SLOT: meta/pricing-title]",
-      description: "[SLOT: meta/pricing-description]",
+      title: "[INPUT: meta/pricing-title]",
+      description: "[INPUT: meta/pricing-description]",
     },
     about: {
-      title: "[SLOT: meta/about-title]",
-      description: "[SLOT: meta/about-description]",
+      title: "[INPUT: meta/about-title]",
+      description: "[INPUT: meta/about-description]",
     },
   },
 };
