@@ -201,7 +201,6 @@ assert(
 
 // Simulate: non-empty items → grid branch would be rendered
 const injectedItem = { title: "Test Project", outcome: "Test Outcome" };
-const injectedItems = [injectedItem];
 assert(
   "injected item has title and outcome fields (matches PastWorkItem shape)",
   typeof injectedItem.title === "string" && typeof injectedItem.outcome === "string"

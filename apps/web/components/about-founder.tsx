@@ -22,8 +22,8 @@ export function AboutFounder() {
         />
 
         <div className="mt-14 grid gap-8 lg:grid-cols-2">
-          {founders.map((founder, index) => (
-            <Card key={index} className="h-full">
+          {founders.map((founder) => (
+            <Card key={founder.name} className="h-full">
               <CardHeader>
                 <CardTitle className="text-base">{founder.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">{founder.roleLine}</p>

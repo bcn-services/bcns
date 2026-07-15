@@ -27,7 +27,7 @@ export function Reviews() {
             <p className="text-xl font-semibold">{holdingState.title}</p>
             <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
             <Link
-              href="/#contact"
+              href={holdingState.ctaHref}
               className="inline-flex items-center rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               {holdingState.ctaLabel}
@@ -35,8 +35,8 @@ export function Reviews() {
           </div>
         ) : (
           <div className="mt-14 grid gap-6 sm:grid-cols-2">
-            {items.map(({ quote, author, role, company }, index) => (
-              <Card key={index} className="h-full">
+            {items.map(({ quote, author, role, company }) => (
+              <Card key={`${author}-${company}`} className="h-full">
                 <CardHeader>
                   <CardDescription className="text-base leading-relaxed">&ldquo;{quote}&rdquo;</CardDescription>
                 </CardHeader>

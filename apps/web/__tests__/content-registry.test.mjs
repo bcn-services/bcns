@@ -46,19 +46,17 @@ function isAllowedStringValue(value) {
  * Recursively collect all string leaf values from an object/array.
  * Structural keys (href, photo) are excluded — they hold URLs/paths, not copy.
  */
-const STRUCTURAL_KEYS = new Set(["href", "photo"]);
-
-function collectStrings(node, path = "", parentKey = "") {
+function collectStrings(node, path = "") {
   if (typeof node === "string") {
-    if (STRUCTURAL_KEYS.has(parentKey)) return [];
+    if (path.endsWith(".href") || path.endsWith(".photo")) return [];
     return [{ path, value: node }];
   }
   if (Array.isArray(node)) {
-    return node.flatMap((item, i) => collectStrings(item, `${path}[${i}]`, ""));
+    return node.flatMap((item, i) => collectStrings(item, `${path}[${i}]`));
   }
   if (node && typeof node === "object") {
     return Object.entries(node).flatMap(([k, v]) =>
-      collectStrings(v, path ? `${path}.${k}` : k, k)
+      collectStrings(v, path ? `${path}.${k}` : k)
     );
   }
   return [];
@@ -67,7 +65,7 @@ function collectStrings(node, path = "", parentKey = "") {
 // ---------------------------------------------------------------------------
 // Test 1 — All 6 section keys present
 // ---------------------------------------------------------------------------
-console.log("\n[1] siteContent exports all 6 section keys");
+console.log("\n[1] siteContent exports all section keys");
 const REQUIRED_KEYS = [
   "hero",
   "problemSolution",
@@ -75,6 +73,13 @@ const REQUIRED_KEYS = [
   "deliveryModels",
   "useCases",
   "contactSection",
+  "pastWork",
+  "reviews",
+  "pricing",
+  "faq",
+  "about",
+  "navCards",
+  "pageMeta",
 ];
 for (const key of REQUIRED_KEYS) {
   assert(`siteContent.${key} exists`, key in siteContent);

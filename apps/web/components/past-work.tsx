@@ -27,7 +27,7 @@ export function PastWork() {
             <p className="text-xl font-semibold">{holdingState.title}</p>
             <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
             <Link
-              href="/#contact"
+              href={holdingState.ctaHref}
               className="inline-flex items-center rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               {holdingState.ctaLabel}
@@ -35,8 +35,8 @@ export function PastWork() {
           </div>
         ) : (
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map(({ title: workTitle, outcome, link }, index) => (
-              <Card key={index} className="h-full">
+            {items.map(({ title: workTitle, outcome, link }) => (
+              <Card key={workTitle} className="h-full">
                 <CardHeader>
                   <CardTitle className="text-base">{workTitle}</CardTitle>
                 </CardHeader>

@@ -169,6 +169,7 @@ export interface HoldingState {
   title: string;
   body: string;
   ctaLabel: string;
+  ctaHref: string;
 }
 
 export interface PageMeta {
@@ -338,6 +339,7 @@ export const siteContent: SiteContent = {
       title: "[SLOT: past-work/holding-title]",
       body: "[SLOT: past-work/holding-body]",
       ctaLabel: "[SLOT: past-work/holding-cta]",
+      ctaHref: "[SLOT: past-work/holding-cta-href]",
     },
   },
 
@@ -350,6 +352,7 @@ export const siteContent: SiteContent = {
       title: "[SLOT: reviews/holding-title]",
       body: "[SLOT: reviews/holding-body]",
       ctaLabel: "[SLOT: reviews/holding-cta]",
+      ctaHref: "[SLOT: reviews/holding-cta-href]",
     },
   },
 
