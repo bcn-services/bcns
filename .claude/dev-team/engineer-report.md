@@ -1,51 +1,43 @@
 # Engineer Report
-**Task:** P1 — App scaffold: Electron + renderer/shell split for apps/delucas/
+**Task:** P2 — SQLite schema, P&L module, recurring materializer, typed IPC handlers
 **Branch:** feat/delucas-p1-scaffold
 **Date:** 2026-07-15
 
 ## Design Decisions
-
-- **Two-config Vite strategy:** `vite.config.ts` (standalone renderer, port 3001) + `electron.vite.config.ts` (electron-vite wrapping main+preload+renderer) — separates browser-only dev from full Electron mode without duplicating build logic
-- **Package name `@delucas/app`** (not `@bcns/delucas`) — task spec explicit; client-scoped namespace
-- **Mock bridge install in `main.tsx`:** checks `window.bridge == null` before assigning `mockBridge` — idempotent, safe in both browser (mock) and Electron (preload populates first)
-- **Import-boundary test as pure Node.js ESM script** — zero test-framework overhead; headlessly verifiable; scans renderer src for `from 'electron'`, `require('electron')`, `from 'node:*'`, `require('node:*')`
-- **tsconfig.renderer.json extends `react-library.json`** — `composite: true` added for project references; `noEmit: true` inherited (typecheck only; build goes through Vite)
-- **tsconfig.main.json overrides `module: CommonJS`, `moduleResolution: Node`** — required for Electron main; overrides `ESNext`/`Bundler` in base.json
-- **ESLint flat config (`eslint.config.mjs`)** — matches apps/web pattern; .eslintrc.cjs would be silently ignored by ESLint 9 flat config mode
-- **IPC channels use `namespace:method` pattern** (`db:query`, `dialog:openFile`) — prevents collisions as bridge grows; main-process stubs return safe zero-values for unimplemented phases
-- **`@bcns/ui` resolved via `resolve.alias`** in both Vite configs — package has no build step; alias points to `packages/ui/src/index.ts`
-- **Electron 29 chosen** — bundles Node 20, satisfies root `engines: node >=18.18.0` (Electron 28 bundles 18.17.1, misses by one patch)
+- `src/shared/` boundary: `types.ts` and `pnl.ts` have zero Node/Electron imports — importable from renderer, shell, and headless tests; no boundary violation possible
+- `day_of_month BETWEEN 1 AND 28` in schema: caps day to the safest universal value (Feb always has ≥28 days), avoiding leap-year/month-end edge cases in recurring materialization
+- `amount_cents INTEGER` + `direction TEXT` instead of signed amount: keeps constraint logic explicit; direction is always `revenue|expense`, never inferred from sign
+- ISO 8601 date strings (`YYYY-MM-DD`) in SQLite: month bucketing is a pure `str.slice(0,7)` — no Date parsing, no TZ risk
+- `source_ref = "recurring:<ruleId>:<YYYY-MM>"` for idempotency: existence check on `(source = 'recurring', source_ref = ?)` before each insert; running materializer twice creates zero duplicates
+- `db.pragma("journal_mode = WAL")` on startup: safe for single-process Electron; improves read concurrency if background workers are added later
+- `db:query` channel restricted to SELECT-only: prevents generic SQL write injection via renderer; typed IPC handlers (`db:insertTransaction`, etc.) are the correct write path
+- `tsx` for tests: `--experimental-strip-types` fails on extensionless CJS→ESM cross-boundary imports; `tsx` handles it transparently with no tsconfig changes needed
+- `better-sqlite3` compiled against system Node 22 (not Electron ABI): acceptable for dev; production packaging will need `electron-rebuild` — flagged below
 
 ## Files Changed
-
-- `apps/delucas/package.json` — `@delucas/app` workspace package; scripts: dev/dev:electron/build/lint/typecheck/test/clean; electron 29, react 18, @bcns/ui, electron-vite
-- `apps/delucas/README.md` — taxonomy frontmatter (`type: workflow-app`, `delivery: local-electron`), architecture overview, dev commands
-- `apps/delucas/tsconfig.json` — project references to tsconfig.renderer.json + tsconfig.main.json
-- `apps/delucas/tsconfig.renderer.json` — extends react-library.json; composite; includes renderer + bridge interface/mock
-- `apps/delucas/tsconfig.main.json` — extends base.json; overrides module/moduleResolution for CJS; includes shell-electron + bridge interface/preload
-- `apps/delucas/eslint.config.mjs` — spreads base from @bcns/config/eslint/base; ignores dist/node_modules
-- `apps/delucas/vite.config.ts` — standalone renderer Vite config, port 3001, @bcns/ui alias
-- `apps/delucas/electron.vite.config.ts` — electron-vite config for main+preload+renderer; externalizeDepsPlugin on main/preload
-- `apps/delucas/tailwind.config.ts` — presets @bcns/config/tailwind; renderer + @bcns/ui content globs
-- `apps/delucas/postcss.config.mjs` — tailwindcss + autoprefixer
-- `apps/delucas/src/bridge/BridgeInterface.ts` — typed BridgeAPI (db/ingestion/dialog/settings) + Window augmentation; no impl, no forbidden imports
-- `apps/delucas/src/bridge/mockBridge.ts` — browser-safe BridgeAPI stub; all methods warn+return safe defaults
-- `apps/delucas/src/bridge/preload.ts` — contextBridge.exposeInMainWorld("bridge"); forwards each method to ipcRenderer.invoke()
-- `apps/delucas/src/shell-electron/main.ts` — BrowserWindow creation; ipcMain handlers for all four namespaces; dialog fully implemented, others are stubs
-- `apps/delucas/src/renderer/index.html` — HTML entry point
-- `apps/delucas/src/renderer/main.tsx` — React root; installs mockBridge if window.bridge is null
-- `apps/delucas/src/renderer/App.tsx` — basic app shell, routing placeholder
-- `apps/delucas/src/renderer/index.css` — Tailwind directives
-- `apps/delucas/tests/import-boundary.test.mjs` — pure Node.js ESM static analysis; exits 1 on any renderer import from electron/node:*
-- `pnpm-lock.yaml` — updated with electron 29, electron-vite, vite, @vitejs/plugin-react
+- `src/shared/types.ts` — all domain types: Transaction, RecurringRule, MonthPnl, CategoryBreakdown, NewTransaction, etc.
+- `src/shared/pnl.ts` — bucketByMonth, computeMonthPnl, compute12MonthSeries, generateSummary; pure functions, no side effects
+- `src/shell-electron/db/schema.ts` — MIGRATIONS array with full DDL for all 4 tables + indexes
+- `src/shell-electron/db/migrations.ts` — schema_migrations tracking table; idempotent apply loop with per-migration transactions
+- `src/shell-electron/db/queries.ts` — typed getTransactions, getTransactionsByMonth, insertTransaction, getRecurringRules, isEmailProcessed, markEmailProcessed, getSetting, setSetting
+- `src/shell-electron/recurring.ts` — materializeRecurring: walks rule date range, deduplicates via source_ref EXISTS check
+- `src/shell-electron/main.ts` — real DB init + WAL pragma + startup materialization; 12 typed ipcMain handlers replacing P1 stubs
+- `src/bridge/BridgeInterface.ts` — expanded BridgeAPI with all 10 typed db methods; imports shared types
+- `src/bridge/preload.ts` — forwarding stubs for all new ipcRenderer.invoke channels
+- `src/bridge/mockBridge.ts` — no-op stubs for all new BridgeAPI methods (was causing renderer typecheck failure)
+- `tsconfig.main.json` — added `src/shared/**/*` to include
+- `tsconfig.renderer.json` — added `src/shared/**/*` to include
+- `package.json` — added better-sqlite3, @types/better-sqlite3, tsx devDep; updated test script
+- `tests/pnl.test.mjs` — 22 unit tests: bucketByMonth (4), computeMonthPnl (7), compute12MonthSeries (6), generateSummary (5)
+- `tests/db.test.mjs` — 21 unit tests: migrations (3), queries (4), email dedup (3), settings (3), recurring materializer (8)
 
 ## Deferred / Out of Scope
-
-- `better-sqlite3` + `imapflow` not installed — P2 (db) and P3/P4 (ingestion) will add them; `electron-rebuild` for native addon ABI deferred until then
-- `react-router-dom` routing — App.tsx has placeholder comment; P2+ will add routes
-- `electron-builder` packaging config — not needed for dev/scaffold; deferred to ship phase
+- Electron ABI rebuild for better-sqlite3: compiles against system Node 22 now; `electron-rebuild` or `@electron/rebuild` needed in the packaging step (P6/deploy phase)
+- `getRecurringRules` query is exposed via IPC but not yet used by the renderer — placeholder for P5 settings UI
+- No `INSERT INTO recurring_rules` query helper — rules currently inserted only via test SQL; add when P5 adds a rule-management UI
 
 ## Flags for Reviewer
-
-- electron-vite outputs renderer to `apps/delucas/dist/renderer/` — Turbo build output glob is `dist/**`, which covers it; verify caching works correctly across runs
-- `tsconfig.main.json` has `noEmit: false` + `composite: true` — `tsc -p tsconfig.json` will emit .js into `dist/main/` during project-reference typecheck; `dist/` should be in .gitignore (not checked)
+- `better-sqlite3` native addon: if the Electron build ever packages with `asar`, the `.node` file must be excluded or prebuild-unpacked — standard Electron packaging concern
+- `materializeRecurring` on every startup: O(rules × months) but trivially fast for <100 rules; no pagination needed at this scale
+- `db:query` SELECT-only guard is a string prefix check (`trimStart().toUpperCase().startsWith("SELECT")`) — acceptable for a single-user local app, but not SQL injection-proof for adversarial input; satisfactory given renderer sandbox + no network exposure
+- `getTransactions` returns all rows with no pagination: will grow unbounded; QA/P5 should add a date-range param before the 12-month series call loads full history
