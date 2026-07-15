@@ -44,6 +44,24 @@ function nextMonth(month: string): string {
   return `${y}-${nm.toString().padStart(2, "0")}`;
 }
 
+/** Section card — consistent visual panel for each section of this tab */
+function SectionCard({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="rounded-xl bg-card border border-border shadow-sm px-5 py-5">
+      {children}
+    </div>
+  );
+}
+
+/** Section heading — small uppercase label above the section content */
+function SectionHeading({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+      {children}
+    </p>
+  );
+}
+
 export function AddFix(): React.JSX.Element {
   const [currentMonth, setCurrentMonth] = useState(todayMonth);
   const [showManualForm, setShowManualForm] = useState(false);
@@ -61,19 +79,17 @@ export function AddFix(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
 
       {/* Manual entry */}
-      <section>
+      <SectionCard>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Enter manually
-          </h2>
+          <SectionHeading>Enter manually</SectionHeading>
           {!showManualForm && (
             <button
               type="button"
               onClick={() => setShowManualForm(true)}
-              className="text-xs text-primary hover:underline"
+              className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
             >
               + Add transaction
             </button>
@@ -86,7 +102,7 @@ export function AddFix(): React.JSX.Element {
             onCancel={() => setShowManualForm(false)}
           />
         ) : lastReport !== null ? (
-          <p className="text-sm text-green-600 dark:text-green-400">
+          <p className="text-sm text-green-700">
             Saved {lastReport.imported} transaction{lastReport.imported !== 1 ? "s" : ""}.
           </p>
         ) : (
@@ -94,15 +110,13 @@ export function AddFix(): React.JSX.Element {
             No transactions added yet this session.
           </p>
         )}
-      </section>
+      </SectionCard>
 
       {/* PDF drag-and-drop */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          Import from PDF
-        </h2>
+      <SectionCard>
+        <SectionHeading>Import from PDF</SectionHeading>
         <DragDropZone onImported={() => refresh()} />
-      </section>
+      </SectionCard>
 
       {/* Email review queue */}
       <section>
@@ -112,9 +126,9 @@ export function AddFix(): React.JSX.Element {
       {/* Transaction list */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
             Transactions
-          </h2>
+          </p>
           <MonthNav currentMonth={currentMonth} onPrev={handlePrev} onNext={handleNext} />
         </div>
         <TransactionList transactions={transactions} onMutated={refresh} />

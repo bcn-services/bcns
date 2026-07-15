@@ -203,7 +203,7 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
 
   if (transactions.length === 0) {
     return (
-      <div className="border border-border rounded-lg p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl bg-card border border-border shadow-sm px-5 py-4 text-sm text-muted-foreground">
         No transactions this month
       </div>
     );
@@ -214,9 +214,9 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
     {deleteError !== null && (
       <p className="text-xs text-red-600 dark:text-red-400">{deleteError}</p>
     )}
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-muted/50 border-b border-border">
+        <thead className="bg-muted/40 border-b border-border">
           <tr>
             <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</th>
             <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Vendor</th>
