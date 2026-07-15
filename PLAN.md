@@ -185,7 +185,7 @@ Tier naming rationale (do not surface on the site): the split is **how hard it i
 - **cta-primary:** Book a free consult
 - **cta-secondary:** See what we build *(→ /services)*
 - **proof-point-1:** Fixed quote before work starts
-- **proof-point-2:** You own everything we build
+- **proof-point-2:** Use it forever, free *(updated by C1 pass)*
 - **proof-point-3:** Free 30-minute consult
 
 ### Home — nav cards
@@ -199,7 +199,7 @@ Tier naming rationale (do not surface on the site): the split is **how hard it i
 - **description:** Send a few sentences about your business and the problem. We'll reply within [INPUT: response-time promise] with next steps — and honest advice, even if that advice is "you don't need custom software."
 - **highlight-1:** **Free consult** — A 30-minute call about how your business runs. No pitch, no obligation.
 - **highlight-2:** **Fixed quote** — You approve the exact price before any work starts.
-- **highlight-3:** **You own it** — Code, accounts, and data are yours, working with us or not.
+- **highlight-3:** **Yours to use** — Your data and accounts stay yours. It keeps running whether we work together or not. *(updated by C1 pass)*
 
 ### /services — use cases
 - **eyebrow:** What we build · **title:** Tools shaped to your business, not the other way around · **description:** Four kinds of problems we solve most — if yours isn't here, ask anyway.
@@ -216,27 +216,27 @@ Tier naming rationale (do not surface on the site): the split is **how hard it i
 
 ### /pricing
 - **eyebrow:** Pricing · **title:** Two build sizes, one day rate — quoted before we start · **description:** Every project gets a fixed quote up front. The tiers show typical scope; your quote depends on the consult.
-- **Card 1 — Starter build** · price: [INPUT: starter price range] · A single-purpose tool: a booking page, a report generator, one automation. Features: One core workflow, built end to end / Delivered in [INPUT: starter turnaround] / [INPUT: support window] of included fixes
-- **Card 2 — Full build** · price: [INPUT: full-build price range] · A system your business runs on: multiple workflows, logins, data that stays in sync. Features: Multiple connected workflows / Delivered in [INPUT: full-build turnaround] / [INPUT: support window] of included fixes
-- **Card 3 — AI consulting** · price: [INPUT: day rate] / day · Working sessions to find and set up AI where it pays for itself. Features: Audit of where AI fits your operation / Hands-on setup, not a slide deck / Plain-English handoff notes
+- **Card 1 — Standard build** *(was "Starter build")* · price: $2,000–$5,000 · A single-purpose tool: a booking page, a report generator, one automation. Features: One core workflow, built end to end / Delivered in about a week / 30 days of fixes and tweaks included / One year of bug fixes, free
+- **Card 2 — Advanced build** *(was "Full build")* · price: $5,000–$15,000 · A system your business runs on: multiple workflows, logins, data that stays in sync. Features: Multiple connected workflows / Delivered in two to three weeks / 30 days of fixes and tweaks included / One year of bug fixes, free
+- **Card 3 — AI consulting** · price: $800 / day · Working sessions to find and set up AI where it pays for itself. Features: Audit of where AI fits your operation / Hands-on setup, not a slide deck / Plain-English handoff notes
 
 ### /pricing — FAQ
 - **eyebrow:** FAQ · **title:** The questions we'd ask too · **description:** Anything else — ask in the form and we'll answer straight.
-1. **How much will my project cost?** — Every project gets a fixed quote after the free consult. Typical starter builds run [INPUT: starter range]; full builds [INPUT: full range]. The quote is the price — no hourly surprises.
-2. **How long does a build take?** — [INPUT: typical turnaround summary]. You get a delivery date with the quote, and we tell you immediately if anything threatens it.
-3. **What happens if something breaks after delivery?** — Every build includes [INPUT: support window] of fixes at no charge. After that, we're a message away.
+1. **How much will my project cost?** — Every project gets a fixed quote after the free consult. Standard builds run $2,000 to $5,000. Advanced builds run $5,000 to $15,000. The quote is the price. No hourly surprises. *(updated by C1 pass)*
+2. **How long does a build take?** — Most single tools ship in about a week. Larger connected systems take two to three weeks. You get a delivery date with the quote, and we tell you right away if anything threatens it. *(updated by C1 pass)*
+3. **What happens if something breaks after delivery?** — For the first 30 days, tell us anything that needs fixing or refining and we handle it, no questions asked. After that, genuine bugs in what we built stay free to fix for a year. New features, or changes to things that already work, are quoted separately. *(updated by C1 pass)*
 4. **Do I need to be technical to work with you?** — No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.
-5. **Who owns what you build?** — You do — code, accounts, and data. If we stop working together, everything keeps running and it's yours.
+*(FAQ 5 — "Who owns what you build?" removed by C1 pass. Ownership stay-silent policy.)*
 
 ### /about (two-founder outline — suggested beats, specifics are INPUT slots)
 - **eyebrow:** About · **title:** The people behind bcns · **description:** Two founders — one builds, one makes sure it's worth building.
-- **Founder 1 — Nate Seluga** · roleLine: Engineering · photo: [INPUT: photo] · bio beats: what he builds and why custom tools for small businesses; [INPUT: 1-2 notable projects with concrete outcomes]; builder-first — school is a credential, not the lead. credentials: Computer science, Harvey Mudd College / [INPUT: credential 2] / [INPUT: credential 3]
-- **Founder 2 — Brandon Chung** · roleLine: Business & clients · photo: [INPUT: photo] · bio beats: [INPUT: business experience summary]; owns scoping, communication, and making sure every build serves the business. credentials: [INPUT: NYU program] , New York University / [INPUT: credential 2] / [INPUT: credential 3]
-- **whyBcns (shared):** [INPUT: 2-3 sentences — why you two started bcns and what you want it to be]
+- **Founder 1 — Nate Seluga** · roleLine: Engineering · photo: [INPUT: photo] · bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after handoff. Computer science at Harvey Mudd College." credentials: Computer science, Harvey Mudd College *(C1: removed [INPUT: notable projects] beat and extra credential slots)*
+- **Founder 2 — Brandon Chung** · roleLine: Business & clients · photo: [INPUT: photo] · bio: "[INPUT: business experience summary]. Brandon owns scoping, communication, and making sure every build earns its cost. He's the reason we don't build things clients don't need." credentials: [INPUT: NYU program], New York University / [INPUT: credential 2] / [INPUT: credential 3]
+- **whyBcns (shared):** "Small businesses get two bad options. Software that doesn't fit, or a price only big companies can pay. We build the third one. Custom tools, built lean, straight from the two of us." *(filled by C1 pass)*
 
 ### /work — holding state
-- **Past work:** eyebrow: Past work · title: Our first builds are in progress · body: We're building for our first clients right now. Case studies land here as projects wrap — each covering the problem, what we built, and what changed. · cta: Want to be one of them? Book a free consult.
-- **Reviews:** title: Reviews will live here too · body: Real names, real businesses, unedited — as soon as our first clients have something to say.
+- **Past work:** eyebrow: Past work · title: Our first builds are in progress · body: "We're building for our first clients right now. Case studies land here as projects wrap. Each one covers the problem, what we built, and what changed." · cta: Want to be one of them? Book a free consult.
+- **Reviews:** title: "No reviews yet. That changes with our first client." *(was "Reviews will live here too")* · body: "Real names, real businesses, unedited. As soon as our first clients have something to say." *(C1 pass updated both)*
 
 ---
 

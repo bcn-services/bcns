@@ -511,7 +511,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 - **Tone:** Honest; don't over-promise
 - **Length:** 1-2 sentences, ≤150 chars
 
-### tiers[0] — Starter build
+### tiers[0] — Standard build
 
 #### tiers[0].id _(optional)_
 - **Field:** `pricing.tiers[0].id`
@@ -520,14 +520,14 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[0].name
 - **Field:** `pricing.tiers[0].name`
-- **Purpose:** Display name for the first pricing tier
+- **Purpose:** Display name for the first pricing tier. Currently `Standard build`.
 - **Tone:** Descriptive noun; signals the scope of the tier
 - **Length:** 1-3 words, ≤25 chars
 
 #### tiers[0].price
 - **Field:** `pricing.tiers[0].price`
-- **Purpose:** Price string — contains `[INPUT: starter price range]`
-- **Tone:** N/A (formatted value, e.g. "$2,500–$5,000")
+- **Purpose:** Price string. Currently `$2,000–$5,000`.
+- **Tone:** N/A (formatted value)
 - **Length:** ≤20 chars
 
 #### tiers[0].description
@@ -539,11 +539,11 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 #### tiers[0].features[n] (open-ended array)
 - **Field:** `pricing.tiers[0].features`
 - **Purpose:** Bullet list of deliverables/inclusions for tier 0
-- **Note:** features[1] contains `[INPUT: starter turnaround]`; features[2] contains `[INPUT: support window]`
-- **Tone:** Concrete noun phrase (e.g. "Weekly analytics report")
+- **Note:** features[1] = `Delivered in about a week`; features[2] = `30 days of fixes and tweaks included`; features[3] = `One year of bug fixes, free`
+- **Tone:** Concrete noun phrase
 - **Length:** ≤60 chars per item
 
-### tiers[1] — Full build
+### tiers[1] — Advanced build
 
 #### tiers[1].id _(optional)_
 - **Field:** `pricing.tiers[1].id`
@@ -551,11 +551,12 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[1].name
 - **Field:** `pricing.tiers[1].name`
+- **Purpose:** Currently `Advanced build`.
 - **Length:** 1-3 words, ≤25 chars
 
 #### tiers[1].price
 - **Field:** `pricing.tiers[1].price`
-- **Purpose:** Price string — contains `[INPUT: full-build price range]`
+- **Purpose:** Price string. Currently `$5,000–$15,000`.
 - **Length:** ≤20 chars
 
 #### tiers[1].description
@@ -564,7 +565,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[1].features[n] (open-ended array)
 - **Field:** `pricing.tiers[1].features`
-- **Note:** features[1] contains `[INPUT: full-build turnaround]`; features[2] contains `[INPUT: support window]`
+- **Note:** features[1] = `Delivered in two to three weeks`; features[2] = `30 days of fixes and tweaks included`; features[3] = `One year of bug fixes, free`
 - **Length:** ≤60 chars per item
 
 ### tiers[2] — AI consulting
@@ -579,7 +580,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[2].price
 - **Field:** `pricing.tiers[2].price`
-- **Purpose:** Price string — contains `[INPUT: day rate]`
+- **Purpose:** Price string. Currently `$800 / day`.
 - **Length:** ≤20 chars
 
 #### tiers[2].description
@@ -684,22 +685,22 @@ Each founder entry has:
 #### founders[n].bio
 - **Field:** `about.founders[n].bio`
 - **Purpose:** 1-3 paragraph biography — the founder's story, expertise, and why they do this work
-- **Tone:** First-person preferred; specific/evidence-driven, no marketing fluff
-- **Note:** Nate's bio contains narrative notes; Brandon's bio contains `[INPUT: business experience summary]` — both need to be filled with real copy
+- **Tone:** Specific/evidence-driven, no marketing fluff
+- **Note:** Nate's bio is written. Brandon's bio leads with `[INPUT: business experience summary]` — fill with the specific businesses/roles when ready.
 - **Length:** 100-300 words; shorter is better if every sentence earns its place
 
 #### founders[n].credentials[] (open-ended array)
 - **Field:** `about.founders[n].credentials`
 - **Purpose:** Bullet list of credentials (degrees, former employers, notable achievements)
 - **Tone:** Factual noun phrase
-- **Note:** Most entries contain `[INPUT: …]` placeholders — replace with real values
+- **Note:** Nate: one credential line (Harvey Mudd CS) — no placeholders remain. Brandon: `[INPUT: NYU program]`, `[INPUT: credential 2]`, `[INPUT: credential 3]` — fill when confirmed.
 - **Length:** ≤80 chars per item; append strings to add more
 
 ### whyBcns
 - **Field:** `about.whyBcns`
 - **Purpose:** 2-3 sentences explaining why Nate and Brandon started bcns and what they want it to be
 - **Tone:** Personal, honest; written in the voice of the founders
-- **Note:** Contains `[INPUT: 2-3 sentences — why you two started bcns and what you want it to be]` — fill this after the founding story is agreed on
+- **Note:** C1 pass wrote the founding story. Edit in place if the framing evolves.
 - **Length:** 2-3 sentences, ≤250 chars
 
 > `founders` is a fixed tuple of exactly 2. Adding a third founder requires updating the interface and the component.
@@ -737,68 +738,57 @@ Navigation card grid linking to the main pages. Fixed tuple of 4.
 
 ## Page Meta (`siteContent.pageMeta`)
 
-SEO `<title>` and `<meta name="description">` for each page. All values
-contain `[INPUT: …]` placeholders — fill these once the real page content is
-confirmed.
+SEO `<title>` and `<meta name="description">` for each page. All values are
+filled as of the C1 pass. Edit in place if positioning language changes.
 
 ### pageMeta.home
 
 #### pageMeta.home.title
 - **Field:** `pageMeta.home.title`
-- **Note:** Contains `[INPUT: meta/home-title]`
 - **Length:** 50-60 chars (browser truncates beyond ~60)
 
 #### pageMeta.home.description
 - **Field:** `pageMeta.home.description`
-- **Note:** Contains `[INPUT: meta/home-description]`
 - **Length:** 140-160 chars
 
 ### pageMeta.services
 
 #### pageMeta.services.title
 - **Field:** `pageMeta.services.title`
-- **Note:** Contains `[INPUT: meta/services-title]`
 - **Length:** 50-60 chars
 
 #### pageMeta.services.description
 - **Field:** `pageMeta.services.description`
-- **Note:** Contains `[INPUT: meta/services-description]`
 - **Length:** 140-160 chars
 
 ### pageMeta.work
 
 #### pageMeta.work.title
 - **Field:** `pageMeta.work.title`
-- **Note:** Contains `[INPUT: meta/work-title]`
 - **Length:** 50-60 chars
 
 #### pageMeta.work.description
 - **Field:** `pageMeta.work.description`
-- **Note:** Contains `[INPUT: meta/work-description]`
 - **Length:** 140-160 chars
 
 ### pageMeta.pricing
 
 #### pageMeta.pricing.title
 - **Field:** `pageMeta.pricing.title`
-- **Note:** Contains `[INPUT: meta/pricing-title]`
 - **Length:** 50-60 chars
 
 #### pageMeta.pricing.description
 - **Field:** `pageMeta.pricing.description`
-- **Note:** Contains `[INPUT: meta/pricing-description]`
 - **Length:** 140-160 chars
 
 ### pageMeta.about
 
 #### pageMeta.about.title
 - **Field:** `pageMeta.about.title`
-- **Note:** Contains `[INPUT: meta/about-title]`
 - **Length:** 50-60 chars
 
 #### pageMeta.about.description
 - **Field:** `pageMeta.about.description`
-- **Note:** Contains `[INPUT: meta/about-description]`
 - **Length:** 140-160 chars
 
 ---
@@ -893,4 +883,23 @@ Total registry fields: 77. All 77 have a CONTENT.md entry. No orphans in either 
 
 ---
 
-_Last updated: 2026-07-14. Source of truth: `apps/web/lib/content.ts`._
+## Remaining `[INPUT: …]` slots (Needs-Nate)
+
+These are the only `[INPUT: …]` slots remaining in `content.ts` after the C1 voice pass.
+All pricing, turnaround, response-time, support-window, and page-meta slots are now filled.
+
+| Field | Slot |
+|---|---|
+| `about.founders[0].photo` | `[INPUT: photo]` |
+| `about.founders[1].photo` | `[INPUT: photo]` |
+| `about.founders[1].bio` (opening) | `[INPUT: business experience summary]` |
+| `about.founders[1].credentials[0]` | `[INPUT: NYU program]` |
+| `about.founders[1].credentials[1]` | `[INPUT: credential 2]` |
+| `about.founders[1].credentials[2]` | `[INPUT: credential 3]` |
+
+**First real past-work entry + review** are not placeholders — they are empty arrays
+(`pastWork.items`, `reviews.items`). Add entries to those arrays to flip /work live.
+
+---
+
+_Last updated: 2026-07-15 (C1 voice pass). Source of truth: `apps/web/lib/content.ts`._
