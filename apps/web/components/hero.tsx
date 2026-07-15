@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Badge, buttonVariants, Container } from "@bcns/ui";
 import { siteContent } from "@/lib/content";
@@ -18,7 +19,7 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_80%)] bg-[linear-gradient(to_right,hsl(var(--border)/0.6)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.6)_1px,transparent_1px)] bg-[size:44px_44px]"
       />
 
-      <Container className="flex flex-col items-center py-20 text-center sm:py-28">
+      <Container className="flex flex-col items-center pt-20 pb-12 text-center sm:pt-28 sm:pb-16">
         <Badge className="animate-fade-up">
           {badge}
         </Badge>
@@ -32,21 +33,21 @@ export function Hero() {
         </p>
 
         <div className="mt-9 flex flex-col gap-3 animate-fade-up sm:flex-row">
-          <a href="#contact" className={buttonVariants({ size: "lg" })}>
+          <Link href="/#contact" className={buttonVariants({ size: "lg" })}>
             {ctaPrimary}
             <ArrowRight aria-hidden />
-          </a>
-          <a
-            href="#examples"
+          </Link>
+          <Link
+            href="/services#examples"
             className={buttonVariants({ variant: "outline", size: "lg" })}
           >
             {ctaSecondary}
-          </a>
+          </Link>
         </div>
 
         <ul className="mt-10 flex flex-col flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground animate-fade-up sm:flex-row">
-          {proofPoints.map((point, index) => (
-            <li key={index} className="flex items-center gap-2">
+          {proofPoints.map((point) => (
+            <li key={point} className="flex items-center gap-2">
               <CheckCircle2 className="size-4 text-primary" aria-hidden />
               {point}
             </li>

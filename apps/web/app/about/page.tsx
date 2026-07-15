@@ -1,24 +1,20 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { Hero } from "@/components/hero";
-import { NavCards } from "@/components/nav-cards";
-import { ContactSection } from "@/components/contact-section";
+import { AboutFounder } from "@/components/about-founder";
 import { SiteFooter } from "@/components/site-footer";
 import { siteContent } from "@/lib/content";
 
 export const metadata: Metadata = {
-  title: siteContent.pageMeta.home.title,
-  description: siteContent.pageMeta.home.description,
+  title: siteContent.pageMeta.about.title,
+  description: siteContent.pageMeta.about.description,
 };
 
-export default function HomePage() {
+export default function AboutPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
       <main className="flex-1">
-        <Hero />
-        <NavCards />
-        <ContactSection />
+        <AboutFounder />
       </main>
       <SiteFooter />
     </div>

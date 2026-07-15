@@ -1,4 +1,4 @@
-import { CalendarClock, Boxes, LineChart, Wrench } from "lucide-react";
+import { CalendarClock, Boxes, LineChart, Sparkles } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -10,13 +10,13 @@ import {
 } from "@bcns/ui";
 import { siteContent } from "@/lib/content";
 
-const useCaseIcons = [CalendarClock, Boxes, LineChart, Wrench] as const;
+const useCaseIcons = [CalendarClock, Boxes, LineChart, Sparkles] as const;
 
 export function UseCases() {
   const { eyebrow, title, description, items } = siteContent.useCases;
 
   return (
-    <section id="examples" className="border-t border-border/60 bg-secondary/70 py-24 sm:py-28">
+    <section id="examples" className="border-t border-border/60 bg-secondary/70 pt-16 pb-24 sm:pt-20 sm:pb-28">
       <Container>
         <SectionHeading
           eyebrow={eyebrow}

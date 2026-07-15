@@ -80,6 +80,7 @@ export function ContactForm() {
           Accept: "application/json",
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10_000),
       });
 
       if (!res.ok) throw new Error(`Request failed with status ${res.status}`);

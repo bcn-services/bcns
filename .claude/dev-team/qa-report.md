@@ -1,23 +1,26 @@
 ---
 # QA Report
-**Task:** A4 — Legal pages + config scaffolding
-**Branch:** worktree-experimental-overnight-first-draft
+**Task:** B4 — CONTENT.md + trackers updated
+**Branch:** feat/b1-multi-page-routing
 **Date:** 2026-07-14
 **Gate mode:** tests+behavioral
 
 ## VERDICT: PASS
 
 ## Criteria Checked
-- `pnpm lint && pnpm typecheck && pnpm build` green — all three commands clean, 0 errors — PASS
-- `/privacy` and `/terms` appear in Next.js build table — both listed as `○` static pages; `.html`/`.rsc`/`.meta` files confirmed in `.next/server/app/` — PASS
-- Both pages render with labeled slots, no real legal text — `[PRIVACY POLICY BODY:…]` and `[TERMS OF SERVICE BODY:…]` present in source and in built `.html` output — PASS
-- Footer links point to `/privacy` and `/terms` (not `#`) — `href: "/privacy"` and `href: "/terms"` in `legalLinks`; no `#` for those entries — PASS
-- `sitemap.ts` includes both routes with `siteConfig.url` base — `` `${siteConfig.url}/privacy` `` and `` `${siteConfig.url}/terms` `` confirmed — PASS
-- `site.ts` has `name: "bcns"` and `domain`/`email`/`url` as placeholder constants with TODO comments — all fields present, three TODO comments confirmed — PASS
+- Every registry field in content.ts appears in CONTENT.md (no orphans either direction) — 49 field/section assertions in b4-content-md.test.mjs — PASS
+- /work flip instruction documented ("add an entry to pastWork.items — holding state disappears") — flip phrase assertions in b4-content-md.test.mjs — PASS
+- [INPUT: …] convention documented — placeholder explanation assertions — PASS
+- `pnpm lint` green — ran, 2/2 tasks successful — PASS
+- `pnpm typecheck` green — ran, 2/2 tasks successful — PASS
+- `pnpm build` green — 13/13 static pages generated, all routes present — PASS
+
+## Failures
+none
 
 ## Tests Added
-- `apps/web/__tests__/a4-legal-pages.test.mjs` — 21 assertions across all 6 criteria; runs via `npx tsx`. No new infra created (reused existing tsx-based pattern from A2).
+- `apps/web/__tests__/b4-content-md.test.mjs` — 49 assertions: all top-level siteContent keys in CONTENT.md, all leaf field names in CONTENT.md, /work flip instruction phrase, [INPUT: placeholder convention explanation
 
 ## Not Verifiable
-- none
+none
 ---

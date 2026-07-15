@@ -46,22 +46,22 @@
 
 ## Section 1 — Restructure + copy (dev-team-auto)
 
-### B1 — Multi-page routing + thin home · `status: not started` · `track: full`
+### B1 — Multi-page routing + thin home · `status: done` · `track: full`
 
 - **task:** Restructure the single-page app into the locked site map. Create routed pages `app/services/page.tsx`, `app/pricing/page.tsx`, `app/about/page.tsx`, `app/work/page.tsx`, each composing the existing section components: `/services` = use-cases + how-it-works; `/pricing` = pricing + faq; `/about` = about-founder (reworked in B2); `/work` = past-work + reviews. Rebuild `app/page.tsx` as the thin home: hero → new nav-cards section (3 cards: What we build → /services, Past Work → /work, Pricing → /pricing) → contact section. Remove problem-solution and delivery-models from all pages (keep components in the repo, unwired). Update header nav in `site.ts` to Services · Work · Pricing · About (page links, not anchors) with the Book-a-free-consult CTA intact; footer links updated to the new routes; `sitemap.ts` includes all new routes. Per-page `metadata` (title/description) reads from the registry.
 - **done when:** `/`, `/services`, `/pricing`, `/about`, `/work`, `/privacy`, `/terms` all return 200 and render their assigned sections; home renders exactly hero + nav-cards + contact; problem-solution and delivery-models appear on no page; header nav shows the 4 page links in order and each resolves; sitemap lists all routes; `pnpm lint && pnpm typecheck && pnpm build` green.
 
-### B2 — Registry rework: nav cards, two-founder about, pricing shape, /work holding state · `status: not started` · `track: full`
+### B2 — Registry rework: nav cards, two-founder about, pricing shape, /work holding state · `status: done` · `track: full`
 
 - **task:** Rework `apps/web/lib/content.ts` to match the new IA. (1) Add a `navCards` section type (3 entries: title, description, href). (2) Replace `aboutFounder` with a two-founder model: shared eyebrow/title/description + `founders` array (name, roleLine, photo slot, bio, credentials[]) + a shared `whyBcns` paragraph field. (3) Reshape pricing to 3 cards where tier 3 is the AI-consulting day-rate card (price fields are free strings so `[INPUT: …]` renders). (4) Add holding-state support: `pastWork` and `reviews` each get a `holdingState` object (title, body, ctaLabel) and their page components render the holding state when `items` is empty, the real grid otherwise — verified by a unit test that renders both states. Add per-page metadata fields to the registry.
 - **done when:** registry typechecks with the new shapes; `/about` renders two founder cards from the `founders` array; `/work` renders holding-state copy with an empty `items` array and renders an item grid when a test entry is injected (unit test covers both branches); pricing renders 3 cards with free-string prices; existing passing tests remain passing; build green.
 
-### B3 — Wire the drafted copy · `status: not started` · `track: light`
+### B3 — Wire the drafted copy · `status: done` · `track: light`
 
 - **task:** Replace every `[SLOT: …]` value in the registry with the exact copy from the **Copy appendix** below, section by section. Unknowns use the `[INPUT: …]` strings exactly as written in the appendix. Delete registry entries for the cut sections' copy (problem-solution, delivery-models) or mark them unused.
 - **done when:** a repo-wide grep finds zero `[SLOT:` occurrences in `apps/web/lib/content.ts` and zero on any rendered page (test asserts rendered HTML of all routes contains no `[SLOT:`); every `[INPUT: …]` string on a rendered page matches one defined in the appendix; hero headline, nav card titles, pricing card names, FAQ questions, and /work holding-state title each match the appendix verbatim (spot-check test); build green.
 
-### B4 — CONTENT.md + trackers updated to the new IA · `status: not started` · `track: light`
+### B4 — CONTENT.md + trackers updated to the new IA · `status: done` · `track: light`
 
 - **task:** Rewrite `apps/web/CONTENT.md` to mirror the new registry 1:1 (per-page organization; document the `[INPUT: …]` convention, the two-founder model, and **how to flip /work live**: "add an entry to `pastWork.items` and the holding state disappears — no code change"). Keep the fill/extend guides. Update `PROGRESS.md` per run convention.
 - **done when:** every registry field appears in `CONTENT.md` and vice versa (no orphans either direction); the /work flip instructions and `[INPUT: …]` convention are documented; build green.

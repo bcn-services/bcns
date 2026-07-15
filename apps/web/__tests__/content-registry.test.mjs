@@ -42,9 +42,15 @@ function isAllowedStringValue(value) {
   return SLOT_RE.test(value) || STEP_RE.test(value);
 }
 
-/** Recursively collect all string leaf values from an object/array. */
+/**
+ * Recursively collect all string leaf values from an object/array.
+ * Structural keys (href, photo) are excluded — they hold URLs/paths, not copy.
+ */
 function collectStrings(node, path = "") {
-  if (typeof node === "string") return [{ path, value: node }];
+  if (typeof node === "string") {
+    if (path.endsWith(".href") || path.endsWith(".photo")) return [];
+    return [{ path, value: node }];
+  }
   if (Array.isArray(node)) {
     return node.flatMap((item, i) => collectStrings(item, `${path}[${i}]`));
   }
@@ -59,7 +65,7 @@ function collectStrings(node, path = "") {
 // ---------------------------------------------------------------------------
 // Test 1 — All 6 section keys present
 // ---------------------------------------------------------------------------
-console.log("\n[1] siteContent exports all 6 section keys");
+console.log("\n[1] siteContent exports all section keys");
 const REQUIRED_KEYS = [
   "hero",
   "problemSolution",
@@ -67,6 +73,13 @@ const REQUIRED_KEYS = [
   "deliveryModels",
   "useCases",
   "contactSection",
+  "pastWork",
+  "reviews",
+  "pricing",
+  "faq",
+  "about",
+  "navCards",
+  "pageMeta",
 ];
 for (const key of REQUIRED_KEYS) {
   assert(`siteContent.${key} exists`, key in siteContent);
