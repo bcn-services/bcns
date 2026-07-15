@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Badge, buttonVariants, Container } from "@bcns/ui";
 import { siteContent } from "@/lib/content";
@@ -32,16 +33,16 @@ export function Hero() {
         </p>
 
         <div className="mt-9 flex flex-col gap-3 animate-fade-up sm:flex-row">
-          <a href="#contact" className={buttonVariants({ size: "lg" })}>
+          <Link href="/#contact" className={buttonVariants({ size: "lg" })}>
             {ctaPrimary}
             <ArrowRight aria-hidden />
-          </a>
-          <a
-            href="#examples"
+          </Link>
+          <Link
+            href="/services#examples"
             className={buttonVariants({ variant: "outline", size: "lg" })}
           >
             {ctaSecondary}
-          </a>
+          </Link>
         </div>
 
         <ul className="mt-10 flex flex-col flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground animate-fade-up sm:flex-row">

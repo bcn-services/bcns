@@ -146,6 +146,19 @@ export interface AboutFounderContent {
   credentials: string[];
 }
 
+export interface PageMeta {
+  title: string;
+  description: string;
+}
+
+export interface PageMetaRegistry {
+  home: PageMeta;
+  services: PageMeta;
+  work: PageMeta;
+  pricing: PageMeta;
+  about: PageMeta;
+}
+
 export interface SiteContent {
   hero: HeroContent;
   problemSolution: ProblemSolutionContent;
@@ -158,6 +171,7 @@ export interface SiteContent {
   pricing: PricingContent;
   faq: FaqContent;
   aboutFounder: AboutFounderContent;
+  pageMeta: PageMetaRegistry;
 }
 
 // ---------------------------------------------------------------------------
@@ -397,5 +411,28 @@ export const siteContent: SiteContent = {
       "[SLOT: about/credential-2]",
       "[SLOT: about/credential-3]",
     ],
+  },
+
+  pageMeta: {
+    home: {
+      title: "[SLOT: meta/home-title]",
+      description: "[SLOT: meta/home-description]",
+    },
+    services: {
+      title: "[SLOT: meta/services-title]",
+      description: "[SLOT: meta/services-description]",
+    },
+    work: {
+      title: "[SLOT: meta/work-title]",
+      description: "[SLOT: meta/work-description]",
+    },
+    pricing: {
+      title: "[SLOT: meta/pricing-title]",
+      description: "[SLOT: meta/pricing-description]",
+    },
+    about: {
+      title: "[SLOT: meta/about-title]",
+      description: "[SLOT: meta/about-description]",
+    },
   },
 };

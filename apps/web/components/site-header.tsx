@@ -8,7 +8,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <Container className="flex h-16 items-center justify-between gap-4">
-        <Link href="#top" className="flex items-center gap-2 font-semibold">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
           <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Boxes className="size-5" aria-hidden />
           </span>
@@ -29,9 +29,9 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <a href="#contact" className={buttonVariants({ size: "sm", className: "hidden sm:inline-flex" })}>
+          <Link href="/#contact" className={buttonVariants({ size: "sm", className: "hidden sm:inline-flex" })}>
             Book a free consult
-          </a>
+          </Link>
         </div>
       </Container>
     </header>

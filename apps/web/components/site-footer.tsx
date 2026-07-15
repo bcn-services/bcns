@@ -6,7 +6,7 @@ import { siteConfig } from "@/lib/site";
 const legalLinks = [
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
-  { label: "Contact", href: "#contact" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 export function SiteFooter() {
@@ -14,7 +14,7 @@ export function SiteFooter() {
     <footer className="border-t border-border/60 py-12">
       <Container className="flex flex-col items-center justify-between gap-6 sm:flex-row">
         <div className="flex flex-col items-center gap-2 sm:items-start">
-          <Link href="#top" className="flex items-center gap-2 font-semibold">
+          <Link href="/" className="flex items-center gap-2 font-semibold">
             <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Boxes className="size-4" aria-hidden />
             </span>

@@ -14,16 +14,10 @@ export const siteConfig = {
   // TODO: replace with a real inbox before launch.
   email: "hello@bcns.com",
   nav: [
-    { label: "Problems", href: "#problems" },
-    { label: "How it works", href: "#how-it-works" },
-    { label: "Delivery", href: "#delivery" },
-    { label: "Examples", href: "#examples" },
-    { label: "Past Work", href: "#past-work" },
-    { label: "Reviews", href: "#reviews" },
-    { label: "Pricing", href: "#pricing" },
-    { label: "FAQ", href: "#faq" },
-    { label: "About", href: "#about" },
-    { label: "Contact", href: "#contact" },
+    { label: "Services", href: "/services" },
+    { label: "Work", href: "/work" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "About", href: "/about" },
   ],
 } as const;
 
