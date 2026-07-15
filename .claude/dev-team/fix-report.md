@@ -20,6 +20,32 @@ None.
 - All 113 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 23 dashboard)
 
 ---
+# Fix Report — P6 Settings, backup, first-run
+**Date:** 2026-07-15
+**Findings addressed:** 6 of 6: 0 QA failures + 6 review findings (1 Critical + 2 Important + 3 Minor)
+
+## Changes Made
+- `main.ts:50–65` — added `ALLOWED_SETTINGS_KEYS = new Set([...])` with all 9 valid keys at module level — review Critical
+- `main.ts:705` — added allowlist guard in `settings:set`; throws on any key not in the set — review Critical
+- `backup.ts:117–128` — restructured `runBackup`: copy in own try/catch with early return on failure; rotation and status update only after copy succeeds — review Important
+- `main.ts:729–752` — restructured `backup:triggerNow`: copy in own try/catch, rotation after success only, calls `setBackupStatus({ lastBackup: today, error: null })` to sync in-memory state — review Important
+- `backup.ts:32–37` — added `setBackupStatus(update)` export to allow main.ts to update the module-private singleton — supporting change for Important fix #3
+- `backup.ts:113–128` — added JSDoc on `runBackup` noting `copyFileSync` skips WAL sidecars; recommends `db.backup(dest)` for production — review Minor
+- `electron-builder.config.mjs:20` — added `asarUnpack: ["**/*.node"]` to unpack native binaries from asar archive — review Minor
+- `Settings.tsx:78` — replaced silent catch with `console.error("[Settings] failed to load", settingKey, err)` — review Minor
+
+## Disputed
+None.
+
+## Deferred
+None.
+
+## Verification
+- `pnpm --filter @delucas/app typecheck` — PASS
+- `pnpm --filter @delucas/app lint` — PASS
+- All 133 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 23 dashboard + 10 backup + 10 settings)
+
+---
 # Fix Report — P1 App Scaffold
 **Date:** 2026-07-15
 **Findings addressed:** 5 of 5: 0 QA failures + 5 review findings (2 Important + 3 Minor)
