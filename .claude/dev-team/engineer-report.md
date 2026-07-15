@@ -1,35 +1,25 @@
 # Engineer Report
-**Task:** B1 — Multi-page routing + thin home
+**Task:** B4 — Rewrite CONTENT.md to mirror the new multi-page registry 1:1
 **Branch:** feat/b1-multi-page-routing
 **Date:** 2026-07-14
 
 ## Design Decisions
-- **Routing**: Used Next.js App Router file-system routing (`app/<route>/page.tsx`) — zero config, matches existing privacy/terms pattern
-- **ProblemSolution + DeliveryModels**: Excluded from all rendered pages (component files kept in repo); task spec says "remove from all pages, keep files"
-- **NavCards**: Static component (no content.ts key) with 3 cards (What we build → /services, Past Work → /work, Pricing → /pricing); labels/descriptions are inline strings since these are structural navigation copy, not content-slot copy
-- **pageMeta**: Added `PageMeta` + `PageMetaRegistry` interface and stub fields to `lib/content.ts` so per-page metadata reads from the registry; pages consume `siteContent.pageMeta.<key>` directly in metadata export
-- **Hero CTAs**: Converted `<a>` to Next.js `<Link>` to satisfy `@next/next/no-html-link-for-pages` rule; `/#contact` targets home contact section from any page
-- **Nav shape**: Kept `{ label: string; href: string }` shape from siteConfig; `as const` preserved; only 4 entries now (Services, Work, Pricing, About) in task-specified order
+- Doc-only change: no code files touched; confirmed by lint/typecheck/build green
+- Replaced `[SLOT: …]` convention docs with `[INPUT: …]` convention docs matching the actual registry
+- Organized by page (page map table at top) then by registry key, not by section type
+- Two-founder model (`about.founders[n]`) documented with all 5 fields: name, roleLine, photo, bio, credentials[]
+- `about.whyBcns` documented as a top-level string field (was missing entirely from old doc)
+- `navCards` and `pageMeta` sections added (both missing from old doc)
+- `holdingState` on `pastWork` and `reviews` documented with all 4 sub-fields; /work flip instructions explicit
+- `PricingTier.id` (optional) documented
+- Cross-check table at end: 77 fields, all covered, no orphans
 
 ## Files Changed
-- `apps/web/app/page.tsx` — stripped to Hero + NavCards + ContactSection; added pageMeta metadata export
-- `apps/web/app/services/page.tsx` — NEW: HowItWorks + UseCases with pageMeta metadata
-- `apps/web/app/pricing/page.tsx` — NEW: Pricing + Faq with pageMeta metadata
-- `apps/web/app/about/page.tsx` — NEW: AboutFounder with pageMeta metadata
-- `apps/web/app/work/page.tsx` — NEW: PastWork + Reviews with pageMeta metadata
-- `apps/web/app/sitemap.ts` — added /services, /work, /pricing, /about at priority 0.8
-- `apps/web/lib/site.ts` — replaced 10 hash-anchor nav entries with 4 page-route entries
-- `apps/web/lib/content.ts` — added PageMeta/PageMetaRegistry interfaces and stub pageMeta registry entry
-- `apps/web/components/site-header.tsx` — logo href `#top` → `/`; CTA `<a href="#contact">` → `<Link href="/#contact">`
-- `apps/web/components/site-footer.tsx` — logo href `#top` → `/`; Contact link `#contact` → `/#contact`
-- `apps/web/components/hero.tsx` — added Link import; primary CTA `#contact` → `/#contact`; secondary CTA `#examples` → `/services#examples`
-- `apps/web/components/nav-cards.tsx` — NEW: 3-card navigation grid for home page
+- `apps/web/CONTENT.md` — full rewrite; 496 insertions, 490 deletions; 77-field cross-check table included
 
 ## Deferred / Out of Scope
-- Actual copy for pageMeta fields (still `[SLOT: …]`) — copy task is separate
-- Mobile nav/hamburger menu for subpages — existing header renders nav links hidden on mobile (`hidden md:flex`); no mobile nav exists yet
-- ContactSection on subpages — contact stays home-only; CTA links point to `/#contact`
+- PLAN.md B4 status update handled externally per task instructions
+- Privacy and terms pages have no content registry fields — noted in page map, no doc entries needed
 
 ## Flags for Reviewer
-- NavCards description strings are inline, not from content.ts — intentional for structural copy but flagging in case content team wants them slottable
-- `/#contact` anchor linking relies on home page rendering ContactSection with `id="contact"` — verify the id is set on that component's section element
+- None — doc-only change, no runtime paths

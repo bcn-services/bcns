@@ -1,18 +1,19 @@
 ---
-# Fix Report — A2: Scaffold missing sections
-**Date:** 2026-07-13
-**Findings addressed:** 4 of 4: 0 QA failures + 4 review findings
+# Fix Report — B2: Registry rework
+**Date:** 2026-07-14
+**Findings addressed:** 5 of 5 review findings (0 QA failures + 5 review findings)
 
 ## Changes Made
-- `components/past-work.tsx:33` — replaced `<p>` with `<a href target="_blank" rel="noopener noreferrer">` guarded by `link` truthiness — review Important
-- `components/about-founder.tsx:27` — replaced hardcoded `"Background"` with `{cardTitleBio}` from registry — review Important
-- `components/about-founder.tsx:34` — replaced hardcoded `"Credentials"` with `{cardTitleCredentials}` from registry — review Important
-- `components/about-founder.tsx:21` — replaced `description=""` with `description={description}` from registry — review Important
-- `lib/content.ts:89` — changed `link: string` to `link?: string` in `PastWorkItem` interface — review Minor
-- `lib/content.ts:139-144` — added `description?`, `cardTitleBio`, `cardTitleCredentials` to `AboutFounderContent`; seeded `[SLOT: about/…]` values in registry
+- `content-registry.test.mjs:49-57` — replaced `parentKey` propagation + `STRUCTURAL_KEYS` Set with path-suffix check (`path.endsWith('.href') || path.endsWith('.photo')`) inside `collectStrings`; removed now-unused `STRUCTURAL_KEYS` const — review Important
+- `content.ts:168-172` + `past-work.tsx:30` + `reviews.tsx:30` — added `ctaHref: string` to `HoldingState` interface; added `[SLOT: past-work/holding-cta-href]` and `[SLOT: reviews/holding-cta-href]` in siteContent; both components now read `holdingState.ctaHref` instead of hardcoded `"/#contact"` — review Important
+- `about-founder.tsx:26` — replaced `key={index}` with `key={founder.name}` on founders map — review Minor
+- `past-work.tsx:39` — replaced `key={index}` with `key={workTitle}` on items map — review Minor
+- `reviews.tsx:39` — replaced `key={index}` with `` key={`${author}-${company}`} `` on items map — review Minor
+- `content-registry.test.mjs:71-78` — expanded `REQUIRED_KEYS` from 6 to 13 keys (added `pastWork`, `reviews`, `pricing`, `faq`, `about`, `navCards`, `pageMeta`) — review Minor
+- `b2-registry-rework.test.mjs:204` — removed unused `injectedItems` variable (lint error surfaced by the above changes) — collateral lint fix
 
 ## Build Status
-`pnpm lint && pnpm typecheck && pnpm build` — all green, 7 static pages generated.
+`pnpm lint && pnpm typecheck && pnpm build` — all green. `content-registry.test.mjs` 188/188 passed; `b2-registry-rework.test.mjs` 77/77 passed.
 
 ## Disputed
 None.
