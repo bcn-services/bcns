@@ -24,7 +24,7 @@ export function UseCases() {
           description={description}
         />
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {items.map(({ tag, title: caseTitle, description: caseDescription }, index) => {
             const Icon = useCaseIcons[index];
             if (!Icon) return null;
