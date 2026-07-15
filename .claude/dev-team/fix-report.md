@@ -41,3 +41,26 @@ None.
 ## Deferred
 None — all 7 findings addressed. typecheck, lint, and all 43 tests pass on `feat/delucas-p1-scaffold`.
 ---
+# Fix Report — P3 Ingestion framework
+**Date:** 2026-07-15
+**Findings addressed:** 6 of 6: 0 QA failures + 6 review findings (2 Critical + 3 Important + 1 Minor)
+
+## Changes Made
+- `ingestion/llm.ts:65` — hoisted `new Anthropic({ timeout: 30_000 })` to module scope; removed per-call instantiation — review Critical + Minor 6
+- `main.ts:307` — added `path.resolve()` + home-dir containment check on `ingestion:processPdf`; strips resolved path from forwarded error messages — review Critical
+- `main.ts:282` — added `/^\d{4}-\d{2}-\d{2}$/.test(tx.date)` to `submitManual` validation block — review Important
+- `main.ts:330` — added `/^\d{4}-\d{2}-\d{2}$/.test(tx.date)` to `confirmImport` validation block — review Important
+- `ingestion/pdf.ts:39–65` — wrapped page-render block in `try/finally`; calls `pdfDocument.destroy()` in finally — review Important
+- `ingestion/runner.ts:44–46` — added comment documenting that `failed` counts source-level errors, not per-transaction failures — review Important
+
+## Disputed
+None.
+
+## Deferred
+None.
+
+## Verification
+- `pnpm --filter @delucas/app typecheck` — PASS
+- `pnpm --filter @delucas/app lint` — PASS
+- All 68 tests pass (22 pnl + 21 db + 25 ingestion)
+---
