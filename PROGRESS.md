@@ -9,8 +9,8 @@
 ---
 
 ## Current position
-- **Status:** Combined overnight branch. B1–B4 done. V1–V5 done (first pass). C1 DONE. P1–P6 ALL DONE. Reached STOP HERE marker. bcns visual-pass (second pass) DONE on branch `visual-pass/bcns-nate-personal`. DeLuca's visual pass still pending (separate cowork session).
-- **Next:** Nate reviews + merges `visual-pass/bcns-nate-personal` → overnight-combined. Then layout-loop DeLuca's visual pass (separate cowork session). Then Section 3–4 Needs-Nate items.
+- **Status:** Combined overnight branch. B1–B4 done. V1–V5 done (first pass). C1 DONE. P1–P6 ALL DONE. Reached STOP HERE marker. bcns visual-pass (second pass) DONE on branch `visual-pass/bcns-nate-personal`. DeLuca's visual pass DONE on branch `visual/delucas-pizza-warmth`.
+- **Next:** Nate reviews + merges `visual-pass/bcns-nate-personal` → overnight-combined. Then reviews + merges `visual/delucas-pizza-warmth` → overnight-combined. Then Section 3–4 Needs-Nate items.
 - **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy; DeLuca's: Nate installs + configures on client laptop (Section 4).
 - **Last updated:** 2026-07-15 (P6 settings/backup/first-run done — d0c88c3; STOP HERE reached)
 
@@ -72,6 +72,24 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-15** — ✅ **DeLuca's pizza app visual pass done** on branch `visual/delucas-pizza-warmth`. 6 commits. Pizza-shop warmth brand applied across all renderer files (presentation only — no logic, schema, or IPC touched). Full change log:
+
+  **Pass 1 — Brand palette via CSS variables** (`index.css`): Off-white/cream background (hsl 34 22% 92%), tomato-red primary accent (hsl 10 72% 38%), warm stone borders, near-black with warm undertone foreground. Eliminates the clinical white / generic anti-pattern (craft P7). Active tab underline and "DeLuca's" wordmark pick up the tomato-red.
+
+  **Pass 2 — Headline numbers + wordmark** (`HeadlineNumbers.tsx`, `App.tsx`): Labels changed to plain English — "Money in" (was "Revenue"), "Spent" (was "Expenses"), "Profit" (unchanged). Profit card is dominant (`text-5xl font-extrabold`) vs. the other two (`text-4xl font-bold`) — creates hierarchy per P1. Cards get `rounded-xl bg-card border shadow-sm` for figure/ground lift. "DeLuca's" wordmark set to `text-primary` (tomato-red) with `bg-card` header band.
+
+  **Pass 3 — Empty state + section card surfaces** (`EmptyState.tsx`, `ProfitBarChart.tsx`, `CategoryBars.tsx`): EmptyState now: larger pizza emoji focal point, bold "Nothing here yet" heading, friendly body copy, tomato-red "ADD & FIX →" directional cue. All section cards unified to `rounded-xl bg-card border shadow-sm`. Chart/expense placeholders updated to descriptive plain text.
+
+  **Pass 4 — Card/background contrast + MonthNav** (`index.css`, `MonthNav.tsx`): Background darkened to medium cream so white cards float clearly off it (figure/ground per craft token). MonthNav buttons get `bg-card border shadow-sm rounded-lg` — feel like real controls. Month label bolded to `font-bold text-lg`.
+
+  **Pass 5 — Add & fix tab section panels** (`AddFix.tsx`, `TransactionList.tsx`): SectionCard wrapper applied to "Enter manually" and "Import from PDF" sections. TransactionList empty/data states updated to `rounded-xl bg-card shadow-sm`. Section headings use `tracking-widest font-semibold` pattern. Vertical gap tightened to `space-y-5` to match Dashboard rhythm.
+
+  **Pass 6 — Banners, recurring rules, review queue** (`BannerList.tsx`, `RentRuleEditor.tsx`, `ReviewQueue.tsx`): BannerList rewritten with `red-50/red-200` warm styling, SVG warning icon, × dismiss button (more prominent than prior text link). Section headings and "+ Add rule" button weight/hover behavior unified. Rule rows get `rounded-xl bg-card shadow-sm` surface treatment.
+
+  **Stopping condition:** Diminishing returns — all rubric rows satisfied for the empty/first-run state (the only state visible in browser dev mode). Flagged decision: could not verify headline number size in live data state (mock bridge returns zeros; north-star "read number in 3 seconds" was met structurally — `text-5xl font-extrabold` tabular-nums for Profit). Flag for Nate to check in Electron with real data.
+
+  **Branch:** `visual/delucas-pizza-warmth` — **do not merge without Nate's sign-off**.
 
 - **2026-07-15** — ✅ **bcns website visual pass (second pass) done** on branch `visual-pass/bcns-nate-personal`. 5 commits. Pages improved:
   - `/` — nav cards: replaced arrow-circle CTA with visible "Explore →" text link in brand blue; added top-border accent that animates to primary on hover; reduced section top padding so cards are visible in first viewport.
