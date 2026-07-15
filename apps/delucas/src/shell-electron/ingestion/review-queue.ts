@@ -30,7 +30,19 @@ export interface ReviewItem {
 // Module-level queue (singleton in main process)
 // ---------------------------------------------------------------------------
 
+/**
+ * Process-lifetime singleton — this queue is in-memory only and is reset on
+ * each app restart. This is intentional for v1: any pending review items that
+ * were not resolved before the app closed are simply re-queued on the next
+ * ingestion run (because their message-ids are not yet in processed_emails).
+ */
 const queue: ReviewItem[] = [];
+
+/**
+ * Monotonic counter for review item IDs. Resets to 1 on each app restart —
+ * safe because the queue is ephemeral (IDs are only meaningful within a
+ * single process lifetime).
+ */
 let nextId = 1;
 
 // ---------------------------------------------------------------------------

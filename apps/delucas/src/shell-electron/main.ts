@@ -26,7 +26,7 @@ import type { NewTransaction } from "../shared/types";
 import { ManualSource } from "./ingestion/sources/manual";
 import { RecurringSource } from "./ingestion/sources/recurring";
 import { DragDropSource } from "./ingestion/sources/dragdrop";
-import { EmailSource, getEmailStatus } from "./ingestion/sources/email";
+import { EmailSource, getEmailStatus, setEmailError } from "./ingestion/sources/email";
 import { runSources, getLastRunReport } from "./ingestion/runner";
 import { extractFromPdfImage } from "./ingestion/llm";
 import { pdfFirstPageToBase64 } from "./ingestion/pdf";
@@ -102,11 +102,27 @@ function getImapConfig(db: Database.Database): ImapConfig | null {
   const portRaw = getSetting(db, "imap_port");
   const secureRaw = getSetting(db, "imap_secure");
 
+  if (portRaw !== undefined) {
+    const port = parseInt(portRaw, 10);
+    if (Number.isNaN(port)) {
+      console.warn(`[main] imap_port setting "${portRaw}" is not a valid integer — skipping IMAP connection`);
+      setEmailError("Invalid IMAP port in settings");
+      return null;
+    }
+    return {
+      host,
+      user,
+      password,
+      port,
+      secure: secureRaw !== undefined ? secureRaw !== "false" : true,
+    };
+  }
+
   return {
     host,
     user,
     password,
-    port: portRaw !== undefined ? parseInt(portRaw, 10) : 993,
+    port: 993,
     secure: secureRaw !== undefined ? secureRaw !== "false" : true,
   };
 }
@@ -490,7 +506,16 @@ app.whenReady().then(() => {
 
   registerIpcHandlers(db);
 
-  // Run email ingestion on startup (best-effort; failure is captured in emailStatus)
+  try {
+    createWindow();
+  } catch (err) {
+    console.error("[main] createWindow failed", err);
+    app.quit();
+    return;
+  }
+
+  // Run ingestion after the window is up so it does not delay window creation.
+  // Best-effort; failure is captured in emailStatus (never throws).
   emailSource = new EmailSource(db, () => getImapConfig(db));
   const now2 = new Date();
   const currentMonth2 = `${now2.getFullYear()}-${(now2.getMonth() + 1).toString().padStart(2, "0")}`;
@@ -498,13 +523,6 @@ app.whenReady().then(() => {
   runSources(db, [recurringSource2, manualSource, dragDropSource, emailSource]).catch((err) => {
     console.error("[main] startup ingestion run failed", err);
   });
-
-  try {
-    createWindow();
-  } catch (err) {
-    console.error("[main] createWindow failed", err);
-    app.quit();
-  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

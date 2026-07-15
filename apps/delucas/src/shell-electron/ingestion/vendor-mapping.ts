@@ -68,8 +68,13 @@ export function saveVendorMap(db: Database.Database, map: VendorMap): void {
  * Look up a vendor string in the map.
  * Performs case-insensitive substring matching: if any key is a substring of
  * the (lowercased) vendor, the corresponding category is returned.
- * First match wins (iteration order of the map object).
- * Falls back to "other".
+ *
+ * First-match-wins is intentional: the caller controls ordering by the order
+ * keys were inserted into the VendorMap object (plain JS object iteration order,
+ * i.e. insertion order for string keys per ES2015+). More specific rules should
+ * be inserted before broader ones when building the map.
+ *
+ * Falls back to "other" when no key matches.
  */
 export function resolveCategory(vendor: string, map: VendorMap): TransactionCategory {
   const lowerVendor = vendor.toLowerCase();

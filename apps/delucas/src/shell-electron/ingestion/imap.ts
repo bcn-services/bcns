@@ -130,14 +130,41 @@ function findPdfParts(node: MessageStructurePart): string[] {
   return parts;
 }
 
+/** Maximum attachment size accepted (20 MB). Streams exceeding this are rejected. */
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+/** Maximum number of unprocessed messages fetched per run. Remaining messages are picked up on the next run. */
+const MAX_BATCH_SIZE = 50;
+
 /**
  * Stream a body part to a Buffer.
+ * Rejects with an error if the accumulated size exceeds MAX_ATTACHMENT_BYTES.
  */
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+async function streamToBuffer(
+  stream: NodeJS.ReadableStream,
+  messageId: string
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    let aborted = false;
     stream.on("data", (chunk: Buffer | string) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      if (aborted) return;
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buf.byteLength;
+      if (totalBytes > MAX_ATTACHMENT_BYTES) {
+        aborted = true;
+        // Drain remaining events without accumulating — destroy if supported
+        const destroyable = stream as NodeJS.ReadableStream & { destroy?: () => void };
+        destroyable.destroy?.();
+        const err = new Error(
+          `[imap] attachment too large (>${MAX_ATTACHMENT_BYTES} bytes) for message ${messageId} — skipping`
+        );
+        console.error(err.message);
+        reject(err);
+        return;
+      }
+      chunks.push(buf);
     });
     stream.on("end", () => resolve(Buffer.concat(chunks)));
     stream.on("error", reject);
@@ -149,9 +176,12 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 // ---------------------------------------------------------------------------
 
 /**
- * Connect to IMAP, fetch all messages in INBOX that have PDF attachments
+ * Connect to IMAP, fetch unprocessed messages in INBOX that have PDF attachments
  * and have not yet been recorded in processed_emails. Returns an array of
  * EmailWithPdf for the caller to run through LLM extraction.
+ *
+ * Capped at MAX_BATCH_SIZE (50) unprocessed messages per run — remaining
+ * messages are picked up on the next scheduled run.
  *
  * On any connection or auth failure, throws — caller catches and sets status.
  *
@@ -180,6 +210,9 @@ export async function fetchUnprocessedEmails(
     const results: EmailWithPdf[] = [];
 
     for (const msg of messages) {
+      // Stop once we have reached the per-run batch cap
+      if (results.length >= MAX_BATCH_SIZE) break;
+
       // Determine a stable message-id
       const rawMessageId = msg.envelope?.messageId ?? `uid-${msg.uid}`;
       // Normalize: strip angle brackets if present
@@ -201,11 +234,12 @@ export async function fetchUnprocessedEmails(
 
       try {
         const dl = await client.download(String(msg.uid), part, { uid: true });
-        const pdfBuffer = await streamToBuffer(dl.content);
+        const pdfBuffer = await streamToBuffer(dl.content, messageId);
         results.push({ messageId, pdfBuffer });
       } catch (dlErr) {
         console.error(`[imap] failed to download PDF part ${part} from message ${messageId}`, dlErr);
-        // Skip this message — do not mark processed so it can be retried
+        // Mark processed on permanent download failure to avoid infinite retry
+        recordProcessed(db, messageId);
       }
     }
 

@@ -40,6 +40,12 @@ export interface EmailStatus {
   error: string | null;
 }
 
+/**
+ * Process-lifetime singleton — reset to defaults on each app launch.
+ * This is intentional for v1: status is ephemeral and reflects the state of
+ * the current process only. Consumers must not rely on this persisting across
+ * restarts.
+ */
 let emailStatus: EmailStatus = {
   connected: false,
   lastChecked: null,
@@ -48,6 +54,14 @@ let emailStatus: EmailStatus = {
 
 export function getEmailStatus(): EmailStatus {
   return { ...emailStatus };
+}
+
+/**
+ * Set emailStatus.error from outside this module (e.g. when main process
+ * detects a configuration problem before EmailSource.pull() is called).
+ */
+export function setEmailError(error: string): void {
+  emailStatus = { connected: false, lastChecked: null, error };
 }
 
 // ---------------------------------------------------------------------------
