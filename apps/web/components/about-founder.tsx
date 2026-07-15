@@ -23,12 +23,13 @@ export function AboutFounder() {
 
         <div className="mt-14 grid gap-8 lg:grid-cols-2">
           {founders.map((founder) => (
-            <Card key={founder.name} className="h-full">
-              <CardHeader>
-                <CardTitle className="text-xl">{founder.name}</CardTitle>
-                <p className="text-sm font-medium text-primary/80">{founder.roleLine}</p>
+            <Card key={founder.name} className="relative h-full overflow-hidden">
+              <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-primary/40" aria-hidden />
+              <CardHeader className="pl-8">
+                <CardTitle className="text-2xl font-bold">{founder.name}</CardTitle>
+                <p className="text-sm font-semibold uppercase tracking-wider text-primary/70">{founder.roleLine}</p>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pl-8">
                 <CardDescription className="text-base leading-relaxed">
                   {founder.bio}
                 </CardDescription>
