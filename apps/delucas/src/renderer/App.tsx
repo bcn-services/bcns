@@ -7,8 +7,9 @@
 import React, { useState } from "react";
 import { Dashboard } from "./pages/Dashboard";
 import { AddFix } from "./pages/AddFix";
+import { Settings } from "./pages/Settings";
 
-type Tab = "dashboard" | "addfix";
+type Tab = "dashboard" | "addfix" | "settings";
 
 interface TabButtonProps {
   label: string;
@@ -52,12 +53,23 @@ export default function App(): React.JSX.Element {
             active={tab === "addfix"}
             onClick={() => setTab("addfix")}
           />
+          <TabButton
+            label="Settings"
+            active={tab === "settings"}
+            onClick={() => setTab("settings")}
+          />
         </nav>
       </header>
 
       {/* Tab content */}
       <main className="px-6 py-6 max-w-4xl mx-auto" role="tabpanel">
-        {tab === "dashboard" ? <Dashboard /> : <AddFix />}
+        {tab === "dashboard" ? (
+          <Dashboard />
+        ) : tab === "addfix" ? (
+          <AddFix />
+        ) : (
+          <Settings />
+        )}
       </main>
     </div>
   );

@@ -26,6 +26,15 @@ import {
   markEmailProcessed,
 } from "./db/queries";
 import { materializeRecurring } from "./recurring";
+import {
+  buildBackupDeps,
+  dailyTrigger,
+  quitBackup,
+  getBackupStatus,
+  copyToBackupFolder,
+  rotateOld,
+  dateString,
+} from "./backup";
 import { compute12MonthSeries, computeMonthPnl, generateSummary } from "../shared/pnl";
 import type { NewTransaction } from "../shared/types";
 import { ManualSource } from "./ingestion/sources/manual";
@@ -692,6 +701,30 @@ function registerIpcHandlers(db: Database.Database): void {
       throw new Error(`settings:set: unsupported value type: ${typeof value}`);
     }
   });
+
+  // ------------------------------------------------------------------
+  // backup — P6
+  // ------------------------------------------------------------------
+
+  ipcMain.handle("backup:getStatus", () => {
+    return getBackupStatus();
+  });
+
+  ipcMain.handle("backup:triggerNow", () => {
+    const backupFolder = getSetting(db, "backup_folder");
+    if (!backupFolder) {
+      return { ok: false, error: "Backup folder not configured in Settings." };
+    }
+    try {
+      const today = dateString();
+      copyToBackupFolder(DB_PATH, backupFolder, today);
+      rotateOld(backupFolder);
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -718,6 +751,23 @@ app.whenReady().then(() => {
   }
 
   registerIpcHandlers(db);
+
+  // Daily backup on open — runs at most once per calendar day.
+  // Silently skipped if backup_folder is not configured.
+  try {
+    dailyTrigger(buildBackupDeps(db, DB_PATH, getSetting, setSetting));
+  } catch (err) {
+    console.error("[main] dailyTrigger failed unexpectedly", err);
+  }
+
+  // Quit backup — synchronous copy before the process exits.
+  app.on("before-quit", () => {
+    try {
+      quitBackup(buildBackupDeps(db, DB_PATH, getSetting, setSetting));
+    } catch (err) {
+      console.error("[main] quitBackup failed", err);
+    }
+  });
 
   try {
     createWindow();

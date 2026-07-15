@@ -3,16 +3,22 @@
  * Profit is green when positive, red when negative.
  * Shows the plain-English summary sentence from P2's generateSummary().
  *
+ * When all values are zero AND transactionCount is 0, shows EmptyState
+ * instead of three zero cards (first-run / empty DB experience).
+ *
  * Renderer only — no node:* or electron imports.
  */
 
 import React from "react";
 import type { MonthPnl } from "../../shared/types";
+import { EmptyState } from "./EmptyState";
 
 interface HeadlineNumbersProps {
   pnl: MonthPnl | null;
   summary: string;
   loading: boolean;
+  /** Total transactions for the current month — used to detect first-run empty state. */
+  transactionCount: number;
 }
 
 function formatCents(cents: number): string {
@@ -39,7 +45,7 @@ function StatCard({ label, value, colorClass = "text-foreground" }: StatCardProp
   );
 }
 
-export function HeadlineNumbers({ pnl, summary, loading }: HeadlineNumbersProps): React.JSX.Element {
+export function HeadlineNumbers({ pnl, summary, loading, transactionCount }: HeadlineNumbersProps): React.JSX.Element {
   if (loading || pnl === null) {
     return (
       <div className="space-y-3">
@@ -53,6 +59,17 @@ export function HeadlineNumbers({ pnl, summary, loading }: HeadlineNumbersProps)
         </div>
       </div>
     );
+  }
+
+  // Empty-state: no transactions and all values are zero — show friendly prompt
+  const isEmpty =
+    transactionCount === 0 &&
+    pnl.revenue_cents === 0 &&
+    pnl.expense_cents === 0 &&
+    pnl.profit_cents === 0;
+
+  if (isEmpty) {
+    return <EmptyState />;
   }
 
   const profitColor =

@@ -167,6 +167,14 @@ export interface BridgeAPI {
     get: (key: string) => Promise<unknown>;
     set: (key: string, value: unknown) => Promise<void>;
   };
+
+  /** Backup status and manual trigger — P6 */
+  backup: {
+    /** Returns the in-memory backup status (lastBackup date string or null, error or null). */
+    getStatus: () => Promise<{ lastBackup: string | null; error: string | null }>;
+    /** Trigger a backup immediately (for Settings screen "Backup now" button). */
+    triggerNow: () => Promise<{ ok: boolean; error?: string }>;
+  };
 }
 
 /** Global augmentation so renderer can access the bridge via window.bridge */

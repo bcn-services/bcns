@@ -2,15 +2,16 @@
   "name": "@delucas/app",
   "version": "0.0.0",
   "private": true,
-  "main": "dist/main/main.js",
+  "main": "dist/main/index.js",
   "scripts": {
     "dev": "vite --config vite.config.ts",
     "dev:electron": "electron-vite dev",
     "build": "electron-vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
-    "test": "node tests/import-boundary.test.mjs && tsx tests/pnl.test.mjs && tsx tests/db.test.mjs && tsx tests/ingestion.test.mjs && tsx tests/email.test.mjs && tsx tests/dashboard.test.mjs",
-    "clean": "rm -rf dist .turbo node_modules"
+    "test": "node tests/import-boundary.test.mjs && tsx tests/pnl.test.mjs && tsx tests/db.test.mjs && tsx tests/ingestion.test.mjs && tsx tests/email.test.mjs && tsx tests/dashboard.test.mjs && tsx tests/backup.test.mjs && tsx tests/settings.test.mjs",
+    "package": "electron-vite build && electron-builder --mac dmg --win nsis --config electron-builder.config.mjs",
+    "clean": "rm -rf dist release .turbo node_modules"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -19,7 +20,6 @@
     "better-sqlite3": "^9.6.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "electron": "^29.4.6",
     "imapflow": "^1.4.7",
     "lucide-react": "^0.454.0",
     "pdfjs-dist": "^4.10.38",
@@ -35,6 +35,8 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "electron": "^29.4.6",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "eslint": "^9.15.0",
     "postcss": "^8.4.49",

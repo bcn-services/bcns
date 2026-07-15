@@ -116,6 +116,13 @@ const bridge: BridgeAPI = {
     set: (key: string, value: unknown): Promise<void> =>
       ipcRenderer.invoke("settings:set", key, value),
   },
+
+  backup: {
+    getStatus: (): Promise<{ lastBackup: string | null; error: string | null }> =>
+      ipcRenderer.invoke("backup:getStatus"),
+    triggerNow: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("backup:triggerNow"),
+  },
 };
 
 contextBridge.exposeInMainWorld("bridge", bridge);

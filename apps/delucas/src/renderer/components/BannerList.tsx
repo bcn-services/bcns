@@ -1,10 +1,6 @@
 /**
- * BannerList — renders active failure banners (email/LLM status).
+ * BannerList — renders active failure banners (email error, backup error).
  * Each banner is dismissible but returns while the underlying issue persists.
- *
- * Accepts EmailStatusBridge; if error is non-null and the banner hasn't been
- * dismissed in this render cycle, it shows. If the error clears, the banner
- * auto-hides on the next poll.
  *
  * Renderer only — no node:* or electron imports.
  */
@@ -14,42 +10,49 @@ import type { EmailStatusBridge } from "../../bridge/BridgeInterface";
 
 interface BannerListProps {
   emailStatus: EmailStatusBridge | null;
+  backupError?: string | null;
 }
 
-export function BannerList({ emailStatus }: BannerListProps): React.JSX.Element | null {
-  // Track which error strings have been dismissed in this session.
-  // When the error text changes (different error) or clears and comes back,
-  // the banner re-appears.
-  const [dismissedError, setDismissedError] = useState<string | null>(null);
+interface SingleBannerProps {
+  label: string;
+  message: string;
+}
 
-  const currentError = emailStatus?.error ?? null;
+function SingleBanner({ label, message }: SingleBannerProps): React.JSX.Element {
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => { setDismissed(false); }, [message]);
+  if (dismissed) return <></>;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">
+      <span className="text-destructive">
+        <span className="font-semibold">{label}</span>{" "}
+        {message}
+      </span>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="shrink-0 text-destructive/60 hover:text-destructive transition-colors text-xs underline"
+        aria-label={`Dismiss ${label} banner`}
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
 
-  // When the error changes (new error or cleared), reset the dismissed state.
-  // dismissedError is intentionally excluded from the dep array — the effect
-  // only needs to run when the error string itself changes, not when the user
-  // dismisses (which would cause an unnecessary re-run after every dismiss).
-  useEffect(() => {
-    setDismissedError(null);
-  }, [currentError]);
-
-  if (currentError === null || currentError === dismissedError) return null;
+export function BannerList({ emailStatus, backupError }: BannerListProps): React.JSX.Element | null {
+  const emailError = emailStatus?.error ?? null;
+  const hasAnyBanner = emailError !== null || (backupError != null && backupError !== "");
+  if (!hasAnyBanner) return null;
 
   return (
     <div className="space-y-2" role="alert" aria-live="assertive">
-      <div className="flex items-start justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">
-        <span className="text-destructive">
-          <span className="font-semibold">Email check failed:</span>{" "}
-          {currentError}
-        </span>
-        <button
-          type="button"
-          onClick={() => setDismissedError(currentError)}
-          className="shrink-0 text-destructive/60 hover:text-destructive transition-colors text-xs underline"
-          aria-label="Dismiss email error banner"
-        >
-          Dismiss
-        </button>
-      </div>
+      {emailError !== null && (
+        <SingleBanner label="Email check failed:" message={emailError} />
+      )}
+      {backupError != null && backupError !== "" && (
+        <SingleBanner label="Backup failed:" message={backupError} />
+      )}
     </div>
   );
 }

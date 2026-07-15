@@ -194,4 +194,15 @@ export const mockBridge: BridgeAPI = {
       console.warn("[mockBridge] settings.set called — no-op in browser mode");
     },
   },
+
+  backup: {
+    getStatus: async (): Promise<{ lastBackup: string | null; error: string | null }> => {
+      console.warn("[mockBridge] backup.getStatus — returning null status in browser mode");
+      return { lastBackup: null, error: null };
+    },
+    triggerNow: async (): Promise<{ ok: boolean; error?: string }> => {
+      console.warn("[mockBridge] backup.triggerNow — no-op in browser mode");
+      return { ok: true };
+    },
+  },
 };
