@@ -9,10 +9,10 @@
 ---
 
 ## Current position
-- **Status:** Combined overnight branch. B1–B4 done (site restructure). V1–V5 done (layout-loop visual pass, on layout-loop/bcns-section-2). C1 NOT STARTED (voice/content pass). P1–P6 NOT STARTED (DeLuca's pizza app).
-- **Next:** Run dev-team-auto on this branch — it will execute C1 then P1–P6 in order, then halt at the STOP HERE. Both layout-loop visual passes (website + pizza) run in cowork after.
-- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy. None block the overnight run.
-- **Last updated:** 2026-07-15 (overnight-combined branch created — C1 + P1–P6 queued)
+- **Status:** Combined overnight branch. B1–B4 done (site restructure). V1–V5 done (layout-loop visual pass). C1 DONE (voice/content pass). P1–P6 NOT STARTED (DeLuca's pizza app).
+- **Next:** P1–P6 (DeLuca's pizza app) — dev-team-auto. Then both layout-loop visual passes in cowork.
+- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy. None block P1–P6.
+- **Last updated:** 2026-07-15 (C1 voice/content pass complete — 419a05f)
 
 ---
 
@@ -33,6 +33,11 @@
 | B2 — Registry rework: nav cards, two-founder about, pricing shape, /work holding state | ✅ done [full] — NavCardsContent, AboutContent (2-founder), HoldingState+ctaHref, 3-tier pricing; e6fc921 |
 | B3 — Wire the drafted copy | ✅ done [light] — all [SLOT:] replaced with appendix copy, [INPUT:] slots for unknowns, zero SLOT on rendered pages; 08f533e |
 | B4 — CONTENT.md + trackers updated | ✅ done [light] — CONTENT.md rewritten 1:1 with registry (77 fields), flip instructions + [INPUT:] convention documented; e6642bc |
+
+### v2 Section 3 — Voice + content pass (dev-team-auto)
+| Item | Status | Notes |
+|------|--------|-------|
+| C1 — Voice + content pass | ✅ done [light] — zero em-dashes, zero buzzwords, ownership reframe, resolved slots filled (Standard/Advanced build, pricing, support model, meta), FK grade 4.4, B3 tests updated, build green; 419a05f |
 
 ### v2 Section 2 — Visual pass (layout-loop, cowork)
 | Item | Status | Notes |
@@ -57,6 +62,8 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-15** — ✅ **C1 voice + content pass done** (light track, 2 attempts). Rewrote `apps/web/lib/content.ts` per the copy brief: zero em-dashes, zero buzzwords, ownership reframe ("Use it forever, free"), all pricing/turnaround/support/meta slots filled with resolved values (Standard build $2,000–$5,000, Advanced build $5,000–$15,000, AI consulting $800/day, 30-day tweaks + 1-year bug-fix support model). About section: builder-first bios, no fabricated portfolio, honest founding story in whyBcns. Reviews holding state updated to "No reviews yet. That changes with our first client." FK grade 4.4 (well under 8.0 threshold). B3 spot-check tests updated and passing. CONTENT.md mirrors registry 1:1. Build green. Commit: 419a05f.
 
 - **2026-07-14** — 🔄 **v2 plan started** on branch `experimental-v2`. PLAN.md updated to v2 — multi-page site with real drafted copy. Items A1-A4 (v1 architecture) remain done on prior branch `worktree-experimental-overnight-first-draft`. v2 plan B1-B4 starts fresh from the current single-page-app state on `experimental-v2`. Base: all components + registry + legal pages from A1-A4 work are merged in.
 

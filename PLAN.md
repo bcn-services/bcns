@@ -71,7 +71,7 @@
 
 > This run **replaces and tightens the copy** in `apps/web/lib/content.ts` — it does the opposite of Section 1's "wire verbatim" rule: here the agent rewrites toward the voice spec and fills every resolved `[INPUT: …]` slot with the real values below. Only the Nate-only slots in **Needs-Nate** stay `[INPUT: …]`. No new facts beyond what the copy brief supplies. All checks are headlessly verifiable.
 
-### C1 — Voice + content pass · `status: not started` · `track: light`
+### C1 — Voice + content pass · `status: done` · `track: light`
 
 - **task:** Rewrite every string in `apps/web/lib/content.ts` to match the **Copy
   brief** below, then update `apps/web/CONTENT.md` to mirror the result 1:1. Four

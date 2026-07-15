@@ -1,5 +1,12 @@
 # Dev-team memory log
 
+## 2026-07-15 — dev-team-auto — C1 Voice + content pass
+- **Outcome:** DONE — 2 attempts (light track, branch worktree-agent-afb098493a86a56c1, commit 419a05f)
+- **What happened:** Rewrote content.ts for voice/copy pass. Engineer missed the second `$` inside en-dash price ranges ("$2,000–5,000" instead of "$2,000–$5,000"). QA caught it on first pass. Bug Fixer patched in one step. QA re-gate PASS. FK readability grade 4.4 (threshold 8.0). Readability check script committed at apps/web/scripts/readability-check.py.
+- **What worked:** Light track correct — copy-only change, single file. QA grep for exact price strings (using Python to avoid shell en-dash encoding issues) reliably caught the format bug.
+- **What failed:** Engineer forgot the second dollar sign inside the en-dash range on both build tiers. grep on the orchestrator side silently failed to match due to en-dash encoding; QA used Python to catch it correctly.
+- **Remember next run:** En-dash (`–`) encoding in shell grep can silently mismatch — use Python or `python3 -c "import subprocess; ..."` for exact-string checks involving Unicode range characters. The readability script is now at apps/web/scripts/readability-check.py for future copy passes.
+
 ## 2026-07-14 — dev-team-auto — B4 CONTENT.md + trackers updated
 - **Outcome:** DONE — 1 attempt (light track, branch feat/b1-multi-page-routing, commit e6642bc)
 - **What happened:** Rewrote CONTENT.md 1:1 with new registry (77 fields). QA PASS first attempt, 49 assertions.
