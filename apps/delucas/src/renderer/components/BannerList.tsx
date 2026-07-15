@@ -24,12 +24,13 @@ export function BannerList({ emailStatus }: BannerListProps): React.JSX.Element 
 
   const currentError = emailStatus?.error ?? null;
 
-  // When the error changes (new error or cleared), reset the dismissed state
+  // When the error changes (new error or cleared), reset the dismissed state.
+  // dismissedError is intentionally excluded from the dep array — the effect
+  // only needs to run when the error string itself changes, not when the user
+  // dismisses (which would cause an unnecessary re-run after every dismiss).
   useEffect(() => {
-    if (currentError !== dismissedError) {
-      setDismissedError(null);
-    }
-  }, [currentError, dismissedError]);
+    setDismissedError(null);
+  }, [currentError]);
 
   if (currentError === null || currentError === dismissedError) return null;
 

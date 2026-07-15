@@ -152,6 +152,7 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleSave(tx: Transaction, updates: EditState): Promise<void> {
     const dollars = parseFloat(updates.amountDollars);
@@ -184,16 +185,17 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
 
   async function handleDelete(id: number): Promise<void> {
     setSaving(true);
+    setDeleteError(null);
     try {
       const result = await window.bridge.db.deleteTransaction(id);
       if (result.ok) {
         setDeletingId(null);
         onMutated();
       } else {
-        console.error("[TransactionList] delete failed", result.error);
+        setDeleteError(result.error ?? "Failed to delete transaction.");
       }
     } catch (err) {
-      console.error("[TransactionList] delete error", err);
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete transaction.");
     } finally {
       setSaving(false);
     }
@@ -208,6 +210,10 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
   }
 
   return (
+    <div className="space-y-2">
+    {deleteError !== null && (
+      <p className="text-xs text-red-600 dark:text-red-400">{deleteError}</p>
+    )}
     <div className="border border-border rounded-lg overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 border-b border-border">
@@ -256,7 +262,7 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeletingId(null)}
+                        onClick={() => { setDeletingId(null); setDeleteError(null); }}
                         disabled={saving}
                         className="text-xs text-muted-foreground hover:underline disabled:opacity-50"
                       >
@@ -287,6 +293,7 @@ export function TransactionList({ transactions, onMutated }: TransactionListProp
           })}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

@@ -304,7 +304,7 @@ function registerIpcHandlers(db: Database.Database): void {
   // ------------------------------------------------------------------
   ipcMain.handle("db:getTransactionsForMonth", (_event, month: string) => {
     if (typeof month !== "string" || !/^\d{4}-\d{2}$/.test(month)) {
-      return { ok: false, error: "db:getTransactionsForMonth: month must be YYYY-MM" };
+      throw new Error("db:getTransactionsForMonth: month must be YYYY-MM");
     }
     try {
       return getTransactionsByMonth(db, month);
@@ -429,11 +429,59 @@ function registerIpcHandlers(db: Database.Database): void {
   // db:updateRecurringRule — P5
   // ------------------------------------------------------------------
   ipcMain.handle("db:updateRecurringRule", (_event, id: number, updates: Record<string, unknown>) => {
+    const VALID_CATEGORIES = new Set(["food", "beverage", "utilities", "rent", "labor", "other"]);
+
     if (!Number.isInteger(id) || id <= 0) {
       return { ok: false, error: "db:updateRecurringRule: id must be a positive integer" };
     }
+    if (typeof updates !== "object" || updates === null) {
+      return { ok: false, error: "db:updateRecurringRule: updates must be an object" };
+    }
+
+    const validated: Record<string, unknown> = {};
+    if (updates["amount_cents"] !== undefined) {
+      if (!Number.isInteger(updates["amount_cents"]) || (updates["amount_cents"] as number) <= 0) {
+        return { ok: false, error: "db:updateRecurringRule: amount_cents must be a positive integer" };
+      }
+      validated["amount_cents"] = updates["amount_cents"];
+    }
+    if (updates["day_of_month"] !== undefined) {
+      if (
+        !Number.isInteger(updates["day_of_month"]) ||
+        (updates["day_of_month"] as number) < 1 ||
+        (updates["day_of_month"] as number) > 28
+      ) {
+        return { ok: false, error: "db:updateRecurringRule: day_of_month must be an integer 1–28" };
+      }
+      validated["day_of_month"] = updates["day_of_month"];
+    }
+    if (updates["vendor"] !== undefined) {
+      if (typeof updates["vendor"] !== "string" || (updates["vendor"] as string).trim() === "") {
+        return { ok: false, error: "db:updateRecurringRule: vendor must be a non-empty string" };
+      }
+      validated["vendor"] = (updates["vendor"] as string).trim();
+    }
+    if (updates["category"] !== undefined) {
+      if (!VALID_CATEGORIES.has(updates["category"] as string)) {
+        return { ok: false, error: "db:updateRecurringRule: invalid category" };
+      }
+      validated["category"] = updates["category"];
+    }
+    if (updates["end_date"] !== undefined) {
+      if (updates["end_date"] !== null && (typeof updates["end_date"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(updates["end_date"] as string))) {
+        return { ok: false, error: "db:updateRecurringRule: end_date must be YYYY-MM-DD or null" };
+      }
+      validated["end_date"] = updates["end_date"];
+    }
+    if (updates["is_active"] !== undefined) {
+      if (typeof updates["is_active"] !== "boolean") {
+        return { ok: false, error: "db:updateRecurringRule: is_active must be a boolean" };
+      }
+      validated["is_active"] = updates["is_active"];
+    }
+
     try {
-      const changed = updateRecurringRule(db, id, updates);
+      const changed = updateRecurringRule(db, id, validated);
       return changed ? { ok: true } : { ok: false, error: "Rule not found" };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
