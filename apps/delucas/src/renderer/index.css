@@ -22,10 +22,10 @@
 @layer base {
   :root {
     /* Background: warm cream, not clinical white */
-    --background: 38 30% 96%;
+    --background: 34 22% 92%;
 
-    /* Card surfaces: slightly warmer / lifted off the field */
-    --card: 36 28% 98%;
+    /* Card surfaces: bright warm white — visually lifted off the cream field */
+    --card: 36 25% 98%;
     --card-foreground: 20 14% 12%;
 
     /* Foreground: near-black with warm brown undertone */
