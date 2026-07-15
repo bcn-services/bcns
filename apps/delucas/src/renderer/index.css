@@ -1,3 +1,79 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * DeLuca's — pizza-shop warmth brand tokens.
+ *
+ * Palette:
+ *   Background: warm off-white / cream (not clinical white)
+ *   Surface: slightly warmer card background
+ *   Primary: deep tomato-red — the one accent that earns its place
+ *   Muted: warm stone/tan
+ *   Foreground: near-black with warm undertone
+ *
+ * Craft alignment:
+ *   - P7: rejects generic/default — cream base + tomato accent give character
+ *   - P1: primary accent directs the eye to the one thing that matters
+ *   - P11: one base (cream) + one accent (tomato) + semantic green/red
+ *   - P8: spacing rhythm stays on 8px scale
+ */
+
+@layer base {
+  :root {
+    /* Background: warm cream, not clinical white */
+    --background: 38 30% 96%;
+
+    /* Card surfaces: slightly warmer / lifted off the field */
+    --card: 36 28% 98%;
+    --card-foreground: 20 14% 12%;
+
+    /* Foreground: near-black with warm brown undertone */
+    --foreground: 20 14% 12%;
+
+    /* Border: warm stone, visible but soft */
+    --border: 30 18% 82%;
+    --input: 30 18% 82%;
+
+    /* Primary: deep tomato-red — the main accent */
+    --primary: 10 72% 38%;
+    --primary-foreground: 38 30% 96%;
+
+    /* Secondary: warm tan surface */
+    --secondary: 34 22% 90%;
+    --secondary-foreground: 20 14% 18%;
+
+    /* Muted: warm stone */
+    --muted: 34 18% 91%;
+    --muted-foreground: 20 10% 44%;
+
+    /* Accent: same as primary (single accent system) */
+    --accent: 10 72% 38%;
+    --accent-foreground: 38 30% 96%;
+
+    /* Destructive: keep standard red but warm-tinted */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 38 30% 96%;
+
+    /* Ring: tomato-red focus */
+    --ring: 10 72% 38%;
+
+    /* Radius: 14px on cards, per craft token */
+    --radius: 0.875rem;
+  }
+}
+
+/* Base typography: warm body text, comfortable line-height */
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+}
