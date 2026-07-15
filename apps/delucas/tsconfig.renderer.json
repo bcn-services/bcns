@@ -9,6 +9,6 @@
     "composite": true,
     "tsBuildInfoFile": ".tsbuildinfo/renderer"
   },
-  "include": ["src/renderer/**/*", "src/bridge/BridgeInterface.ts", "src/bridge/mockBridge.ts"],
+  "include": ["src/renderer/**/*", "src/shared/**/*", "src/bridge/BridgeInterface.ts", "src/bridge/mockBridge.ts"],
   "exclude": ["node_modules", "dist"]
 }

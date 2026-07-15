@@ -8,20 +8,39 @@
  * in Electron, or mockBridge.ts in browser dev mode).
  */
 
+import type {
+  Transaction,
+  NewTransaction,
+  RecurringRule,
+  MonthPnl,
+} from "../shared/types";
+
+export type { Transaction, NewTransaction, RecurringRule, MonthPnl };
+
 export interface DialogOptions {
   filters?: Array<{ name: string; extensions: string[] }>;
 }
 
 export interface BridgeAPI {
-  /** DB operations — implemented in P2 */
+  /** DB operations */
   db: {
     /**
-     * SECURITY: the ipcMain handler for "db:query" MUST use parameterized
-     * queries exclusively (e.g. db.prepare(sql).all(...params)).  It must
-     * never pass the client-supplied `sql` string directly to SQLite without
-     * an allowlist check — doing so would open a SQL injection vector.
+     * Generic parameterized SELECT. Main process enforces SELECT-only.
+     * SECURITY: parameterized via db.prepare().all(...params); never raw SQL concat.
      */
     query: (sql: string, params?: unknown[]) => Promise<unknown[]>;
+
+    /** Typed read/write operations */
+    getTransactions: () => Promise<Transaction[]>;
+    getTransactionsByMonth: (month: string) => Promise<Transaction[]>;
+    insertTransaction: (tx: NewTransaction) => Promise<number>;
+    getMonthPnl: (month: string) => Promise<MonthPnl>;
+    get12MonthSeries: (endMonth: string) => Promise<MonthPnl[]>;
+    getSummary: (month: string) => Promise<string>;
+    getRecurringRules: () => Promise<RecurringRule[]>;
+    materializeRecurring: (throughMonth: string) => Promise<void>;
+    isEmailProcessed: (messageId: string) => Promise<boolean>;
+    markEmailProcessed: (messageId: string) => Promise<void>;
   };
 
   /** Email ingestion — implemented in P3/P4 */
