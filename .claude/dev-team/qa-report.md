@@ -1,26 +1,32 @@
 ---
 # QA Report
-**Task:** B4 — CONTENT.md + trackers updated
-**Branch:** feat/b1-multi-page-routing
-**Date:** 2026-07-14
+**Task:** C1 — Voice + content pass
+**Branch:** worktree-agent-afb098493a86a56c1
+**Date:** 2026-07-15
 **Gate mode:** tests+behavioral
 
-## VERDICT: PASS
+## VERDICT: FAIL
 
 ## Criteria Checked
-- Every registry field in content.ts appears in CONTENT.md (no orphans either direction) — 49 field/section assertions in b4-content-md.test.mjs — PASS
-- /work flip instruction documented ("add an entry to pastWork.items — holding state disappears") — flip phrase assertions in b4-content-md.test.mjs — PASS
-- [INPUT: …] convention documented — placeholder explanation assertions — PASS
-- `pnpm lint` green — ran, 2/2 tasks successful — PASS
-- `pnpm typecheck` green — ran, 2/2 tasks successful — PASS
-- `pnpm build` green — 13/13 static pages generated, all routes present — PASS
+
+- **C1** — No em-dashes: `grep -c "—" apps/web/lib/content.ts` → 0 — PASS
+- **C2** — No buzzwords: buzzword grep returns zero matches — PASS
+- **C3** — No ownership-of-code claim: hero proof point reads "Use it forever, free"; contact highlight 3 title is "Yours to use", body contains no word "code"; no FAQ about code ownership — PASS
+- **C4** — All non-Needs-Nate INPUT slots filled: pricing/turnaround/response-time/meta grep returns zero; 5 remaining slots are Needs-Nate only (photo x2, business experience summary, NYU program, credential 2, credential 3) — PASS
+- **C5** — Pricing cards: correct names, features, AI consulting price; HOWEVER price strings are `$2,000–5,000` and `$5,000–15,000` (missing second `$` in range) vs criterion-specified `$2,000–$5,000` and `$5,000–$15,000`; both "30 days of fixes and tweaks included" and "One year of bug fixes, free" present in both build tiers — FAIL (price format)
+- **C6** — Readability FK grade: script committed at `apps/web/scripts/readability-check.py`; 39 body strings / 742 words score FK grade **4.4** (threshold 8.0) — PASS
+- **C7** — CONTENT.md mirrors registry 1:1: b4 test (49 assertions) passes; Needs-Nate slots table present at end of CONTENT.md — PASS
+- **C8** — B3 spot-check tests (34/34) pass; holding-state structural tests pass; no-`[SLOT:]` test passes; `pnpm lint && pnpm typecheck && pnpm build` all green — PASS
 
 ## Failures
-none
+
+- **Criterion 5 — price format typo**: `pricing.tiers[0].price` is `"$2,000–5,000"` and `pricing.tiers[1].price` is `"$5,000–15,000"` — second dollar sign missing from range; criterion specifies `$2,000–$5,000` and `$5,000–$15,000` — Root Cause: typo in content.ts price string values — **bug**
 
 ## Tests Added
-- `apps/web/__tests__/b4-content-md.test.mjs` — 49 assertions: all top-level siteContent keys in CONTENT.md, all leaf field names in CONTENT.md, /work flip instruction phrase, [INPUT: placeholder convention explanation
+
+- `apps/web/scripts/readability-check.py` — extracts body copy (description/bio/body/answer/subheadline/whyBcns fields) from content.ts and computes Flesch-Kincaid grade level using textstat; exits 0 (PASS) on grade ≤ 8, exits 1 (FAIL) otherwise; currently scores 4.4
 
 ## Not Verifiable
-none
+
+- none — all criteria covered
 ---
