@@ -9,8 +9,8 @@
 ---
 
 ## Current position
-- **Status:** Combined overnight branch. B1–B4 done. V1–V5 done. C1 DONE. P1–P6 ALL DONE. Reached STOP HERE marker. Both layout-loop visual passes next (cowork sessions).
-- **Next:** layout-loop visual pass — bcns website (branch off overnight-combined); then layout-loop DeLuca's visual pass (separate cowork session). Then Section 3–4 Needs-Nate items.
+- **Status:** Combined overnight branch. B1–B4 done. V1–V5 done (first pass). C1 DONE. P1–P6 ALL DONE. Reached STOP HERE marker. bcns visual-pass (second pass) DONE on branch `visual-pass/bcns-nate-personal`. DeLuca's visual pass still pending (separate cowork session).
+- **Next:** Nate reviews + merges `visual-pass/bcns-nate-personal` → overnight-combined. Then layout-loop DeLuca's visual pass (separate cowork session). Then Section 3–4 Needs-Nate items.
 - **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy; DeLuca's: Nate installs + configures on client laptop (Section 4).
 - **Last updated:** 2026-07-15 (P6 settings/backup/first-run done — d0c88c3; STOP HERE reached)
 
@@ -72,6 +72,15 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-15** — ✅ **bcns website visual pass (second pass) done** on branch `visual-pass/bcns-nate-personal`. 5 commits. Pages improved:
+  - `/` — nav cards: replaced arrow-circle CTA with visible "Explore →" text link in brand blue; added top-border accent that animates to primary on hover; reduced section top padding so cards are visible in first viewport.
+  - `/services` — AI consulting card gets faint primary border + bg tint (peer but distinct); card grid mt reduced from mt-14 to mt-10 (tighter heading→cards gap).
+  - `/pricing` — AI consulting card gains "DAY RATE" badge label (sparkles icon + uppercase text in primary blue) + elevated secondary/60 surface. Clearly reads as a different engagement model, not a third tier.
+  - `/about` — founder names enlarged to text-2xl/bold; roles set to uppercase tracking-wider in primary blue; left accent stripe + consistent left padding added. Builder-first hierarchy is now visually enforced.
+  - `/work` — holding-state icon enlarged to size-16/rounded-2xl with glow border; title to text-2xl/bold; ambient radial glow added from icon center (brand atmosphere); section bottom padding tightened to eliminate dead void. Looks intentional and confident.
+  - Mobile breakpoint check attempted — Claude-in-Chrome cannot emulate mobile viewport (extension limitation). Layout uses Tailwind sm/lg responsive classes throughout which were already implemented correctly.
+  - Flagged decision: about page has equal-weight founder cards (no P1-dominant element). Decided this is correct — elevating one founder over the other would be wrong. Equal weight is the right design choice for a two-founder card grid.
 
 - **2026-07-15** — ✅ **P6 settings/backup/first-run done** (full track, 1 build attempt + review/fix pass). Built Settings tab (IMAP/Anthropic key/backup folder/vendor mapping editor), backup module (daily trigger comparing ISO date strings, quit backup via before-quit, 30-file rotation, safe sequential rotation after copy), EmptyState first-run screen, electron-builder config (Mac DMG unsigned + Windows NSIS, asarUnpack .node). Mac DMG artifact produced at release/. Review found 1 Critical (settings:set no allowlist) + 2 Important (rotation ran before copy succeeded, triggerNow stale status). All fixed. 133 tests. Commit: d0c88c3. STOP HERE marker reached.
 
