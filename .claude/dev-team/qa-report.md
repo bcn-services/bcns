@@ -1,4 +1,38 @@
 ---
+# QA Report — P6
+**Task:** P6 — Settings, backup, first-run, and electron-builder config
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+**Gate mode:** tests+behavioral
+
+## VERDICT: PASS
+
+## Criteria Checked
+- Backup rotation keeps last 30 files — `backup.test.mjs` rotateOld: 35 files → 30, oldest 5 deleted — PASS
+- daily-on-open at most once per day — `backup.test.mjs` dailyTrigger skip (same date) + run (different date) — PASS
+- Settings round-trip persist — `settings.test.mjs` 10 tests (all P6 keys + JSON vendor map upsert) — PASS
+- Empty DB renders EmptyState not crash/zeros — `HeadlineNumbers` gates on `transactionCount===0 && all values 0` → `<EmptyState />`; component exists — PASS (code inspection; headless Electron not feasible)
+- Settings persist across renderer reload — IPC wiring in `Settings.tsx` uses bridge `settings:get`/`settings:set`; SQLite upsert verified in `settings.test.mjs` — PASS
+- `pnpm package` produces Mac DMG — `release/DeLuca's Revenue Tracker-0.0.0-arm64.dmg` confirmed present — PASS
+- Build green: `pnpm lint && pnpm typecheck && pnpm build` — all three commands clean, 0 errors — PASS
+- Renderer import boundary — `import-boundary.test.mjs`: 24 files checked, 0 violations — PASS
+- 133 total tests pass — 22+21+25+22+23+10+10=133 — PASS
+- `backup.getStatus` and `backup.triggerNow` in mockBridge — confirmed at mockBridge.ts lines 200/204 — PASS
+- `Settings.tsx` has all 5 required fields — imap_host, imap_user, imap_password, anthropic_key, backup_folder all present — PASS
+- `before-quit` handler in `main.ts` — `app.on("before-quit", ...)` at line 764 — PASS
+- `dailyTrigger` date comparison correct, no double-run — compares `last_backup_date` string to today; updates only after successful copy — PASS
+
+## Failures
+none
+
+## Tests Added
+No new test files. `backup.test.mjs` (10 tests) and `settings.test.mjs` (10 tests) were authored by the Engineer. QA verified all 133 tests pass.
+
+## Not Verifiable
+- Behavioral empty-DB EmptyState render: Electron renderer not scriptable headless; verified via component code inspection.
+- Behavioral settings-persist-across-reload: Electron session reload not scriptable; verified via IPC wiring + SQLite upsert behavior.
+
+---
 # QA Report — P5
 **Task:** P5 — Dashboard (the product)
 **Branch:** feat/delucas-p1-scaffold
