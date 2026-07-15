@@ -1,5 +1,30 @@
 ---
-# QA Report
+# QA Report — P1
+**Task:** P1 — App scaffold: Electron + renderer/shell split for apps/delucas/
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+**Gate mode:** tests+behavioral
+
+## VERDICT: PASS
+
+## Criteria Checked
+
+- Renderer loads in plain browser via `pnpm dev` — `curl http://localhost:3001/` returned HTTP 200 — PASS
+- Electron window check: `dist/main/index.js` (1.8 kB) and `dist/preload/index.js` (0.67 kB) exist; preload artifact line 19 contains `contextBridge.exposeInMainWorld("bridge", bridge)` — PASS
+- Import-boundary test (`apps/delucas/tests/import-boundary.test.mjs`): `node` exit 0 — 2 renderer files checked, 0 violations — PASS
+- Build green: `pnpm lint && pnpm typecheck && pnpm build` from repo root — all 4 packages pass, 0 errors — PASS
+
+## Tests Added
+
+- `apps/delucas/tests/import-boundary.test.mjs` — authored by engineer; pure Node.js ESM static analysis; verified it runs and exits 0 (no infra created by QA)
+
+## Not Verifiable
+
+- Actual Electron window rendering (GUI visible, React mounted) — skipped per gate instructions (headless); covered by artifact existence + preload bridge check
+
+---
+
+# QA Report — C1 (prior run, preserved)
 **Task:** C1 — Voice + content pass
 **Branch:** worktree-agent-afb098493a86a56c1
 **Date:** 2026-07-15
