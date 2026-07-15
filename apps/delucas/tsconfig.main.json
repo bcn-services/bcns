@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@bcns/config/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "outDir": "dist/main",
+    "baseUrl": ".",
+    "composite": true,
+    "tsBuildInfoFile": ".tsbuildinfo/main"
+  },
+  "include": ["src/shell-electron/**/*", "src/bridge/BridgeInterface.ts", "src/bridge/preload.ts"],
+  "exclude": ["node_modules", "dist"]
+}
