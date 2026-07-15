@@ -16,7 +16,7 @@ export function UseCases() {
   const { eyebrow, title, description, items } = siteContent.useCases;
 
   return (
-    <section id="examples" className="border-t border-border/60 bg-secondary/70 pt-16 pb-24 sm:pt-20 sm:pb-28">
+    <section id="examples" className="border-t border-border/60 bg-secondary/70 pt-12 pb-16 sm:pt-16 sm:pb-20">
       <Container>
         <SectionHeading
           eyebrow={eyebrow}
@@ -29,7 +29,7 @@ export function UseCases() {
             const Icon = useCaseIcons[index];
             if (!Icon) return null;
             return (
-              <Card key={index} className="group h-full transition-shadow hover:shadow-md">
+              <Card key={index} className={`group h-full transition-shadow hover:shadow-md${index === 3 ? " border-primary/30 bg-primary/[0.03]" : ""}`}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-transform group-hover:-translate-y-0.5">
