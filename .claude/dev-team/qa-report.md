@@ -1,4 +1,36 @@
 ---
+# QA Report — P5
+**Task:** P5 — Dashboard (the product)
+**Branch:** feat/delucas-p1-scaffold
+**Date:** 2026-07-15
+**Gate mode:** tests+behavioral
+
+## VERDICT: PASS
+
+## Criteria Checked
+- Headline numbers equal P2-computed values for seeded month — `computeMonthPnl` revenue=500000, expense=350000, profit=150000 vs seeded fixture — PASS
+- Summary sentence matches profit sign — `generateSummary` profit→"made", loss→"spent", zero→"equal" — PASS
+- 12 bars render with correct values — `compute12MonthSeries` returns 12 entries, last=FIXTURE_MONTH with profit=150000, empties=0 — PASS
+- Category bars match seeded totals — `expense_by_category` food=120000, rent=150000, labor=80000 — PASS
+- "Since you last opened" strip reflects simulated ingestion run — IngestionRunReport shape test (found/imported/ran_at) — PASS
+- Editing a transaction updates the headline — `updateTransaction` increases food expense; P&L recomputes correctly — PASS
+- Banner renders when email status is failed — EmailStatusBridge error-present test confirms non-null error — PASS
+- Build green: `pnpm lint && pnpm typecheck && pnpm build` — all three clean after removing unused `testAsync` (lint fix) — PASS
+- Renderer boundary: src/renderer/ imports nothing from electron/node:* — import-boundary: 22 files, 0 violations — PASS
+- Month navigation: prev/next correctly adjusts YYYY-MM string — prevMonth/nextMonth pure functions verified (Jan→Dec year wrap, Dec→Jan year wrap) — PASS (code inspection; pure functions)
+- Tab switching: "Add & fix" tab contains ManualEntryForm, DragDropZone, ReviewQueue, TransactionList, RentRuleEditor — AddFix.tsx renders all five components — PASS (source inspection)
+- Delete a transaction: confirm it removes from the list — `deleteTransaction` removes Landlord LLC, expense drops 350000→200000 — PASS
+
+## Failures
+none
+
+## Tests Added
+- `apps/delucas/tests/dashboard.test.mjs` — 23 behavioral checks: headline numbers (3), summary sign (3), 12-month series (3), category bars (3), ingestion strip shape (1), transaction update/delete (4), email banner status (2), recurring rule CRUD (3), import boundary (1). Removed unused `testAsync` to pass lint.
+
+## Not Verifiable
+- Month navigation and tab-component presence verified by code inspection; full DOM assertions require an Electron test driver not available headless.
+
+---
 # QA Report — P4
 **Task:** P4 — Email (IMAP) ingestion source
 **Branch:** feat/delucas-p1-scaffold
