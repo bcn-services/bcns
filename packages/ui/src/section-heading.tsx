@@ -30,7 +30,7 @@ function SectionHeading({
           {eyebrow}
         </span>
       ) : null}
-      <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
+      <h2 className="font-display text-balance text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
       {description ? (
         <p className="text-pretty text-lg text-muted-foreground">{description}</p>
       ) : null}

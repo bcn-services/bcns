@@ -1,129 +1,190 @@
-# bcns Landing Template — Plan (v1)
+# bcns Site Restructure — Plan (v2: multi-page + real copy)
 
-> Source of truth for the first build run. Goal: a **reusable, scalable landing
-> template** — solid architecture and on-brand visuals, with content as clearly
-> labeled `[X GOES HERE]` slots plus an outline of what belongs in each. Not a
-> finished marketing site. The words are specced, not written; the bones and the
-> design are real.
+> Source of truth for the second build run. v1 built the slot template; this run
+> reorganizes it into a **multi-page site with real drafted copy**, ready for a
+> warm customer (contacted or referred) to land on. Copy is drafted in the
+> appendix below — the run **wires it in verbatim**, it does not write marketing
+> copy. Anything unknown (prices, turnaround, founder specifics, past work) stays
+> an explicit `[INPUT: …]` slot.
 >
-> **This run has two sections, split by the `⚠️ AUTONOMOUS RUN — STOP HERE`
-> marker.** An orchestrator prompt (pasted by Nate into a Claude cowork session)
-> drives both: `dev-team-auto` builds Section 1 (architecture) and stops
-> at the marker; then `layout-loop` runs Section 2 (visuals). The two skills have
-> **complementary edit fences** — dev-team-auto owns structure/data/copy-slots;
-> layout-loop is presentation-only and forbidden from touching copy or data — so
-> the handoff is clean with no overlap.
+> **Two sections split by the `⚠️ AUTONOMOUS RUN — STOP HERE` marker:**
+> `dev-team-auto` runs Section 1 (restructure + copy wiring) and stops;
+> `layout-loop` runs Section 2 (visual pass on the new pages) in cowork.
+> Same complementary edit fences as v1 — dev-team-auto owns structure/data/copy,
+> layout-loop is presentation-only.
+>
+> **Base branch:** run from `layout-loop/nate-personal-first-draft` (contains all
+> v1 architecture + the visual first draft). Work on a new experimental branch
+> off it; never merge to main without Nate's sign-off.
 
 ---
 
-## Status
-
-- **Scaffold:** pnpm + Turborepo monorepo, Next.js 14 App Router, TS strict, Tailwind, shared `@bcns/ui` + `@bcns/config`. Lint/typecheck/build all green. 6 landing sections exist with placeholder prose.
-- **Section 1 (dev-team-auto):** architecture only — data-driven content model, full information architecture scaffolded, prose stripped to labeled slots, `CONTENT.md` spec. **No style/layout work.**
-- **Section 2 (layout-loop):** full visual first draft against `craft.md` + `nate-personal` brand, in cowork on an isolated branch. Never auto-merged.
-- **Out of scope this run:** `templates/`, product-building, the rest of the repo. Real content, domain, email, deploy — all Needs-Nate, below the marker.
-
----
-
-## Finalized decisions
+## Decisions locked in the 2026-07-14 grilling session
 
 | Area | Decision |
 | --- | --- |
-| **Company name** | `bcns` — **final.** Wire it everywhere (`site.ts`, metadata, footer). |
-| **Domain** | `bcns.com` is taken. Site URL / domain stays a clearly-marked **placeholder constant**; real domain is Needs-Nate. |
-| **Email / contact** | No inbox yet. `hello@bcns.com` shown as the eventual address; **form is the only contact path.** Receiving inbox + form provider are Needs-Nate. |
-| **Content model** | Every section is **data-driven** from a typed content registry (extend `apps/web/lib/site.ts` or add `lib/content.ts`). Copy = labeled `[SLOT: …]` placeholders, never hardcoded in JSX. Adding an entry (a review, a past-work item) is a **data edit**, not a new component. |
-| **Content spec** | Slots live in the data layer **and** are mirrored 1:1 in a standalone `CONTENT.md` (purpose / tone / length per slot) so copy can be drafted outside the codebase. |
-| **Information architecture** | Hero · Problem/Solution · How-it-works · Delivery models · Use-cases · **Past work** · **Reviews** · **Pricing** · **FAQ** · **About/founder** · Contact. (Process/timeline folds into How-it-works.) |
-| **Visual work** | Handled exclusively by `layout-loop` in Section 2. dev-team-auto does **zero** styling. |
-| **Brand** | `craft.md` (invariant taste, exists) + `nate-personal.md` (swappable brand — **draft, must be seeded before Section 2**). |
+| **Audience** | Warm visitors: ~66% arrive after direct outreach, ~33% referred. They're vetting: "what is this, is it legit, what does it cost, how do I start." Not optimized for cold traffic. |
+| **Offer** | Fixed-scope custom builds at two sizes (starter / full), plus **AI consulting priced per day**. Prices and turnaround TBD until test customers — all numbers are `[INPUT: …]` slots. |
+| **Site map** | **Thin home** (hero + 3 nav cards + contact) with subpages `/services`, `/pricing`, `/about`, `/work`. Header nav: Services · Work · Pricing · About + "Book a free consult" CTA. |
+| **Nav cards (home)** | What we build → `/services` · Past Work → `/work` · Pricing → `/pricing` (this order, Past Work center). |
+| **/work** | Stays **live and in nav** (not hidden). Renders an honest holding state ("first builds in progress…") while `pastWork.items` / `reviews.items` are empty; automatically switches to the real grid when entries are added. Never a bare "past work goes here." |
+| **Pricing** | 3 cards: Starter build + Full build (price *ranges* as `[INPUT: …]`) + AI consulting (per-day rate as `[INPUT: …]`). FAQ lives on `/pricing`. |
+| **About** | Two founders: **Nate Seluga** (engineering) and **Brandon Chung** (business, NYU). Architecture + outlined suggested content now; personal specifics are `[INPUT: …]` slots. Builder-first framing — schools appear as credential lines, not headlines. |
+| **Problem/Solution section** | Cut as a standalone section; its best lines fold into the hero subhead and services intro. |
+| **Delivery Models section** | Merged into `/pricing` tiers + `/services` copy — no separate section. |
+| **Copy** | All drafted (appendix below). Placeholder convention: `[INPUT: <what goes here>]`. No `[SLOT: …]` may remain on any rendered page. |
 
-### Guardrails (for Section 1 / dev-team-auto)
+### Guardrails (Section 1 / dev-team-auto)
 
-- **Structure and data only. No visual design, no styling passes, no `dt-ui`.** Use `dt-engineer`. Leave every look-and-feel decision to Section 2.
-- **No invented facts.** bcns has zero shipped clients — no fake case studies, reviews, or metrics. Example entries in Past work / Reviews are **labeled placeholders** (`[REVIEW 1: …]`), not fabricated quotes.
-- **Single source of truth.** All marketing copy flows through the content registry; components render from it. `name`/`domain`/`email` stay single-constant in `site.ts`.
-- **Stay green.** `pnpm lint && pnpm typecheck && pnpm build` pass after every item. `done when:` criteria are all verifiable headlessly (build + structural presence), never "looks good."
+- **Structure, data, and copy-wiring only. No visual design, no `dt-ui`.** Use `dt-engineer`. Section 2 owns look-and-feel.
+- **Use the appendix copy verbatim.** Do not improve, extend, or invent copy. If a slot exists in code with no appendix entry, make it an `[INPUT: …]` slot and note it in PROGRESS.md.
+- **No invented facts** — no fake prices, clients, quotes, metrics, or founder details.
+- **Single source of truth** — all copy flows through the content registry (`apps/web/lib/content.ts`); components render from it. `CONTENT.md` mirrors the registry 1:1.
+- **Stay green** — `pnpm lint && pnpm typecheck && pnpm build` after every item. All `done when:` criteria verifiable headlessly.
 
 ---
 
-## Section 1 — Architecture (dev-team-auto)
+## Section 1 — Restructure + copy (dev-team-auto)
 
-> Run by `dev-team-auto`. Each item drives through the convergence loop
-> (`dt-engineer` builds → QA gates tests+behavioral → review → fix) to DONE or
-> BLOCKED. Structural only — no visuals.
+### B1 — Multi-page routing + thin home · `status: not started` · `track: full`
 
-### A1 — Content-model data layer · `status: not started` · `track: full`
+- **task:** Restructure the single-page app into the locked site map. Create routed pages `app/services/page.tsx`, `app/pricing/page.tsx`, `app/about/page.tsx`, `app/work/page.tsx`, each composing the existing section components: `/services` = use-cases + how-it-works; `/pricing` = pricing + faq; `/about` = about-founder (reworked in B2); `/work` = past-work + reviews. Rebuild `app/page.tsx` as the thin home: hero → new nav-cards section (3 cards: What we build → /services, Past Work → /work, Pricing → /pricing) → contact section. Remove problem-solution and delivery-models from all pages (keep components in the repo, unwired). Update header nav in `site.ts` to Services · Work · Pricing · About (page links, not anchors) with the Book-a-free-consult CTA intact; footer links updated to the new routes; `sitemap.ts` includes all new routes. Per-page `metadata` (title/description) reads from the registry.
+- **done when:** `/`, `/services`, `/pricing`, `/about`, `/work`, `/privacy`, `/terms` all return 200 and render their assigned sections; home renders exactly hero + nav-cards + contact; problem-solution and delivery-models appear on no page; header nav shows the 4 page links in order and each resolves; sitemap lists all routes; `pnpm lint && pnpm typecheck && pnpm build` green.
 
-- **task:** Introduce a typed, per-section content registry that drives the site. Extend `apps/web/lib/site.ts` (or add `apps/web/lib/content.ts`) with a structured object per section. Refactor the 6 existing sections (`hero`, `problem-solution`, `how-it-works`, `delivery-models`, `use-cases`, `contact-section`) to render entirely from the registry. Replace hardcoded marketing sentences in component bodies with labeled `[SLOT: …]` placeholders in the registry. Do not restyle anything.
-- **done when:** `pnpm lint && pnpm typecheck && pnpm build` green; all 6 existing sections render from the registry; no hardcoded marketing sentence remains in any component body; every content field is either a labeled `[SLOT: …]` placeholder or a neutral structural default; no visual/styling changes in the diff.
+### B2 — Registry rework: nav cards, two-founder about, pricing shape, /work holding state · `status: not started` · `track: full`
 
-### A2 — Scaffold the missing sections · `status: not started` · `track: full`
+- **task:** Rework `apps/web/lib/content.ts` to match the new IA. (1) Add a `navCards` section type (3 entries: title, description, href). (2) Replace `aboutFounder` with a two-founder model: shared eyebrow/title/description + `founders` array (name, roleLine, photo slot, bio, credentials[]) + a shared `whyBcns` paragraph field. (3) Reshape pricing to 3 cards where tier 3 is the AI-consulting day-rate card (price fields are free strings so `[INPUT: …]` renders). (4) Add holding-state support: `pastWork` and `reviews` each get a `holdingState` object (title, body, ctaLabel) and their page components render the holding state when `items` is empty, the real grid otherwise — verified by a unit test that renders both states. Add per-page metadata fields to the registry.
+- **done when:** registry typechecks with the new shapes; `/about` renders two founder cards from the `founders` array; `/work` renders holding-state copy with an empty `items` array and renders an item grid when a test entry is injected (unit test covers both branches); pricing renders 3 cards with free-string prices; existing passing tests remain passing; build green.
 
-- **task:** Add the 5 missing sections as data-driven components reading from the registry: **Past work**, **Reviews**, **Pricing**, **FAQ**, **About/founder**. Each collection-style section (Past work, Reviews, Pricing tiers, FAQ items) uses an **array of entry slots** so entries are addable by data edit alone. Wire each section into `app/page.tsx` and the nav in `site.ts`. Seed 1–2 **labeled example entries** for Past work and Reviews (e.g. `[PAST WORK 1: title / one-line outcome / link]`) — placeholders, not invented facts. Structural markup only; no styling beyond what already exists.
-- **done when:** build green; all 5 new sections present on the page and in nav; each collection section supports add-an-entry-by-data (verified by the registry shape); Past work + Reviews carry labeled example-entry slots; no fabricated content; no visual design work in the diff.
+### B3 — Wire the drafted copy · `status: not started` · `track: light`
 
-### A3 — CONTENT.md spec + slot audit · `status: not started` · `track: light`
+- **task:** Replace every `[SLOT: …]` value in the registry with the exact copy from the **Copy appendix** below, section by section. Unknowns use the `[INPUT: …]` strings exactly as written in the appendix. Delete registry entries for the cut sections' copy (problem-solution, delivery-models) or mark them unused.
+- **done when:** a repo-wide grep finds zero `[SLOT:` occurrences in `apps/web/lib/content.ts` and zero on any rendered page (test asserts rendered HTML of all routes contains no `[SLOT:`); every `[INPUT: …]` string on a rendered page matches one defined in the appendix; hero headline, nav card titles, pricing card names, FAQ questions, and /work holding-state title each match the appendix verbatim (spot-check test); build green.
 
-- **task:** Author `apps/web/CONTENT.md` (or repo-root `CONTENT.md`): every section, every slot, mirrored 1:1 from the data registry, each with **purpose / suggested tone / length guidance**. Add a short "How to fill a slot" and "How to add a section or a collection entry" guide. Verify no drift — every registry slot appears in `CONTENT.md` and vice versa.
-- **done when:** `CONTENT.md` covers every registry slot 1:1 (no orphans either direction); includes fill + extend instructions; build green.
+### B4 — CONTENT.md + trackers updated to the new IA · `status: not started` · `track: light`
 
-### A4 — Legal pages + config scaffolding · `status: not started` · `track: light`
-
-- **task:** Create real routed `app/privacy/page.tsx` and `app/terms/page.tsx` pages whose bodies are **labeled slots** (`[PRIVACY POLICY BODY: …]`), not real legal text. Point the footer's Privacy/Terms links at them (kill the dead `#`). Confirm `site.ts` `name: "bcns"`; keep `domain`/`email`/`url` as clearly-commented placeholder constants (single source). Ensure `sitemap.ts` includes the new routes and metadata reads from config.
-- **done when:** `/privacy` and `/terms` render with labeled slots; footer links resolve to them; `name` wired as `bcns`; `domain`/`email`/`url` remain single-source placeholder constants; sitemap includes both routes; build green. No real legal text (Needs-Nate).
+- **task:** Rewrite `apps/web/CONTENT.md` to mirror the new registry 1:1 (per-page organization; document the `[INPUT: …]` convention, the two-founder model, and **how to flip /work live**: "add an entry to `pastWork.items` and the holding state disappears — no code change"). Keep the fill/extend guides. Update `PROGRESS.md` per run convention.
+- **done when:** every registry field appears in `CONTENT.md` and vice versa (no orphans either direction); the /work flip instructions and `[INPUT: …]` convention are documented; build green.
 
 ---
 
 > **⚠️ AUTONOMOUS RUN — STOP HERE**
 
-_dev-team-auto halts here. Everything below is run differently: Section 2 by the
-`layout-loop` skill in cowork, and the Needs-Nate items by Nate directly._
+_dev-team-auto halts here. Section 2 runs via the `layout-loop` skill in a
+cowork session; Needs-Nate items are Nate's._
 
 ---
 
-## Section 2 — Visual first draft (layout-loop, cowork)
+## Section 2 — Visual pass on the new pages (layout-loop, cowork)
 
-> **Prerequisite (Needs-Nate, blocks this section):** seed
-> `~/os/knowledge/library/design-language/brands/nate-personal.md` — a draft is
-> fine, but the file must exist. `layout-loop` refuses to run without a brand
-> file. `craft.md` already exists.
->
-> **How to run:** in a Claude **cowork** session (screen access required —
-> layout-loop verifies by looking at rendered pixels). The orchestrator prompt
-> launches it after Section 1 completes. Launch: `pnpm --filter web
-> dev` → `http://localhost:3000`. Brand: `nate-personal`. Target queue: the
-> landing page (all sections) + `/privacy`, `/terms`.
+brand: nate-personal
+launch: pnpm --filter web dev
+url: http://localhost:3000
 
-### V1 — Full visual formatting pass · `status: not started`
+> Presentation only — never edit copy, data, props, logic, or routing. Isolated
+> branch, one focused change per pass, morning report, never auto-merged.
+> `[INPUT: …]` strings are content, not styling bugs — style them as normal text.
 
-- **task:** Run `layout-loop` over the full site. Apply `craft.md` (invariant taste) + `nate-personal` brand tokens to format the visuals of the entire skeleton for a first draft — typography, spacing rhythm, hierarchy, color, section composition, mobile + desktop. Work on an **isolated branch**, one focused change per pass, commit each iteration. **Do not touch copy, data, props, or the content slots** (edit fence: presentation only). Leave a morning report.
-- **done when (layout-loop rubric):** objective gates pass — WCAG AA contrast, no overflow/overlap/clipping, layout holds at mobile **and** desktop. All four rubric rows (uniquely-Nate, intuitive, simple, aesthetically pleasing) satisfied with cited visual evidence. Loop ended by convergence or the 5-pass cap per page. Content provably unchanged. **Never auto-merged** — Nate reviews the report + diff and merges himself.
+- page: /
+  notes: thin home — hero + 3 nav cards + contact must feel complete, not sparse; nav cards are the primary interaction, make them obviously clickable
+  status: not started
+
+- page: /services
+  notes: 4 use-case cards (incl. AI consulting) + 3-step process; keep the AI card visually peer to the others, not an afterthought
+  status: not started
+
+- page: /pricing
+  notes: 3 cards where card 3 is a day-rate, not a tier — differentiate it; [INPUT: …] price strings must not break the card rhythm
+  status: not started
+
+- page: /about
+  notes: two equal founder cards; builder-first hierarchy — names and roles before schools
+  status: not started
+
+- page: /work
+  notes: holding state must look intentional and confident, not empty — this page is linked from a home nav card
+  status: not started
 
 ---
 
-## Needs-Nate (all deferred, none block Section 1)
+## Needs-Nate (deferred; none block Section 1)
 
-- [ ] **Brand file** — seed `nate-personal.md` (draft). *Blocks Section 2.*
-- [ ] **Domain** — `bcns.com` is taken; pick + buy the real domain, set `NEXT_PUBLIC_SITE_URL` and the `domain` constant.
-- [ ] **Inbox + form provider** — set up a receiving inbox (recommend Cloudflare Email Routing → your Gmail, free) and a form endpoint (recommend Web3Forms free tier); set `NEXT_PUBLIC_CONTACT_ENDPOINT` / `NEXT_PUBLIC_CONTACT_ACCESS_KEY`.
-- [ ] **Real content** — fill the slots from `CONTENT.md`: copy, Past work, Reviews, Pricing, FAQ, About/founder. Decide the founder/credibility framing (tie to portfolio + HMC, or brand-only).
-- [ ] **Legal text** — write real Privacy + Terms bodies.
-- [ ] **Deploy** — Vercel free tier (`vercel --prod`), set env vars, attach domain, verify live.
+- [ ] **Fill `[INPUT: …]` slots:** price ranges + turnaround + support window (after test customers), AI consulting day rate, response-time promise, founder bios/credentials/photos (you + Brandon), notable projects.
+- [ ] **First real past-work entry + review** — flips /work off holding state (data edit only).
+- [ ] **Domain, inbox + form provider, legal text, deploy** — unchanged from v1.
 
-## Out of scope this run (Phase 2 — future PLAN.md)
+---
 
-- Extracting the landing skeleton into a reusable, brand-swappable starter under `templates/`.
-- Building actual client products / apps under `apps/`.
-- Anything in the repo outside `apps/web/` (except the shared config/UI packages `apps/web` already consumes).
+## Copy appendix (Section 1 wires this verbatim)
+
+> Placeholder convention: `[INPUT: <description>]` — render as-is; Nate fills later.
+
+### Home — hero
+- **badge:** Custom software for local businesses
+- **headline:** Software built around how your business already works
+- **subheadline:** Off-the-shelf tools make you change your process. We build tools that fit it — scoped, quoted, and delivered.
+- **cta-primary:** Book a free consult
+- **cta-secondary:** See what we build *(→ /services)*
+- **proof-point-1:** Fixed quote before work starts
+- **proof-point-2:** You own everything we build
+- **proof-point-3:** Free 30-minute consult
+
+### Home — nav cards
+1. **What we build** — Booking systems, dashboards, automations, and AI consulting — the problems we solve and how. *(→ /services)*
+2. **Past work** — What we've built, and what it changed for the businesses using it. *(→ /work)*
+3. **Pricing** — Two build sizes and a day rate for AI consulting — and how quoting works. *(→ /pricing)*
+
+### Home — contact
+- **eyebrow:** Get in touch
+- **title:** Tell us what's slowing you down
+- **description:** Send a few sentences about your business and the problem. We'll reply within [INPUT: response-time promise] with next steps — and honest advice, even if that advice is "you don't need custom software."
+- **highlight-1:** **Free consult** — A 30-minute call about how your business runs. No pitch, no obligation.
+- **highlight-2:** **Fixed quote** — You approve the exact price before any work starts.
+- **highlight-3:** **You own it** — Code, accounts, and data are yours, working with us or not.
+
+### /services — use cases
+- **eyebrow:** What we build · **title:** Tools shaped to your business, not the other way around · **description:** Four kinds of problems we solve most — if yours isn't here, ask anyway.
+1. **tag:** Bookings — **title:** Scheduling & booking systems — **description:** Take appointments the way you already do — deposits, reminders, and a calendar that matches your real workflow.
+2. **tag:** Operations — **title:** Inventory & back-office automation — **description:** Replace the spreadsheet juggling: ordering, invoicing, and tracking that update themselves.
+3. **tag:** Insight — **title:** Dashboards & reporting — **description:** One screen that shows how the business is doing — sales, costs, trends — without exporting anything.
+4. **tag:** AI — **title:** AI consulting — **description:** A working session to find where AI actually saves you time, then set it up with you. Priced per day.
+
+### /services — how it works
+- **eyebrow:** The process · **title:** Three steps from first call to finished tool · **description:** You'll know the price and the plan before anything gets built.
+1. **Free consult** — A 30-minute conversation about how your business runs and where the friction is. No jargon.
+2. **Scope & quote** — We write up exactly what we'll build, what it costs, and when it lands. You approve first.
+3. **Build & handoff** — We build it, walk your team through it, and include [INPUT: support window] of fixes. You own the result.
+
+### /pricing
+- **eyebrow:** Pricing · **title:** Two build sizes, one day rate — quoted before we start · **description:** Every project gets a fixed quote up front. The tiers show typical scope; your quote depends on the consult.
+- **Card 1 — Starter build** · price: [INPUT: starter price range] · A single-purpose tool: a booking page, a report generator, one automation. Features: One core workflow, built end to end / Delivered in [INPUT: starter turnaround] / [INPUT: support window] of included fixes
+- **Card 2 — Full build** · price: [INPUT: full-build price range] · A system your business runs on: multiple workflows, logins, data that stays in sync. Features: Multiple connected workflows / Delivered in [INPUT: full-build turnaround] / [INPUT: support window] of included fixes
+- **Card 3 — AI consulting** · price: [INPUT: day rate] / day · Working sessions to find and set up AI where it pays for itself. Features: Audit of where AI fits your operation / Hands-on setup, not a slide deck / Plain-English handoff notes
+
+### /pricing — FAQ
+- **eyebrow:** FAQ · **title:** The questions we'd ask too · **description:** Anything else — ask in the form and we'll answer straight.
+1. **How much will my project cost?** — Every project gets a fixed quote after the free consult. Typical starter builds run [INPUT: starter range]; full builds [INPUT: full range]. The quote is the price — no hourly surprises.
+2. **How long does a build take?** — [INPUT: typical turnaround summary]. You get a delivery date with the quote, and we tell you immediately if anything threatens it.
+3. **What happens if something breaks after delivery?** — Every build includes [INPUT: support window] of fixes at no charge. After that, we're a message away.
+4. **Do I need to be technical to work with you?** — No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.
+5. **Who owns what you build?** — You do — code, accounts, and data. If we stop working together, everything keeps running and it's yours.
+
+### /about (two-founder outline — suggested beats, specifics are INPUT slots)
+- **eyebrow:** About · **title:** The people behind bcns · **description:** Two founders — one builds, one makes sure it's worth building.
+- **Founder 1 — Nate Seluga** · roleLine: Engineering · photo: [INPUT: photo] · bio beats: what he builds and why custom tools for small businesses; [INPUT: 1-2 notable projects with concrete outcomes]; builder-first — school is a credential, not the lead. credentials: Computer science, Harvey Mudd College / [INPUT: credential 2] / [INPUT: credential 3]
+- **Founder 2 — Brandon Chung** · roleLine: Business & clients · photo: [INPUT: photo] · bio beats: [INPUT: business experience summary]; owns scoping, communication, and making sure every build serves the business. credentials: [INPUT: NYU program] , New York University / [INPUT: credential 2] / [INPUT: credential 3]
+- **whyBcns (shared):** [INPUT: 2-3 sentences — why you two started bcns and what you want it to be]
+
+### /work — holding state
+- **Past work:** eyebrow: Past work · title: Our first builds are in progress · body: We're building for our first clients right now. Case studies land here as projects wrap — each covering the problem, what we built, and what changed. · cta: Want to be one of them? Book a free consult.
+- **Reviews:** title: Reviews will live here too · body: Real names, real businesses, unedited — as soon as our first clients have something to say.
 
 ---
 
 ## Conventions (for the agents)
 
-- **Section 1 = structure/data/copy-slots only.** `dt-engineer`, never `dt-ui`. No styling. `done when:` is always build + structural presence, verifiable headlessly.
-- **Section 2 = presentation only.** `layout-loop` never edits copy, data, props, logic, or routing. Isolated branch, never merges without Nate's sign-off.
-- All marketing copy flows through the content registry; components render from it. `CONTENT.md` mirrors the registry 1:1 — update both together.
-- No invented facts, quotes, metrics, or case studies. Example entries are labeled placeholders.
-- `name`/`domain`/`email`/`url` are single-source constants in `site.ts`.
-- Keep `pnpm lint && pnpm typecheck && pnpm build` green after every item.
+- Section 1 = structure/data/copy-wiring only; `dt-engineer`, never `dt-ui`; `done when:` always headlessly verifiable.
+- Section 2 = presentation only; isolated branch; never merges without Nate's sign-off.
+- Registry and `CONTENT.md` update together, always 1:1.
+- No invented facts. Copy comes from the appendix; unknowns stay `[INPUT: …]`.
+- `pnpm lint && pnpm typecheck && pnpm build` green after every item.

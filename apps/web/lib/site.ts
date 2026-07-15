@@ -18,6 +18,11 @@ export const siteConfig = {
     { label: "How it works", href: "#how-it-works" },
     { label: "Delivery", href: "#delivery" },
     { label: "Examples", href: "#examples" },
+    { label: "Past Work", href: "#past-work" },
+    { label: "Reviews", href: "#reviews" },
+    { label: "Pricing", href: "#pricing" },
+    { label: "FAQ", href: "#faq" },
+    { label: "About", href: "#about" },
     { label: "Contact", href: "#contact" },
   ],
 } as const;

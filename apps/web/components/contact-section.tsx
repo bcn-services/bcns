@@ -1,28 +1,13 @@
 import { Mail, MessageSquare, Clock } from "lucide-react";
 import { Container, SectionHeading } from "@bcns/ui";
 import { ContactForm } from "@/components/contact-form";
-import { siteConfig } from "@/lib/site";
+import { siteContent } from "@/lib/content";
 
-const highlights = [
-  {
-    icon: MessageSquare,
-    title: "A real conversation",
-    description: "You talk to the person who'll build it — not a sales rep reading a script.",
-  },
-  {
-    icon: Clock,
-    title: "Fast, honest answer",
-    description:
-      "If we're not the right fit, we'll say so and point you somewhere better. No hard sell.",
-  },
-  {
-    icon: Mail,
-    title: "Prefer email?",
-    description: `Reach us directly at ${siteConfig.email}.`,
-  },
-];
+const highlightIcons = [MessageSquare, Clock, Mail] as const;
 
 export function ContactSection() {
+  const { eyebrow, title, description, highlights } = siteContent.contactSection;
+
   return (
     <section id="contact" className="border-t border-border/60 py-24 sm:py-28">
       <Container>
@@ -30,22 +15,26 @@ export function ContactSection() {
           <div className="flex flex-col gap-8">
             <SectionHeading
               align="left"
-              eyebrow="Contact"
-              title="Tell us what's slowing you down"
-              description="Book a free consult. We'll figure out whether custom software is worth it for your business — and if it is, what it'd take to build."
+              eyebrow={eyebrow}
+              title={title}
+              description={description}
             />
             <ul className="flex flex-col gap-6">
-              {highlights.map(({ icon: Icon, title, description }) => (
-                <li key={title} className="flex gap-4">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  <div>
-                    <p className="font-medium">{title}</p>
-                    <p className="text-sm text-muted-foreground">{description}</p>
-                  </div>
-                </li>
-              ))}
+              {highlights.map(({ title: highlightTitle, description: highlightDescription }, index) => {
+                const Icon = highlightIcons[index];
+                if (!Icon) return null;
+                return (
+                  <li key={index} className="flex gap-4">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+                      <Icon className="size-5" aria-hidden />
+                    </span>
+                    <div>
+                      <p className="font-medium">{highlightTitle}</p>
+                      <p className="text-sm text-muted-foreground">{highlightDescription}</p>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

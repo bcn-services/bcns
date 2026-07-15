@@ -3,60 +3,64 @@
 @tailwind utilities;
 
 @layer base {
+  /* nate-personal light fallback */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --background: 240 20% 97%;
+    --foreground: 250 30% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 250 30% 11%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 214 72% 44%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 250 20% 92%;
+    --secondary-foreground: 250 30% 11%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 250 20% 92%;
+    --muted-foreground: 250 16% 42%;
 
-    --accent: 214 95% 93%;
-    --accent-foreground: 221 83% 33%;
+    --accent: 262 45% 88%;
+    --accent-foreground: 262 60% 36%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    --border: 250 20% 88%;
+    --input: 250 20% 88%;
+    --ring: 214 72% 44%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
   }
 
+  /* nate-personal dark (default) — charcoal-purple field, pastel blue/purple accents */
   .dark {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
+    --background: 250 22% 10%;        /* #15131F field */
+    --foreground: 250 28% 94%;        /* #ECEAF5 ink */
 
-    --card: 222 44% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 250 22% 15%;              /* #201D30 surface */
+    --card-foreground: 250 28% 94%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 214 100% 74%;          /* #7CB3FF pastel blue — primary CTA */
+    --primary-foreground: 250 22% 10%;
 
-    --secondary: 217 33% 14%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 250 22% 18%;         /* #262238 elevated surface */
+    --secondary-foreground: 250 28% 94%;
 
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 250 22% 18%;
+    --muted-foreground: 250 16% 65%;  /* #9A97B4 muted ink */
 
-    --accent: 217 33% 18%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 262 30% 22%;            /* purple-tinted chip bg */
+    --accent-foreground: 214 100% 74%; /* pastel blue icon/text on chip */
 
-    --destructive: 0 63% 45%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 250 28% 94%;
 
-    --border: 217 33% 18%;
-    --input: 217 33% 20%;
-    --ring: 224 76% 60%;
+    --border: 250 18% 23%;            /* #332F45 hairline */
+    --input: 250 18% 25%;
+    --ring: 214 100% 74%;
+
+    --radius: 0.875rem;
   }
 }
 
