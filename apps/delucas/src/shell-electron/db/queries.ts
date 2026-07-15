@@ -29,11 +29,27 @@ export function getTransactionsByMonth(
   monthPrefix: string
 ): Transaction[] {
   // monthPrefix is "YYYY-MM"; date column is "YYYY-MM-DD"
+  if (!/^\d{4}-\d{2}$/.test(monthPrefix)) {
+    throw new Error(`getTransactionsByMonth: invalid month format "${monthPrefix}" (expected YYYY-MM)`);
+  }
   return db
     .prepare<[string], Transaction>(
       "SELECT * FROM transactions WHERE date LIKE ? ORDER BY date ASC"
     )
     .all(`${monthPrefix}-%`);
+}
+
+export function getTransactionsInRange(
+  db: Database.Database,
+  from: string,
+  to: string
+): Transaction[] {
+  // from/to are "YYYY-MM-DD"; selects rows where date >= from AND date <= to
+  return db
+    .prepare<[string, string], Transaction>(
+      "SELECT * FROM transactions WHERE date >= ? AND date <= ? ORDER BY date ASC"
+    )
+    .all(from, to);
 }
 
 export function insertTransaction(

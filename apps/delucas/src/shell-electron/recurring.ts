@@ -81,31 +81,37 @@ export function materializeRecurring(
     const ruleStartMonth = toYearMonth(rule.start_date);
     const ruleEndMonth = rule.end_date !== null ? toYearMonth(rule.end_date) : null;
 
-    let [y, m] = parseYearMonth(ruleStartMonth);
+    // Wrap each rule's month loop in a transaction so a mid-loop crash does
+    // not leave the DB partially materialized for that rule.
+    const materializeRule = db.transaction(() => {
+      let [y, m] = parseYearMonth(ruleStartMonth);
 
-    // Walk month by month from the rule's start to throughMonth
-    while (y < endYear || (y === endYear && m <= endMonth)) {
-      const monthKey = `${y}-${m.toString().padStart(2, "0")}`;
+      // Walk month by month from the rule's start to throughMonth
+      while (y < endYear || (y === endYear && m <= endMonth)) {
+        const monthKey = `${y}-${m.toString().padStart(2, "0")}`;
 
-      // Stop if rule has an end date and we've passed it
-      if (ruleEndMonth !== null && monthKey > ruleEndMonth) break;
+        // Stop if rule has an end date and we've passed it
+        if (ruleEndMonth !== null && monthKey > ruleEndMonth) break;
 
-      const sourceRef = makeSourceRef(rule.id, monthKey);
+        const sourceRef = makeSourceRef(rule.id, monthKey);
 
-      // Idempotency check — skip if already materialized
-      if (existsStmt.get(sourceRef) === undefined) {
-        insertTransaction(db, {
-          date: buildDate(y, m, rule.day_of_month),
-          amount_cents: rule.amount_cents,
-          direction: rule.direction,
-          category: rule.category,
-          vendor: rule.vendor,
-          source: "recurring",
-          source_ref: sourceRef,
-        });
+        // Idempotency check — skip if already materialized
+        if (existsStmt.get(sourceRef) === undefined) {
+          insertTransaction(db, {
+            date: buildDate(y, m, rule.day_of_month),
+            amount_cents: rule.amount_cents,
+            direction: rule.direction,
+            category: rule.category,
+            vendor: rule.vendor,
+            source: "recurring",
+            source_ref: sourceRef,
+          });
+        }
+
+        [y, m] = nextMonth(y, m);
       }
+    });
 
-      [y, m] = nextMonth(y, m);
-    }
+    materializeRule();
   }
 }
