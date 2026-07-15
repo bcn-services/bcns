@@ -64,3 +64,28 @@ None.
 - `pnpm --filter @delucas/app lint` — PASS
 - All 68 tests pass (22 pnl + 21 db + 25 ingestion)
 ---
+# Fix Report — P4 (Email / IMAP ingestion)
+**Date:** 2026-07-15
+**Findings addressed:** 8 of 8 review findings (0 QA failures + 8 review findings)
+
+## Changes Made
+- `imap.ts:136–145` — added `MAX_ATTACHMENT_BYTES` (20 MB); `streamToBuffer` tracks accumulated size, calls `destroy?.()`, rejects with logged error on overflow — review Critical
+- `imap.ts:174` — added `MAX_BATCH_SIZE = 50`; loop breaks at `results.length >= MAX_BATCH_SIZE` so at most 50 unprocessed messages downloaded per run — review Critical
+- `imap.ts:206–209` — download failure `catch` block now calls `recordProcessed(db, messageId)` to prevent infinite retry on permanently broken attachments — review Minor
+- `main.ts:109` / `email.ts` — `getImapConfig` guards `parseInt` with `Number.isNaN`; calls `setEmailError("Invalid IMAP port in settings")` and returns null; `setEmailError()` exported from `email.ts` — review Important
+- `email.ts:43–47` — added JSDoc on `emailStatus` documenting process-lifetime/reset-on-restart as intentional for v1 — review Important
+- `main.ts:493–507` — moved startup ingestion block to after `createWindow()` (with `return` on window failure) so IMAP timeout no longer delays window open — review Important
+- `vendor-mapping.ts:74–80` — added JSDoc on `resolveCategory` documenting first-match-wins and insertion-order control — review Minor
+- `review-queue.ts:33–34` — added JSDoc on `queue` and `nextId` documenting in-memory-only, reset-on-restart as intentional for v1 — review Important / Minor
+
+## Disputed
+None.
+
+## Deferred
+None.
+
+## Verification
+- `pnpm --filter @delucas/app typecheck` — PASS
+- `pnpm --filter @delucas/app lint` — PASS
+- All 91 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 1 import-boundary)
+---
