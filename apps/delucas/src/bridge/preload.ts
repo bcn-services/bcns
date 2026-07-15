@@ -16,8 +16,11 @@ import type {
   LLMExtractResultBridge,
   EmailStatusBridge,
   ReviewItemBridge,
+  MutationResult,
+  TransactionUpdatesInput,
+  RecurringRuleUpdates,
 } from "./BridgeInterface";
-import type { NewTransaction } from "../shared/types";
+import type { NewTransaction, RecurringRule } from "../shared/types";
 
 const bridge: BridgeAPI = {
   db: {
@@ -33,6 +36,15 @@ const bridge: BridgeAPI = {
     insertTransaction: (tx: NewTransaction): Promise<number> =>
       ipcRenderer.invoke("db:insertTransaction", tx),
 
+    getTransactionsForMonth: (month: string): Promise<import("../shared/types").Transaction[]> =>
+      ipcRenderer.invoke("db:getTransactionsForMonth", month),
+
+    updateTransaction: (id: number, updates: TransactionUpdatesInput): Promise<MutationResult> =>
+      ipcRenderer.invoke("db:updateTransaction", id, updates),
+
+    deleteTransaction: (id: number): Promise<MutationResult> =>
+      ipcRenderer.invoke("db:deleteTransaction", id),
+
     getMonthPnl: (month: string): Promise<import("../shared/types").MonthPnl> =>
       ipcRenderer.invoke("db:getMonthPnl", month),
 
@@ -44,6 +56,15 @@ const bridge: BridgeAPI = {
 
     getRecurringRules: (): Promise<import("../shared/types").RecurringRule[]> =>
       ipcRenderer.invoke("db:getRecurringRules"),
+
+    insertRecurringRule: (rule: Omit<RecurringRule, "id">): Promise<MutationResult & { id?: number }> =>
+      ipcRenderer.invoke("db:insertRecurringRule", rule),
+
+    updateRecurringRule: (id: number, updates: RecurringRuleUpdates): Promise<MutationResult> =>
+      ipcRenderer.invoke("db:updateRecurringRule", id, updates),
+
+    deleteRecurringRule: (id: number): Promise<MutationResult> =>
+      ipcRenderer.invoke("db:deleteRecurringRule", id),
 
     materializeRecurring: (throughMonth: string): Promise<void> =>
       ipcRenderer.invoke("db:materializeRecurring", throughMonth),

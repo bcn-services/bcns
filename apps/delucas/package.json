@@ -9,7 +9,7 @@
     "build": "electron-vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
-    "test": "node tests/import-boundary.test.mjs && tsx tests/pnl.test.mjs && tsx tests/db.test.mjs && tsx tests/ingestion.test.mjs && tsx tests/email.test.mjs",
+    "test": "node tests/import-boundary.test.mjs && tsx tests/pnl.test.mjs && tsx tests/db.test.mjs && tsx tests/ingestion.test.mjs && tsx tests/email.test.mjs && tsx tests/dashboard.test.mjs",
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {

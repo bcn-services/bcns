@@ -14,7 +14,12 @@ import {
   getTransactionsByMonth,
   getTransactionsInRange,
   insertTransaction,
+  updateTransaction,
+  deleteTransaction,
   getRecurringRules,
+  insertRecurringRule,
+  updateRecurringRule,
+  deleteRecurringRule,
   getSetting,
   setSetting,
   isEmailProcessed,
@@ -292,6 +297,166 @@ function registerIpcHandlers(db: Database.Database): void {
 
   ipcMain.handle("db:markEmailProcessed", (_event, messageId: string) => {
     markEmailProcessed(db, messageId);
+  });
+
+  // ------------------------------------------------------------------
+  // db:getTransactionsForMonth — P5 alias for getTransactionsByMonth
+  // ------------------------------------------------------------------
+  ipcMain.handle("db:getTransactionsForMonth", (_event, month: string) => {
+    if (typeof month !== "string" || !/^\d{4}-\d{2}$/.test(month)) {
+      return { ok: false, error: "db:getTransactionsForMonth: month must be YYYY-MM" };
+    }
+    try {
+      return getTransactionsByMonth(db, month);
+    } catch (err) {
+      console.error("[main] db:getTransactionsForMonth failed", err);
+      throw err;
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // db:updateTransaction — P5
+  // ------------------------------------------------------------------
+  ipcMain.handle("db:updateTransaction", (_event, id: number, updates: Record<string, unknown>) => {
+    const VALID_DIRECTIONS = new Set(["revenue", "expense"]);
+    const VALID_CATEGORIES = new Set(["food", "beverage", "utilities", "rent", "labor", "other"]);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return { ok: false, error: "db:updateTransaction: id must be a positive integer" };
+    }
+    if (typeof updates !== "object" || updates === null) {
+      return { ok: false, error: "db:updateTransaction: updates must be an object" };
+    }
+
+    const validated: Record<string, unknown> = {};
+    if (updates["date"] !== undefined) {
+      if (typeof updates["date"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(updates["date"])) {
+        return { ok: false, error: "db:updateTransaction: date must be YYYY-MM-DD" };
+      }
+      validated["date"] = updates["date"];
+    }
+    if (updates["amount_cents"] !== undefined) {
+      if (!Number.isInteger(updates["amount_cents"]) || (updates["amount_cents"] as number) <= 0) {
+        return { ok: false, error: "db:updateTransaction: amount_cents must be a positive integer" };
+      }
+      validated["amount_cents"] = updates["amount_cents"];
+    }
+    if (updates["direction"] !== undefined) {
+      if (!VALID_DIRECTIONS.has(updates["direction"] as string)) {
+        return { ok: false, error: "db:updateTransaction: invalid direction" };
+      }
+      validated["direction"] = updates["direction"];
+    }
+    if (updates["category"] !== undefined) {
+      if (!VALID_CATEGORIES.has(updates["category"] as string)) {
+        return { ok: false, error: "db:updateTransaction: invalid category" };
+      }
+      validated["category"] = updates["category"];
+    }
+    if (updates["vendor"] !== undefined) {
+      if (typeof updates["vendor"] !== "string" || (updates["vendor"] as string).trim() === "") {
+        return { ok: false, error: "db:updateTransaction: vendor must be a non-empty string" };
+      }
+      validated["vendor"] = updates["vendor"];
+    }
+
+    try {
+      const changed = updateTransaction(db, id, validated);
+      return changed ? { ok: true } : { ok: false, error: "Transaction not found" };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[main] db:updateTransaction failed", err);
+      return { ok: false, error: message };
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // db:deleteTransaction — P5
+  // ------------------------------------------------------------------
+  ipcMain.handle("db:deleteTransaction", (_event, id: number) => {
+    if (!Number.isInteger(id) || id <= 0) {
+      return { ok: false, error: "db:deleteTransaction: id must be a positive integer" };
+    }
+    try {
+      const changed = deleteTransaction(db, id);
+      return changed ? { ok: true } : { ok: false, error: "Transaction not found" };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[main] db:deleteTransaction failed", err);
+      return { ok: false, error: message };
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // db:insertRecurringRule — P5
+  // ------------------------------------------------------------------
+  ipcMain.handle("db:insertRecurringRule", (_event, rule: Record<string, unknown>) => {
+    const VALID_DIRECTIONS = new Set(["revenue", "expense"]);
+    const VALID_CATEGORIES = new Set(["food", "beverage", "utilities", "rent", "labor", "other"]);
+    if (
+      typeof rule !== "object" || rule === null ||
+      typeof rule["label"] !== "string" || (rule["label"] as string).trim() === "" ||
+      !Number.isInteger(rule["amount_cents"]) || (rule["amount_cents"] as number) <= 0 ||
+      !VALID_DIRECTIONS.has(rule["direction"] as string) ||
+      !VALID_CATEGORIES.has(rule["category"] as string) ||
+      typeof rule["vendor"] !== "string" || (rule["vendor"] as string).trim() === "" ||
+      !Number.isInteger(rule["day_of_month"]) ||
+      (rule["day_of_month"] as number) < 1 || (rule["day_of_month"] as number) > 28 ||
+      typeof rule["start_date"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rule["start_date"] as string)
+    ) {
+      return { ok: false, error: "db:insertRecurringRule: invalid rule fields" };
+    }
+    try {
+      const id = insertRecurringRule(db, {
+        label: (rule["label"] as string).trim(),
+        amount_cents: rule["amount_cents"] as number,
+        direction: rule["direction"] as "revenue" | "expense",
+        category: rule["category"] as import("../shared/types").TransactionCategory,
+        vendor: (rule["vendor"] as string).trim(),
+        day_of_month: rule["day_of_month"] as number,
+        start_date: rule["start_date"] as string,
+        end_date: rule["end_date"] != null ? (rule["end_date"] as string) : null,
+      });
+      return { ok: true, id };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[main] db:insertRecurringRule failed", err);
+      return { ok: false, error: message };
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // db:updateRecurringRule — P5
+  // ------------------------------------------------------------------
+  ipcMain.handle("db:updateRecurringRule", (_event, id: number, updates: Record<string, unknown>) => {
+    if (!Number.isInteger(id) || id <= 0) {
+      return { ok: false, error: "db:updateRecurringRule: id must be a positive integer" };
+    }
+    try {
+      const changed = updateRecurringRule(db, id, updates);
+      return changed ? { ok: true } : { ok: false, error: "Rule not found" };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[main] db:updateRecurringRule failed", err);
+      return { ok: false, error: message };
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // db:deleteRecurringRule — P5
+  // ------------------------------------------------------------------
+  ipcMain.handle("db:deleteRecurringRule", (_event, id: number) => {
+    if (!Number.isInteger(id) || id <= 0) {
+      return { ok: false, error: "db:deleteRecurringRule: id must be a positive integer" };
+    }
+    try {
+      const changed = deleteRecurringRule(db, id);
+      return changed ? { ok: true } : { ok: false, error: "Rule not found" };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[main] db:deleteRecurringRule failed", err);
+      return { ok: false, error: message };
+    }
   });
 
   // ------------------------------------------------------------------

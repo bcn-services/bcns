@@ -15,8 +15,11 @@ import type {
   LLMExtractResultBridge,
   EmailStatusBridge,
   ReviewItemBridge,
+  MutationResult,
+  TransactionUpdatesInput,
+  RecurringRuleUpdates,
 } from "./BridgeInterface";
-import type { NewTransaction, MonthPnl } from "../shared/types";
+import type { NewTransaction, MonthPnl, RecurringRule } from "../shared/types";
 
 const EMPTY_PNL: MonthPnl = {
   month: "",
@@ -55,6 +58,21 @@ export const mockBridge: BridgeAPI = {
       return 0;
     },
 
+    getTransactionsForMonth: async (_month: string) => {
+      console.warn("[mockBridge] db.getTransactionsForMonth — returning []");
+      return [];
+    },
+
+    updateTransaction: async (_id: number, _updates: TransactionUpdatesInput): Promise<MutationResult> => {
+      console.warn("[mockBridge] db.updateTransaction — no-op");
+      return { ok: true };
+    },
+
+    deleteTransaction: async (_id: number): Promise<MutationResult> => {
+      console.warn("[mockBridge] db.deleteTransaction — no-op");
+      return { ok: true };
+    },
+
     getMonthPnl: async (_month: string): Promise<MonthPnl> => {
       console.warn("[mockBridge] db.getMonthPnl — returning empty P&L");
       return { ...EMPTY_PNL };
@@ -73,6 +91,21 @@ export const mockBridge: BridgeAPI = {
     getRecurringRules: async () => {
       console.warn("[mockBridge] db.getRecurringRules — returning []");
       return [];
+    },
+
+    insertRecurringRule: async (_rule: Omit<RecurringRule, "id">): Promise<MutationResult & { id?: number }> => {
+      console.warn("[mockBridge] db.insertRecurringRule — no-op");
+      return { ok: true, id: 0 };
+    },
+
+    updateRecurringRule: async (_id: number, _updates: RecurringRuleUpdates): Promise<MutationResult> => {
+      console.warn("[mockBridge] db.updateRecurringRule — no-op");
+      return { ok: true };
+    },
+
+    deleteRecurringRule: async (_id: number): Promise<MutationResult> => {
+      console.warn("[mockBridge] db.deleteRecurringRule — no-op");
+      return { ok: true };
     },
 
     materializeRecurring: async (_throughMonth: string): Promise<void> => {

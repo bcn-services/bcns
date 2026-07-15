@@ -18,6 +18,37 @@ import type {
 export type { Transaction, NewTransaction, RecurringRule, MonthPnl };
 
 // ---------------------------------------------------------------------------
+// P5 — Transaction edit/delete result + update input type
+// ---------------------------------------------------------------------------
+
+export interface MutationResult {
+  ok: boolean;
+  error?: string;
+}
+
+export interface TransactionUpdatesInput {
+  date?: string;
+  amount_cents?: number;
+  direction?: string;
+  category?: string;
+  vendor?: string;
+}
+
+// ---------------------------------------------------------------------------
+// P5 — Recurring rule update input
+// ---------------------------------------------------------------------------
+
+export interface RecurringRuleUpdates {
+  label?: string;
+  amount_cents?: number;
+  direction?: string;
+  category?: string;
+  vendor?: string;
+  day_of_month?: number;
+  end_date?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Ingestion types exposed through the bridge
 // (mirrors LLMExtractResult in shell-electron/ingestion/llm.ts — must be
 //  importable by the renderer without any node:* deps)
@@ -76,10 +107,22 @@ export interface BridgeAPI {
     getTransactions: () => Promise<Transaction[]>;
     getTransactionsByMonth: (month: string) => Promise<Transaction[]>;
     insertTransaction: (tx: NewTransaction) => Promise<number>;
+    /** P5 — fetch transactions for a specific month (same as getTransactionsByMonth) */
+    getTransactionsForMonth: (month: string) => Promise<Transaction[]>;
+    /** P5 — update mutable fields of an existing transaction */
+    updateTransaction: (id: number, updates: TransactionUpdatesInput) => Promise<MutationResult>;
+    /** P5 — delete a transaction by id */
+    deleteTransaction: (id: number) => Promise<MutationResult>;
     getMonthPnl: (month: string) => Promise<MonthPnl>;
     get12MonthSeries: (endMonth: string) => Promise<MonthPnl[]>;
     getSummary: (month: string) => Promise<string>;
     getRecurringRules: () => Promise<RecurringRule[]>;
+    /** P5 — create a recurring rule */
+    insertRecurringRule: (rule: Omit<RecurringRule, "id">) => Promise<MutationResult & { id?: number }>;
+    /** P5 — update a recurring rule */
+    updateRecurringRule: (id: number, updates: RecurringRuleUpdates) => Promise<MutationResult>;
+    /** P5 — delete a recurring rule */
+    deleteRecurringRule: (id: number) => Promise<MutationResult>;
     materializeRecurring: (throughMonth: string) => Promise<void>;
     isEmailProcessed: (messageId: string) => Promise<boolean>;
     markEmailProcessed: (messageId: string) => Promise<void>;

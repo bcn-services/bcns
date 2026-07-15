@@ -89,6 +89,34 @@ export function insertTransaction(
   return result.id;
 }
 
+export interface TransactionUpdates {
+  date?: string;
+  amount_cents?: number;
+  direction?: string;
+  category?: string;
+  vendor?: string;
+}
+
+export function updateTransaction(
+  db: Database.Database,
+  id: number,
+  updates: TransactionUpdates
+): boolean {
+  const fields = Object.keys(updates) as (keyof TransactionUpdates)[];
+  if (fields.length === 0) return false;
+  const setClauses = fields.map((f) => `${f} = ?`).join(", ");
+  const values = fields.map((f) => updates[f]);
+  const result = db
+    .prepare(`UPDATE transactions SET ${setClauses} WHERE id = ?`)
+    .run(...values, id);
+  return result.changes > 0;
+}
+
+export function deleteTransaction(db: Database.Database, id: number): boolean {
+  const result = db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
 // ---------------------------------------------------------------------------
 // Recurring rules
 // ---------------------------------------------------------------------------
@@ -97,6 +125,63 @@ export function getRecurringRules(db: Database.Database): RecurringRule[] {
   return db
     .prepare<[], RecurringRule>("SELECT * FROM recurring_rules ORDER BY id ASC")
     .all();
+}
+
+export interface RecurringRuleUpdates {
+  label?: string;
+  amount_cents?: number;
+  direction?: string;
+  category?: string;
+  vendor?: string;
+  day_of_month?: number;
+  end_date?: string | null;
+}
+
+export function insertRecurringRule(
+  db: Database.Database,
+  rule: Omit<RecurringRule, "id">
+): number {
+  const result = db
+    .prepare<
+      [string, number, string, string, string, number, string, string | null],
+      { id: number }
+    >(
+      `INSERT INTO recurring_rules (label, amount_cents, direction, category, vendor, day_of_month, start_date, end_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`
+    )
+    .get(
+      rule.label,
+      rule.amount_cents,
+      rule.direction,
+      rule.category,
+      rule.vendor,
+      rule.day_of_month,
+      rule.start_date,
+      rule.end_date ?? null
+    );
+  if (result === undefined) throw new Error("insertRecurringRule: no id returned");
+  return result.id;
+}
+
+export function updateRecurringRule(
+  db: Database.Database,
+  id: number,
+  updates: RecurringRuleUpdates
+): boolean {
+  const fields = Object.keys(updates) as (keyof RecurringRuleUpdates)[];
+  if (fields.length === 0) return false;
+  const setClauses = fields.map((f) => `${f} = ?`).join(", ");
+  const values = fields.map((f) => updates[f]);
+  const result = db
+    .prepare(`UPDATE recurring_rules SET ${setClauses} WHERE id = ?`)
+    .run(...values, id);
+  return result.changes > 0;
+}
+
+export function deleteRecurringRule(db: Database.Database, id: number): boolean {
+  const result = db.prepare("DELETE FROM recurring_rules WHERE id = ?").run(id);
+  return result.changes > 0;
 }
 
 // ---------------------------------------------------------------------------
