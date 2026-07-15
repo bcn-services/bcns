@@ -42,15 +42,23 @@ function isAllowedStringValue(value) {
   return SLOT_RE.test(value) || STEP_RE.test(value);
 }
 
-/** Recursively collect all string leaf values from an object/array. */
-function collectStrings(node, path = "") {
-  if (typeof node === "string") return [{ path, value: node }];
+/**
+ * Recursively collect all string leaf values from an object/array.
+ * Structural keys (href, photo) are excluded — they hold URLs/paths, not copy.
+ */
+const STRUCTURAL_KEYS = new Set(["href", "photo"]);
+
+function collectStrings(node, path = "", parentKey = "") {
+  if (typeof node === "string") {
+    if (STRUCTURAL_KEYS.has(parentKey)) return [];
+    return [{ path, value: node }];
+  }
   if (Array.isArray(node)) {
-    return node.flatMap((item, i) => collectStrings(item, `${path}[${i}]`));
+    return node.flatMap((item, i) => collectStrings(item, `${path}[${i}]`, ""));
   }
   if (node && typeof node === "object") {
     return Object.entries(node).flatMap(([k, v]) =>
-      collectStrings(v, path ? `${path}.${k}` : k)
+      collectStrings(v, path ? `${path}.${k}` : k, k)
     );
   }
   return [];

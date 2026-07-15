@@ -10,7 +10,7 @@ import {
 import { siteContent } from "@/lib/content";
 
 export function AboutFounder() {
-  const { eyebrow, title, description, cardTitleBio, cardTitleCredentials, bio, credentials } = siteContent.aboutFounder;
+  const { eyebrow, title, description, founders, whyBcns } = siteContent.about;
 
   return (
     <section id="about" className="border-t border-border/60 py-24 sm:py-28">
@@ -22,30 +22,33 @@ export function AboutFounder() {
         />
 
         <div className="mt-14 grid gap-8 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{cardTitleBio}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CardDescription className="text-base leading-relaxed">{bio}</CardDescription>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{cardTitleCredentials}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {credentials.map((credential, index) => (
-                  <li key={index} className="text-sm text-muted-foreground">
-                    {credential}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+          {founders.map((founder, index) => (
+            <Card key={index} className="h-full">
+              <CardHeader>
+                <CardTitle className="text-base">{founder.name}</CardTitle>
+                <p className="text-sm text-muted-foreground">{founder.roleLine}</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <CardDescription className="text-base leading-relaxed">
+                  {founder.bio}
+                </CardDescription>
+                <ul className="space-y-2">
+                  {founder.credentials.map((credential, credIndex) => (
+                    <li key={credIndex} className="text-sm text-muted-foreground">
+                      {credential}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ))}
         </div>
+
+        {whyBcns && (
+          <p className="mt-12 text-base leading-relaxed text-muted-foreground">
+            {whyBcns}
+          </p>
+        )}
       </Container>
     </section>
   );

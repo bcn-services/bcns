@@ -94,6 +94,7 @@ export interface PastWorkContent {
   title: string;
   description: string;
   items: PastWorkItem[];
+  holdingState: HoldingState;
 }
 
 export interface ReviewItem {
@@ -108,9 +109,11 @@ export interface ReviewsContent {
   title: string;
   description: string;
   items: ReviewItem[];
+  holdingState: HoldingState;
 }
 
 export interface PricingTier {
+  id?: string;
   name: string;
   price: string;
   description: string;
@@ -136,14 +139,36 @@ export interface FaqContent {
   items: FaqItem[];
 }
 
-export interface AboutFounderContent {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  cardTitleBio: string;
-  cardTitleCredentials: string;
+export interface FounderItem {
+  name: string;
+  roleLine: string;
+  photo?: string;
   bio: string;
   credentials: string[];
+}
+
+export interface AboutContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  founders: [FounderItem, FounderItem];
+  whyBcns: string;
+}
+
+export interface NavCardItem {
+  title: string;
+  description: string;
+  href: string;
+}
+
+export interface NavCardsContent {
+  items: [NavCardItem, NavCardItem, NavCardItem, NavCardItem];
+}
+
+export interface HoldingState {
+  title: string;
+  body: string;
+  ctaLabel: string;
 }
 
 export interface PageMeta {
@@ -170,7 +195,8 @@ export interface SiteContent {
   reviews: ReviewsContent;
   pricing: PricingContent;
   faq: FaqContent;
-  aboutFounder: AboutFounderContent;
+  about: AboutContent;
+  navCards: NavCardsContent;
   pageMeta: PageMetaRegistry;
 }
 
@@ -307,38 +333,24 @@ export const siteContent: SiteContent = {
     eyebrow: "[SLOT: past-work/eyebrow]",
     title: "[SLOT: past-work/title]",
     description: "[SLOT: past-work/description]",
-    items: [
-      {
-        title: "[SLOT: past-work/item-1-title]",
-        outcome: "[SLOT: past-work/item-1-outcome]",
-        link: "[SLOT: past-work/item-1-link]",
-      },
-      {
-        title: "[SLOT: past-work/item-2-title]",
-        outcome: "[SLOT: past-work/item-2-outcome]",
-        link: "[SLOT: past-work/item-2-link]",
-      },
-    ],
+    items: [],
+    holdingState: {
+      title: "[SLOT: past-work/holding-title]",
+      body: "[SLOT: past-work/holding-body]",
+      ctaLabel: "[SLOT: past-work/holding-cta]",
+    },
   },
 
   reviews: {
     eyebrow: "[SLOT: reviews/eyebrow]",
     title: "[SLOT: reviews/title]",
     description: "[SLOT: reviews/description]",
-    items: [
-      {
-        quote: "[SLOT: reviews/item-1-quote]",
-        author: "[SLOT: reviews/item-1-author]",
-        role: "[SLOT: reviews/item-1-role]",
-        company: "[SLOT: reviews/item-1-company]",
-      },
-      {
-        quote: "[SLOT: reviews/item-2-quote]",
-        author: "[SLOT: reviews/item-2-author]",
-        role: "[SLOT: reviews/item-2-role]",
-        company: "[SLOT: reviews/item-2-company]",
-      },
-    ],
+    items: [],
+    holdingState: {
+      title: "[SLOT: reviews/holding-title]",
+      body: "[SLOT: reviews/holding-body]",
+      ctaLabel: "[SLOT: reviews/holding-cta]",
+    },
   },
 
   pricing: {
@@ -399,17 +411,57 @@ export const siteContent: SiteContent = {
     ],
   },
 
-  aboutFounder: {
+  about: {
     eyebrow: "[SLOT: about/eyebrow]",
     title: "[SLOT: about/title]",
     description: "[SLOT: about/description]",
-    cardTitleBio: "[SLOT: about/card-title-bio]",
-    cardTitleCredentials: "[SLOT: about/card-title-credentials]",
-    bio: "[SLOT: about/bio]",
-    credentials: [
-      "[SLOT: about/credential-1]",
-      "[SLOT: about/credential-2]",
-      "[SLOT: about/credential-3]",
+    founders: [
+      {
+        name: "[SLOT: about/founder-1-name]",
+        roleLine: "[SLOT: about/founder-1-role]",
+        bio: "[SLOT: about/founder-1-bio]",
+        credentials: [
+          "[SLOT: about/founder-1-credential-1]",
+          "[SLOT: about/founder-1-credential-2]",
+          "[SLOT: about/founder-1-credential-3]",
+        ],
+      },
+      {
+        name: "[SLOT: about/founder-2-name]",
+        roleLine: "[SLOT: about/founder-2-role]",
+        bio: "[SLOT: about/founder-2-bio]",
+        credentials: [
+          "[SLOT: about/founder-2-credential-1]",
+          "[SLOT: about/founder-2-credential-2]",
+          "[SLOT: about/founder-2-credential-3]",
+        ],
+      },
+    ],
+    whyBcns: "[SLOT: about/why-bcns]",
+  },
+
+  navCards: {
+    items: [
+      {
+        title: "[SLOT: nav-cards/what-we-build-title]",
+        description: "[SLOT: nav-cards/what-we-build-description]",
+        href: "/services",
+      },
+      {
+        title: "[SLOT: nav-cards/past-work-title]",
+        description: "[SLOT: nav-cards/past-work-description]",
+        href: "/work",
+      },
+      {
+        title: "[SLOT: nav-cards/pricing-title]",
+        description: "[SLOT: nav-cards/pricing-description]",
+        href: "/pricing",
+      },
+      {
+        title: "[SLOT: nav-cards/about-title]",
+        description: "[SLOT: nav-cards/about-description]",
+        href: "/about",
+      },
     ],
   },
 
