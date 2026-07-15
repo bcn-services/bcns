@@ -33,6 +33,11 @@ export function getBackupStatus(): BackupStatus {
   return { ...backupStatus };
 }
 
+/** Update the in-memory backup status (used by manual trigger in main.ts). */
+export function setBackupStatus(update: Partial<BackupStatus>): void {
+  Object.assign(backupStatus, update);
+}
+
 // ---------------------------------------------------------------------------
 // Core helpers
 // ---------------------------------------------------------------------------
@@ -113,18 +118,27 @@ export interface BackupDeps {
 /**
  * Run a backup: copy + rotate, then update backupStatus in memory.
  * Does not throw — captures errors into backupStatus.error.
+ *
+ * NOTE: `copyToBackupFolder` uses `fs.copyFileSync` which skips WAL sidecar
+ * files (.db-wal, .db-shm). This is acceptable for v1 because WAL frames are
+ * small and the DB is checkpointed on close. For production, prefer
+ * `db.backup(dest)` (better-sqlite3 online-backup API) to capture a
+ * transactionally consistent snapshot including any un-checkpointed WAL data.
  */
 function runBackup(dbPath: string, backupFolder: string, today: string): void {
   try {
     copyToBackupFolder(dbPath, backupFolder, today);
-    rotateOld(backupFolder);
-    backupStatus.lastBackup = today;
-    backupStatus.error = null;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[backup] backup failed:", err);
+    console.error("[backup] backup copy failed:", err);
     backupStatus.error = message;
+    return;
   }
+  // Rotation runs only after the copy succeeds so we never delete old backups
+  // without a replacement.
+  rotateOld(backupFolder);
+  backupStatus.lastBackup = today;
+  backupStatus.error = null;
 }
 
 /**

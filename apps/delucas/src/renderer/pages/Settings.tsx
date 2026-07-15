@@ -75,7 +75,7 @@ function TextField({ label, settingKey, type = "text", placeholder, defaultValue
     loadSetting(settingKey).then((v) => {
       setValue(v !== "" ? v : (defaultValue ?? ""));
       loaded.current = true;
-    }).catch(() => { /* ignore */ });
+    }).catch((err) => { console.error("[Settings] failed to load", settingKey, err); });
   }, [settingKey, defaultValue]);
 
   const handleBlur = useCallback(() => {

@@ -31,6 +31,7 @@ import {
   dailyTrigger,
   quitBackup,
   getBackupStatus,
+  setBackupStatus,
   copyToBackupFolder,
   rotateOld,
   dateString,
@@ -46,6 +47,24 @@ import { extractFromPdfImage } from "./ingestion/llm";
 import { pdfFirstPageToBase64 } from "./ingestion/pdf";
 import { getReviewQueue, clearReviewItem } from "./ingestion/review-queue";
 import type { ImapConfig } from "./ingestion/imap";
+
+// ---------------------------------------------------------------------------
+// Settings allowlist — only these keys may be written by the renderer.
+// Reject any key not in this set to prevent a compromised renderer from
+// overwriting arbitrary settings.
+// ---------------------------------------------------------------------------
+
+const ALLOWED_SETTINGS_KEYS = new Set([
+  "imap_host",
+  "imap_user",
+  "imap_password",
+  "imap_port",
+  "imap_secure",
+  "anthropic_key",
+  "backup_folder",
+  "last_backup_date",
+  "vendor_category_map",
+]);
 
 // ---------------------------------------------------------------------------
 // Database setup
@@ -687,6 +706,9 @@ function registerIpcHandlers(db: Database.Database): void {
   });
 
   ipcMain.handle("settings:set", (_event, key: string, value: unknown) => {
+    if (!ALLOWED_SETTINGS_KEYS.has(key)) {
+      throw new Error(`settings:set: unknown key "${key}"`);
+    }
     // Accept string, number, or plain object/array (serialized to JSON for settings table).
     // This allows storing the vendor_category_map as JSON.
     if (typeof value === "string") {
@@ -715,15 +737,18 @@ function registerIpcHandlers(db: Database.Database): void {
     if (!backupFolder) {
       return { ok: false, error: "Backup folder not configured in Settings." };
     }
+    const today = dateString();
     try {
-      const today = dateString();
       copyToBackupFolder(DB_PATH, backupFolder, today);
-      rotateOld(backupFolder);
-      return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { ok: false, error: message };
     }
+    // Rotation only after copy succeeds — mirrors the safety order in runBackup.
+    rotateOld(backupFolder);
+    // Keep in-memory status in sync so getBackupStatus() reflects manual runs.
+    setBackupStatus({ lastBackup: today, error: null });
+    return { ok: true };
   });
 }
 

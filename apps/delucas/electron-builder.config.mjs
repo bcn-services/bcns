@@ -17,6 +17,9 @@ const config = {
     // App source root — electron-builder packs files relative to this
     app: ".",
   },
+  // Unpack native .node binaries from the asar archive so they can be dlopen'd
+  // at runtime (asar-packed native modules cannot be loaded by Node/Electron).
+  asarUnpack: ["**/*.node"],
   // Include only the built output; exclude source, tests, and dev tooling
   files: [
     // The default exclusions remove 'dist/' — override by explicitly
