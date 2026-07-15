@@ -279,13 +279,13 @@ export function RentRuleEditor(): React.JSX.Element {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
           Recurring rules
         </p>
         <button
           type="button"
           onClick={() => { setShowAddForm(true); setFormError(null); }}
-          className="text-xs text-primary hover:underline"
+          className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
         >
           + Add rule
         </button>
@@ -333,7 +333,7 @@ export function RentRuleEditor(): React.JSX.Element {
           }
 
           return (
-            <div key={rule.id} className="flex items-center justify-between border border-border rounded-lg px-3 py-2 text-sm">
+            <div key={rule.id} className="flex items-center justify-between rounded-xl bg-card border border-border shadow-sm px-4 py-3 text-sm">
               <div>
                 <span className="font-medium text-foreground">{rule.label}</span>
                 <span className="text-muted-foreground ml-2">

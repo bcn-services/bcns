@@ -64,7 +64,7 @@ export function ReviewQueue(): React.JSX.Element | null {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+      <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
         Needs review ({items.length})
       </h2>
       {items.map((item) => (
