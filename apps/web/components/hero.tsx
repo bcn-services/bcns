@@ -19,7 +19,7 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_80%)] bg-[linear-gradient(to_right,hsl(var(--border)/0.6)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.6)_1px,transparent_1px)] bg-[size:44px_44px]"
       />
 
-      <Container className="flex flex-col items-center py-20 text-center sm:py-28">
+      <Container className="flex flex-col items-center pt-20 pb-12 text-center sm:pt-28 sm:pb-16">
         <Badge className="animate-fade-up">
           {badge}
         </Badge>
