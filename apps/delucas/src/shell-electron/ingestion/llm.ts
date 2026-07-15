@@ -11,6 +11,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 // ---------------------------------------------------------------------------
+// Module-scope client — hoisted so timeout applies to every call and the
+// instance is not re-created on each extraction request.
+// ---------------------------------------------------------------------------
+
+const client = new Anthropic({ timeout: 30_000 });
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -61,8 +68,6 @@ export async function extractFromPdfImage(
   if (mock !== undefined) {
     return mock;
   }
-
-  const client = new Anthropic();
 
   const response = await client.messages.create({
     model: "claude-3-5-sonnet-latest",

@@ -43,6 +43,11 @@ export async function runSources(
       candidates = await source.pull();
     } catch (err) {
       console.error(`[runner] source "${source.name}" pull() threw`, err);
+      // NOTE: `failed` counts source-level errors, not individual transaction
+      // failures. A single pull() throw increments failed by 1 regardless of
+      // how many transactions that source might have produced. This is
+      // intentional — we have no way to know the expected count if pull() never
+      // returned.
       failed++;
       continue;
     }

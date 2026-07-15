@@ -38,30 +38,36 @@ export async function pdfFirstPageToBase64(filePath: string): Promise<string> {
   const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
   const pdfDocument = await loadingTask.promise;
 
-  if (pdfDocument.numPages === 0) {
-    throw new Error("PDF has no pages");
+  try {
+    if (pdfDocument.numPages === 0) {
+      throw new Error("PDF has no pages");
+    }
+
+    const page = await pdfDocument.getPage(1);
+
+    // Render at 2x scale for better LLM accuracy
+    const scale = 2.0;
+    const viewport = page.getViewport({ scale });
+
+    // Use @napi-rs/canvas for headless rendering (ships ARM64 Darwin prebuilt binaries)
+    const { createCanvas } = await import("@napi-rs/canvas");
+    const canvas = createCanvas(
+      Math.floor(viewport.width),
+      Math.floor(viewport.height)
+    );
+    const context = canvas.getContext("2d");
+
+    await page.render({
+      canvasContext: context as unknown as CanvasRenderingContext2D,
+      viewport,
+    }).promise;
+
+    // Export as PNG buffer and convert to base64
+    const pngBuffer = canvas.toBuffer("image/png");
+    return pngBuffer.toString("base64");
+  } finally {
+    // Destroy the PDF document to release internal pdfjs worker resources
+    // regardless of success or failure.
+    pdfDocument.destroy();
   }
-
-  const page = await pdfDocument.getPage(1);
-
-  // Render at 2x scale for better LLM accuracy
-  const scale = 2.0;
-  const viewport = page.getViewport({ scale });
-
-  // Use @napi-rs/canvas for headless rendering (ships ARM64 Darwin prebuilt binaries)
-  const { createCanvas } = await import("@napi-rs/canvas");
-  const canvas = createCanvas(
-    Math.floor(viewport.width),
-    Math.floor(viewport.height)
-  );
-  const context = canvas.getContext("2d");
-
-  await page.render({
-    canvasContext: context as unknown as CanvasRenderingContext2D,
-    viewport,
-  }).promise;
-
-  // Export as PNG buffer and convert to base64
-  const pngBuffer = canvas.toBuffer("image/png");
-  return pngBuffer.toString("base64");
 }

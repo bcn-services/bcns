@@ -280,6 +280,7 @@ function registerIpcHandlers(db: Database.Database): void {
       typeof tx !== "object" ||
       tx === null ||
       typeof tx.date !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tx.date) ||
       typeof tx.vendor !== "string" ||
       !Number.isInteger(tx.amount_cents) ||
       tx.amount_cents <= 0 ||
@@ -307,12 +308,24 @@ function registerIpcHandlers(db: Database.Database): void {
     if (typeof filePath !== "string" || filePath.length === 0) {
       throw new Error("ingestion:processPdf: filePath must be a non-empty string");
     }
+
+    // Path-containment check: only allow files under the user's home directory
+    // (covers Downloads, Desktop, Documents) to prevent renderer-supplied
+    // path traversal attacks.
+    const resolvedPath = path.resolve(filePath);
+    const homeDir = app.getPath("home");
+    if (!resolvedPath.startsWith(homeDir + path.sep) && resolvedPath !== homeDir) {
+      throw new Error("ingestion:processPdf: file path is outside the user home directory");
+    }
+
     try {
-      const base64Image = await pdfFirstPageToBase64(filePath);
+      const base64Image = await pdfFirstPageToBase64(resolvedPath);
       return await extractFromPdfImage(base64Image);
     } catch (err) {
+      // Strip the resolved path from pdfjs error messages before forwarding to renderer
+      const message = err instanceof Error ? err.message.replaceAll(resolvedPath, "[redacted]") : String(err);
       console.error("[main] ingestion:processPdf failed", err);
-      throw err;
+      throw new Error(message);
     }
   });
 
@@ -326,6 +339,7 @@ function registerIpcHandlers(db: Database.Database): void {
       typeof tx !== "object" ||
       tx === null ||
       typeof tx.date !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tx.date) ||
       typeof tx.vendor !== "string" ||
       !Number.isInteger(tx.amount_cents) ||
       tx.amount_cents <= 0 ||
