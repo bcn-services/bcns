@@ -9,8 +9,8 @@
 ---
 
 ## Current position
-- **Status:** Section 1 complete. All 4 items (B1–B4) DONE. Branch: feat/b1-multi-page-routing merged into experimental-v2.
-- **Next:** Section 2 — layout-loop visual pass on the new pages (/, /services, /pricing, /about, /work). Cowork/screen access required.
+- **Status:** Section 1 + Section 2 complete. B1–B4 DONE on experimental-v2. Layout-loop passes V1–V5 DONE on branch layout-loop/bcns-section-2 (awaiting Nate review + merge).
+- **Next:** Nate reviews layout-loop branch and merges to experimental-v2. Then: fill [INPUT:] slots (prices, turnaround, founder specifics), deploy to Vercel, set up domain + contact form.
 - **Blockers (Needs-Nate):** Fill [INPUT: …] slots (prices, turnaround, founder bios/photos/credentials, whyBcns), first real past-work entry, domain + deploy. None block Section 2.
 - **Blockers (Needs-Nate):** Domain, inbox/form provider, real content (INPUT slots), legal text, deploy — all deferred. None block Section 1.
 - **Last updated:** 2026-07-14 (v2 plan started — dev-team-auto run)
@@ -38,7 +38,11 @@
 ### v2 Section 2 — Visual pass (layout-loop, cowork)
 | Item | Status | Notes |
 |------|--------|-------|
-| V1 through V5 — per-page visual passes | ⬜ Not started | layout-loop skill, cowork/screen access required |
+| V1 — `/` home visual pass | ✅ done — nav card accent circle arrow, hero padding tightened; baa9238 |
+| V2 — `/services` visual pass | ✅ done — UseCases before HowItWorks, Sparkles on AI card; 70a87b5 |
+| V3 — `/pricing` visual pass | ✅ done — AI consulting card differentiated, feature checkmarks; 97e4af0 |
+| V4 — `/about` visual pass | ✅ done — name text-xl, role accent, credential dot bullets, whyBcns centered; 965a5ab |
+| V5 — `/work` visual pass | ✅ done — both holding states promoted to bordered panels with icons; 953a7ab |
 
 Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 
