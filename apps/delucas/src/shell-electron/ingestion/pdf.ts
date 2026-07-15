@@ -13,6 +13,18 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 /**
+ * Convert the first page of a PDF Buffer to a base64-encoded PNG.
+ * Used by the email ingestion path where the PDF is already in memory.
+ *
+ * @param buffer - Raw PDF bytes
+ * @returns Base64-encoded PNG string (no data URI prefix)
+ */
+export async function pdfBufferToBase64(buffer: Buffer): Promise<string> {
+  const uint8Array = new Uint8Array(buffer);
+  return renderPdfUint8Array(uint8Array);
+}
+
+/**
  * Convert the first page of a PDF file to a base64-encoded PNG.
  *
  * @param filePath - Absolute path to the PDF file
@@ -30,11 +42,14 @@ export async function pdfFirstPageToBase64(filePath: string): Promise<string> {
 
   const fileBuffer = fs.readFileSync(resolved);
   const uint8Array = new Uint8Array(fileBuffer);
+  return renderPdfUint8Array(uint8Array);
+}
+
+async function renderPdfUint8Array(uint8Array: Uint8Array): Promise<string> {
 
   // Dynamic import to avoid issues with ESM/CJS interop at module load time.
   // pdfjs-dist v4 ships ESM only; the main entry is build/pdf.mjs (pkg "main").
   const pdfjsLib = await import("pdfjs-dist");
-
   const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
   const pdfDocument = await loadingTask.promise;
 

@@ -8,7 +8,14 @@
  * plain browser context.
  */
 
-import type { BridgeAPI, DialogOptions, IngestionRunReportBridge, LLMExtractResultBridge } from "./BridgeInterface";
+import type {
+  BridgeAPI,
+  DialogOptions,
+  IngestionRunReportBridge,
+  LLMExtractResultBridge,
+  EmailStatusBridge,
+  ReviewItemBridge,
+} from "./BridgeInterface";
 import type { NewTransaction, MonthPnl } from "../shared/types";
 
 const EMPTY_PNL: MonthPnl = {
@@ -116,6 +123,21 @@ export const mockBridge: BridgeAPI = {
     confirmImport: async (_tx: NewTransaction): Promise<IngestionRunReportBridge> => {
       console.warn("[mockBridge] ingestion.confirmImport — no-op in browser mode");
       return { found: 1, imported: 1, failed: 0, ran_at: new Date().toISOString() };
+    },
+
+    getEmailStatus: async (): Promise<EmailStatusBridge> => {
+      console.warn("[mockBridge] ingestion.getEmailStatus — returning disconnected");
+      return { connected: false, lastChecked: null, error: null };
+    },
+
+    getReviewQueue: async (): Promise<ReviewItemBridge[]> => {
+      console.warn("[mockBridge] ingestion.getReviewQueue — returning []");
+      return [];
+    },
+
+    clearReviewItem: async (_id: string): Promise<boolean> => {
+      console.warn("[mockBridge] ingestion.clearReviewItem — no-op in browser mode");
+      return false;
     },
   },
 

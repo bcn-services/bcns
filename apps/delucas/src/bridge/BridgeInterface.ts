@@ -40,6 +40,25 @@ export interface IngestionRunReportBridge {
   ran_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// P4 — Email status + review queue types
+// ---------------------------------------------------------------------------
+
+export interface EmailStatusBridge {
+  connected: boolean;
+  lastChecked: string | null;
+  error: string | null;
+}
+
+export interface ReviewItemBridge {
+  id: string;
+  queued_at: string;
+  message_id: string;
+  extraction: LLMExtractResultBridge;
+}
+
+export type VendorMapBridge = Record<string, string>;
+
 export interface DialogOptions {
   filters?: Array<{ name: string; extensions: string[] }>;
 }
@@ -66,11 +85,11 @@ export interface BridgeAPI {
     markEmailProcessed: (messageId: string) => Promise<void>;
   };
 
-  /** Ingestion — P3 */
+  /** Ingestion — P3 + P4 */
   ingestion: {
     /** Legacy stub — kept for back-compat */
     triggerPoll: () => Promise<void>;
-    /** Run all ingestion sources (recurring + any staged manual/dragdrop) */
+    /** Run all ingestion sources (recurring + any staged manual/dragdrop + email) */
     runSources: () => Promise<IngestionRunReportBridge>;
     /** Submit a manually entered transaction */
     submitManual: (tx: NewTransaction) => Promise<IngestionRunReportBridge>;
@@ -86,6 +105,12 @@ export interface BridgeAPI {
      * `tx` is the user-edited version of what LLM extracted.
      */
     confirmImport: (tx: NewTransaction) => Promise<IngestionRunReportBridge>;
+    /** P4 — Email connection status */
+    getEmailStatus: () => Promise<EmailStatusBridge>;
+    /** P4 — Low/medium-confidence items awaiting user review */
+    getReviewQueue: () => Promise<ReviewItemBridge[]>;
+    /** P4 — Dismiss or confirm a review item (removes it from the queue) */
+    clearReviewItem: (id: string) => Promise<boolean>;
   };
 
   /** Native file dialogs */

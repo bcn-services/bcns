@@ -26,9 +26,12 @@ import type { NewTransaction } from "../shared/types";
 import { ManualSource } from "./ingestion/sources/manual";
 import { RecurringSource } from "./ingestion/sources/recurring";
 import { DragDropSource } from "./ingestion/sources/dragdrop";
+import { EmailSource, getEmailStatus } from "./ingestion/sources/email";
 import { runSources, getLastRunReport } from "./ingestion/runner";
 import { extractFromPdfImage } from "./ingestion/llm";
 import { pdfFirstPageToBase64 } from "./ingestion/pdf";
+import { getReviewQueue, clearReviewItem } from "./ingestion/review-queue";
+import type { ImapConfig } from "./ingestion/imap";
 
 // ---------------------------------------------------------------------------
 // Database setup
@@ -81,6 +84,32 @@ function createWindow(): BrowserWindow {
 
 const manualSource = new ManualSource();
 const dragDropSource = new DragDropSource();
+
+// EmailSource is created after db is ready (needs db reference).
+// We use a factory so it can read current IMAP config from settings at run time.
+let emailSource: EmailSource | null = null;
+
+// ---------------------------------------------------------------------------
+// IMAP config helper — reads host/user/password/port/secure from settings
+// ---------------------------------------------------------------------------
+
+function getImapConfig(db: Database.Database): ImapConfig | null {
+  const host = getSetting(db, "imap_host");
+  const user = getSetting(db, "imap_user");
+  const password = getSetting(db, "imap_password");
+  if (!host || !user || !password) return null;
+
+  const portRaw = getSetting(db, "imap_port");
+  const secureRaw = getSetting(db, "imap_secure");
+
+  return {
+    host,
+    user,
+    password,
+    port: portRaw !== undefined ? parseInt(portRaw, 10) : 993,
+    secure: secureRaw !== undefined ? secureRaw !== "false" : true,
+  };
+}
 
 function registerIpcHandlers(db: Database.Database): void {
   // ------------------------------------------------------------------
@@ -258,13 +287,19 @@ function registerIpcHandlers(db: Database.Database): void {
     return;
   });
 
-  // Run all sources: recurring (current month) + any staged manual/dragdrop entries
+  // Run all sources: recurring (current month) + any staged manual/dragdrop + email
   ipcMain.handle("ingestion:runSources", async () => {
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
     const recurringSource = new RecurringSource(db, currentMonth);
+
+    // Create EmailSource lazily on first use; it reads IMAP config from settings at call time
+    if (emailSource === null) {
+      emailSource = new EmailSource(db, () => getImapConfig(db));
+    }
+
     try {
-      return await runSources(db, [recurringSource, manualSource, dragDropSource]);
+      return await runSources(db, [recurringSource, manualSource, dragDropSource, emailSource]);
     } catch (err) {
       console.error("[main] ingestion:runSources failed", err);
       throw err;
@@ -359,6 +394,30 @@ function registerIpcHandlers(db: Database.Database): void {
   });
 
   // ------------------------------------------------------------------
+  // ingestion:getEmailStatus — P4: email connection status
+  // ------------------------------------------------------------------
+  ipcMain.handle("ingestion:getEmailStatus", () => {
+    return getEmailStatus();
+  });
+
+  // ------------------------------------------------------------------
+  // ingestion:getReviewQueue — P4: low/medium-confidence items
+  // ------------------------------------------------------------------
+  ipcMain.handle("ingestion:getReviewQueue", () => {
+    return getReviewQueue();
+  });
+
+  // ------------------------------------------------------------------
+  // ingestion:clearReviewItem — P4: dismiss or confirm a review item
+  // ------------------------------------------------------------------
+  ipcMain.handle("ingestion:clearReviewItem", (_event, id: string) => {
+    if (typeof id !== "string" || id.length === 0) {
+      throw new Error("ingestion:clearReviewItem: id must be a non-empty string");
+    }
+    return clearReviewItem(id);
+  });
+
+  // ------------------------------------------------------------------
   // dialog — fully implemented
   // ------------------------------------------------------------------
   ipcMain.handle(
@@ -390,10 +449,19 @@ function registerIpcHandlers(db: Database.Database): void {
   });
 
   ipcMain.handle("settings:set", (_event, key: string, value: unknown) => {
-    if (typeof value !== "string" && typeof value !== "number") {
-      throw new Error(`settings:set: value must be a string or number, got ${typeof value}`);
+    // Accept string, number, or plain object/array (serialized to JSON for settings table).
+    // This allows storing the vendor_category_map as JSON.
+    if (typeof value === "string") {
+      setSetting(db, key, value);
+    } else if (typeof value === "number") {
+      setSetting(db, key, String(value));
+    } else if (typeof value === "boolean") {
+      setSetting(db, key, String(value));
+    } else if (typeof value === "object" && value !== null) {
+      setSetting(db, key, JSON.stringify(value));
+    } else {
+      throw new Error(`settings:set: unsupported value type: ${typeof value}`);
     }
-    setSetting(db, key, String(value));
   });
 }
 
@@ -421,6 +489,15 @@ app.whenReady().then(() => {
   }
 
   registerIpcHandlers(db);
+
+  // Run email ingestion on startup (best-effort; failure is captured in emailStatus)
+  emailSource = new EmailSource(db, () => getImapConfig(db));
+  const now2 = new Date();
+  const currentMonth2 = `${now2.getFullYear()}-${(now2.getMonth() + 1).toString().padStart(2, "0")}`;
+  const recurringSource2 = new RecurringSource(db, currentMonth2);
+  runSources(db, [recurringSource2, manualSource, dragDropSource, emailSource]).catch((err) => {
+    console.error("[main] startup ingestion run failed", err);
+  });
 
   try {
     createWindow();

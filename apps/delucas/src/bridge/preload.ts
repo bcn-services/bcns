@@ -9,7 +9,14 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
-import type { BridgeAPI, DialogOptions, IngestionRunReportBridge, LLMExtractResultBridge } from "./BridgeInterface";
+import type {
+  BridgeAPI,
+  DialogOptions,
+  IngestionRunReportBridge,
+  LLMExtractResultBridge,
+  EmailStatusBridge,
+  ReviewItemBridge,
+} from "./BridgeInterface";
 import type { NewTransaction } from "../shared/types";
 
 const bridge: BridgeAPI = {
@@ -66,6 +73,15 @@ const bridge: BridgeAPI = {
 
     confirmImport: (tx: NewTransaction): Promise<IngestionRunReportBridge> =>
       ipcRenderer.invoke("ingestion:confirmImport", tx),
+
+    getEmailStatus: (): Promise<EmailStatusBridge> =>
+      ipcRenderer.invoke("ingestion:getEmailStatus"),
+
+    getReviewQueue: (): Promise<ReviewItemBridge[]> =>
+      ipcRenderer.invoke("ingestion:getReviewQueue"),
+
+    clearReviewItem: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke("ingestion:clearReviewItem", id),
   },
 
   dialog: {
