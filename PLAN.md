@@ -322,8 +322,7 @@ brand: TBD (client brand profile — pizza-shop warmth; define at session start)
 - [ ] Check his inbox for Slice summary emails → if present, plan revenue automation as v1.1 (new `IngestionSource`).
 - [ ] On his laptop: install correct-OS build; enable 2FA + generate email app password; create his Anthropic account (his card, ~$5 spend cap); configure settings; point backup at his synced folder and watch one backup sync.
 - [ ] Watch real invoices import; correct vendor→category mappings live.
-- [ ] Rename `apps/delucas/` → real business name; update README frontmatter.
-- [ ] Tag `<business>-v1.0-shipped`; commit lockfile.
+- [ ] Tag `delucas-v1.0-shipped`; commit lockfile.
 - [ ] Walk him through it: open app → read numbers. That's the whole tutorial.
 - [ ] **Done** when he reads this month's profit on his own machine without help.
 - [ ] Post-ship (bcns, not client): extract `templates/local-app/` from the shipped app.
