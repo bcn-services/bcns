@@ -1,5 +1,30 @@
 ---
-# Review Report — B2 (Registry rework)
+# Review Report — P5 (Dashboard)
+**Date:** 2026-07-15
+**Files Reviewed:** 14
+**Standards Applied:** efficiency, reliability, scalability, security, fault tolerance
+
+## Summary
+The P5 implementation is fundamentally sound: IPC handlers validate inputs at the boundary, the dynamic SET clause in `updateTransaction` operates on a pre-validated, typed key set (no injection path), and the React cleanup pattern (`cancelled` flag + `clearInterval`) correctly prevents memory leaks. Three Important findings: `updateRecurringRule` passes raw client data directly to SQLite without field validation, which is an injection-adjacent gap; `getTransactionsForMonth` returns `{ok, error}` on validation failure while the renderer treats its return type as `Transaction[]`, causing a silent type mismatch that drops the error; and `BannerList`'s `useEffect` re-runs whenever `dismissedError` changes, including after a dismiss, producing a no-op re-render loop on every dismiss action.
+
+## Findings
+
+### Important
+- `apps/delucas/src/shell-electron/main.ts:431–443` — **Security / Validate at Boundaries** — `db:updateRecurringRule` passes `updates: Record<string, unknown>` directly to `updateRecurringRule(db, id, updates)` with no field allowlist or value validation; `updateRecurringRule` in queries.ts calls `Object.keys(updates)` and interpolates those keys directly into the SET clause; a renderer that sends `{ "id = 1; DROP TABLE transactions; --": 1 }` would pass the query intact to `db.prepare()` — validate each key against an explicit allowlist (`label`, `amount_cents`, `direction`, `category`, `vendor`, `day_of_month`, `end_date`) and each value against its type before passing to the query function, matching the pattern already used in `db:updateTransaction`.
+- `apps/delucas/src/shell-electron/main.ts:305–314` — **Reliability / Explicit Over Implicit** — `db:getTransactionsForMonth` returns `{ ok: false, error: "…" }` on bad input but returns a `Transaction[]` on success; the bridge type declares return type `Transaction[]`; the renderer hook in `useDashboardData.ts` does `setTransactions(txs ?? [])` treating the return as an array — when validation fails the object `{ok,error}` is stored as the `transactions` state and rendered as an empty list with no error surfaced; throw instead of returning `{ok,error}` to match `getTransactionsByMonth` (which throws) and the renderer's catch-path.
+- `apps/delucas/src/renderer/components/BannerList.tsx:28–32` — **Reliability / Handle Errors at Boundaries** — the `useEffect` has `[currentError, dismissedError]` in its dependency array; when the user dismisses a banner, `setDismissedError(currentError)` fires, which triggers the effect again immediately; the effect checks `if (currentError !== dismissedError)` — at that point they are equal so it does nothing, but it still re-runs on every dismiss causing an unnecessary render cycle; remove `dismissedError` from the dep array and guard only on `currentError` (the effect only needs to reset state when the error string changes, not when the dismissed string changes).
+
+### Minor
+- `apps/delucas/src/renderer/pages/Dashboard.tsx` and `apps/delucas/src/renderer/pages/AddFix.tsx` — **Scalability / No Global Mutable State** — both pages maintain independent `currentMonth` state; switching tabs while navigating months resets the month on the other tab; deferred per engineer, noted here because the symptom is user-visible state loss — acceptable for v1 per spec, but worth lifting to App.tsx if the spec ever calls for consistent month across tabs.
+- `apps/delucas/src/renderer/components/ProfitBarChart.tsx:43` — **Efficiency / Hoist Invariants** — `Math.max(1, ...profits.map(Math.abs))` maps `profits` twice (once to get absolute values, once spread into Math.max); hoist to `Math.max(1, ...profits.map(p => Math.abs(p)))` already done but `profits` itself is computed via `series.map` inside render — no perf concern at 12 items, no action needed.
+- `apps/delucas/src/renderer/components/TransactionList.tsx` — **Reliability / Don't Assume Success** — `handleDelete` swallows the error on failure: `console.error` only, no user feedback; the row stays in a non-deleting state but the user has no indication the delete failed — surface the error string to a local `deleteError` state the same way `editError` is handled for edits.
+
+## STANDARDS.md Updates
+- **IPC partial-update handlers must validate individual fields**: `db:updateX` handlers that accept a `Record<string, unknown>` updates object must allowlist permitted keys and validate each value type before passing to the query function; `Object.keys()` on an unvalidated object interpolates attacker-controlled column names into the SET clause.
+- **IPC handler return-type consistency**: within a `db:*` handler group, validation failures must either all throw (letting Electron IPC surface the rejection to the renderer's catch block) or all return `{ok, error}` — mixing the two shapes on the same logical channel causes silent type mismatches in the renderer.
+
+---
+# Review Report — P1 (Electron scaffold)
 **Date:** 2026-07-14
 **Files Reviewed:** 6
 **Standards Applied:** efficiency, reliability, scalability, security, fault tolerance

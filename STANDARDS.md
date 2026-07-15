@@ -2,6 +2,14 @@
 
 Project-specific efficiency, reliability, and resilience conventions observed in this codebase. These extend the global review standards and do not duplicate them.
 
+## Electron Security
+
+- **Electron BrowserWindow sandbox**: all BrowserWindow instances must set `sandbox: true`; preload `contextBridge` works under sandbox and does not require `sandbox: false`.
+- **IPC boundary test coverage**: the import-boundary static-analysis test must scan every source directory whose output is bundled into the renderer (at minimum `src/renderer/` and `src/bridge/`), not just `src/renderer/`.
+- **IPC sql channels**: any `db:*` ipcMain handler that reaches SQLite must use parameterized queries and must never pass the raw client-supplied sql string directly to `db.prepare()`; the channel is a SQL injection vector unless the handler validates or allowlists the statement.
+- **IPC partial-update handlers must validate individual fields**: `db:updateX` handlers that accept a `Record<string, unknown>` updates object must allowlist permitted keys and validate each value type before passing to the query function; `Object.keys()` on an unvalidated object interpolates attacker-controlled column names into the SET clause.
+- **IPC handler return-type consistency**: within a `db:*` handler group, validation failures must either all throw (letting Electron IPC surface the rejection to the renderer's catch block) or all return `{ok, error}` — mixing the two shapes on the same logical channel causes silent type mismatches in the renderer.
+
 ## Content Registry
 
 - **Static content registry pattern**: all section copy lives in `apps/web/lib/content.ts` as a single `siteContent` const; icons are parallel `as const` arrays in component files indexed by position; `siteConfig` in `apps/web/lib/site.ts` remains the sole source for `name`, `domain`, and `email` and is never imported into the content registry.
