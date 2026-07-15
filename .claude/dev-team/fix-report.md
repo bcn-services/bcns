@@ -1,3 +1,24 @@
+# Fix Report — P5 Dashboard
+**Date:** 2026-07-15
+**Findings addressed:** 4 of 4: 0 QA failures + 3 Important + 1 Minor review findings
+
+## Changes Made
+- `main.ts:431–443` — added field allowlist + per-field type validation to `db:updateRecurringRule` before passing to `updateRecurringRule`; allowed fields: `amount_cents`, `day_of_month`, `vendor`, `category`, `end_date`, `is_active`; wrapped in existing try/catch returning `{ok, error}` — review Important (security / validate at boundaries)
+- `main.ts:305–308` — changed `return { ok: false, error: "…" }` on bad month input to `throw new Error("…")` so the renderer's catch path handles it and the return type stays `Transaction[]` throughout — review Important (reliability / explicit over implicit)
+- `BannerList.tsx:28–32` — removed `dismissedError` from `useEffect` dep array; effect now runs only when `currentError` changes, eliminating the no-op re-run after every dismiss — review Important (reliability / handle errors at boundaries)
+- `TransactionList.tsx` — added `deleteError` state; surfaces delete failures via `<p>` element above the table (same visual pattern as `editError`); clears on cancel — review Minor (reliability / don't assume success)
+
+## Disputed
+None.
+
+## Deferred
+None.
+
+## Verification
+- `pnpm --filter @delucas/app typecheck` — PASS
+- `pnpm --filter @delucas/app lint` — PASS
+- All 113 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 23 dashboard)
+
 ---
 # Fix Report — P1 App Scaffold
 **Date:** 2026-07-15
