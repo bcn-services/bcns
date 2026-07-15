@@ -1,4 +1,4 @@
-# AGENTS.md — bcns
+# CLAUDE.md — bcns
 
 Project-level guidance for Claude Code agents working in this repo.
 
