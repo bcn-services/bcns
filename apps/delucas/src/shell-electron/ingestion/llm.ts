@@ -11,11 +11,46 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 // ---------------------------------------------------------------------------
-// Module-scope client — hoisted so timeout applies to every call and the
-// instance is not re-created on each extraction request.
+// Lazy module-scope client.
+//
+// The client is constructed on first use rather than at import time so that the
+// API key configured in Settings (read from SQLite, which is not open until the
+// app is ready) can be injected via setAnthropicApiKey() before any extraction
+// runs. An eager module-scope client would capture process.env.ANTHROPIC_API_KEY
+// at import time and never see the Settings value.
+//
+// If no key is injected, the SDK falls back to process.env.ANTHROPIC_API_KEY,
+// which keeps the module usable from scripts/tests that export the env var.
 // ---------------------------------------------------------------------------
 
-const client = new Anthropic({ timeout: 30_000 });
+let client: Anthropic | null = null;
+let configuredApiKey: string | undefined;
+
+/**
+ * Inject the Anthropic API key from Settings. Call once at startup (and again
+ * whenever the key changes). Passing a new key rebuilds the cached client so the
+ * change takes effect on the next extraction. Passing null/empty clears the
+ * override and falls back to process.env.ANTHROPIC_API_KEY.
+ */
+export function setAnthropicApiKey(apiKey: string | null | undefined): void {
+  const next = apiKey != null && apiKey.trim() !== "" ? apiKey.trim() : undefined;
+  if (next !== configuredApiKey) {
+    configuredApiKey = next;
+    client = null; // force rebuild with the new key on next use
+  }
+}
+
+/** Build (once) and return the Anthropic client, using the injected key if set. */
+function getClient(): Anthropic {
+  if (client === null) {
+    client = new Anthropic({
+      timeout: 30_000,
+      // Omit apiKey when unset so the SDK reads process.env.ANTHROPIC_API_KEY.
+      ...(configuredApiKey !== undefined ? { apiKey: configuredApiKey } : {}),
+    });
+  }
+  return client;
+}
 
 /**
  * Default extraction model. Vision-capable, cheapest tier — chosen to fit the
@@ -80,7 +115,7 @@ export async function extractFromPdfImage(
     return mock;
   }
 
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model,
     max_tokens: 512,
     system: SYSTEM_PROMPT,

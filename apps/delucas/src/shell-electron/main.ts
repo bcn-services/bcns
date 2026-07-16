@@ -43,7 +43,7 @@ import { RecurringSource } from "./ingestion/sources/recurring";
 import { DragDropSource } from "./ingestion/sources/dragdrop";
 import { EmailSource, getEmailStatus, setEmailError } from "./ingestion/sources/email";
 import { runSources, getLastRunReport } from "./ingestion/runner";
-import { extractFromPdfImage } from "./ingestion/llm";
+import { extractFromPdfImage, setAnthropicApiKey } from "./ingestion/llm";
 import { pdfFirstPageToBase64 } from "./ingestion/pdf";
 import { getReviewQueue, clearReviewItem } from "./ingestion/review-queue";
 import type { ImapConfig } from "./ingestion/imap";
@@ -722,6 +722,12 @@ function registerIpcHandlers(db: Database.Database): void {
     } else {
       throw new Error(`settings:set: unsupported value type: ${typeof value}`);
     }
+
+    // Keep the live LLM client in sync when the Anthropic key changes, so a
+    // Settings edit takes effect without an app restart.
+    if (key === "anthropic_key") {
+      setAnthropicApiKey(typeof value === "string" ? value : null);
+    }
   });
 
   // ------------------------------------------------------------------
@@ -776,6 +782,14 @@ app.whenReady().then(() => {
   }
 
   registerIpcHandlers(db);
+
+  // Inject the Anthropic API key from Settings into the LLM client. Done after
+  // the DB is open so the stored key (not just process.env) is used at handoff.
+  try {
+    setAnthropicApiKey(getSetting(db, "anthropic_key") ?? null);
+  } catch (err) {
+    console.error("[main] failed to load Anthropic key from settings", err);
+  }
 
   // Daily backup on open — runs at most once per calendar day.
   // Silently skipped if backup_folder is not configured.
