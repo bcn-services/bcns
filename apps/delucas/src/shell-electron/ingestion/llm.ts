@@ -17,6 +17,16 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ timeout: 30_000 });
 
+/**
+ * Default extraction model. Vision-capable, cheapest tier — chosen to fit the
+ * client's ~$5/mo spend cap on one-page invoice extraction.
+ *
+ * NOTE: the previous value `claude-3-5-sonnet-latest` pointed at a retired model
+ * line (Claude 3.5 Sonnet retired 2025-10-28) and returned a 404. Swap this to
+ * `claude-sonnet-4-6` if accuracy on messy invoices falls short.
+ */
+export const DEFAULT_MODEL = "claude-haiku-4-5";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -35,7 +45,7 @@ export interface LLMExtractResult {
 // Extraction
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an invoice data extractor. Given an image of a document page, extract the following fields and respond with ONLY valid JSON matching this schema exactly:
+export const SYSTEM_PROMPT = `You are an invoice data extractor. Given an image of a document page, extract the following fields and respond with ONLY valid JSON matching this schema exactly:
 
 {
   "is_invoice": boolean,
@@ -62,7 +72,8 @@ Rules:
  */
 export async function extractFromPdfImage(
   base64Image: string,
-  mock?: LLMExtractResult
+  mock?: LLMExtractResult,
+  model: string = DEFAULT_MODEL
 ): Promise<LLMExtractResult> {
   // Mockable bypass for tests — no live API call
   if (mock !== undefined) {
@@ -70,7 +81,7 @@ export async function extractFromPdfImage(
   }
 
   const response = await client.messages.create({
-    model: "claude-3-5-sonnet-latest",
+    model,
     max_tokens: 512,
     system: SYSTEM_PROMPT,
     messages: [
