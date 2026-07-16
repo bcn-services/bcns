@@ -272,6 +272,8 @@ export function RentRuleEditor({ onChanged }: RentRuleEditorProps = {}): React.J
       });
       if (!result.ok) { setFormError(result.error ?? "Failed to update rule."); return; }
       setEditingId(null);
+      // Re-materialize so edits that newly qualify a month appear immediately.
+      await window.bridge.db.materializeRecurring(currentMonth());
       await fetchRules();
       onChanged?.();
     } catch (err) {
