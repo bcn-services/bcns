@@ -136,7 +136,7 @@ export function AddFix(): React.JSX.Element {
 
       {/* Recurring rules */}
       <section>
-        <RentRuleEditor />
+        <RentRuleEditor onChanged={refresh} />
       </section>
 
     </div>
