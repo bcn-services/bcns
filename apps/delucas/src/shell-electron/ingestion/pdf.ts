@@ -47,10 +47,37 @@ export async function pdfFirstPageToBase64(filePath: string): Promise<string> {
 
 async function renderPdfUint8Array(uint8Array: Uint8Array): Promise<string> {
 
-  // Dynamic import to avoid issues with ESM/CJS interop at module load time.
-  // pdfjs-dist v4 ships ESM only; the main entry is build/pdf.mjs (pkg "main").
-  const pdfjsLib = await import("pdfjs-dist");
-  const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+  // Use @napi-rs/canvas for headless rendering (ships ARM64 Darwin prebuilt
+  // binaries). It also supplies the browser globals that pdfjs's canvas
+  // renderer expects but that Node / the Electron main process do not define
+  // (Path2D, DOMMatrix, ImageData). Without these, glyph rendering throws
+  // "Path2D is not defined".
+  const canvasMod = await import("@napi-rs/canvas");
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (g["Path2D"] === undefined) g["Path2D"] = canvasMod.Path2D;
+  if (g["DOMMatrix"] === undefined) g["DOMMatrix"] = canvasMod.DOMMatrix;
+  if (g["ImageData"] === undefined) g["ImageData"] = canvasMod.ImageData;
+
+  // Use pdfjs's "legacy" build — the default modern build assumes a browser
+  // environment and warns/fails under Node. Dynamic import avoids ESM/CJS
+  // interop issues at module load time.
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
+  // Non-embedded standard-14 fonts (e.g. Helvetica) need pdfjs's bundled font
+  // data. Best-effort: resolve the dir from the installed package; if that
+  // fails, PDFs with embedded fonts (most real invoices) still render.
+  let standardFontDataUrl: string | undefined;
+  try {
+    standardFontDataUrl =
+      path.join(path.dirname(require.resolve("pdfjs-dist/package.json")), "standard_fonts") + path.sep;
+  } catch {
+    standardFontDataUrl = undefined;
+  }
+
+  const loadingTask = pdfjsLib.getDocument({
+    data: uint8Array,
+    ...(standardFontDataUrl !== undefined ? { standardFontDataUrl } : {}),
+  });
   const pdfDocument = await loadingTask.promise;
 
   try {
@@ -64,8 +91,7 @@ async function renderPdfUint8Array(uint8Array: Uint8Array): Promise<string> {
     const scale = 2.0;
     const viewport = page.getViewport({ scale });
 
-    // Use @napi-rs/canvas for headless rendering (ships ARM64 Darwin prebuilt binaries)
-    const { createCanvas } = await import("@napi-rs/canvas");
+    const { createCanvas } = canvasMod;
     const canvas = createCanvas(
       Math.floor(viewport.width),
       Math.floor(viewport.height)
