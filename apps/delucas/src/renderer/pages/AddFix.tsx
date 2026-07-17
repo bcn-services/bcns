@@ -120,7 +120,7 @@ export function AddFix(): React.JSX.Element {
 
       {/* Email review queue */}
       <section>
-        <ReviewQueue />
+        <ReviewQueue onSaved={refresh} />
       </section>
 
       {/* Transaction list */}
@@ -136,7 +136,7 @@ export function AddFix(): React.JSX.Element {
 
       {/* Recurring rules */}
       <section>
-        <RentRuleEditor />
+        <RentRuleEditor onChanged={refresh} />
       </section>
 
     </div>

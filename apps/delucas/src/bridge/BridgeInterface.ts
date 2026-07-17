@@ -106,7 +106,9 @@ export interface BridgeAPI {
     /** Typed read/write operations */
     getTransactions: () => Promise<Transaction[]>;
     getTransactionsByMonth: (month: string) => Promise<Transaction[]>;
-    insertTransaction: (tx: NewTransaction) => Promise<number>;
+    insertTransaction: (
+      tx: NewTransaction
+    ) => Promise<{ ok: true; id: number } | { ok: false; error: string }>;
     /** P5 — fetch transactions for a specific month (same as getTransactionsByMonth) */
     getTransactionsForMonth: (month: string) => Promise<Transaction[]>;
     /** P5 — update mutable fields of an existing transaction */

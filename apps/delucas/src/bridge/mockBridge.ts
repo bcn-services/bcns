@@ -53,9 +53,11 @@ export const mockBridge: BridgeAPI = {
       return [];
     },
 
-    insertTransaction: async (_tx: NewTransaction): Promise<number> => {
+    insertTransaction: async (
+      _tx: NewTransaction
+    ): Promise<{ ok: true; id: number } | { ok: false; error: string }> => {
       console.warn("[mockBridge] db.insertTransaction — no-op");
-      return 0;
+      return { ok: true, id: 0 };
     },
 
     getTransactionsForMonth: async (_month: string) => {

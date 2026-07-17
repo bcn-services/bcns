@@ -11,11 +11,56 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 // ---------------------------------------------------------------------------
-// Module-scope client — hoisted so timeout applies to every call and the
-// instance is not re-created on each extraction request.
+// Lazy module-scope client.
+//
+// The client is constructed on first use rather than at import time so that the
+// API key configured in Settings (read from SQLite, which is not open until the
+// app is ready) can be injected via setAnthropicApiKey() before any extraction
+// runs. An eager module-scope client would capture process.env.ANTHROPIC_API_KEY
+// at import time and never see the Settings value.
+//
+// If no key is injected, the SDK falls back to process.env.ANTHROPIC_API_KEY,
+// which keeps the module usable from scripts/tests that export the env var.
 // ---------------------------------------------------------------------------
 
-const client = new Anthropic({ timeout: 30_000 });
+let client: Anthropic | null = null;
+let configuredApiKey: string | undefined;
+
+/**
+ * Inject the Anthropic API key from Settings. Call once at startup (and again
+ * whenever the key changes). Passing a new key rebuilds the cached client so the
+ * change takes effect on the next extraction. Passing null/empty clears the
+ * override and falls back to process.env.ANTHROPIC_API_KEY.
+ */
+export function setAnthropicApiKey(apiKey: string | null | undefined): void {
+  const next = apiKey != null && apiKey.trim() !== "" ? apiKey.trim() : undefined;
+  if (next !== configuredApiKey) {
+    configuredApiKey = next;
+    client = null; // force rebuild with the new key on next use
+  }
+}
+
+/** Build (once) and return the Anthropic client, using the injected key if set. */
+function getClient(): Anthropic {
+  if (client === null) {
+    client = new Anthropic({
+      timeout: 30_000,
+      // Omit apiKey when unset so the SDK reads process.env.ANTHROPIC_API_KEY.
+      ...(configuredApiKey !== undefined ? { apiKey: configuredApiKey } : {}),
+    });
+  }
+  return client;
+}
+
+/**
+ * Default extraction model. Vision-capable, cheapest tier — chosen to fit the
+ * client's ~$5/mo spend cap on one-page invoice extraction.
+ *
+ * NOTE: the previous value `claude-3-5-sonnet-latest` pointed at a retired model
+ * line (Claude 3.5 Sonnet retired 2025-10-28) and returned a 404. Swap this to
+ * `claude-sonnet-4-6` if accuracy on messy invoices falls short.
+ */
+export const DEFAULT_MODEL = "claude-haiku-4-5";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,7 +80,7 @@ export interface LLMExtractResult {
 // Extraction
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an invoice data extractor. Given an image of a document page, extract the following fields and respond with ONLY valid JSON matching this schema exactly:
+export const SYSTEM_PROMPT = `You are an invoice data extractor. Given an image of a document page, extract the following fields and respond with ONLY valid JSON matching this schema exactly:
 
 {
   "is_invoice": boolean,
@@ -55,6 +100,19 @@ Rules:
 - Respond with ONLY the JSON object, no explanation or markdown`;
 
 /**
+ * Strip a Markdown code fence from an LLM response if present. Some models wrap
+ * JSON in ```json ... ``` despite being told to return raw JSON. Returns the
+ * trimmed input unchanged when no fence is found.
+ *
+ * Exported for unit testing.
+ */
+export function stripJsonFence(text: string): string {
+  const trimmed = text.trim();
+  const m = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/i);
+  return m && m[1] !== undefined ? m[1].trim() : trimmed;
+}
+
+/**
  * Extract invoice data from a base64-encoded image of a PDF page.
  *
  * @param base64Image - Base64-encoded PNG/JPEG image data
@@ -62,15 +120,16 @@ Rules:
  */
 export async function extractFromPdfImage(
   base64Image: string,
-  mock?: LLMExtractResult
+  mock?: LLMExtractResult,
+  model: string = DEFAULT_MODEL
 ): Promise<LLMExtractResult> {
   // Mockable bypass for tests — no live API call
   if (mock !== undefined) {
     return mock;
   }
 
-  const response = await client.messages.create({
-    model: "claude-3-5-sonnet-latest",
+  const response = await getClient().messages.create({
+    model,
     max_tokens: 512,
     system: SYSTEM_PROMPT,
     messages: [
@@ -100,7 +159,7 @@ export async function extractFromPdfImage(
     throw new Error("LLM returned no text content");
   }
 
-  const rawText = textBlock.text.trim();
+  const rawText = stripJsonFence(textBlock.text);
 
   // Parse and validate JSON
   let parsed: unknown;

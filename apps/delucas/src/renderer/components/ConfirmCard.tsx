@@ -21,6 +21,8 @@ import type { LLMExtractResultBridge } from "../../bridge/BridgeInterface";
 interface ConfirmCardProps {
   extracted: LLMExtractResultBridge;
   filePath: string;
+  /** Category suggested from the vendor→category map; defaults to "other". */
+  suggestedCategory?: TransactionCategory;
   onConfirm: (tx: NewTransaction) => void;
   onReject: () => void;
 }
@@ -37,14 +39,14 @@ const CONFIDENCE_COLOR: Record<LLMExtractResultBridge["confidence"], string> = {
   low: "text-red-600 dark:text-red-400",
 };
 
-export function ConfirmCard({ extracted, filePath, onConfirm, onReject }: ConfirmCardProps): React.JSX.Element {
+export function ConfirmCard({ extracted, filePath, suggestedCategory = "other", onConfirm, onReject }: ConfirmCardProps): React.JSX.Element {
   const [vendor, setVendor] = useState(extracted.vendor ?? "");
   const [date, setDate] = useState(extracted.date ?? new Date().toISOString().slice(0, 10));
   const [amountDollars, setAmountDollars] = useState(
     extracted.amount !== null ? (extracted.amount / 100).toFixed(2) : ""
   );
   const [direction, setDirection] = useState<TransactionDirection>("expense");
-  const [category, setCategory] = useState<TransactionCategory>("other");
+  const [category, setCategory] = useState<TransactionCategory>(suggestedCategory);
   const [error, setError] = useState<string | null>(null);
 
   function handleConfirm(): void {
@@ -81,16 +83,32 @@ export function ConfirmCard({ extracted, filePath, onConfirm, onReject }: Confir
       {/* Header */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base font-semibold text-foreground">Review extracted invoice</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {extracted.is_invoice ? "Review extracted invoice" : "Review this document"}
+          </h2>
           {extracted.is_invoice && (
             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
               Invoice detected
             </span>
           )}
         </div>
-        <p className={["text-xs font-medium", CONFIDENCE_COLOR[extracted.confidence]].join(" ")}>
-          {CONFIDENCE_LABEL[extracted.confidence]}
-        </p>
+        {/* Confidence only means something once it IS an invoice. When the model
+            says it's not an invoice, showing "High confidence" is misleading —
+            surface a clear warning instead. */}
+        {extracted.is_invoice ? (
+          <p className={["text-xs font-medium", CONFIDENCE_COLOR[extracted.confidence]].join(" ")}>
+            {CONFIDENCE_LABEL[extracted.confidence]}
+          </p>
+        ) : (
+          <div className="mt-2 rounded-lg border border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950 px-3 py-2">
+            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+              This doesn&apos;t look like an invoice.
+            </p>
+            <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+              You can enter the details by hand and save it anyway, or discard it.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Editable fields */}

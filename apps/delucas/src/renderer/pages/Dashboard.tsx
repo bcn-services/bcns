@@ -19,6 +19,7 @@ import { ProfitBarChart } from "../components/ProfitBarChart";
 import { CategoryBars } from "../components/CategoryBars";
 import { IngestionStrip } from "../components/IngestionStrip";
 import { BannerList } from "../components/BannerList";
+import { CheckNowButton } from "../components/CheckNowButton";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useIngestionState } from "../hooks/useIngestionState";
 
@@ -41,13 +42,19 @@ function nextMonth(month: string): string {
   return `${y}-${nm.toString().padStart(2, "0")}`;
 }
 
-export function Dashboard(): React.JSX.Element {
+interface DashboardProps {
+  /** Switch to the Add & fix tab — used by the "needs review" notification. */
+  onGoToReview?: () => void;
+}
+
+export function Dashboard({ onGoToReview }: DashboardProps = {}): React.JSX.Element {
   const [currentMonth, setCurrentMonth] = useState(todayMonth);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
 
   const { pnl, series, transactions: _txs, summary, loading, refresh } = useDashboardData(currentMonth);
-  const { emailStatus } = useIngestionState();
+  const { emailStatus, reviewQueue, refresh: refreshIngestion } = useIngestionState();
+  const reviewCount = reviewQueue.length;
 
   useEffect(() => {
     window.bridge.backup.getStatus().then((s) => {
@@ -61,6 +68,30 @@ export function Dashboard(): React.JSX.Element {
 
   return (
     <div className="space-y-5">
+      {/* Check for new invoices (email poll + other sources) */}
+      <div className="flex justify-end">
+        <CheckNowButton onComplete={() => { refresh(); refreshIngestion(); }} />
+      </div>
+
+      {/* Needs-review notification — links to the review queue in Add & fix */}
+      {reviewCount > 0 && (
+        <button
+          type="button"
+          onClick={onGoToReview}
+          className="w-full flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-4 py-3 text-left hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors"
+        >
+          <span className="flex items-center gap-2.5 text-sm font-medium text-amber-800 dark:text-amber-200">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 9v3.75m0 3.75h.008M11.25 4.5l-8.4 14.55A1.5 1.5 0 004.15 21.3h15.7a1.5 1.5 0 001.3-2.25L12.75 4.5a1.5 1.5 0 00-1.5-.75 1.5 1.5 0 00-1.5.75z" />
+            </svg>
+            {reviewCount} invoice{reviewCount === 1 ? "" : "s"} need{reviewCount === 1 ? "s" : ""} your review
+          </span>
+          <span className="text-sm font-semibold text-amber-800 dark:text-amber-200 shrink-0">
+            Review now →
+          </span>
+        </button>
+      )}
+
       {/* Active failure banners (email + backup) */}
       <BannerList emailStatus={emailStatus} backupError={backupError} />
 

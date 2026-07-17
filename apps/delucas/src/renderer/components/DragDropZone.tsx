@@ -15,15 +15,30 @@
  */
 
 import React, { useState, useRef } from "react";
-import type { NewTransaction } from "../../shared/types";
+import type { NewTransaction, TransactionCategory } from "../../shared/types";
 import type { LLMExtractResultBridge, IngestionRunReportBridge } from "../../bridge/BridgeInterface";
+import { parseVendorMap, resolveCategory } from "../../shared/vendor-category";
 import { ConfirmCard } from "./ConfirmCard";
 
 type ZoneState =
   | { type: "idle" }
   | { type: "processing" }
-  | { type: "confirm"; extracted: LLMExtractResultBridge; filePath: string }
+  | { type: "confirm"; extracted: LLMExtractResultBridge; filePath: string; suggestedCategory: TransactionCategory }
   | { type: "error"; message: string };
+
+/**
+ * Suggest a category for the extracted vendor using the saved vendor→category
+ * map (the same map the email auto-import uses). Falls back to "other".
+ */
+async function suggestCategory(vendor: string | null): Promise<TransactionCategory> {
+  if (vendor === null || vendor.trim() === "") return "other";
+  try {
+    const raw = await window.bridge.settings.get("vendor_category_map");
+    return resolveCategory(vendor, parseVendorMap(typeof raw === "string" ? raw : null));
+  } catch {
+    return "other";
+  }
+}
 
 interface DragDropZoneProps {
   onImported: (report: IngestionRunReportBridge) => void;
@@ -38,7 +53,8 @@ export function DragDropZone({ onImported }: DragDropZoneProps): React.JSX.Eleme
     setState({ type: "processing" });
     try {
       const extracted = await window.bridge.ingestion.processPdf(filePath);
-      setState({ type: "confirm", extracted, filePath });
+      const suggestedCategory = await suggestCategory(extracted.vendor);
+      setState({ type: "confirm", extracted, filePath, suggestedCategory });
     } catch (err) {
       // LLM failure: show ConfirmCard with empty fields so user can fill manually
       console.warn("[DragDropZone] processPdf failed, falling back to manual confirm", err);
@@ -49,7 +65,7 @@ export function DragDropZone({ onImported }: DragDropZoneProps): React.JSX.Eleme
         amount: null,
         confidence: "low",
       };
-      setState({ type: "confirm", extracted: fallback, filePath });
+      setState({ type: "confirm", extracted: fallback, filePath, suggestedCategory: "other" });
     }
   }
 
@@ -107,6 +123,7 @@ export function DragDropZone({ onImported }: DragDropZoneProps): React.JSX.Eleme
       <ConfirmCard
         extracted={state.extracted}
         filePath={state.filePath}
+        suggestedCategory={state.suggestedCategory}
         onConfirm={handleConfirm}
         onReject={handleReject}
       />

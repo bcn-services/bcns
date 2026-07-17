@@ -178,7 +178,20 @@ function RuleForm({ initial, onSave, onCancel, saving, error, submitLabel }: Rul
   );
 }
 
-export function RentRuleEditor(): React.JSX.Element {
+/** Current calendar month as "YYYY-MM", using local date parts to match the
+ *  startup materializer in main.ts (which uses local getFullYear/getMonth). */
+function currentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
+}
+
+interface RentRuleEditorProps {
+  /** Called after a rule is added/updated/deleted so the parent can refresh the
+   *  dashboard (headline numbers, transaction list) to reflect materialized rent. */
+  onChanged?: () => void;
+}
+
+export function RentRuleEditor({ onChanged }: RentRuleEditorProps = {}): React.JSX.Element {
   const [rules, setRules] = useState<RecurringRule[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -230,7 +243,11 @@ export function RentRuleEditor(): React.JSX.Element {
       const result = await window.bridge.db.insertRecurringRule(parsed.rule);
       if (!result.ok) { setFormError(result.error ?? "Failed to add rule."); return; }
       setShowAddForm(false);
+      // Materialize the new rule through the current month so its transactions
+      // appear immediately, instead of only on the next app restart.
+      await window.bridge.db.materializeRecurring(currentMonth());
       await fetchRules();
+      onChanged?.();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to add rule.");
     } finally {
@@ -255,7 +272,10 @@ export function RentRuleEditor(): React.JSX.Element {
       });
       if (!result.ok) { setFormError(result.error ?? "Failed to update rule."); return; }
       setEditingId(null);
+      // Re-materialize so edits that newly qualify a month appear immediately.
+      await window.bridge.db.materializeRecurring(currentMonth());
       await fetchRules();
+      onChanged?.();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to update rule.");
     } finally {
@@ -269,6 +289,7 @@ export function RentRuleEditor(): React.JSX.Element {
       await window.bridge.db.deleteRecurringRule(id);
       setDeletingId(null);
       await fetchRules();
+      onChanged?.();
     } catch (err) {
       console.error("[RentRuleEditor] delete failed", err);
     } finally {
