@@ -45,6 +45,28 @@ export async function pdfFirstPageToBase64(filePath: string): Promise<string> {
   return renderPdfUint8Array(uint8Array);
 }
 
+/**
+ * Filesystem-backed pdfjs standard-font factory.
+ *
+ * pdfjs chooses a browser (network fetch) font factory whenever it doesn't
+ * detect a Node environment — which is the case in the Electron main process
+ * (`process.type === "browser"`). That factory can't read a filesystem path, so
+ * `standardFontDataUrl` fails with "Unable to load font data". This factory
+ * reads the font files straight off disk, independent of pdfjs's environment
+ * detection. Matches the `{ baseUrl }` constructor + `fetch({ filename })`
+ * contract of pdfjs's BaseStandardFontDataFactory.
+ */
+class FsStandardFontDataFactory {
+  private readonly baseUrl: string;
+  constructor({ baseUrl }: { baseUrl: string }) {
+    this.baseUrl = baseUrl;
+  }
+  async fetch({ filename }: { filename: string }): Promise<Uint8Array> {
+    const data = await fs.promises.readFile(path.join(this.baseUrl, filename));
+    return new Uint8Array(data);
+  }
+}
+
 async function renderPdfUint8Array(uint8Array: Uint8Array): Promise<string> {
 
   // Use @napi-rs/canvas for headless rendering (ships ARM64 Darwin prebuilt
@@ -87,7 +109,9 @@ async function renderPdfUint8Array(uint8Array: Uint8Array): Promise<string> {
 
   const loadingTask = pdfjsLib.getDocument({
     data: uint8Array,
-    ...(standardFontDataUrl !== undefined ? { standardFontDataUrl } : {}),
+    ...(standardFontDataUrl !== undefined
+      ? { standardFontDataUrl, StandardFontDataFactory: FsStandardFontDataFactory }
+      : {}),
   });
   const pdfDocument = await loadingTask.promise;
 
