@@ -100,6 +100,19 @@ Rules:
 - Respond with ONLY the JSON object, no explanation or markdown`;
 
 /**
+ * Strip a Markdown code fence from an LLM response if present. Some models wrap
+ * JSON in ```json ... ``` despite being told to return raw JSON. Returns the
+ * trimmed input unchanged when no fence is found.
+ *
+ * Exported for unit testing.
+ */
+export function stripJsonFence(text: string): string {
+  const trimmed = text.trim();
+  const m = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/i);
+  return m && m[1] !== undefined ? m[1].trim() : trimmed;
+}
+
+/**
  * Extract invoice data from a base64-encoded image of a PDF page.
  *
  * @param base64Image - Base64-encoded PNG/JPEG image data
@@ -146,7 +159,7 @@ export async function extractFromPdfImage(
     throw new Error("LLM returned no text content");
   }
 
-  const rawText = textBlock.text.trim();
+  const rawText = stripJsonFence(textBlock.text);
 
   // Parse and validate JSON
   let parsed: unknown;

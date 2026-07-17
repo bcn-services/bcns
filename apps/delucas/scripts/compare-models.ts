@@ -15,7 +15,7 @@
 import * as fs from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { pdfBufferToBase64 } from "../src/shell-electron/ingestion/pdf";
-import { SYSTEM_PROMPT, validateLLMResult } from "../src/shell-electron/ingestion/llm";
+import { SYSTEM_PROMPT, validateLLMResult, stripJsonFence } from "../src/shell-electron/ingestion/llm";
 
 // Models to compare. Add/remove freely.
 const MODELS = ["claude-haiku-4-5", "claude-sonnet-4-6"] as const;
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
       let parsedOk = false;
       let parsedNote = "";
       try {
-        validateLLMResult(JSON.parse(raw));
+        validateLLMResult(JSON.parse(stripJsonFence(raw)));
         parsedOk = true;
       } catch (e) {
         parsedNote = e instanceof Error ? e.message : String(e);
