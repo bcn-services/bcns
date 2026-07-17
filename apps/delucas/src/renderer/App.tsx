@@ -64,7 +64,7 @@ export default function App(): React.JSX.Element {
       {/* Tab content */}
       <main className="px-6 py-6 max-w-4xl mx-auto" role="tabpanel">
         {tab === "dashboard" ? (
-          <Dashboard />
+          <Dashboard onGoToReview={() => setTab("addfix")} />
         ) : tab === "addfix" ? (
           <AddFix />
         ) : (
