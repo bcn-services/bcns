@@ -7,7 +7,23 @@
 
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "path";
+import { createRequire } from "node:module";
 import Database from "better-sqlite3";
+
+// ---------------------------------------------------------------------------
+// pdfjs (used for invoice rendering) calls process.getBuiltinModule("fs"|
+// "module"|"url") in its Node helpers. That API arrived in Node 22.3, but
+// Electron's bundled Node is older, so the call throws and PDF rendering fails
+// for any file that routes through pdfjs's Node file access (fonts, CMaps).
+// Polyfill it once, before anything imports pdfjs, using a real require.
+// ---------------------------------------------------------------------------
+{
+  const proc = process as NodeJS.Process & { getBuiltinModule?: (id: string) => unknown };
+  if (typeof proc.getBuiltinModule !== "function") {
+    const req = createRequire(__filename);
+    proc.getBuiltinModule = (id: string): unknown => req(id);
+  }
+}
 import { runMigrations } from "./db/migrations";
 import {
   getTransactions,
