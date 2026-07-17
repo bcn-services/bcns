@@ -19,6 +19,7 @@ import { ProfitBarChart } from "../components/ProfitBarChart";
 import { CategoryBars } from "../components/CategoryBars";
 import { IngestionStrip } from "../components/IngestionStrip";
 import { BannerList } from "../components/BannerList";
+import { CheckNowButton } from "../components/CheckNowButton";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useIngestionState } from "../hooks/useIngestionState";
 
@@ -47,7 +48,7 @@ export function Dashboard(): React.JSX.Element {
   const [lastBackup, setLastBackup] = useState<string | null>(null);
 
   const { pnl, series, transactions: _txs, summary, loading, refresh } = useDashboardData(currentMonth);
-  const { emailStatus } = useIngestionState();
+  const { emailStatus, refresh: refreshIngestion } = useIngestionState();
 
   useEffect(() => {
     window.bridge.backup.getStatus().then((s) => {
@@ -61,6 +62,11 @@ export function Dashboard(): React.JSX.Element {
 
   return (
     <div className="space-y-5">
+      {/* Check for new invoices (email poll + other sources) */}
+      <div className="flex justify-end">
+        <CheckNowButton onComplete={() => { refresh(); refreshIngestion(); }} />
+      </div>
+
       {/* Active failure banners (email + backup) */}
       <BannerList emailStatus={emailStatus} backupError={backupError} />
 
