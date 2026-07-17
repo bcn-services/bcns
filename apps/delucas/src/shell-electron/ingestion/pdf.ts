@@ -64,14 +64,25 @@ async function renderPdfUint8Array(uint8Array: Uint8Array): Promise<string> {
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
   // Non-embedded standard-14 fonts (e.g. Helvetica) need pdfjs's bundled font
-  // data. Best-effort: resolve the dir from the installed package; if that
-  // fails, PDFs with embedded fonts (most real invoices) still render.
+  // data. Resolve the dir from the installed package. Use createRequire against
+  // this file rather than the bare `require` — in the bundled Electron main the
+  // bundler replaces `require`, so `require.resolve` misresolves and the fonts
+  // silently fail to load (every glyph renders blank). If resolution or the
+  // directory is missing, PDFs with embedded fonts (most real invoices) still
+  // render, so this is best-effort.
   let standardFontDataUrl: string | undefined;
   try {
-    standardFontDataUrl =
-      path.join(path.dirname(require.resolve("pdfjs-dist/package.json")), "standard_fonts") + path.sep;
-  } catch {
-    standardFontDataUrl = undefined;
+    const { createRequire } = await import("node:module");
+    const req = createRequire(__filename);
+    const fontsDir =
+      path.join(path.dirname(req.resolve("pdfjs-dist/package.json")), "standard_fonts") + path.sep;
+    if (fs.existsSync(fontsDir)) {
+      standardFontDataUrl = fontsDir;
+    } else {
+      console.warn(`[pdf] standard_fonts dir not found at ${fontsDir}; non-embedded fonts may not render`);
+    }
+  } catch (err) {
+    console.warn("[pdf] could not resolve pdfjs standard_fonts dir", err);
   }
 
   const loadingTask = pdfjsLib.getDocument({
