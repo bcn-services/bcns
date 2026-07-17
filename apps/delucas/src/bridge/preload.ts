@@ -33,7 +33,9 @@ const bridge: BridgeAPI = {
     getTransactionsByMonth: (month: string): Promise<import("../shared/types").Transaction[]> =>
       ipcRenderer.invoke("db:getTransactionsByMonth", month),
 
-    insertTransaction: (tx: NewTransaction): Promise<number> =>
+    insertTransaction: (
+      tx: NewTransaction
+    ): Promise<{ ok: true; id: number } | { ok: false; error: string }> =>
       ipcRenderer.invoke("db:insertTransaction", tx),
 
     getTransactionsForMonth: (month: string): Promise<import("../shared/types").Transaction[]> =>

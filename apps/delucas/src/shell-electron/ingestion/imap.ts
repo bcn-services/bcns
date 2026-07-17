@@ -80,7 +80,7 @@ export type ImapFlowFactory = (config: ImapConfig) => ImapFlowLike;
 export function defaultImapFactory(config: ImapConfig): ImapFlowLike {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ImapFlow } = require("imapflow") as { ImapFlow: new (opts: unknown) => ImapFlowLike };
-  return new ImapFlow({
+  const client = new ImapFlow({
     host: config.host,
     port: config.port,
     secure: config.secure,
@@ -92,6 +92,24 @@ export function defaultImapFactory(config: ImapConfig): ImapFlowLike {
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
   });
+
+  // imapflow is an EventEmitter. A socket-level error (timeout, reset, Gmail
+  // dropping an idle connection) is emitted as an 'error' event; with no
+  // listener, Node re-throws it as an *uncaught exception* that can crash the
+  // Electron main process — even after the fetch already succeeded. The fetch
+  // flow surfaces real failures via try/catch + email status, so log and
+  // swallow client errors here instead of letting them bubble up.
+  const emitter = client as unknown as {
+    on?: (event: string, cb: (err: unknown) => void) => void;
+  };
+  emitter.on?.("error", (err) => {
+    console.error(
+      "[imap] client error (non-fatal):",
+      err instanceof Error ? err.message : String(err)
+    );
+  });
+
+  return client;
 }
 
 // ---------------------------------------------------------------------------

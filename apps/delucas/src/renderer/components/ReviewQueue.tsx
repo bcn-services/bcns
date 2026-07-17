@@ -12,8 +12,15 @@ import type { ReviewItemBridge } from "../../bridge/BridgeInterface";
 import type { NewTransaction } from "../../shared/types";
 import { ConfirmCard } from "./ConfirmCard";
 
-export function ReviewQueue(): React.JSX.Element | null {
+interface ReviewQueueProps {
+  /** Called after a review item is approved+saved so the parent can refresh the
+   *  dashboard/transaction list to show the new transaction. */
+  onSaved?: () => void;
+}
+
+export function ReviewQueue({ onSaved }: ReviewQueueProps = {}): React.JSX.Element | null {
   const [items, setItems] = useState<ReviewItemBridge[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchQueue = useCallback(async (): Promise<void> => {
     try {
@@ -34,23 +41,34 @@ export function ReviewQueue(): React.JSX.Element | null {
   if (items.length === 0) return null;
 
   async function handleConfirm(item: ReviewItemBridge, tx: NewTransaction): Promise<void> {
+    setError(null);
+    // Import the approved transaction. Only clear the review item if the insert
+    // actually succeeded — otherwise the item would vanish with nothing saved.
+    let result: { ok: true; id: number } | { ok: false; error: string };
     try {
-      // Import the approved transaction
-      const txWithEmail: NewTransaction = {
+      result = await window.bridge.db.insertTransaction({
         ...tx,
         source: "email",
         source_ref: item.message_id,
-      };
-      await window.bridge.db.insertTransaction(txWithEmail);
+      });
     } catch (err) {
       console.error("[ReviewQueue] failed to insert transaction", err);
+      setError("Could not save this transaction. Please try again.");
+      return;
     }
+    if (!result.ok) {
+      console.error("[ReviewQueue] insert rejected:", result.error);
+      setError(result.error);
+      return;
+    }
+
     try {
       await window.bridge.ingestion.clearReviewItem(item.id);
     } catch (err) {
       console.error("[ReviewQueue] failed to clear review item", err);
     }
     await fetchQueue();
+    onSaved?.();
   }
 
   async function handleReject(item: ReviewItemBridge): Promise<void> {
@@ -67,6 +85,9 @@ export function ReviewQueue(): React.JSX.Element | null {
       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
         Needs review ({items.length})
       </h2>
+      {error !== null && (
+        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
       {items.map((item) => (
         <ConfirmCard
           key={item.id}
