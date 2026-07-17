@@ -18,10 +18,10 @@ import Database from "better-sqlite3";
 // Polyfill it once, before anything imports pdfjs, using a real require.
 // ---------------------------------------------------------------------------
 {
-  const proc = process as NodeJS.Process & { getBuiltinModule?: (id: string) => unknown };
+  const proc = process as unknown as { getBuiltinModule?: (id: string) => object | undefined };
   if (typeof proc.getBuiltinModule !== "function") {
     const req = createRequire(__filename);
-    proc.getBuiltinModule = (id: string): unknown => req(id);
+    proc.getBuiltinModule = (id: string): object | undefined => req(id) as object | undefined;
   }
 }
 import { runMigrations } from "./db/migrations";
