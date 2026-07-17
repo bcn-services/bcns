@@ -21,6 +21,8 @@ import type { LLMExtractResultBridge } from "../../bridge/BridgeInterface";
 interface ConfirmCardProps {
   extracted: LLMExtractResultBridge;
   filePath: string;
+  /** Category suggested from the vendor→category map; defaults to "other". */
+  suggestedCategory?: TransactionCategory;
   onConfirm: (tx: NewTransaction) => void;
   onReject: () => void;
 }
@@ -37,14 +39,14 @@ const CONFIDENCE_COLOR: Record<LLMExtractResultBridge["confidence"], string> = {
   low: "text-red-600 dark:text-red-400",
 };
 
-export function ConfirmCard({ extracted, filePath, onConfirm, onReject }: ConfirmCardProps): React.JSX.Element {
+export function ConfirmCard({ extracted, filePath, suggestedCategory = "other", onConfirm, onReject }: ConfirmCardProps): React.JSX.Element {
   const [vendor, setVendor] = useState(extracted.vendor ?? "");
   const [date, setDate] = useState(extracted.date ?? new Date().toISOString().slice(0, 10));
   const [amountDollars, setAmountDollars] = useState(
     extracted.amount !== null ? (extracted.amount / 100).toFixed(2) : ""
   );
   const [direction, setDirection] = useState<TransactionDirection>("expense");
-  const [category, setCategory] = useState<TransactionCategory>("other");
+  const [category, setCategory] = useState<TransactionCategory>(suggestedCategory);
   const [error, setError] = useState<string | null>(null);
 
   function handleConfirm(): void {
