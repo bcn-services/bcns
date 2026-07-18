@@ -9,10 +9,10 @@
 ---
 
 ## Current position
-- **Status:** Combined overnight branch. B1–B4 done. V1–V5 done (first pass). C1 DONE. P1–P6 ALL DONE. Reached STOP HERE marker. bcns visual-pass (second pass) DONE on branch `visual-pass/bcns-nate-personal`. DeLuca's visual pass DONE on branch `visual/delucas-pizza-warmth`.
-- **Next:** Nate reviews + merges `visual-pass/bcns-nate-personal` → overnight-combined. Then reviews + merges `visual/delucas-pizza-warmth` → overnight-combined. Then Section 3–4 Needs-Nate items.
-- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy; DeLuca's: Nate installs + configures on client laptop (Section 4).
-- **Last updated:** 2026-07-15 (P6 settings/backup/first-run done — d0c88c3; STOP HERE reached)
+- **Status:** P1–P6 done, e2e validated, visual passes done. Ready to run Section 2 (revenue toggle on drag-drop confirm card) via dev-team-auto.
+- **Next:** Run dev-team-auto on `apps/delucas/` — it will skip P1–P6 (done), execute Section 2, and stop at the marker.
+- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy; DeLuca's: client laptop OS, Slice login (to check for @slicelife.com emails → unlock SliceEmailSource), labor-app name.
+- **Last updated:** 2026-07-17 (Section 2 added to PLAN.md; ready for dev-team-auto)
 
 ---
 
@@ -57,6 +57,11 @@
 | P4 — Email (IMAP) ingestion source | ✅ done [full] — imapflow (CJS, DI-mockable), 50-msg batch cap, 20MB attachment cap, vendor→category mapping, review queue (in-memory), startup-after-window, NaN port guard; a617a07 |
 | P5 — Dashboard (the product) | ✅ done [full] — two-tab dashboard (headline/chart/categories/strip/banners + add&fix tab), TransactionList edit/delete, MonthNav, RentRuleEditor, custom SVG chart; updateRecurringRule hardened; ed05659 |
 | P6 — Settings, backup, first-run | ✅ done [full] — Settings screen (IMAP/Anthropic/backup/vendor map), backup module (daily trigger, quit trigger, 30-file rotation, safe rotation order), EmptyState first-run, electron-builder (Mac DMG + Win NSIS unsigned, asarUnpack .node); d0c88c3 |
+| E2E validation checkpoint | ✅ done — pipeline validated against real credentials (Gmail IMAP + Anthropic key); ~15 bugs found and fixed on branch `delucas-e2e`; model updated to `claude-haiku-4-5`; PDF render fixed 4 ways (pdfjs legacy build, Path2D/DOMMatrix globals, filesystem font factory, process.getBuiltinModule polyfill); Settings Anthropic key now passed to SDK; 133 tests passing |
+| S1 — Revenue toggle on drag-drop confirm card | ⬜ not started |
+| Packaging (Section 3) | ⬜ not started — needs `electron-builder install-app-deps`, asar/pdfjs font path verification in packaged build |
+| Slice integration research | ✅ done — Slice API is a fintech partner API (not a merchant sales API); no confirmed automated email summaries; integration plan written in PLAN.md §3b; path determined at handoff |
+| Handoff (Section 5) | ⬜ not started — blocked on client laptop OS, Slice login, labor-app name |
 
 Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 
@@ -72,6 +77,43 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-17** — ✅ **E2E validation complete; Slice integration researched; PLAN.md updated.**
+
+  **E2E validation (branch `delucas-e2e`, ~15 commits).** The full ingestion pipeline was validated
+  end-to-end against real credentials for the first time. Gmail IMAP connected, PDFs extracted, LLM
+  parsed invoices, review queue staged low-confidence items, vendor→category mapping applied, backup
+  triggered on quit, and a "needs review" notification appeared on the Dashboard. All bugs found had
+  been masked by the 133 mock-only tests. Major fixes:
+
+  - **Model string** (`claude-3-5-sonnet-latest` → `claude-haiku-4-5`): prior string pointed to a
+    retired model line (Claude 3.5 Sonnet retired 2025-10-28), returning 404.
+  - **Anthropic key not passed to SDK**: Settings key was never forwarded to the `Anthropic` client
+    constructor — all real API calls silently fell through to a missing env var.
+  - **PDF rendering broken in Electron in 4 ways**: (1) pdfjs needed its legacy build (not the ESM
+    build); (2) `Path2D` and `DOMMatrix` globals required `@napi-rs/canvas`; (3) a custom
+    `FilesystemStandardFontDataFactory` needed to bypass asar-packaged font loading; (4) a
+    `process.getBuiltinModule` polyfill was required for pdfjs's Node compatibility shim.
+  - Additional fixes: Markdown code fence stripping before JSON parse, recurring rule appearing
+    without restart, non-invoice flagging in confirm card, orphaned CheckNowButton, IMAP socket
+    errors made non-fatal, review-queue save now refreshes the dashboard.
+
+  **Highest packaging risk (unverified):** The pdfjs `standard_fonts` directory is resolved via
+  `createRequire` from the pdfjs-dist package path. Inside a packaged/asar build, this path may
+  point inside the archive where `FilesystemStandardFontDataFactory` cannot read it. This MUST be
+  verified before handoff by installing from the DMG artifact and testing PDF drag-drop with a
+  font-embedded document. Full packaging plan in PLAN.md §3 (Section 3 — Packaging).
+
+  **Slice research findings.** Slice's public API (`get-slice.com/docs/api-overview`) is a fintech
+  partner API — seven endpoints for quote/payment/settlement workflows. It is not a merchant sales
+  data API; individual pizzeria owners cannot call it to get their revenue. No confirmed automated
+  email summaries from Slice to owners; reporting lives in the Owner's App only. Three integration
+  paths documented in PLAN.md §3b: email pipeline (check client inbox at handoff), PDF statement
+  drag-drop override, or continued manual entry. Labor integration remains blocked pending the
+  client's software name (PLAN.md §3c).
+
+  **PLAN.md additions:** Section 3 (Packaging), Section 3b (Slice integration), Section 3c (labor
+  integration stub), Section 4 (RC checklist, replaces old §3), Section 5 (Handoff, replaces old §4).
 
 - **2026-07-15** — ✅ **DeLuca's pizza app visual pass done** on branch `visual/delucas-pizza-warmth`. 6 commits. Pizza-shop warmth brand applied across all renderer files (presentation only — no logic, schema, or IPC touched). Full change log:
 

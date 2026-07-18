@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@bcns/config/tsconfig/react-library.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/renderer/*"]
+    },
+    "composite": true,
+    "tsBuildInfoFile": ".tsbuildinfo/renderer"
+  },
+  "include": ["src/renderer/**/*", "src/bridge/BridgeInterface.ts", "src/bridge/mockBridge.ts"],
+  "exclude": ["node_modules", "dist"]
+}
