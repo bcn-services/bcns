@@ -275,7 +275,7 @@ export const siteContent: SiteContent = {
       {
         title: "Your data",
         description:
-          "We host and maintain the app for you. Your data is always yours, and you can export it any time.",
+          "We host and maintain the app for you. Your data is always yours, and we'll export it and hand it over whenever you ask.",
       },
     ],
   },
@@ -350,7 +350,7 @@ export const siteContent: SiteContent = {
         features: [
           "Audit of where AI fits your operation",
           "Hands-on setup, not a slide deck",
-          "Plain-English handoff notes",
+          "Plain-English project notes",
         ],
       },
     ],

@@ -17,3 +17,24 @@ none.
 
 ## Deferred
 - content.ts:317,332 duplicate `price` on build tiers — reviewer marked acceptable (kept for type/b3 stability); left unchanged per instructions.
+
+---
+# Fix Report — W2 hosted framing
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 2 of 2 (1 review Important + 1 review Minor)
+
+## Changes Made
+- apps/web/lib/content.ts:278 — reworded contact copy from present-tense self-serve "you can export it any time" to service/intent "we'll export it and hand it over whenever you ask" (no unbuilt-feature guarantee; still satisfies W2 #4 data-ownership+export) — review Important.
+- apps/web/lib/content.ts:353 — renamed "Plain-English handoff notes" to "Plain-English project notes" to avoid drift from site-wide hosting reframe — review Minor.
+
+## Verification
+- corepack pnpm lint + typecheck + build all green.
+- Suite: a4/b1/b3/b4 + all w1 + all w2 pass; exactly the 4 pre-existing files fail (a2-fix, a2-new, b2, content-registry) — no new failures.
+- Python: content.ts has 0 em-dashes; "Use it forever, free" and "whether we work together or not" absent. W2 test #4 unchanged — reworded copy retains "your data" + "export" tokens the `/export/` assertion matches.
+
+## Disputed
+none.
+
+## Deferred
+none.

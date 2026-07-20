@@ -1,27 +1,29 @@
 # Review Report
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
-**Files Reviewed:** 3 (content.ts, pricing.tsx, w1-pricing.test.mjs)
-**Standards Applied:** efficiency, reliability, correctness-of-intent, voice/guardrails, consistency
+**Files Reviewed:** 2 (apps/web/lib/content.ts, apps/web/__tests__/w2-hosted-framing.test.mjs)
+**Standards Applied:** completeness of reframe, truthfulness, voice/guardrails, W1 consistency, test quality
 
-## No Critical or Important findings
-
-Money-strings are correct and consistent across all four sites — pricing tiers
-(content.ts:317-335), FAQ answer (367), and pageMeta.pricing description (465):
-$1,000/$149, $3,000/$349, 15 users then $20/user, consulting $800/day. No old
-$2,000/$5,000/$15,000 ranges remain. Voice clean: em-dash=0, en-dash=0, no
-SaaS/"we help"/buzzwords. 7/7 W1 tests pass; 4 gate tests (a4,b1,b3,b4) stay green.
+## Summary
+The reframe is complete and internally consistent: every registry claim that previously implied the client owns the code, keeps the software after non-payment, or receives a one-time handoff has been corrected to the managed-hosting model, and no contradicting survivor remains. One Important truthfulness issue: the new contact copy promises data export as a present-tense guarantee, but no export capability exists (static marketing site, no app/backend). No Critical findings.
 
 ## Findings
 
-### Minor
-- Minor — pricing.tsx:27 — render branch keys on magic `index === 2` not field presence; a reordered/added non-consulting tier lacking `setup/monthly/seats` would silently render three blank `<p>` (undefined→nothing) — branch on `isConsulting = !!tier.price && !tier.setup` or a `tier.isConsulting` flag so render follows data shape, not array position.
-- Minor — w1-pricing.test.mjs:8-73 — tests assert the registry (single source of truth) but never assert pricing.tsx renders setup/monthly/seats; a regression deleting those `<p>` in the component keeps all 7 green (QA's built-HTML check caught it but isn't committed) — add one render/snapshot or built-HTML assertion so component drift is gated, not just registry drift.
-- Minor — content.ts:317,332 — build tiers keep a now-unused `price` ("$1,000 setup") that the page never renders for builds (only setup/monthly/seats shown); harmless but a stale second source of the setup figure that can drift from `setup` — acceptable per engineer's rationale (keeps `price` required for b3/type stability); note only, no fix needed unless W4 consolidates.
+### Important
+- Important — apps/web/lib/content.ts:278 — truthfulness/over-claim — "you can export it any time" is a present-tense guarantee of an unbuilt capability (no "export" feature anywhere in repo; grep confirms this is the only export mention) — reword as intent/service, e.g. "your data is always yours to take with you" or "we'll export it for you whenever you ask", promising ownership without asserting a self-serve feature that isn't built.
 
-## CONTENT.md drift (noted, not fixed)
-CONTENT.md mirror of new `setup/monthly/seats` field docs is deferred to W4 per
-plan; b4-content-md gate still passes (substring match, no new field asserted).
+### Minor
+- Minor — apps/web/lib/content.ts:353 — term consistency — "Plain-English handoff notes" survives the "handoff" sweep; truthful here (AI consulting delivers notes, not running software) but "handoff" now conflicts with the site-wide "we host/run/maintain" reframe — optional: rename to "Plain-English setup notes"; leave if term drift is acceptable.
+
+## Non-findings (checked, cleared)
+- "one-time setup" (L318/L333/L367) — consistent with W1 setup-fee-plus-monthly recurring model, not a one-time-handoff claim.
+- "Brandon owns scoping" (L405) — owns a responsibility, not the code; truthful.
+- "your business runs" (L210/L269/L337) — describes the client's operation, not software running unpaid.
+- howItWorks[2] "Build & launch" (L222), hero.proofPoints[1] (L196), highlights[2] "Your data" (L277), founder bio "after launch" (L396) — all correctly hosted-framed.
+- Voice: no em-dash, no "SaaS", no "we help", no buzzwords in changed copy; sentences short/plain.
+
+## Test quality
+Solid, not hollow: asserts registry values (hero.proofPoints, contactSection.highlights, howItWorks.items[2]) AND source-string absences (removed phrases, em-dash, SaaS, "we help"). Gap: test #4 accepts the L278 export promise as-is, so it will not catch the over-claim above — if L278 is reworded to drop literal "export", update the test's `/export/` regex in lockstep.
 
 ## STANDARDS.md Updates
-none — no project-specific efficiency/reliability pattern beyond existing conventions.
+none (voice conventions already in baseline.md; no new project-specific efficiency/reliability pattern observed).
