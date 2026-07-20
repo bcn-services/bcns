@@ -27,8 +27,9 @@ export function Pricing() {
             // Branch on data shape, not array position: build tiers carry
             // setup/monthly/seats; the consulting tier carries a single price.
             const isConsulting = !setup;
+            const isAdvanced = !isConsulting && index === 1;
             return (
-              <Card key={index} className={`h-full${isConsulting ? " border-t-2 border-t-primary border-primary/30 bg-secondary/60" : ""}`}>
+              <Card key={index} className={`h-full${isConsulting ? " border-t-2 border-t-primary border-primary/30 bg-secondary/60" : isAdvanced ? " border-t-2 border-t-primary/70 bg-secondary/30" : ""}`}>
                 <CardHeader>
                   {isConsulting && (
                     <div className="mb-3 flex items-center gap-2">
