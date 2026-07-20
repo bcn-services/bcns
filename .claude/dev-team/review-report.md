@@ -1,29 +1,22 @@
 # Review Report
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
-**Files Reviewed:** 2 (apps/web/lib/content.ts, apps/web/__tests__/w2-hosted-framing.test.mjs)
-**Standards Applied:** completeness of reframe, truthfulness, voice/guardrails, W1 consistency, test quality
+**Files Reviewed:** 9 (5 src + package.json/tsconfig/eslint + 4 test files; item A1, commits 3be5edc + b951975)
+**Standards Applied:** efficiency, scalability, reliability, security
 
 ## Summary
-The reframe is complete and internally consistent: every registry claim that previously implied the client owns the code, keeps the software after non-payment, or receives a one-time handoff has been corrected to the managed-hosting model, and no contradicting survivor remains. One Important truthfulness issue: the new contact copy promises data export as a present-tense guarantee, but no export capability exists (static marketing site, no app/backend). No Critical findings.
+The implementation is fundamentally sound: money is integer cents end-to-end with no float leak, the SDK is pinned at 0.39.0, DEFAULT_MODEL is exactly `claude-haiku-4-5`, the BYOK factory never reads `process.env` and never logs/leaks the key (only the trimmed key is forwarded to the injected ctor), and the DI seam makes a real SDK call impossible in tests. All 44 tests pass; lint/typecheck/web-build are green. Two real robustness gaps remain for shared money-critical code: `PRICING` is only *compile-time* readonly, so a consumer can mutate the nested tier objects at runtime and poison the shared module; and `formatUsd` silently rounds non-round cents, which is safe for today's whole-dollar prices but a latent surprise once billing renders overage/proration totals.
 
 ## Findings
 
 ### Important
-- Important — apps/web/lib/content.ts:278 — truthfulness/over-claim — "you can export it any time" is a present-tense guarantee of an unbuilt capability (no "export" feature anywhere in repo; grep confirms this is the only export mention) — reword as intent/service, e.g. "your data is always yours to take with you" or "we'll export it for you whenever you ask", promising ownership without asserting a self-serve feature that isn't built.
+- Important — packages/app-core/src/pricing.ts:23-26 — Safety & Security / Safe Defaults — `PRICING` is typed `Readonly<Record<Tier, TierPricing>>` but the nested `TierPricing` objects are neither `Readonly` nor frozen and `TierPricing` fields are mutable `number`; any consumer can do `PRICING.standard.monthlyCents = 1` and poison the shared single-source-of-truth at runtime (classic shared-constant mutation) — deep-freeze the map + each tier (`Object.freeze`) and make `TierPricing` fields `readonly`.
 
 ### Minor
-- Minor — apps/web/lib/content.ts:353 — term consistency — "Plain-English handoff notes" survives the "handoff" sweep; truthful here (AI consulting delivers notes, not running software) but "handoff" now conflicts with the site-wide "we host/run/maintain" reframe — optional: rename to "Plain-English setup notes"; leave if term drift is acceptable.
-
-## Non-findings (checked, cleared)
-- "one-time setup" (L318/L333/L367) — consistent with W1 setup-fee-plus-monthly recurring model, not a one-time-handoff claim.
-- "Brandon owns scoping" (L405) — owns a responsibility, not the code; truthful.
-- "your business runs" (L210/L269/L337) — describes the client's operation, not software running unpaid.
-- howItWorks[2] "Build & launch" (L222), hero.proofPoints[1] (L196), highlights[2] "Your data" (L277), founder bio "after launch" (L396) — all correctly hosted-framed.
-- Voice: no em-dash, no "SaaS", no "we help", no buzzwords in changed copy; sentences short/plain.
-
-## Test quality
-Solid, not hollow: asserts registry values (hero.proofPoints, contactSection.highlights, howItWorks.items[2]) AND source-string absences (removed phrases, em-dash, SaaS, "we help"). Gap: test #4 accepts the L278 export promise as-is, so it will not catch the over-claim above — if L278 is reworded to drop literal "export", update the test's `/export/` regex in lockstep.
+- Minor — packages/app-core/src/pricing.ts:33-36 — Reliability / Explicit Over Implicit — `formatUsd` does `Math.round(cents/100)`, so non-round cents render misleadingly (`149_99` → `$150`, `149_49` → `$149`), silently hiding cents; safe now (all prices whole-dollar) but a lurking bug once billing formats overage/tax/proration — assert whole-dollar input, or use `Intl.NumberFormat("en-US",{style:"currency",currency:"USD"})` and show cents when present.
+- Minor — packages/app-core/src/pricing.ts:33 — Reliability / Fail Fast — `formatUsd` has no `NaN`/`Infinity`/negative guard (unlike `monthlyCharge`'s seat guard): `formatUsd(NaN)` → `"$NaN"`, `formatUsd(-149_00)` → `"$-149"` — add a `Number.isFinite` guard for parity and decide negative-cents rendering explicitly.
 
 ## STANDARDS.md Updates
-none (voice conventions already in baseline.md; no new project-specific efficiency/reliability pattern observed).
+- **Money as integer cents**: all billing values are integer cents; rates/thresholds live once in `packages/app-core/src/pricing.ts`; functions read the exported constants (no duplicated magic numbers).
+- **Shared constants must be runtime-immutable**: exported shared config/pricing objects must be deep-frozen (or `as const` with `readonly` fields), not merely `Readonly<>`-typed, since consumers compile the raw `.ts` and TS readonly is erased at runtime.
+- **BYOK / no-env boundary**: external-client factories take a DI ctor seam (`deps.ClientCtor`), never read `process.env`, never log the key, and throw a typed error (`MissingApiKeyError`) on missing/empty/whitespace key.

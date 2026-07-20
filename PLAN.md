@@ -137,7 +137,7 @@
 > Scope to what is verifiable headlessly: pure/mockable logic and a buildable
 > scaffold. Real Clerk/Stripe/Neon/Coolify wiring (needs live keys) is Needs-Nate.
 
-### A1 — Create the `@bcns/app-core` package: billing math, subscription state, BYOK-AI · `status: not started` · `track: full` · `flag: money`
+### A1 — Create the `@bcns/app-core` package: billing math, subscription state, BYOK-AI · `status: done` · `track: full` · `flag: money`
 
 - **task:** Add a new shared workspace package `packages/app-core/` (`@bcns/app-core`),
   extending `@bcns/config` like the other packages, exporting three fully-unit-tested
