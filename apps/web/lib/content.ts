@@ -308,9 +308,9 @@ export const siteContent: SiteContent = {
 
   pricing: {
     eyebrow: "Pricing",
-    title: "Two build sizes, one day rate. Quoted before we start.",
+    title: "Two build sizes. A setup fee, then monthly to run it.",
     description:
-      "Every project gets a fixed quote up front. The tiers show typical scope. Your quote depends on the consult.",
+      "Each build has a one-time setup fee and a flat monthly fee that covers hosting and support. You get the exact numbers in a fixed quote after the free consult.",
     tiers: [
       {
         name: "Standard build",
