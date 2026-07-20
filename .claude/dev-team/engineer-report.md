@@ -1,31 +1,30 @@
 # Engineer Report
-**Task:** A2 — Scaffold `templates/hosted-web/` hosted-app starter wired to `@bcns/app-core`.
+**Task:** PLAN.md A3 — Architecture decision record for the hosted-web business & delivery model
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
-**Commit:** c348e04
 
 ## Design Decisions
-- New package `@bcns/hosted-web-template` (`private:true`) at `templates/hosted-web/`, Next.js App Router + TS strict.
-- Added `templates/*` to `pnpm-workspace.yaml` so `workspace:*` deps (`@bcns/ui`, `@bcns/config`, `@bcns/app-core`) resolve and `pnpm --filter` works. Documented that on extract-to-own-repo these become versioned `@bcns/*` registry deps (Needs-Nate).
-- Test runner: **`tsx --test`** (added `tsx ^4.23.1` devDep) — raw Node ESM can't follow `@bcns/app-core`'s extensionless re-exports; tsx does bundler-style resolution.
-- AI opt-in via env `AI_ENABLED`; separate `lib/ai.ts` imports app-core `createAnthropicClient`, only invoked when flag on.
-- Webhook `app/api/stripe/webhook/route.ts` maps event → app-core `decideFromEvent` (provision/suspend). Signature-verification is a documented stub (no real Stripe SDK call); the decision routes through A1 pure logic.
+- Docs-only item: no code/architecture change. Authored a single ADR at `docs/architecture/hosted-web-model.md` in standard Context / Decision / Consequences form.
+- Sourced every fact from PLAN.md "Decisions locked (2026-07-18)" table; no invented figures.
+
+## Sections Documented
+- **Pricing & seat model** — setup $1,000/$3,000 + recurring $149/$349, 15 seats then $20/seat/mo, with rationale.
+- **BYOK-AI** — clients attach own Anthropic key, billed by Anthropic, opt-in, default Haiku, key encrypted, never in repo.
+- **Hosting stack** — Coolify/Hetzner + Cloudflare + Neon + Clerk + Stripe; operating cost ~$25-75/mo (~10 clients), revisit past ~$150-200/mo; risk/mitigation table (single-VPS blast radius, DDoS, lock-in, secrets).
+- **Repo model** — one repo per client, with explicit note it reverses old Part II "monorepo, separate repos rejected" and why.
+- **Shared-package + template propagation** — `@bcns/ui`/`@bcns/config`/`@bcns/app-core` + `templates/hosted-web/` starter; version-bump propagation.
+- Explicit references to `@bcns/app-core` and `templates/hosted-web/` (relative links, verified paths).
 
 ## Files Changed
-- `pnpm-workspace.yaml` — added `templates/*` glob
-- `templates/hosted-web/package.json` — new pkg, workspace deps, `tsx --test` scripts
-- `templates/hosted-web/lib/{env,ai,webhook}.ts` — env-driven config (safe defaults when keys absent), opt-in AI, webhook decision helper
-- `templates/hosted-web/app/api/stripe/webhook/route.ts` — webhook route
-- `templates/hosted-web/app/{layout,page}.tsx` — minimal page
-- `templates/hosted-web/tests/{ai-optin,webhook}.test.mjs` — opt-in boundary + webhook→suspend tests
-- `templates/hosted-web/.env.example` — DATABASE_URL, Clerk, Stripe, ANTHROPIC_API_KEY placeholders (no real secrets)
-- `templates/hosted-web/{README.md,Dockerfile,DEPLOY.md}` — taxonomy frontmatter, multi-stage build, Coolify/Cloudflare/Neon/Clerk deploy notes
+- `docs/architecture/hosted-web-model.md` — new ADR (only file added).
+- `.claude/dev-team/engineer-report.md` — this report.
 
-## Commands
-- Build: `corepack pnpm --filter @bcns/hosted-web-template build`
-- Dev (port 3100): `corepack pnpm --filter @bcns/hosted-web-template dev`
-- Test: `corepack pnpm --filter @bcns/hosted-web-template test`
+## Verification
+- `corepack pnpm --filter web build` succeeds (docs-only change, confirmed green).
+- Valid Markdown; references to both artifacts resolve to real paths.
 
-## Notes
-- Engineer self-verified: build OK; dev `/` → HTTP 200 with AI off + no keys; webhook `past_due`→`{"decision":"suspend"}`; no real secrets committed; web build + app-core tests still green.
-- This report was reconstructed after the original working-tree report was lost (not committed with c348e04).
+## Deferred / Out of Scope
+- No changes to `apps/web` content or any other `.claude/dev-team/*.md`.
+
+## Flags for Reviewer
+- None (documentation only, no runtime/hot-path code).
