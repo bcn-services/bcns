@@ -1,28 +1,36 @@
 # Engineer Report
-**Task:** W4 — Mirror all W1–W3 copy changes from `content.ts` into `apps/web/CONTENT.md` 1:1
+**Task:** Add `packages/app-core/` (`@bcns/app-core`) — pricing/billing math, subscription access decisions, BYOK Anthropic client factory.
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
 
 ## Design Decisions
-- Light-track docs mirror; no architecture/API/data-model work. Diffed CONTENT.md field-by-field against the CURRENT `content.ts` (read the source, not just the summary).
-- Documented the new optional `PricingTier` fields (`setup`/`monthly`/`seats`) as per-tier `#### … _(optional)_` blocks under tiers[0] and tiers[1]; noted tiers[2] (AI consulting, day-rate) omits them — matching the registry where only build tiers carry them.
-- Refreshed stale hardcoded `Currently` price values (tiers[0] $2,000–$5,000 → $1,000 setup; tiers[1] $5,000–$15,000 → $3,000 setup). Free-string fields never verbatim-mirrored in CONTENT.md (hero proofPoints, contact highlights) describe purpose only, so W1/W2 hosted-framing edits to those needed no value change.
-- FAQ is open-ended (`items[n]`), so the three new W3 entries add array entries, not new field paths. Added a "Seeded questions" list (indices 0–6) capturing all seven Q&As incl. monthly-fee coverage, BYO-Anthropic-key, and stop-paying/data-export; bumped intro "5 pre-seeded" → "7".
-- Cross-check: added 3 rows (`tiers[0..1].setup/monthly/seats`); bumped stated total 77 → 80. FAQ items stay under the generic `items[n]` rows — documented that explicitly.
+- Source-only workspace package (no build step) mirroring `packages/ui` exactly: `version 0.0.0`, `private`, `type:module`, `exports {".":"./src/index.ts"}` — consumers compile raw `.ts`.
+- tsconfig `extends @bcns/config/tsconfig/base.json` + `noEmit:true` (base lacks it, unlike react-library/nextjs) since this is typecheck-only.
+- Money as integer cents throughout; every rate/threshold lives once in `pricing.ts` (`INCLUDED_SEATS`, `PER_SEAT_CENTS`, `PRICING`) — functions read from it, no duplicated magic numbers.
+- `decideAccess` is an exhaustive `switch` with NO `default` — a future `SubStatus` becomes a compile error, not silent fall-through.
+- `createAnthropicClient` takes a DI seam (`deps.ClientCtor`), never reads `process.env`; throws `MissingApiKeyError` on missing/empty/whitespace key (trim-then-check). Default model tagged on client via non-enumerable `defaultModel`.
+- `DEFAULT_MODEL = "claude-haiku-4-5"` (exact current cheap model; not `claude-3-5-haiku-*`).
+- `index.ts` uses extensionless re-exports (tsc/Bundler resolution); tests import `../src/x.ts` with extension (run under `tsx`).
+- Tests: delucas `tsx` pattern — `.mjs` + `node:assert/strict`, hand-rolled `test()`, explicit `&&` chain (no bare glob). `@anthropic-ai/sdk ^0.39.0` to match delucas/lockfile.
 
 ## Files Changed
-- `apps/web/CONTENT.md` — added setup/monthly/seats tier docs; refreshed stale tier prices; added seeded-FAQ list (7 entries) + intro count; +3 cross-check rows and 77→80 total; updated footer date/summary.
+- `packages/app-core/package.json` — new pkg manifest, tsx test chain, SDK dep.
+- `packages/app-core/tsconfig.json` — extends base + `noEmit:true`.
+- `packages/app-core/eslint.config.mjs` — re-exports `@bcns/config/eslint/base`.
+- `packages/app-core/src/pricing.ts` — cents constants, `PRICING`, `formatUsd`, `monthlyCharge`, `setupFeeCents`, seat guard.
+- `packages/app-core/src/subscription.ts` — `decideAccess` (exhaustive), `decideFromEvent`, event type.
+- `packages/app-core/src/anthropic.ts` — `DEFAULT_MODEL`, `MissingApiKeyError`, DI `createAnthropicClient`.
+- `packages/app-core/src/index.ts` — re-exports all public symbols.
+- `packages/app-core/tests/{pricing,subscription,anthropic}.test.mjs` — 24 unit tests.
+- `pnpm-lock.yaml` — links `@bcns/app-core` via `corepack pnpm install`.
 
 ## Deferred / Out of Scope
-- Docs-only item: did not touch `content.ts` or components. Did not re-derive the legacy "77" (the table has 79 rows; some collapse concepts) — applied the accurate +3 delta relative to their baseline.
-- Pre-existing em-dashes in CONTENT.md prose/headers left as-is (no-em-dash voice rule targets live site copy, not this docs file); new FAQ list uses the file's existing em-dash separator convention.
-
-## Orphan Fields Found + Resolved
-- Orphans (registry field with no CONTENT.md entry): `setup`, `monthly`, `seats` on tiers[0]/[1] — resolved by adding field docs + cross-check rows. No reverse orphans (no CONTENT.md field absent from registry). Python spot-check confirms all new names/values present and stale values ($2,000–$5,000, $5,000–$15,000, Build & handoff, Yours to use, Use it forever, free) absent.
-
-## Verification
-- `corepack pnpm build` green; `corepack pnpm lint` clean.
-- Tests: 28 pass / 4 fail. Gate tests a4, b1, b3, **b4 (mirror gate)** PASS; the 4 pre-existing stale failures (a2-fix-verification, a2-new-sections, b2-registry-rework, content-registry) unchanged.
+- No real network/integration test against Anthropic (DI mock only, by design); QA may add more.
+- `defaultModel` stored via `Object.defineProperty` (SDK type has no such field) — runtime tag, not a typed property.
 
 ## Flags for Reviewer
-- b4 uses substring matching, so it does NOT enforce presence of `setup`/`monthly`/`seats` — the 1:1 guarantee here is documentation-level, verified by the spot-check script, not an automated gate.
+- `createAnthropicClient` is the only external-boundary constructor; no retry/timeout hardening here (caller's concern).
+- `formatUsd` rounds to whole dollars — fine for current whole-dollar prices; would lose cents on sub-dollar amounts.
+
+## Test script used
+`tsx tests/pricing.test.mjs && tsx tests/subscription.test.mjs && tsx tests/anthropic.test.mjs`
