@@ -121,7 +121,7 @@
     they stop paying (hosting stops; data exported).
   - New copy is em-dash-free and buzzword-free; existing tests pass; build green.
 
-### W4 — Mirror all copy changes into CONTENT.md · `status: not started` · `track: light`
+### W4 — Mirror all copy changes into CONTENT.md · `status: done` · `track: light`
 
 - **task:** Update `apps/web/CONTENT.md` so it mirrors the reworked registry 1:1:
   new pricing fields (setup/monthly/seats), the hosted-framing changes, and the

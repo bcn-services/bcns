@@ -1,5 +1,5 @@
 # QA Report
-**Task:** W3 — "how hosting works" explanation (monthly-fee coverage, BYO-Anthropic-key, stop-paying) via faq.items[4..6]
+**Task:** W4 — CONTENT.md mirrors `apps/web/lib/content.ts` `siteContent` 1:1
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
 **Gate mode:** tests+behavioral
@@ -7,20 +7,15 @@
 ## VERDICT: PASS
 
 ## Criteria Checked
-- C1 monthly-fee coverage (hosting, backups, bug fixes) — registry item found + built `.next/server/app/pricing.html` contains "hosting"/"backup"/"bug fix" (also "security patch") via Python exact-string — PASS
-- C2 BYO-Anthropic-key + AI optional — faq item asserts "anthropic key" + optional/omittable + "bills you directly"; confirmed in rendered HTML — PASS
-- C3 stop-paying → hosting stops AND data exported/handed over — faq item asserts hosting stops/"goes offline" + "export"/"hand it over"; confirmed in rendered HTML — PASS
-- C4 new copy em-dash-free + buzzword-free — 3 new faq items em-dash/SaaS/"we help" free; `git diff` on content.ts adds 0 em-dashes — PASS
-- C5 gating tests + green build — a4/b1/b3/b4 PASS; lint + typecheck + build all green; 4 pre-existing failures (a2-fix-verification, a2-new-sections, b2-registry-rework, content-registry) unchanged, no new failures — PASS
-
-## Note on the one HTML em-dash (not a defect)
-Python flagged 12 em-dashes in `pricing.html`, all pre-existing site-metadata tagline ("bcns — Custom software... — built to fit...") in `<head>` og/twitter/description tags + the RSC flight-data echo. `git diff worktree-model-migration -- content.ts` shows 0 em-dashes added by W3; all three new FAQ render segments are em-dash-free. C4 scopes to new copy, which is clean.
-
-## Failures
-none
+- 1:1 completeness (registry → CONTENT.md) — key-path diff script: dumped 74 concrete leaf paths from live `siteContent`, normalized indices to `[n]`, diffed vs 81 `**Field:**` templates in CONTENT.md — every real registry field is documented — PASS
+- 1:1 completeness (CONTENT.md → registry, no orphans) — no `**Field:**` entry points to a path absent from content.ts; the 10 apparent "orphans" are all empty runtime arrays (`pastWork.items:[]`, `reviews.items:[]`) or array-of-scalar containers (`credentials`, `features`) / optional `tiers[n].id` the interfaces define but that produce no concrete leaf — correctly documented, not orphaned — PASS
+- New pricing fields documented (setup/monthly/seats; $1,000/$149, $3,000/$349, 15 users/$20) — w4 test asserts each registry value string is present in CONTENT.md + pricing literal spot-checks — PASS
+- Hosting/BYOK/stop-paying FAQ concepts documented — w4 test asserts the 3 new FAQ questions + concepts (hosting, Anthropic key, export) present — PASS
+- `apps/web` build green — `corepack pnpm build` succeeded, all routes prerendered — PASS
+- 4 gate tests (a4, b1, b3, b4) still pass; 4 pre-existing failures unchanged — full suite: 48 pass / 4 fail; failures are exactly a2-fix-verification, a2-new-sections, b2-registry-rework, content-registry (stale) — PASS
 
 ## Tests Added
-- `apps/web/__tests__/w3-hosting-explanation.test.mjs` — 7 tests: registry-level assertions for the 3 new faq.items (C1–C3), behavioral presence check against built `pricing.html` (C1), em-dash/buzzword scan on new copy (C4), append-not-renumber guard (items[0] unchanged, len>=7). All 7 PASS.
+- `apps/web/__tests__/w4-content-mirror.test.mjs` — 20 subtests: loads live `siteContent`, asserts setup/monthly/seats values + pricing literals + the 3 new FAQ questions/concepts are present in CONTENT.md (registry-value → doc presence). `node:test`; passes under `--experimental-strip-types --test`.
 
 ## Not Verifiable
-none
+- none. (Non-blocking note: `howItWorks.items[n].step` — a pre-existing field, not W4-introduced — is documented only in the cross-check table, not as a per-item `**Field:**` block; b4 and the cross-check both cover it, so 1:1 holds. Outside W4 scope; flagged for future tidy, not a failure.)

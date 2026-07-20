@@ -97,3 +97,10 @@
 - **What worked:** APPENDING new faq.items (not inserting) keeps b3's index-based assertions green — the right pattern for adding FAQ entries. Since /pricing renders <Faq/>, FAQ content satisfies "rendered on /pricing" criteria without a separate pricing block.
 - **What failed:** nothing.
 - **Remember next run:** W4 must mirror faq.items[4..6] Q/A into CONTENT.md (b4 substring-matches the Q strings). pricing.html contains 12 pre-existing em-dashes from the site.ts metadata tagline "bcns — Custom software..." in <head>/RSC flight data — NOT content copy; always scope em-dash checks to `content.ts` source or `git diff`, never the full rendered HTML.
+
+## 2026-07-19 — dev-team-auto — W4 CONTENT.md mirror
+- **Outcome:** DONE — 1 build attempt, QA PASS (light track, no review, branch dev-team/model-migration-run, commit 2e5cbde)
+- **What happened:** Sonnet engineer mirrored all W1–W3 changes into CONTENT.md: setup/monthly/seats field docs, refreshed prices, 7 FAQ entries (0–6), cross-check table 77→80. QA wrote a registry-key-path completeness diff (74 live leaf paths vs 81 CONTENT.md **Field:** entries) — clean both directions; apparent mismatches are notation/empty-array artifacts, not orphans. w4-content-mirror.test.mjs (20 subtests) passes.
+- **What worked:** Enumerating live siteContent leaf paths via strip-types and diffing against CONTENT.md's **Field:** entries is a stronger completeness gate than the substring-based b4 test. Section 1 (W-series) fully done.
+- **What failed:** nothing.
+- **Remember next run:** CONTENT.md documents free-string copy fields "by purpose" not verbatim, so W2-style value rewrites needed no CONTENT.md value change — only NEW fields (setup/monthly/seats) and NEW faq entries required mirror edits. howItWorks.items[].step is documented only in the cross-check table (pre-existing), not a per-item **Field:** block — fine, b4 covers it. Section 2 (A1–A4) is next: A1 @bcns/app-core package (flag:money), A2 templates/hosted-web (flag:security), A3 ADR, A4 repo docs.
