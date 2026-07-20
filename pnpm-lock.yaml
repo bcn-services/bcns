@@ -164,6 +164,28 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/app-core:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.39.0
+        version: 0.39.0
+    devDependencies:
+      '@bcns/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.1
+      eslint:
+        specifier: ^9.15.0
+        version: 9.39.4(jiti@2.7.0)
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/config:
     dependencies:
       '@eslint/js':
@@ -225,6 +247,46 @@ importers:
       eslint:
         specifier: ^9.15.0
         version: 9.39.4(jiti@2.7.0)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  templates/hosted-web:
+    dependencies:
+      '@bcns/app-core':
+        specifier: workspace:*
+        version: link:../../packages/app-core
+      '@bcns/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      next:
+        specifier: 14.2.18
+        version: 14.2.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@bcns/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+      eslint:
+        specifier: ^9.15.0
+        version: 9.39.4(jiti@2.7.0)
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
       typescript:
         specifier: ^5.6.3
         version: 5.9.3

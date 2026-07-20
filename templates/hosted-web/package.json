@@ -1,0 +1,30 @@
+{
+  "name": "@bcns/hosted-web-template",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/ai-optin.test.mjs tests/webhook.test.mjs tests/qa-hosted-web.test.mjs tests/webhook-route.test.mjs",
+    "clean": "rm -rf .next .turbo node_modules"
+  },
+  "dependencies": {
+    "@bcns/app-core": "workspace:*",
+    "@bcns/ui": "workspace:*",
+    "next": "14.2.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@bcns/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^9.15.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.6.3"
+  }
+}

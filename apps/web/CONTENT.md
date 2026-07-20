@@ -526,9 +526,30 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[0].price
 - **Field:** `pricing.tiers[0].price`
-- **Purpose:** Price string. Currently `$2,000–$5,000`.
+- **Purpose:** Headline price string shown on the card. Currently `$1,000 setup`.
 - **Tone:** N/A (formatted value)
 - **Length:** ≤20 chars
+
+#### tiers[0].setup _(optional)_
+- **Field:** `pricing.tiers[0].setup`
+- **Purpose:** One-time setup fee, spelled out. Currently `$1,000 one-time setup`.
+- **Tone:** N/A (formatted value)
+- **Note:** Optional field on build tiers; the AI consulting tier (tiers[2]) omits it.
+- **Length:** ≤30 chars
+
+#### tiers[0].monthly _(optional)_
+- **Field:** `pricing.tiers[0].monthly`
+- **Purpose:** Flat monthly hosting/support fee. Currently `$149/mo`.
+- **Tone:** N/A (formatted value)
+- **Note:** Optional; consulting tier omits it.
+- **Length:** ≤20 chars
+
+#### tiers[0].seats _(optional)_
+- **Field:** `pricing.tiers[0].seats`
+- **Purpose:** Included-user allowance and per-seat overage. Currently `Includes up to 15 users, then $20/user per month.`
+- **Tone:** Plain, factual
+- **Note:** Optional; consulting tier omits it.
+- **Length:** 1 sentence, ≤60 chars
 
 #### tiers[0].description
 - **Field:** `pricing.tiers[0].description`
@@ -556,8 +577,26 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[1].price
 - **Field:** `pricing.tiers[1].price`
-- **Purpose:** Price string. Currently `$5,000–$15,000`.
+- **Purpose:** Headline price string shown on the card. Currently `$3,000 setup`.
 - **Length:** ≤20 chars
+
+#### tiers[1].setup _(optional)_
+- **Field:** `pricing.tiers[1].setup`
+- **Purpose:** One-time setup fee, spelled out. Currently `$3,000 one-time setup`.
+- **Note:** Optional; consulting tier omits it.
+- **Length:** ≤30 chars
+
+#### tiers[1].monthly _(optional)_
+- **Field:** `pricing.tiers[1].monthly`
+- **Purpose:** Flat monthly hosting/support fee. Currently `$349/mo`.
+- **Note:** Optional; consulting tier omits it.
+- **Length:** ≤20 chars
+
+#### tiers[1].seats _(optional)_
+- **Field:** `pricing.tiers[1].seats`
+- **Purpose:** Included-user allowance and per-seat overage. Currently `Includes up to 15 users, then $20/user per month.`
+- **Note:** Optional; consulting tier omits it.
+- **Length:** 1 sentence, ≤60 chars
 
 #### tiers[1].description
 - **Field:** `pricing.tiers[1].description`
@@ -581,6 +620,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 #### tiers[2].price
 - **Field:** `pricing.tiers[2].price`
 - **Purpose:** Price string. Currently `$800 / day`.
+- **Note:** AI consulting is a day-rate engagement, so it omits the optional `setup`, `monthly`, and `seats` fields the two build tiers carry.
 - **Length:** ≤20 chars
 
 #### tiers[2].description
@@ -599,7 +639,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 ## FAQ (`siteContent.faq`) — /pricing
 
 Addresses objections and reduces friction before the visitor contacts you.
-`items` is an open-ended array (5 pre-seeded).
+`items` is an open-ended array (7 pre-seeded).
 
 ### eyebrow
 - **Field:** `faq.eyebrow`
@@ -633,6 +673,18 @@ Addresses objections and reduces friction before the visitor contacts you.
 - **Purpose:** Direct, complete answer
 - **Tone:** Honest; if the answer has caveats, name them
 - **Length:** 1-3 sentences, ≤200 chars
+
+#### Seeded questions (current `faq.items` order)
+
+The seven pre-seeded entries, in order, are:
+
+0. **How much will my project cost?** — Setup + monthly framing: Standard is $1,000 setup and $149/mo, Advanced is $3,000 setup and $349/mo, both include up to 15 users then $20/user per month. Exact numbers come in the fixed quote after the free consult.
+1. **How long does a build take?** — About a week for single tools, two to three weeks for connected systems; delivery date lands with the quote.
+2. **What happens if something breaks after delivery?** — 30 days of no-questions fixes, then a year of free bug fixes on what was built; new features quoted separately.
+3. **Do I need to be technical to work with you?** — No; questions are about the business, and everything ships with a plain-English walkthrough.
+4. **What does the monthly fee cover?** — Hosting, uptime, daily backups, security patches, bug fixes, and small tweaks, run on bcns servers so the team reaches it from any device with a login.
+5. **Does my tool use AI, and how does that get billed?** — AI is optional; if used, the client brings their own Anthropic key and Anthropic bills them directly, so they control that cost and can leave AI out entirely.
+6. **What happens if I stop paying the monthly fee?** — Hosting stops and the live tool goes offline, but the data is always the client's; bcns exports it and hands it over before shutting anything down. No lock-in.
 
 > **Adding more FAQs:** append `{ question, answer }` objects to `faq.items`.
 > No interface or component change needed.
@@ -849,6 +901,9 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pricing.tiers[0..2].id` | Pricing — tiers id |
 | `pricing.tiers[0..2].name` | Pricing — tiers name |
 | `pricing.tiers[0..2].price` | Pricing — tiers price |
+| `pricing.tiers[0..1].setup` _(optional)_ | Pricing — tiers setup |
+| `pricing.tiers[0..1].monthly` _(optional)_ | Pricing — tiers monthly |
+| `pricing.tiers[0..1].seats` _(optional)_ | Pricing — tiers seats |
 | `pricing.tiers[0..2].description` | Pricing — tiers description |
 | `pricing.tiers[0..2].features[n]` | Pricing — tiers features |
 | `faq.eyebrow` | FAQ — eyebrow |
@@ -879,7 +934,9 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 77. All 77 have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 80 (77 + the three optional build-tier fields `setup`, `monthly`, `seats`, present on tiers[0] and tiers[1]). All have a CONTENT.md entry. No orphans in either direction.
+
+The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff) live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
 ---
 
@@ -902,4 +959,4 @@ All pricing, turnaround, response-time, support-window, and page-meta slots are 
 
 ---
 
-_Last updated: 2026-07-15 (C1 voice pass). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-07-19 (W4 mirror: hosted framing, setup/monthly/seats pricing, hosting/BYOK/stop-paying FAQ). Source of truth: `apps/web/lib/content.ts`._

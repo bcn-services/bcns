@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # Template starters live in the install graph ONLY so their `workspace:*` deps
+  # (@bcns/ui, @bcns/config, @bcns/app-core) resolve locally. When a template is
+  # extracted to its own repo those become versioned `@bcns/*` registry deps.
+  - "templates/*"

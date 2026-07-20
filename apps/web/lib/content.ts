@@ -93,6 +93,9 @@ export interface PricingTier {
   id?: string;
   name: string;
   price: string;
+  setup?: string;
+  monthly?: string;
+  seats?: string;
   description: string;
   features: string[];
 }
@@ -190,7 +193,7 @@ export const siteContent: SiteContent = {
     ctaSecondary: "See what we build",
     proofPoints: [
       "Fixed quote before work starts",
-      "Use it forever, free",
+      "We host it and keep it running",
       "Free 30-minute consult",
     ],
   },
@@ -214,9 +217,9 @@ export const siteContent: SiteContent = {
       },
       {
         step: "03",
-        title: "Build & handoff",
+        title: "Build & launch",
         description:
-          "We build it, walk your team through it, then give you 30 days to use it and tell us what needs fixing or tweaking. We handle those, no questions asked.",
+          "We build it, launch it, and walk your team through it. From there we host, run, and maintain it, so it keeps working without you managing servers or updates.",
       },
     ],
   },
@@ -270,9 +273,9 @@ export const siteContent: SiteContent = {
         description: "You approve the exact price before any work starts.",
       },
       {
-        title: "Yours to use",
+        title: "Your data",
         description:
-          "Your data and accounts stay yours. It keeps running whether we work together or not.",
+          "We host and maintain the app for you. Your data is always yours, and we'll export it and hand it over whenever you ask.",
       },
     ],
   },
@@ -305,13 +308,16 @@ export const siteContent: SiteContent = {
 
   pricing: {
     eyebrow: "Pricing",
-    title: "Two build sizes, one day rate. Quoted before we start.",
+    title: "Two build sizes. A setup fee, then monthly to run it.",
     description:
-      "Every project gets a fixed quote up front. The tiers show typical scope. Your quote depends on the consult.",
+      "Each build has a one-time setup fee and a flat monthly fee that covers hosting and support. You get the exact numbers in a fixed quote after the free consult.",
     tiers: [
       {
         name: "Standard build",
-        price: "$2,000–$5,000",
+        price: "$1,000 setup",
+        setup: "$1,000 one-time setup",
+        monthly: "$149/mo",
+        seats: "Includes up to 15 users, then $20/user per month.",
         description:
           "A single-purpose tool: a booking page, a report generator, one automation.",
         features: [
@@ -323,7 +329,10 @@ export const siteContent: SiteContent = {
       },
       {
         name: "Advanced build",
-        price: "$5,000–$15,000",
+        price: "$3,000 setup",
+        setup: "$3,000 one-time setup",
+        monthly: "$349/mo",
+        seats: "Includes up to 15 users, then $20/user per month.",
         description:
           "A system your business runs on: multiple workflows, logins, data that stays in sync.",
         features: [
@@ -341,7 +350,7 @@ export const siteContent: SiteContent = {
         features: [
           "Audit of where AI fits your operation",
           "Hands-on setup, not a slide deck",
-          "Plain-English handoff notes",
+          "Plain-English project notes",
         ],
       },
     ],
@@ -355,7 +364,7 @@ export const siteContent: SiteContent = {
       {
         question: "How much will my project cost?",
         answer:
-          "Every project gets a fixed quote after the free consult. Standard builds run $2,000 to $5,000. Advanced builds run $5,000 to $15,000. The quote is the price. No hourly surprises.",
+          "Every build has a one-time setup fee plus a flat monthly fee that keeps it running and supported. Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. You get the exact numbers in a fixed quote after the free consult. No hourly surprises.",
       },
       {
         question: "How long does a build take?",
@@ -372,6 +381,21 @@ export const siteContent: SiteContent = {
         answer:
           "No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.",
       },
+      {
+        question: "What does the monthly fee cover?",
+        answer:
+          "The monthly fee keeps your tool running and cared for. It covers hosting, uptime, daily backups, security patches, bug fixes, and small tweaks along the way. We run it on our own servers, so you and your team reach it from any device with a login. You never manage a server or an update yourself.",
+      },
+      {
+        question: "Does my tool use AI, and how does that get billed?",
+        answer:
+          "AI is optional. If your tool uses AI features, you bring your own Anthropic key, and Anthropic bills you directly for what those features use. You stay in control of that cost, and you can leave AI out entirely if you'd rather not use it.",
+      },
+      {
+        question: "What happens if I stop paying the monthly fee?",
+        answer:
+          "Hosting stops, so the live tool goes offline. Your data is always yours. Before we shut anything down, we export your data and hand it over so you keep everything the tool held. No lock-in, no games.",
+      },
     ],
   },
 
@@ -384,7 +408,7 @@ export const siteContent: SiteContent = {
         name: "Nate Seluga",
         roleLine: "Engineering",
         photo: "[INPUT: photo]",
-        bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after handoff. Computer science at Harvey Mudd College.",
+        bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after launch. Computer science at Harvey Mudd College.",
         credentials: [
           "Computer science, Harvey Mudd College",
         ],
@@ -453,7 +477,7 @@ export const siteContent: SiteContent = {
     pricing: {
       title: "Pricing | bcns",
       description:
-        "Standard builds from $2,000 to $5,000. Advanced builds from $5,000 to $15,000. AI consulting at $800 per day. Fixed quotes, no hourly surprises.",
+        "Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. AI consulting at $800 per day. Fixed quotes, no hourly surprises.",
     },
     about: {
       title: "About bcns | Two Founders, Custom Software",

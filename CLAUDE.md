@@ -4,11 +4,13 @@ Project-level guidance for Claude Code agents working in this repo.
 
 ## What this repo is
 
-bcns is a software studio that builds custom software for local small businesses. This monorepo contains:
+bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, DeLuca's, the shared packages, and the client-app template source. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
 - `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
+- `apps/delucas/` — DeLuca's, a platform-owned app
 - `packages/ui/` — shared React component library (`@bcns/ui`)
 - `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@bcns/config`)
-- `templates/` — reserved for future client app starters (not a workspace package yet)
+- `packages/app-core/` — shared application core (`@bcns/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
+- `templates/hosted-web/` — starter for spinning up a new client repo (`@bcns/hosted-web-template`); `apps/` holds only the platform's own apps
 
 ## Commands
 
@@ -61,10 +63,13 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 
 ## Adding a client app later
 
-1. Create `apps/<client-name>/` (auto-picked up by workspace glob).
-2. Depend on shared packages: `"@bcns/ui": "workspace:*"` and `"@bcns/config": "workspace:*"`.
-3. Extend shared configs as `apps/web` does (tsconfig, eslint, tailwind, prettier).
-4. Add the new app's `dev` script to `turbo.json` pipeline if needed.
+Client apps are **not** added to this monorepo. Each new client business gets **its own repo**, generated from `templates/hosted-web/`. See `docs/architecture/hosted-web-model.md` for the decision and rationale.
+
+1. Generate a new repo from `templates/hosted-web/` (`@bcns/hosted-web-template`) — it comes pre-wired to the hosting stack and the shared packages.
+2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@bcns/ui`, `@bcns/config`, and `@bcns/app-core`.
+3. Propagate shared improvements by publishing a new package version and bumping it in each client repo — no copy-paste, no hand-editing per app.
+
+`apps/` in this monorepo holds only the platform repo's own apps — the marketing site (`apps/web`) and DeLuca's (`apps/delucas`).
 
 ## Deploy
 
