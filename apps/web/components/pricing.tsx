@@ -24,7 +24,9 @@ export function Pricing() {
 
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {tiers.map(({ name, price, setup, monthly, seats, description: tierDescription, features }, index) => {
-            const isConsulting = index === 2;
+            // Branch on data shape, not array position: build tiers carry
+            // setup/monthly/seats; the consulting tier carries a single price.
+            const isConsulting = !setup;
             return (
               <Card key={index} className={`h-full${isConsulting ? " border-t-2 border-t-primary border-primary/30 bg-secondary/60" : ""}`}>
                 <CardHeader>

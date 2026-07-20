@@ -72,10 +72,42 @@ test("consulting tier unchanged: renders a day-rate price", () => {
   assert.match(consulting.price, /\$800/, "consulting price should stay $800/day");
 });
 
-import { readFileSync } from "node:fs";
+test("criterion 1b: pricing.tsx component renders the setup/monthly/seats fields", () => {
+  // Registry-only assertions above can't catch a component regression that
+  // deletes the <p> tags. Gate the component's render shape too.
+  const src = readComponentSource();
+  // build-tier branch must render all three recurring-price fields
+  for (const field of ["{setup}", "{monthly}", "{seats}"]) {
+    assert.ok(src.includes(field), `pricing.tsx no longer renders ${field}`);
+  }
+  // consulting branch renders the single price
+  assert.ok(src.includes("{price}"), "pricing.tsx no longer renders consulting {price}");
+
+  // If a production build exists, assert the rendered HTML carries the six
+  // money strings — an un-mocked check that component drift can't fake green.
+  const html = readBuiltPricingHtml();
+  if (html) {
+    for (const s of ["$1,000", "$149", "$3,000", "$349", "$20", "15"]) {
+      assert.ok(html.includes(s), `built /pricing HTML missing exact string ${s}`);
+    }
+  }
+});
+
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 function readContentSource() {
   const here = dirname(fileURLToPath(import.meta.url));
   return readFileSync(join(here, "..", "lib", "content.ts"), "utf-8");
+}
+function readComponentSource() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return readFileSync(join(here, "..", "components", "pricing.tsx"), "utf-8");
+}
+function readBuiltPricingHtml() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const p = join(here, "..", ".next", "server", "app", "pricing.html");
+  if (!existsSync(p)) return null;
+  // Next escapes entities in HTML (e.g. $&#x2F;); unescape the ones we assert on.
+  return readFileSync(p, "utf-8").replace(/&#x2F;/g, "/").replace(/&#36;/g, "$");
 }
