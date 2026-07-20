@@ -9,10 +9,14 @@ export function Hero() {
 
   return (
     <section id="top" className="relative overflow-hidden">
-      {/* Brand atmosphere: faint grid + pastel-blue glow anchored at top */}
+      {/* Brand atmosphere: grid + layered pastel-blue glow anchored at top */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_50%_at_50%_0%,hsl(var(--primary)/0.20),transparent_70%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(65%_55%_at_50%_0%,hsl(var(--primary)/0.28),transparent_70%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40%_35%_at_75%_20%,hsl(var(--primary)/0.10),transparent_60%)]"
       />
       <div
         aria-hidden
