@@ -60,9 +60,9 @@ export function AboutFounder() {
         </div>
 
         {whyBcns && (
-          <p className="mx-auto mt-14 max-w-2xl text-center text-lg leading-relaxed text-muted-foreground">
+          <blockquote className="mx-auto mt-14 max-w-2xl rounded-xl border border-primary/20 bg-primary/[0.04] px-8 py-6 text-center text-lg leading-relaxed text-foreground/80">
             {whyBcns}
-          </p>
+          </blockquote>
         )}
       </Container>
     </section>
