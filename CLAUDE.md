@@ -9,7 +9,7 @@ bcns is a software studio that builds custom software for local small businesses
 - `apps/delucas/` — DeLuca's, a platform-owned app
 - `packages/ui/` — shared React component library (`@bcns/ui`)
 - `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@bcns/config`)
-- `packages/app-core/` — shared application core (`@bcns/app-core`): auth, DB, AI client, billing helpers
+- `packages/app-core/` — shared application core (`@bcns/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
 - `templates/hosted-web/` — starter for spinning up a new client repo (`@bcns/hosted-web-template`); `apps/` holds only the platform's own apps
 
 ## Commands

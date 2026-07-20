@@ -86,3 +86,24 @@ none.
 
 ## Deferred
 none.
+
+---
+# Fix Report — A4 app-core doc description
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 1 of 1 QA bug (A4 C4)
+
+## Changes Made
+- CLAUDE.md:12 — replaced inaccurate "auth, DB, AI client, billing helpers" with "pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client" — QA bug.
+- README.md:23 — same correction (tree-diagram phrasing), matching `packages/app-core/src/index.ts` exports (PRICING/monthlyCharge, decideAccess/decideFromEvent, createAnthropicClient) — no auth, no DB — QA bug.
+
+## Verification
+- Confirmed against `packages/app-core/src/index.ts`: only pricing/subscription/anthropic exports — no auth/DB.
+- grep "auth, DB" in CLAUDE.md + README.md — 0 matches.
+- corepack pnpm --filter web build — EXIT=0, all routes prerendered static.
+
+## Disputed
+none.
+
+## Deferred
+none.

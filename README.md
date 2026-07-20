@@ -20,7 +20,7 @@ bcns/
 ├─ packages/
 │  ├─ ui/             # Shared React component library (@bcns/ui)
 │  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@bcns/config)
-│  └─ app-core/       # Shared application core (@bcns/app-core): auth, DB, AI, billing
+│  └─ app-core/       # @bcns/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client
 ├─ templates/
 │  └─ hosted-web/     # Starter for spinning up a new client repo (@bcns/hosted-web-template)
 ├─ package.json       # Root scripts + workspace dev dependencies
