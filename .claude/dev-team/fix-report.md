@@ -38,3 +38,27 @@ none.
 
 ## Deferred
 none.
+
+---
+# Fix Report — A1 pricing.ts hardening
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 3 of 3 review findings (1 Important + 2 Minor)
+
+## Changes Made
+- packages/app-core/src/pricing.ts:11-14 — `TierPricing` fields `setupCents`/`monthlyCents` made `readonly` — review Important.
+- packages/app-core/src/pricing.ts:23-26 — deep-froze `PRICING`: `Object.freeze` on the map AND each tier object (kept `as const`), so runtime mutation throws in strict mode and the source-of-truth stays intact — review Important.
+- packages/app-core/src/pricing.ts:33 — `formatUsd` now renders exact cents when present (149_99→$149.99) via integer cents/mod math, bare whole dollars otherwise (149_00→$149, 1_000_00→$1,000 preserved) — review Minor.
+- packages/app-core/src/pricing.ts:33 — added `Number.isFinite` guard (throws on NaN/±Infinity, mirroring seat guard); negatives format as credits (-20_00→"-$20") deliberately, not thrown — review Minor.
+- packages/app-core/tests/fix-app-core.test.mjs — new: freeze holds (map + nested tier, mutation throws & value intact), cents rendering, whole-dollar contract, NaN/Infinity guard, negative credits (10 tests); wired into package.json test chain.
+
+## Verification
+- corepack pnpm --filter @bcns/app-core test — all green (engineer + QA 20 + fix 10); lint + typecheck clean.
+- corepack pnpm --filter web build succeeds; web's 4 gate tests (a4,b1,b3,b4) still green.
+- grep confirmed no consumer relies on old rounding — `formatUsd` used only within app-core tests.
+
+## Disputed
+none.
+
+## Deferred
+none.
