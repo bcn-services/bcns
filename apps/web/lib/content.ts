@@ -193,7 +193,7 @@ export const siteContent: SiteContent = {
     ctaSecondary: "See what we build",
     proofPoints: [
       "Fixed quote before work starts",
-      "Use it forever, free",
+      "We host it and keep it running",
       "Free 30-minute consult",
     ],
   },
@@ -217,9 +217,9 @@ export const siteContent: SiteContent = {
       },
       {
         step: "03",
-        title: "Build & handoff",
+        title: "Build & launch",
         description:
-          "We build it, walk your team through it, then give you 30 days to use it and tell us what needs fixing or tweaking. We handle those, no questions asked.",
+          "We build it, launch it, and walk your team through it. From there we host, run, and maintain it, so it keeps working without you managing servers or updates.",
       },
     ],
   },
@@ -273,9 +273,9 @@ export const siteContent: SiteContent = {
         description: "You approve the exact price before any work starts.",
       },
       {
-        title: "Yours to use",
+        title: "Your data",
         description:
-          "Your data and accounts stay yours. It keeps running whether we work together or not.",
+          "We host and maintain the app for you. Your data is always yours, and you can export it any time.",
       },
     ],
   },
@@ -393,7 +393,7 @@ export const siteContent: SiteContent = {
         name: "Nate Seluga",
         roleLine: "Engineering",
         photo: "[INPUT: photo]",
-        bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after handoff. Computer science at Harvey Mudd College.",
+        bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after launch. Computer science at Harvey Mudd College.",
         credentials: [
           "Computer science, Harvey Mudd College",
         ],
