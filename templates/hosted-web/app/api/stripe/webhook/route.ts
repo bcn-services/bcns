@@ -1,12 +1,26 @@
 /**
  * Stripe subscription-status webhook (App Router).
  *
- * STUB: real deployments must verify the Stripe signature with the official SDK
- * (`stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET)`) before
- * trusting the payload. That verification is intentionally a documented stub
- * here — no Stripe SDK is bundled. The provision/suspend DECISION, however, is
- * real and routes through @bcns/app-core's pure logic via handleStripeEvent, so
- * it is unit-testable and identical to production behavior.
+ * SECURITY — FAIL-CLOSED STUB. Real Stripe signature verification is
+ * intentionally NOT implemented here (no Stripe SDK is bundled). Because this is
+ * a template that clients clone, the route must never *look* production-ready
+ * while trusting unauthenticated input. So it behaves in two honest modes:
+ *
+ *   1. STRIPE_WEBHOOK_SECRET IS set (i.e. a real/prod deploy) → REFUSE the
+ *      request with 501 Not Implemented. A configured secret signals "verify me,"
+ *      but verification is not wired, so we route NOTHING to the provision/suspend
+ *      decision. You MUST wire real verification before production:
+ *          stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET)
+ *      then feed the constructed event through parseEvent + handleStripeEvent.
+ *
+ *   2. STRIPE_WEBHOOK_SECRET is UNSET (local dev / not yet configured) → process
+ *      the event so the endpoint stays runnable without keys, but mark the
+ *      response honestly: signatureVerified:false, mode:"unverified-dev". The
+ *      provision/suspend DECISION still routes through @bcns/app-core's pure
+ *      logic via handleStripeEvent, so it is unit-testable and identical to
+ *      production decision behavior.
+ *
+ * The route NEVER claims a signature was verified when it was not.
  */
 
 import { NextResponse } from "next/server";
@@ -34,11 +48,26 @@ function parseEvent(body: unknown): StripeSubscriptionEvent | null {
 
 export async function POST(request: Request): Promise<Response> {
   const config = getConfig();
-  // STUB: signature verification goes here once STRIPE_WEBHOOK_SECRET is wired.
-  // When the secret is absent (e.g. local/dev), we skip verification but still
-  // exercise the decision path so the endpoint stays runnable without keys.
-  const verificationConfigured = Boolean(config.stripeWebhookSecret);
 
+  // FAIL-CLOSED: a configured signing secret means "authenticate me," but real
+  // verification is not wired in this template. Refuse rather than trust
+  // unauthenticated input, and do NOT touch the provision/suspend decision.
+  if (config.stripeWebhookSecret) {
+    return NextResponse.json(
+      {
+        error: "signature verification not wired",
+        message:
+          "STRIPE_WEBHOOK_SECRET is set but this template does not verify Stripe " +
+          "signatures. Wire stripe.webhooks.constructEvent before production; " +
+          "until then the webhook refuses configured-secret requests.",
+      },
+      { status: 501 },
+    );
+  }
+
+  // Unverified DEV path only (no secret configured). Never reachable once a
+  // secret is set. The response marks itself as unverified so it can never be
+  // mistaken for authenticated production traffic.
   let body: unknown;
   try {
     body = await request.json();
@@ -57,6 +86,7 @@ export async function POST(request: Request): Promise<Response> {
     decision: result.decision,
     customerId: result.customerId,
     subscriptionId: result.subscriptionId,
-    signatureVerified: verificationConfigured,
+    signatureVerified: false,
+    mode: "unverified-dev",
   });
 }

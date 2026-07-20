@@ -27,10 +27,19 @@ auth. Assumes the app has been extracted to its own repo (see README).
    Next.js standalone server.
 4. **Stripe webhook** — point a Stripe webhook at
    `https://<your-domain>/api/stripe/webhook` for subscription events. Copy the
-   signing secret into `STRIPE_WEBHOOK_SECRET`. Wire real
-   `stripe.webhooks.constructEvent` verification (the route ships a documented
-   stub); the provision/suspend decision already routes through
-   `@bcns/app-core`.
+   signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+   > **⚠️ SECURITY — wire real signature verification before production.** This
+   > template does NOT verify Stripe signatures. It is fail-closed: when
+   > `STRIPE_WEBHOOK_SECRET` is **set**, the route **refuses** every request with
+   > `501 Not Implemented` and never routes to the provision/suspend decision —
+   > so a configured deploy cannot silently trust unauthenticated input. Wire
+   > `stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET)` in
+   > `app/api/stripe/webhook/route.ts`, then feed the constructed event through
+   > `parseEvent` + `handleStripeEvent`, to enable the endpoint. With the secret
+   > **unset** (local dev), the route processes events but marks the response
+   > `signatureVerified: false`, `mode: "unverified-dev"`. The provision/suspend
+   > decision routes through `@bcns/app-core` in both wired and dev cases.
 5. **Cloudflare** — add the app's domain, proxy (orange-cloud) it to the Coolify
    host, and enable "Full (strict)" TLS. Coolify issues the origin cert.
 

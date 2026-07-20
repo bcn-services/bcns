@@ -62,3 +62,27 @@ none.
 
 ## Deferred
 none.
+
+---
+# Fix Report — A2 webhook fail-closed (security)
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 2 of 2 review findings (1 Important + 1 Minor)
+
+## Changes Made
+- templates/hosted-web/app/api/stripe/webhook/route.ts:35-70 — fail-closed: when `STRIPE_WEBHOOK_SECRET` IS set the route now returns 501 "signature verification not wired" and never reaches `handleStripeEvent`; secret-unset dev path processes the event but returns `signatureVerified:false` + `mode:"unverified-dev"` — review Important.
+- templates/hosted-web/app/api/stripe/webhook/route.ts:60 — dropped the misleading `signatureVerified:verificationConfigured` (true); no path ever claims verified — review Minor (folded into Important fix).
+- templates/hosted-web/app/api/stripe/webhook/route.ts:1-30 — prominent fail-closed security comment documenting both modes + how to wire `stripe.webhooks.constructEvent`.
+- templates/hosted-web/DEPLOY.md:28 — added SECURITY note: template refuses when secret set; wire real verification before production.
+- templates/hosted-web/tests/webhook-route.test.mjs — new: secret-set->501 (no decision/verified leak), secret-unset->correct suspend/provision + unverified markers, malformed->400, never `signatureVerified:true` (5 tests); wired into `test` script.
+
+## Verification
+- `pnpm --filter @bcns/hosted-web-template` test 19/19 (was 14, +5), build/lint/typecheck all green.
+- Live smoke on :3100 — secret SET -> POST past_due = HTTP 501 refusal (no decision); secret UNSET -> HTTP 200 `{"decision":"suspend",...,"signatureVerified":false,"mode":"unverified-dev"}`; server killed, port clear (no orphan).
+- `pnpm --filter web` build green; `pnpm --filter @bcns/app-core` test 10/10 green.
+
+## Disputed
+none.
+
+## Deferred
+none.
