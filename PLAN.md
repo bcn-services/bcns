@@ -219,10 +219,28 @@
 
 ---
 
+## Section 2 — Revenue ingestion (dev-team-auto)
+
+> Slice has no merchant-facing API and no confirmed automated email summaries (researched 2026-07-17).
+> The one path buildable without client credentials: let the owner drag-drop a Slice statement PDF
+> (downloaded from owners.slicelife.com) and mark it as revenue. If @slicelife.com emails exist at
+> handoff, `SliceEmailSource` (Option A in §3b) becomes the upgrade — one new file, no schema change.
+
+- task: Add a "This is revenue" toggle to the drag-drop confirm card so any PDF (e.g. a downloaded Slice statement) can be imported as `direction: "revenue"` rather than going through the expense-invoice classifier. When the toggle is on, bypass `is_invoice`, force `direction: "revenue"`, and let the user confirm the amount. When off, the existing invoice path is unchanged.
+  done when:
+    - Dragging a PDF with the toggle on saves a transaction with `direction: "revenue"` in the database
+    - A fixture non-invoice PDF imported with the toggle on is not rejected by the `is_invoice` check
+    - Toggle defaults to off and all existing drag-drop tests remain passing
+    - New unit test covers the revenue toggle path from confirm card through runner to DB row
+    - `corepack pnpm typecheck && corepack pnpm test` green from `apps/delucas/`
+  status: not started
+  track: light
+
+---
+
 > **⚠️ AUTONOMOUS RUN — STOP HERE**
 
-_dev-team-auto halts here. Everything below needs a live account, a GitHub repo, a
-scoping session, or is unrelated DeLuca's work — none of it is touched by this run._
+_dev-team-auto halts here after Section 2. Visual passes done on separate branches. Sections 3–5 are Needs-Nate._
 
 ---
 
@@ -236,25 +254,82 @@ scoping session, or is unrelated DeLuca's work — none of it is touched by this
 - [ ] **Data-handling basics:** a simple client data-processing note, a tested restore, and a one-page incident plan (you now hold client business data).
 - [ ] **Website go-live:** the model-migration copy ships on the marketing site (Vercel) after the run is reviewed and merged.
 
+- page: /pricing
+  notes: 3 cards where card 3 is a day-rate, not a tier — differentiate it; price strings like `$2,000–$5,000` must not break the card rhythm
+  status: not started
+
+- page: /about
+  notes: two equal founder cards; builder-first hierarchy — names and roles before schools
+  status: not started
+
+- page: /work
+  notes: holding state must look intentional and confident, not empty — this page is linked from a home nav card
+  status: not started
+
+### DeLuca's app — Visual pass
+
+brand: TBD (client brand profile — pizza-shop warmth; define at session start)
+
+- Targets: dashboard screen, Add & fix tab, confirm/review cards, banners, empty state.
+- North star: a man who barely uses computers reads the headline in 3 seconds. Big type, high contrast, no chart junk, no jargon anywhere ("Money in", not "Revenue", if it reads better).
+- Presentation only — no logic, schema, or IPC changes. Isolated branch, no merge without Nate's sign-off.
+
+## Section 3 — Packaging (Needs-Nate) — *milestone: installers built and verified*
+
+- [ ] Run `electron-builder install-app-deps` from `apps/delucas/` — rebuilds `better-sqlite3` and `@napi-rs/canvas` for Electron's ABI (skipping → `NODE_MODULE_VERSION` crash on launch).
+- [ ] Build: `corepack pnpm build && corepack pnpm package` from `apps/delucas/`. Artifacts → `release/`. Mac = unsigned DMG (x64 + arm64); Windows = unsigned NSIS .exe (x64).
+- [ ] **Highest risk:** pdfjs `standard_fonts` dir is resolved via `createRequire` — inside asar this may point inside the archive where `FilesystemStandardFontDataFactory` cannot read. After installing from the artifact, drag-drop a font-embedded PDF and confirm the LLM receives a legible image (not blank/garbled).
+- [ ] Windows NSIS on macOS requires Wine (`brew install --cask wine-stable`). If unavailable, defer and ship Mac DMG first; confirm client laptop OS at handoff.
+- [ ] Install from the artifact (not dev) and re-run the full pipeline: drag-drop PDF → confirm card saves; email Check Now → invoices imported; quit → backup written; re-open → backup not re-triggered.
+- [ ] **RC reached** when the installed artifact passes all checks above.
+
 ---
 
-## Deferred — DeLuca's app (unchanged by this migration)
+## Section 3b — Slice integration (Needs-Nate, researched 2026-07-17)
 
-> DeLuca's stays a one-time desktop handoff. These items predate the model change
-> and are preserved here; the full completed build history (B1–B4, C1, P1–P6) lives
-> in git. Run these separately from the migration if/when picked up.
+> Slice's public API (`get-slice.com/docs/api-overview`) is a **fintech partner API** — seven endpoints for quote/payment/settlement — built for businesses embedding Slice's payment product, not for pizzeria owners reading their own revenue. No merchant sales endpoint exists. Partner-only credentials require a "pilot conversation" with Slice; not available to DeLuca's owner. **Slice API is not a viable path.**
+>
+> No confirmed automated email summaries from Slice either. Reporting lives in-app (Owner's App / owners.slicelife.com). Emails from `@slicelife.com` exist (order notifications, payout receipts) but no confirmed periodic P&L summary. Check the client's inbox at handoff before ruling out the email path.
 
-- [ ] **S1 — Slice revenue toggle** (`track: light`, `status: not started`): add a
-  "This is revenue" toggle to the drag-drop confirm card so a downloaded Slice
-  statement PDF imports as `direction: "revenue"`, bypassing the `is_invoice`
-  classifier. Done when: toggle-on save writes a `revenue` row; a non-invoice
-  fixture PDF is not rejected with the toggle on; toggle defaults off and existing
-  drag-drop tests pass; new unit test covers the revenue path; `corepack pnpm
-  typecheck && corepack pnpm test` green from `apps/delucas/`.
-- [ ] **Packaging / RC / handoff** (Needs-Nate): install-app-deps rebuild, build both
-  installers, verify pdfjs `standard_fonts` inside asar, install-from-artifact
-  pipeline test; then the handoff checklist (client email provider, Slice inbox
-  check, labor-app name, Anthropic account with spend cap, backup folder, tag
-  `delucas-v1.0-shipped`). Full detail in git history of this file.
-- [ ] Post-ship: extract `templates/local-app/` from the shipped DeLuca's app (the
-  desktop-handoff archetype, distinct from `templates/hosted-web/`).
+**Integration options — pick at handoff:**
+
+| Option | What unblocks it | Effort |
+|--------|-----------------|--------|
+| **A — `SliceEmailSource`** (preferred) | `@slicelife.com` payout/statement emails exist in inbox | ~1 day: new `sources/slice-email.ts` filtering for `@slicelife.com`, new `extractRevenueFromSlice()` in `llm.ts`, returns `direction: "revenue"`. `NormalizedTransaction` already has the field — no schema change. |
+| **B — drag-drop PDF override** | No automated emails; owner downloads monthly PDF from portal | ~2h: add a "revenue summary" toggle to the drag-drop confirm card to bypass `is_invoice` and set `direction: "revenue"`. |
+| **C — manual entry** (current v1) | Always available | Done. |
+
+- [ ] **[INPUT: Slice login]** — at handoff, search inbox for `@slicelife.com` payout/statement emails; choose option A, B, or C.
+- [ ] Implement A or B as v1.1 post-ship if needed.
+
+---
+
+## Section 3c — Labor integration (blocked — Needs-Nate)
+
+> v1 manual entry is live. Full automation requires the employee/scheduling software name.
+
+- [ ] **[INPUT: labor-app name]** — get at handoff; research email/CSV/API export; add `LaborSource` as a new `IngestionSource`.
+
+---
+
+## Section 4 — Release candidate (Needs-Nate) — *milestone: ready to ship*
+
+- [ ] Review + merge `delucas-e2e`; review + merge visual pass (`visual/delucas-pizza-warmth`).
+- [ ] `corepack pnpm typecheck && corepack pnpm test` green from `apps/delucas/`.
+- [ ] Load realistic demo data; eyeball every number against a hand-computed P&L.
+- [ ] Complete Section 3 (Packaging) checklist above, including pdfjs font verification.
+- [ ] **RC reached** when the installed artifact passes all Section 3 checks.
+
+---
+
+## Section 5 — Handoff (Needs-Nate) — *milestone: done*
+
+- [ ] Get client's email provider (**if Outlook/M365 → decision point: drag-and-drop-primary variant**).
+- [ ] **[INPUT: Slice login]** — check inbox for `@slicelife.com` emails → pick option A, B, or C from Section 3b.
+- [ ] **[INPUT: labor-app name]** — note for v1.1 labor integration.
+- [ ] On his laptop: install correct-OS build; enable 2FA + generate email app password; create his Anthropic account (his card, ~$5 spend cap); configure settings; point backup at his synced folder and watch one backup sync.
+- [ ] Watch real invoices import; correct vendor→category mappings live.
+- [ ] Tag `delucas-v1.0-shipped`; commit lockfile.
+- [ ] Walk him through it: open app → read numbers. That's the whole tutorial.
+- [ ] **Done** when he reads this month's profit on his own machine without help.
+- [ ] Post-ship (bcns, not client): extract `templates/local-app/` from the shipped app.
