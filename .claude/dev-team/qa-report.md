@@ -1,32 +1,28 @@
 # QA Report
-**Task:** A1 — `@bcns/app-core`: pricing/billing math, subscription access decisions, BYOK Anthropic client factory.
+**Task:** A2 — Scaffold `templates/hosted-web/` hosted-app starter wired to `@bcns/app-core` (`@bcns/hosted-web-template`).
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
-**Gate mode:** tests+behavioral (pure-logic pkg — no live server; gate = unit tests + import verification, SDK mocked via DI)
+**Gate mode:** tests+behavioral (live smoke pass)
 
 ## VERDICT: PASS
 
 ## Criteria Checked
-- monthlyCharge 15/16/40 seats, both tiers — engineer suite + QA edge tests, all pass — PASS
-- setupFeeCents both tiers — engineer suite + QA (differ-per-tier) — PASS
-- decideAccess all four statuses (active/past_due/canceled/trialing) — engineer + QA (trialing->provision, past_due->suspend) — PASS
-- createAnthropicClient valid key via mocked DI ctor + MissingApiKeyError on missing/empty — engineer + QA (empty, whitespace, trimmed passthrough) — PASS
-- Single pricing object, no duplicated magic numbers — grep of subscription/anthropic/index.ts for 149/349/1000/3000/20/15: NONE found — PASS
-- formatUsd(149_00)==="$149", formatUsd(1_000_00)==="$1,000" — asserted, pass — PASS
-- lint + typecheck green — `corepack pnpm --filter @bcns/app-core lint && typecheck` both clean — PASS
-- importable as `@bcns/app-core` — `tsx -e "import * as c from '@bcns/app-core'"` resolves all 11 symbols — PASS
-- web app still builds — `corepack pnpm --filter web build` succeeded — PASS
-- web 4 passing tests (a4,b1,b3,b4) still green; 4 pre-existing failures unchanged — 48 pass / 4 fail, identical set — PASS
-- SDK stays mocked (guardrail) — all client tests use injected FakeCtor; no network — PASS
+- Build + live 200 — `pnpm --filter @bcns/hosted-web-template build` OK; `next start` on :3100, AI off + no keys, home GET → **200** — PASS
+- AI opt-in boundary — existing `ai-optin.test.mjs` proves flag OFF (with/without key) never calls the factory, and has the control case (flag ON + key → 1 call); 5/5 green — PASS
+- Webhook live → suspend/provision — POST `past_due`→`suspend` (200), `active`→`provision` (200), `canceled`→`suspend` (200); routes through app-core `decideFromEvent`/`decideAccess` (unit-confirmed) — PASS
+- Webhook unit → A1 logic — `webhook.test.mjs` + new QA tests assert handler decisions via `@bcns/app-core` — PASS
+- No secrets — grep of committed `templates/hosted-web/` files: no real `sk_live`/`sk_test`/`pk_live`/`whsec_`/`sk-ant-` values (only placeholders + fake test keys); `.env.example` documents DATABASE_URL, Clerk, Stripe, ANTHROPIC_API_KEY — PASS
+- No regressions — `Dockerfile`+`DEPLOY.md` exist; `pnpm --filter web build` OK; app-core test 10/10; template lint + typecheck clean; 4 web baseline tests (a4,b1,b3,b4) 4/4 — PASS
 
-## Failures
-none
+## Live Smoke HTTP Codes
+- `GET /` (AI off, no keys) → 200
+- `POST /api/stripe/webhook` past_due → 200 `{"decision":"suspend"}`
+- `POST /api/stripe/webhook` active → 200 `{"decision":"provision"}`
+- `POST /api/stripe/webhook` canceled → 200 `{"decision":"suspend"}`
+- Server killed after run; port 3100 confirmed clear (no orphan).
 
 ## Tests Added
-- `packages/app-core/tests/qa-app-core.test.mjs` — 20 edge-case tests: exact overage math + breakdown fields, seat boundaries (14/15/0), invalid seat inputs (negative/non-integer/NaN rejected), decideAccess mapping, MissingApiKeyError on empty/whitespace, trimmed-key passthrough to injected ctor, model default/override. Wired into package.json `test` chain.
-
-## Spec Discrepancy (non-blocking — noted, not a code bug)
-- Task text states 16-seat-standard total = 151_00 and 40-seat-advanced = 399_00. These are arithmetically inconsistent with the authoritative rates (base 149_00/349_00 + PER_SEAT_CENTS=20_00, i.e. $20/seat — confirmed by criterion-2's own magic-number list). Correct math: 149_00 + 1*20_00 = 169_00; 349_00 + 25*20_00 = 849_00. The 151_00/399_00 figures only hold at $2/seat. Engineer's code is correct; the task's example totals are typos. QA tests assert the correct totals (169_00 / 849_00) and document this inline.
+- `templates/hosted-web/tests/qa-hosted-web.test.mjs` — webhook active→provision & canceled→suspend through handler; env safe defaults when no keys (no throw, all undefined, AI off) + whitespace-as-unset; AI-on control case invoking injected factory once with the configured key. Wired into `test` script. Full suite 14/14 green.
 
 ## Not Verifiable
-none — pure-logic package, no routes/DB/serialization, so no live-server smoke pass applies; import verification + DI-mocked client tests cover the boundary.
+none

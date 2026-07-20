@@ -1,22 +1,28 @@
 # Review Report
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
-**Files Reviewed:** 9 (5 src + package.json/tsconfig/eslint + 4 test files; item A1, commits 3be5edc + b951975)
-**Standards Applied:** efficiency, scalability, reliability, security
+**Item:** A2 — `templates/hosted-web/` (`@bcns/hosted-web-template`), commits c348e04 + d80c791
+**Files Reviewed:** 12 (lib/{env,ai,webhook}.ts, api/stripe/webhook/route.ts, Dockerfile, .env.example, .gitignore, .dockerignore, next.config.mjs, 3 test files)
+**Standards Applied:** security (emphasis), reliability, efficiency
 
 ## Summary
-The implementation is fundamentally sound: money is integer cents end-to-end with no float leak, the SDK is pinned at 0.39.0, DEFAULT_MODEL is exactly `claude-haiku-4-5`, the BYOK factory never reads `process.env` and never logs/leaks the key (only the trimmed key is forwarded to the injected ctor), and the DI seam makes a real SDK call impossible in tests. All 44 tests pass; lint/typecheck/web-build are green. Two real robustness gaps remain for shared money-critical code: `PRICING` is only *compile-time* readonly, so a consumer can mutate the nested tier objects at runtime and poison the shared module; and `formatUsd` silently rounds non-round cents, which is safe for today's whole-dollar prices but a latent surprise once billing renders overage/proration totals.
+No committed secrets and the AI opt-in is genuinely fail-closed — both well done. One security finding matters for a template clients clone: the webhook fails OPEN even when the signing secret is present, and reports `signatureVerified: true` while verifying nothing. The rest (secret hygiene, Docker, env parsing, tests) is sound.
 
 ## Findings
 
 ### Important
-- Important — packages/app-core/src/pricing.ts:23-26 — Safety & Security / Safe Defaults — `PRICING` is typed `Readonly<Record<Tier, TierPricing>>` but the nested `TierPricing` objects are neither `Readonly` nor frozen and `TierPricing` fields are mutable `number`; any consumer can do `PRICING.standard.monthlyCents = 1` and poison the shared single-source-of-truth at runtime (classic shared-constant mutation) — deep-freeze the map + each tier (`Object.freeze`) and make `TierPricing` fields `readonly`.
+- Important — templates/hosted-web/app/api/stripe/webhook/route.ts:37-40,54,60 — Safety/Security (auth boundary) — route computes `verificationConfigured = Boolean(stripeWebhookSecret)` but NEVER verifies the signature, then calls `handleStripeEvent` unconditionally AND returns `signatureVerified: verificationConfigured`; with the secret set (real deploy) an unauthenticated POST still reaches the provision/suspend decision while the response falsely claims `signatureVerified:true` — reads production-ready but is an auth-bypass to toggle client access — Fix: when `stripeWebhookSecret` IS set, hard-fail (501/500 "signature verification not wired") before `handleStripeEvent`; keep the keyless dev path explicitly guarded so a configured-secret deploy never silently trusts unauthenticated input.
 
 ### Minor
-- Minor — packages/app-core/src/pricing.ts:33-36 — Reliability / Explicit Over Implicit — `formatUsd` does `Math.round(cents/100)`, so non-round cents render misleadingly (`149_99` → `$150`, `149_49` → `$149`), silently hiding cents; safe now (all prices whole-dollar) but a lurking bug once billing formats overage/tax/proration — assert whole-dollar input, or use `Intl.NumberFormat("en-US",{style:"currency",currency:"USD"})` and show cents when present.
-- Minor — packages/app-core/src/pricing.ts:33 — Reliability / Fail Fast — `formatUsd` has no `NaN`/`Infinity`/negative guard (unlike `monthlyCharge`'s seat guard): `formatUsd(NaN)` → `"$NaN"`, `formatUsd(-149_00)` → `"$-149"` — add a `Number.isFinite` guard for parity and decide negative-cents rendering explicitly.
+- Minor — templates/hosted-web/app/api/stripe/webhook/route.ts:60 — Observability/honesty — `signatureVerified` is derived from "is a secret configured," not from any verification, so the field asserts a security property the code never performs — Fix: drop or rename to `signatureChecked:false` (folded into the Important fix); never surface a "verified" claim the handler cannot back.
+
+## Notes (verified clean — no action)
+- No real secrets anywhere under `templates/hosted-web/`: `.env.example` is placeholders only (`sk_test_your_...`, `whsec_your_...`, `sk-ant-your-api-key`); test keys are obvious fakes; no `sk_live`/`pk_live`/private keys. `.next/` build output is UNTRACKED and gitignored — not committed.
+- `ANTHROPIC_API_KEY` read only via `readEnv` at call time; never hard-coded, logged, or `NEXT_PUBLIC_`-prefixed. No secret can reach the browser bundle or the Docker image.
+- AI genuinely fail-closed: `maybeGetAiClient` checks `aiEnabled` FIRST, returns null before the factory is referenced; unset/garbage `AI_ENABLED` → false. Pinned by ai-optin tests (OFF+key → 0 calls; ON+no-key → 0 calls; control ON+key → 1 call) — not hollow.
+- Dockerfile: multi-stage (deps/build/run), non-root `nextjs` user, runs `node server.js` (standalone prod, not dev), no `ENV`-baked secret, `.env*` excluded by `.dockerignore`. Sound.
+- env.ts: no import-time reads/throws; empty/whitespace treated as unset; qa test proves getConfig() no-throw with all vars cleared.
+- Webhook shape validation: `parseEvent` narrows untrusted JSON (status allowlist + type/customerId/subscriptionId typechecks) before routing; malformed body → 400, not crash/misroute. The gap is authentication, not shape validation.
 
 ## STANDARDS.md Updates
-- **Money as integer cents**: all billing values are integer cents; rates/thresholds live once in `packages/app-core/src/pricing.ts`; functions read the exported constants (no duplicated magic numbers).
-- **Shared constants must be runtime-immutable**: exported shared config/pricing objects must be deep-frozen (or `as const` with `readonly` fields), not merely `Readonly<>`-typed, since consumers compile the raw `.ts` and TS readonly is erased at runtime.
-- **BYOK / no-env boundary**: external-client factories take a DI ctor seam (`deps.ClientCtor`), never read `process.env`, never log the key, and throw a typed error (`MissingApiKeyError`) on missing/empty/whitespace key.
+none (review-only; no code edits per task scope)

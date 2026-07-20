@@ -167,7 +167,7 @@
     numbers from that object (no magic numbers duplicated in the functions).
   - The package builds and is importable as `@bcns/app-core`; `pnpm lint && pnpm typecheck && pnpm build` green.
 
-### A2 — Scaffold `templates/hosted-web/`: buildable hosted-app starter wired to `@bcns/app-core` · `status: not started` · `track: full` · `flag: security`
+### A2 — Scaffold `templates/hosted-web/`: buildable hosted-app starter wired to `@bcns/app-core` · `status: done` · `track: full` · `flag: security`
 
 - **task:** Create `templates/hosted-web/` as a runnable Next.js (App Router, TS
   strict) starter representing the standard hosted client app, depending on
