@@ -1,30 +1,28 @@
 # Engineer Report
-**Task:** PLAN.md A3 — Architecture decision record for the hosted-web business & delivery model
+**Task:** PLAN.md A4 — update repo docs (CLAUDE.md, README.md) to the per-client-repo model
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
 
 ## Design Decisions
-- Docs-only item: no code/architecture change. Authored a single ADR at `docs/architecture/hosted-web-model.md` in standard Context / Decision / Consequences form.
-- Sourced every fact from PLAN.md "Decisions locked (2026-07-18)" table; no invented figures.
-
-## Sections Documented
-- **Pricing & seat model** — setup $1,000/$3,000 + recurring $149/$349, 15 seats then $20/seat/mo, with rationale.
-- **BYOK-AI** — clients attach own Anthropic key, billed by Anthropic, opt-in, default Haiku, key encrypted, never in repo.
-- **Hosting stack** — Coolify/Hetzner + Cloudflare + Neon + Clerk + Stripe; operating cost ~$25-75/mo (~10 clients), revisit past ~$150-200/mo; risk/mitigation table (single-VPS blast radius, DDoS, lock-in, secrets).
-- **Repo model** — one repo per client, with explicit note it reverses old Part II "monorepo, separate repos rejected" and why.
-- **Shared-package + template propagation** — `@bcns/ui`/`@bcns/config`/`@bcns/app-core` + `templates/hosted-web/` starter; version-bump propagation.
-- Explicit references to `@bcns/app-core` and `templates/hosted-web/` (relative links, verified paths).
+- Docs-only change; no architecture/API/data work. Aligned CLAUDE.md + README.md to the A3 ADR (`docs/architecture/hosted-web-model.md`).
+- Framed the monorepo as the **platform repo** (marketing site + DeLuca's + shared packages + template source); client apps live in their own repos.
+- New client apps: generated from `templates/hosted-web/`, consuming `@bcns/ui`/`@bcns/config`/`@bcns/app-core` **by version** (not `workspace:*`); propagate via version bump.
+- Left the generic "auto-picked up by workspace glob" line in CLAUDE.md Architecture (line 29) — it describes platform apps/packages tooling, not client-app placement, so still accurate.
 
 ## Files Changed
-- `docs/architecture/hosted-web-model.md` — new ADR (only file added).
-- `.claude/dev-team/engineer-report.md` — this report.
+- `CLAUDE.md` — rewrote "What this repo is" (platform-repo framing, added `apps/delucas`, `packages/app-core`, `templates/hosted-web`) and replaced "Adding a client app later" monorepo steps with per-client-repo-from-template steps; both point at the ADR.
+- `README.md` — rewrote intro (platform framing + ADR link), file tree (added delucas/app-core/hosted-web, "platform-owned apps only"), and "Adding a client app later" section (per-client repo + ADR link).
 
-## Verification
-- `corepack pnpm --filter web build` succeeds (docs-only change, confirmed green).
-- Valid Markdown; references to both artifacts resolve to real paths.
+## Grep for stale phrasing (acceptance #3)
+Ran (docs, excluding node_modules + `.claude/dev-team/`):
+`grep -rni "Create \`apps/<client|auto-picked-up by the workspace glob|Reserved for future app starters|reserved for future client app" --include="*.md"`
+→ **0 matches** (exit 1). No doc still asserts the monorepo-only client model. (`.claude/dev-team/team-memory.md` / `analyze-report.md` mention the old phrasing only as historical notes; not instructions, not modified.)
+
+## Build check (acceptance #4)
+`corepack pnpm --filter web build` → **succeeds** (all routes prerendered).
 
 ## Deferred / Out of Scope
-- No changes to `apps/web` content or any other `.claude/dev-team/*.md`.
+- Did not touch CLAUDE.md commands/conventions/env-var sections or the generic monorepo-tooling line (per task constraint).
 
 ## Flags for Reviewer
-- None (documentation only, no runtime/hot-path code).
+- None — docs-only. Verify the ADR relative links resolve from repo root.
