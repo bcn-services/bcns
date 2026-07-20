@@ -203,7 +203,7 @@
   the per-client-repo decision with an explicit note that it reverses old Part II,
   and the package/template propagation flow; the file is valid Markdown; build green.
 
-### A4 — Update repo docs to the per-client-repo model · `status: not started` · `track: light`
+### A4 — Update repo docs to the per-client-repo model · `status: done` · `track: light`
 
 - **task:** Update the repo's own guidance so it no longer tells future work to put
   client apps in the monorepo. In `CLAUDE.md` (repo root), replace the "Adding a

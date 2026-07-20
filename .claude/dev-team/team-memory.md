@@ -125,3 +125,10 @@
 - **What worked:** For a docs ADR, a committed node string-presence check (15 required strings + Part II reversal + ≥2 risks) is a clean, durable QA gate — better than a prose read. Sourcing all figures from the PLAN decisions table = no invented facts.
 - **What failed:** nothing.
 - **Remember next run:** ADR lives at docs/architecture/hosted-web-model.md with a __tests__/ content-check beside it. A4 (repo docs) should point CLAUDE.md + README.md at this ADR and describe the per-client-repo model, superseding CLAUDE.md's current "Adding a client app later → apps/<client>/" monorepo instructions.
+
+## 2026-07-19 — dev-team-auto — A4 repo docs to per-client-repo model
+- **Outcome:** DONE — 1 build + QA FAIL + 1 fix pass (light track, no review, branch dev-team/model-migration-run, commit 49d72eb)
+- **What happened:** Sonnet engineer reframed CLAUDE.md "Adding a client app later" + README.md to per-client repos from templates/hosted-web/ (shared packages by version), both cite the ADR, monorepo = platform repo. QA FAILED on an accuracy check: both docs described @bcns/app-core as "auth, DB, AI, billing" — wrong (it's pricing/billing math + subscription provision/suspend + BYOK Anthropic, no auth/DB). Fixer corrected both lines against source exports.
+- **What worked:** Adding an explicit ACCURACY criterion to QA ("does the doc's description of app-core match what A1 built?") caught a plausible-but-false description a presence-only grep would have passed. Worth doing on any doc item that describes code built earlier in the same run.
+- **What failed:** Engineer invented capabilities (auth, DB) for app-core that don't exist — same "assert-what-should-be-true-not-what-is" failure family as W2's over-promise. Both already covered by global learnings.
+- **Remember next run:** Section 2 (A1–A4) COMPLETE. All 8 pre-marker items DONE. STOP HERE marker reached. Everything below the marker is Needs-Nate (live accounts/GitHub) or deferred DeLuca's work.
