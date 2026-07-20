@@ -22,11 +22,11 @@ consequences.
 Two build artifacts already exist and this ADR references them as the concrete
 implementation of the code-sharing decision:
 
-- [`@bcns/app-core`](../../packages/app-core/) — the shared application-core
+- [`@nseluga/app-core`](../../packages/app-core/) — the shared application-core
   package (auth wiring, DB access, AI client, billing helpers) consumed by each
   client repo.
 - [`templates/hosted-web/`](../../templates/hosted-web/)
-  (`@bcns/hosted-web-template`) — the starter that spins up a new client repo
+  (`@nseluga/hosted-web-template`) — the starter that spins up a new client repo
   pre-wired to the hosting stack and the shared packages.
 
 ## Decision
@@ -79,7 +79,7 @@ single-VPS / self-hosting choice only once steady spend passes **~$150–200/mo*
 | --- | --- |
 | **Single-VPS blast radius** — one box hosting many clients is a single point of failure. | Off-box Neon Postgres backups (data survives the box); per-app container isolation so one app can't corrupt another; documented rebuild-from-template restore path. |
 | **DDoS / abusive traffic** | Cloudflare WAF and DDoS protection sit in front of every app; origin only reachable through Cloudflare. |
-| **Managed-service lock-in** — Neon, Clerk, Stripe, Cloudflare are all third parties. | Keep integration behind the `@bcns/app-core` seam so a provider can be swapped without touching each client app; Postgres and Stripe are portable by design. |
+| **Managed-service lock-in** — Neon, Clerk, Stripe, Cloudflare are all third parties. | Keep integration behind the `@nseluga/app-core` seam so a provider can be swapped without touching each client app; Postgres and Stripe are portable by design. |
 | **Secret management** — API keys (incl. client Anthropic keys) must never leak. | Secrets live in Coolify/host env and encrypted at rest, never in a repo; client AI keys stored encrypted per the BYOK-AI decision. |
 
 ### Repo model: one repo per client business
@@ -105,8 +105,8 @@ source. Client apps live outside it.
 
 Shared code is **not** copied between client repos. Instead:
 
-- Shared code lives in **versioned packages**: `@bcns/ui`, `@bcns/config`, and
-  [`@bcns/app-core`](../../packages/app-core/), each consumed by every client
+- Shared code lives in **versioned packages**: `@nseluga/ui`, `@nseluga/config`, and
+  [`@nseluga/app-core`](../../packages/app-core/), each consumed by every client
   repo as a normal dependency.
 - A **starter,
   [`templates/hosted-web/`](../../templates/hosted-web/)** (later a standalone
@@ -137,7 +137,7 @@ Shared code is **not** copied between client repos. Instead:
 - Single VPS is a shared failure domain until spend justifies splitting it
   (mitigated by off-box backups and container isolation).
 - Heavier reliance on managed third parties (Neon, Clerk, Stripe, Cloudflare),
-  accepted for the operational leverage and kept behind the `@bcns/app-core`
+  accepted for the operational leverage and kept behind the `@nseluga/app-core`
   seam.
 - bcns now owns ongoing hosting and maintenance obligations that the old
   one-time model did not carry.

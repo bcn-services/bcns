@@ -18,11 +18,11 @@ bcns/
 │  ├─ web/            # The landing website (Next.js App Router + TS + Tailwind)
 │  └─ delucas/        # DeLuca's, a platform-owned app
 ├─ packages/
-│  ├─ ui/             # Shared React component library (@bcns/ui)
-│  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@bcns/config)
-│  └─ app-core/       # @bcns/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client
+│  ├─ ui/             # Shared React component library (@nseluga/ui)
+│  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@nseluga/config)
+│  └─ app-core/       # @nseluga/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client
 ├─ templates/
-│  └─ hosted-web/     # Starter for spinning up a new client repo (@bcns/hosted-web-template)
+│  └─ hosted-web/     # Starter for spinning up a new client repo (@nseluga/hosted-web-template)
 ├─ package.json       # Root scripts + workspace dev dependencies
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
@@ -36,8 +36,8 @@ bcns/
 - **[Next.js](https://nextjs.org/) 14 (App Router) + TypeScript (strict)** — the site.
 - **[Tailwind CSS](https://tailwindcss.com/)** with dark-mode-ready HSL theme tokens.
 - **shadcn/ui-style components** + **[Lucide](https://lucide.dev/) icons**, with
-  shared primitives living in `@bcns/ui`.
-- **ESLint (flat config) + Prettier**, shared from `@bcns/config` and
+  shared primitives living in `@nseluga/ui`.
+- **ESLint (flat config) + Prettier**, shared from `@nseluga/config` and
   runnable from the repo root via Turbo.
 
 ---
@@ -142,10 +142,10 @@ Client apps are **not** added to this monorepo. Each new client business gets
 for the full delivery model and rationale.
 
 1. Generate a new repo from `templates/hosted-web/`
-   (`@bcns/hosted-web-template`) — pre-wired to the hosting stack and shared
+   (`@nseluga/hosted-web-template`) — pre-wired to the hosting stack and shared
    packages.
 2. Consume the shared packages **by version** (normal dependencies, not
-   `workspace:*`): `@bcns/ui`, `@bcns/config`, and `@bcns/app-core`.
+   `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
 3. Propagate shared improvements by publishing a new package version and bumping
    it in each client repo — no copy-paste per app.
 

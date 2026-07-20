@@ -8,7 +8,7 @@
 >
 > **Scope of this run (above the stop marker):** website copy/registry changes to
 > the new pricing + hosted framing, plus the shared architecture for hosted web
-> apps (a new `@bcns/app-core` package, a working `templates/hosted-web/` starter,
+> apps (a new `@nseluga/app-core` package, a working `templates/hosted-web/` starter,
 > an architecture decision record, and repo-doc updates). Everything that needs a
 > live account (Clerk, Stripe, Neon, Cloudflare, Coolify/Hetzner) or a GitHub repo
 > is a **Needs-Nate** item below the marker, per "make projects locally, connect
@@ -33,7 +33,7 @@
 | **AI (Anthropic)** | **Bring-your-own-key.** Clients attach their own Anthropic API key (billed directly by Anthropic); bcns never touches AI cost or liability. AI is an **opt-in build feature**, not a metered billing line. Default to a cheap model (Haiku); show an in-app usage indicator; store the key encrypted, never in a repo. Optional one-time "AI setup" fee for wiring it. |
 | **Hosting stack** | **Coolify on one Hetzner VPS + Cloudflare + Neon Postgres + Clerk auth + Stripe.** PaaS ergonomics at VPS prices; per-app container isolation; managed DB (off-box backups); Cloudflare for DNS/SSL/DDoS/WAF. ~$25–75/mo total to host ~10 clients. Revisit self-hosting only past ~$150–200/mo steady spend. |
 | **Repo model** | **One repo per client business** (reverses the old Part II "monorepo, separate repos rejected" decision). Reasons: per-client isolation of code/secrets/deploy, clean handoff/offboarding, independent deploy cadence, smaller security blast radius. |
-| **Code sharing** | Shared code lives in **versioned packages** (`@bcns/ui`, `@bcns/config`, new `@bcns/app-core`) consumed by each client repo; a **`templates/hosted-web/` starter** (later a standalone GitHub Template Repository) spins up new client repos pre-wired. Improve a package once → bump the version across client repos to propagate. |
+| **Code sharing** | Shared code lives in **versioned packages** (`@nseluga/ui`, `@nseluga/config`, new `@nseluga/app-core`) consumed by each client repo; a **`templates/hosted-web/` starter** (later a standalone GitHub Template Repository) spins up new client repos pre-wired. Improve a package once → bump the version across client repos to propagate. |
 | **What stays in the bcns monorepo** | The marketing site (`apps/web`), DeLuca's (`apps/delucas`), the shared packages, and the template source. This repo becomes the **bcns platform repo**. |
 
 ### Guardrails (all items)
@@ -137,10 +137,10 @@
 > Scope to what is verifiable headlessly: pure/mockable logic and a buildable
 > scaffold. Real Clerk/Stripe/Neon/Coolify wiring (needs live keys) is Needs-Nate.
 
-### A1 — Create the `@bcns/app-core` package: billing math, subscription state, BYOK-AI · `status: done` · `track: full` · `flag: money`
+### A1 — Create the `@nseluga/app-core` package: billing math, subscription state, BYOK-AI · `status: done` · `track: full` · `flag: money`
 
-- **task:** Add a new shared workspace package `packages/app-core/` (`@bcns/app-core`),
-  extending `@bcns/config` like the other packages, exporting three fully-unit-tested
+- **task:** Add a new shared workspace package `packages/app-core/` (`@nseluga/app-core`),
+  extending `@nseluga/config` like the other packages, exporting three fully-unit-tested
   modules with **no live-service dependencies**:
   **(1) Seat/billing math** — pure functions computing a client's monthly charge
   from tier + seat count: base monthly ($149 standard / $349 advanced), 15 seats
@@ -157,7 +157,7 @@
   (Haiku), and throws a typed, plain-English error when the key is missing/invalid.
   The Anthropic SDK is **mocked** in tests; the module never hard-codes a key.
 - **done when:**
-  - `pnpm --filter @bcns/app-core test` passes with unit tests covering: the
+  - `pnpm --filter @nseluga/app-core test` passes with unit tests covering: the
     monthly charge for 15 seats (no overage), 16 seats (one seat of overage), and
     40 seats, for both tiers; setup-fee lookup for both tiers; subscription-status
     → provision/suspend mapping for all four status values; the BYOK module builds
@@ -165,19 +165,19 @@
     missing/empty key.
   - The pricing config is a single exported object; the billing math reads its
     numbers from that object (no magic numbers duplicated in the functions).
-  - The package builds and is importable as `@bcns/app-core`; `pnpm lint && pnpm typecheck && pnpm build` green.
+  - The package builds and is importable as `@nseluga/app-core`; `pnpm lint && pnpm typecheck && pnpm build` green.
 
-### A2 — Scaffold `templates/hosted-web/`: buildable hosted-app starter wired to `@bcns/app-core` · `status: done` · `track: full` · `flag: security`
+### A2 — Scaffold `templates/hosted-web/`: buildable hosted-app starter wired to `@nseluga/app-core` · `status: done` · `track: full` · `flag: security`
 
 - **task:** Create `templates/hosted-web/` as a runnable Next.js (App Router, TS
   strict) starter representing the standard hosted client app, depending on
-  `@bcns/ui`, `@bcns/config`, and `@bcns/app-core` via `workspace:*`. Include:
+  `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core` via `workspace:*`. Include:
   a README with taxonomy frontmatter (`type: workflow-app`, `delivery: hosted-web`)
   and setup notes; **env-driven config** for the future live services
   (`DATABASE_URL`, Clerk keys, Stripe keys, per-app `ANTHROPIC_API_KEY`) documented
   in a committed `.env.example`, with **no real keys** and graceful behavior when a
   key is absent; an **opt-in AI module** (a feature flag / separate module that
-  imports the `@bcns/app-core` BYOK client, so a client who doesn't want AI simply
+  imports the `@nseluga/app-core` BYOK client, so a client who doesn't want AI simply
   doesn't enable it); a placeholder Stripe subscription-status webhook handler that
   calls the A1 provision/suspend logic (pure logic tested; the HTTP wiring can be a
   stub); a `Dockerfile` and a short `DEPLOY.md` describing the Coolify + Cloudflare
@@ -197,7 +197,7 @@
   Coolify/Hetzner/Cloudflare/Neon/Clerk/Stripe stack (with the operating-cost and
   risk notes), the per-client-repo decision **and that it supersedes the old Part II
   "monorepo, separate repos rejected" decision**, and the shared-package +
-  template propagation mechanism. Reference `@bcns/app-core` and `templates/hosted-web/`.
+  template propagation mechanism. Reference `@nseluga/app-core` and `templates/hosted-web/`.
 - **done when:** `docs/architecture/hosted-web-model.md` exists and documents the
   pricing model, the hosting stack with operating cost + at least two risks/mitigations,
   the per-client-repo decision with an explicit note that it reverses old Part II,
@@ -247,7 +247,7 @@ _dev-team-auto halts here after Section 2. Visual passes done on separate branch
 ## Needs-Nate — hosted infrastructure & repo setup (do after the run)
 
 - [ ] **Provision accounts:** Hetzner (one CPX31 VPS), install **Coolify**; Cloudflare (DNS/SSL/WAF); Neon (managed Postgres); Clerk (auth); Stripe (subscriptions + Customer Portal). Record which env vars each produces.
-- [ ] **Publish shared packages** to a private registry (GitHub Packages): `@bcns/ui`, `@bcns/config`, `@bcns/app-core`, so external client repos can install them by version. (Set up Renovate/Dependabot to bump them across client repos.)
+- [ ] **Publish shared packages** to a private registry (GitHub Packages): `@nseluga/ui`, `@nseluga/config`, `@nseluga/app-core`, so external client repos can install them by version. (Set up Renovate/Dependabot to bump them across client repos.)
 - [ ] **Extract the template to its own repo:** copy `templates/hosted-web/` → a new local project `bcns-app-template/`, then connect it to GitHub and mark it a **Template Repository**. (Make the project locally first; connect to GitHub after.)
 - [ ] **First client app (Coventry Hills):** needs a scoping/grilling session before any build (requirements unknown). Then generate a **new local project** `client-coventry-hills/` from the template, build the client-specific delta, deploy to Coolify; connect to GitHub after.
 - [ ] **Wire live services in `templates/hosted-web/`:** real Clerk auth, real Stripe webhook endpoint + Customer Portal, Neon `DATABASE_URL` + migrations, backups (Neon PITR + nightly dumps to R2/Storage Box), monitoring (Better Stack/UptimeRobot + Sentry). These need the keys from the provisioning step.

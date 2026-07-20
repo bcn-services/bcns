@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Boxes } from "lucide-react";
-import { Container } from "@bcns/ui";
+import { Container } from "@nseluga/ui";
 import { siteConfig } from "@/lib/site";
 
 const legalLinks = [

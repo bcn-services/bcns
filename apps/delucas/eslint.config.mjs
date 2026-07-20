@@ -1,4 +1,4 @@
-import { base } from "@bcns/config/eslint/base";
+import { base } from "@nseluga/config/eslint/base";
 
 export default [
   ...base,

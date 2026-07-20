@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@bcns/ui": "workspace:*",
+    "@nseluga/ui": "workspace:*",
     "@napi-rs/canvas": "^1.0.2",
     "better-sqlite3": "^9.6.0",
     "class-variance-authority": "^0.7.0",
@@ -28,7 +28,7 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
-    "@bcns/config": "workspace:*",
+    "@nseluga/config": "workspace:*",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",

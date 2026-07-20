@@ -2,7 +2,7 @@
 #
 # This Dockerfile assumes the app has been EXTRACTED to its own repo (see
 # README "Extracting to its own repo"): workspace:* deps are now versioned
-# @bcns/* registry deps, so a plain `pnpm install` resolves everything and the
+# @nseluga/* registry deps, so a plain `pnpm install` resolves everything and the
 # monorepo root is no longer needed. Build context = this app's own root.
 #
 #   docker build -t hosted-web .

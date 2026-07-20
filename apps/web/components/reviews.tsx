@@ -8,7 +8,7 @@ import {
   CardTitle,
   Container,
   SectionHeading,
-} from "@bcns/ui";
+} from "@nseluga/ui";
 import { siteContent } from "@/lib/content";
 
 export function Reviews() {

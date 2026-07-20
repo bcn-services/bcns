@@ -21,14 +21,23 @@ All repos live under **github.com/nseluga** (personal account, no org). **Privat
 - Rationale: with everything on a personal account (no org namespace), the `bcns-`
   prefix clusters and sorts the studio's repos together on the profile.
 
-## Shared packages (@bcns/*)
+## Shared packages (@nseluga/*)
 
-`@bcns/app-core`, `@bcns/ui`, `@bcns/config` live here and publish **privately** to
+`@nseluga/app-core`, `@nseluga/ui`, `@nseluga/config` live here and publish **privately** to
 GitHub Packages (`npm.pkg.github.com`) under `nseluga`. Clients never receive them —
 apps are hosted on our VPS, so only machines we control ever install them.
 
+> **⚠️ TEMPORARY SCOPE — migrate to a `bcns` org later.** GitHub Packages requires the
+> npm scope to match the owning account, so on a personal account the packages must be
+> `@nseluga/*`. The name `bcns` is available as a GitHub org. Once the business admin is
+> set up and it's no longer just Nate, create the free **`bcns` org** and rename
+> `@nseluga/*` → `@bcns/*` (global find/replace across this repo + the template + every
+> client repo, then republish). The `@bcns` brand already lives in all repo names
+> (`bcns`, `bcns-app-template`, `bcns-client-*`); only the npm scope is on the temporary
+> `@nseluga` name, and it's invisible to clients.
+
 **Propagation:** improve a package → `pnpm publish` a new version → bump the range /
-`npm update @bcns/app-core` in each client repo. No copy-paste.
+`npm update @nseluga/app-core` in each client repo. No copy-paste.
 
 **Publishing (from this repo, on a machine we control):**
 
@@ -40,7 +49,7 @@ apps are hosted on our VPS, so only machines we control ever install them.
 consuming repo's `.npmrc`:
 
 ```
-@bcns:registry=https://npm.pkg.github.com
+@nseluga:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
@@ -51,7 +60,7 @@ Never commit the token — supply it via env.
 
 ```js
 // next.config.mjs
-transpilePackages: ['@bcns/app-core', '@bcns/ui', '@bcns/config']
+transpilePackages: ['@nseluga/app-core', '@nseluga/ui', '@nseluga/config']
 ```
 
 ## Spinning up a new client (e.g. Coventry Hills)
@@ -71,8 +80,8 @@ legacy **desktop (Electron) app**, not a hosted web app. So it:
 - is **not** generated from `bcns-app-template` (no Next.js/hosted-web scaffold),
 - is **not** deployed to our Coolify/Hetzner VPS and carries no monthly-hosting line
   (self-hosted / client-run, "build once"),
-- still gets its own repo (`bcns-client-delucas`) and consumes `@bcns/*` by version.
+- still gets its own repo (`bcns-client-delucas`) and consumes `@nseluga/*` by version.
 
 Migration is plumbing only: extract `apps/delucas` from this monorepo into its own
-repo, repoint `@bcns/*` deps from `workspace:*` to published versions, and preserve
+repo, repoint `@nseluga/*` deps from `workspace:*` to published versions, and preserve
 history (`git subtree split`). Deferred until packages are published.

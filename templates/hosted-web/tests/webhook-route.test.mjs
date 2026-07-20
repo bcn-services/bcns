@@ -1,12 +1,12 @@
 /**
  * Route-level security tests for the Stripe webhook (fail-closed behavior).
  * Exercises the App Router POST handler directly. Run with:
- *   corepack pnpm --filter @bcns/hosted-web-template test
+ *   corepack pnpm --filter @nseluga/hosted-web-template test
  *
  * Covers the A2 security fix:
  *  - STRIPE_WEBHOOK_SECRET SET + no real signature → REFUSED (501), decision NOT reached.
  *  - STRIPE_WEBHOOK_SECRET UNSET → processes event, honest unverified markers,
- *    correct provision/suspend decision through @bcns/app-core.
+ *    correct provision/suspend decision through @nseluga/app-core.
  *  - Malformed body is still guarded (400) on the dev path.
  */
 

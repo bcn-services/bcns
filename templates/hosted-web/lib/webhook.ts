@@ -1,12 +1,12 @@
 /**
  * webhook.ts — Pure decision logic for the Stripe subscription webhook.
  *
- * All the provisioning/suspension policy routes through @bcns/app-core's pure
+ * All the provisioning/suspension policy routes through @nseluga/app-core's pure
  * `decideFromEvent`/`decideAccess`, so it is unit-testable with no Stripe SDK,
  * no network, and no HTTP. The App Router route is a thin adapter over this.
  */
 
-import { decideFromEvent, type AccessDecision, type StripeSubscriptionEvent } from "@bcns/app-core";
+import { decideFromEvent, type AccessDecision, type StripeSubscriptionEvent } from "@nseluga/app-core";
 
 export interface WebhookResult {
   decision: AccessDecision;

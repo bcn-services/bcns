@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { Badge, buttonVariants, Container } from "@bcns/ui";
+import { Badge, buttonVariants, Container } from "@nseluga/ui";
 import { siteContent } from "@/lib/content";
 
 export function Hero() {

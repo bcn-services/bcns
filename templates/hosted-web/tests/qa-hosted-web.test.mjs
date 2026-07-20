@@ -1,7 +1,7 @@
 /**
  * QA value-add tests for the hosted-web template (A2).
  * Complements the engineer's ai-optin/webhook suites. Run with:
- *   corepack pnpm --filter @bcns/hosted-web-template test
+ *   corepack pnpm --filter @nseluga/hosted-web-template test
  *
  * Covers:
  *  - webhook handler: active -> provision, canceled -> suspend (through app-core)
