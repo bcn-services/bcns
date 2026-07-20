@@ -53,7 +53,7 @@
 
 ## Section 1 — Website: new pricing + hosted framing (dev-team-auto)
 
-### W1 — Reshape pricing registry + page to setup + recurring + seats · `status: not started` · `track: full` · `flag: money`
+### W1 — Reshape pricing registry + page to setup + recurring + seats · `status: done` · `track: full` · `flag: money`
 
 - **task:** Rework the pricing content in `apps/web/lib/content.ts` and the pricing
   page/components to express the new model. Each build tier now carries a

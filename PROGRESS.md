@@ -7,7 +7,7 @@
 
 | Item | Status |
 |------|--------|
-| W1 — Reshape pricing registry + page to setup + recurring + seats | not started |
+| W1 — Reshape pricing registry + page to setup + recurring + seats | done [full] — pricing reshaped to setup ($1,000/$3,000) + monthly ($149/$349) + 15-user/$20-overage; consulting $800/day kept; FAQ rewritten; old ranges removed; QA PASS + clean review; commit a05059f |
 | W2 — Replace false ownership / "runs without us" claims with hosted framing | not started |
 | W3 — Add "how hosting works" explanation (recurring covers / stop-paying) | not started |
 | W4 — Mirror all copy changes into CONTENT.md | not started |
