@@ -9,10 +9,13 @@
 ---
 
 ## Current position
-- **Status:** P1–P6 done, e2e validated, visual passes done. Ready to run Section 2 (revenue toggle on drag-drop confirm card) via dev-team-auto.
-- **Next:** Run dev-team-auto on `apps/delucas/` — it will skip P1–P6 (done), execute Section 2, and stop at the marker.
-- **Blockers (Needs-Nate):** Founder photos, Brandon's NYU program, Brandon's experience summary; first real past-work entry; domain + deploy; DeLuca's: client laptop OS, Slice login (to check for @slicelife.com emails → unlock SliceEmailSource), labor-app name.
-- **Last updated:** 2026-07-17 (Section 2 added to PLAN.md; ready for dev-team-auto)
+- **Status:** Platform build & migration phase **complete**. Model migration merged to `main`; `@nseluga/*` packages published to GitHub Packages; `bcns-app-template` is a GitHub Template Repository; DeLuca's extracted to its own repo `bcns-client-delucas`. This repo is now the clean **platform repo** (marketing site + shared packages + template source; no client apps).
+- **Next:** Scope **Coventry Hills** (first hosted client) in a fresh session, then generate `bcns-client-coventry-hills` from the template and build. Author a fresh PLAN in that client repo.
+- **Blockers (Needs-Nate):** First live deploy (Hetzner/Coolify + Cloudflare + Neon + Clerk + Stripe) when Coventry ships; marketing-site copy gaps (founder photos, Brandon's NYU details, first past-work entry). DeLuca's remaining work (packaging/handoff) now tracked in `bcns-client-delucas`.
+- **Last updated:** 2026-07-20 (GitHub plumbing + DeLuca's extraction; see log)
+
+> **Note:** The DeLuca's milestone rows below are historical — that app now lives
+> in `bcns-client-delucas`, where its packaging/handoff work continues.
 
 ---
 
@@ -77,6 +80,18 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-20** — ✅ **GitHub plumbing complete + DeLuca's extracted (interactive session).** Got the platform onto GitHub under the personal account `nseluga` (no org) and split client apps into their own repos.
+
+  **Platform repo.** Merged the model-migration branch to `main` (PR #6). Network blocks SSH (port 22) → all git over HTTPS via the `gh` credential helper.
+
+  **Shared packages → GitHub Packages.** Wired `@nseluga/*` for private publishing (removed `private`, `version 0.1.0`, `publishConfig` → `npm.pkg.github.com`, ship raw TS via `files:[src]` + `transpilePackages`) (PR #7). Hit the GitHub Packages rule that **scope must match the owner** — `@bcns` fails on a personal account — so renamed `@bcns/*` → `@nseluga/*` repo-wide (PR #8, temporary; migrate to a `bcns` org later). Published `@nseluga/{app-core,ui,config}@0.1.0` (private). Installs need a **classic PAT** with `read:packages` — the `gh` OAuth token can publish but 403s on downloads; verified a fresh authed read works with a classic PAT.
+
+  **Template repo.** Extracted `templates/hosted-web/` → standalone private **`bcns-app-template`**, marked a GitHub *Template Repository*.
+
+  **DeLuca's extracted.** Moved `apps/delucas` out to its own repo **`bcns-client-delucas`** with full history (`git subtree split`); repointed `@nseluga/*` to `^0.1.0`, added `.npmrc` + `.gitignore`, fixed Vite/electron-vite aliases to consume the installed package. Removed it from this monorepo (PR #9); `apps/web` still builds green (13 pages). Fixed two pre-existing DeLuca's bugs there: recurring-rule `start_date` edits weren't persisting (dropped across the update path), and the dashboard didn't reflect rule changes across tabs (shared refresh); plus editing a rule now rewrites the current month + future materialized transactions while preserving past months. All verified (typecheck + full test suite + Electron build).
+
+  **Other:** local git guardrails hook (force-push/destructive-op block) as a stand-in for branch protection (unavailable on free private repos); `SETUP.md` records the repo topology, `bcns-client-<slug>` naming, and the temporary-scope → org migration.
 
 - **2026-07-17** — ✅ **E2E validation complete; Slice integration researched; PLAN.md updated.**
 

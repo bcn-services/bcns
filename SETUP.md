@@ -2,6 +2,11 @@
 
 All repos live under **github.com/nseluga** (personal account, no org). **Private by default.**
 
+> **Status (2026-07-20):** Live. `bcns` (platform) on `main`; `@nseluga/*@0.1.0`
+> published to GitHub Packages; `bcns-app-template` is a Template Repository;
+> `bcns-client-delucas` extracted and running. Fresh installs verified with a
+> classic PAT. Next: scope + build Coventry Hills.
+
 ## Repo topology
 
 - **bcns** — the platform repo (this one): marketing site (`apps/web`), shared
