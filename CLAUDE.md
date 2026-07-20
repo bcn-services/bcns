@@ -4,11 +4,12 @@ Project-level guidance for Claude Code agents working in this repo.
 
 ## What this repo is
 
-bcns is a software studio that builds custom software for local small businesses. This monorepo contains:
+bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the client-app template source. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
 - `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
-- `packages/ui/` — shared React component library (`@bcns/ui`)
-- `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@bcns/config`)
-- `templates/` — reserved for future client app starters (not a workspace package yet)
+- `packages/ui/` — shared React component library (`@nseluga/ui`)
+- `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@nseluga/config`)
+- `packages/app-core/` — shared application core (`@nseluga/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
+- `templates/hosted-web/` — starter for spinning up a new client repo (`@nseluga/hosted-web-template`); `apps/` holds only the platform's own apps
 
 ## Commands
 
@@ -37,7 +38,7 @@ All commands run from the repo root via Turborepo. There is no need to `cd` into
 - `ui/` — primitive shadcn-style components (input, label, textarea)
 - `theme-provider.tsx`, `theme-toggle.tsx` — dark mode via next-themes
 
-**Shared UI (`packages/ui/`):** Shared React primitives used by `apps/web` and any future client apps. Import as `@bcns/ui`. Add to this package when a component will be reused across apps.
+**Shared UI (`packages/ui/`):** Shared React primitives used by `apps/web` and any future client apps. Import as `@nseluga/ui`. Add to this package when a component will be reused across apps.
 
 **Shared config (`packages/config/`):** All ESLint, tsconfig base, Tailwind preset, Prettier config. `apps/web` extends these — do not duplicate config in app-level files.
 
@@ -61,10 +62,13 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 
 ## Adding a client app later
 
-1. Create `apps/<client-name>/` (auto-picked up by workspace glob).
-2. Depend on shared packages: `"@bcns/ui": "workspace:*"` and `"@bcns/config": "workspace:*"`.
-3. Extend shared configs as `apps/web` does (tsconfig, eslint, tailwind, prettier).
-4. Add the new app's `dev` script to `turbo.json` pipeline if needed.
+Client apps are **not** added to this monorepo. Each new client business gets **its own repo**, generated from `templates/hosted-web/`. See `docs/architecture/hosted-web-model.md` for the decision and rationale.
+
+1. Generate a new repo from `templates/hosted-web/` (`@nseluga/hosted-web-template`) — it comes pre-wired to the hosting stack and the shared packages.
+2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
+3. Propagate shared improvements by publishing a new package version and bumping it in each client repo — no copy-paste, no hand-editing per app.
+
+`apps/` in this monorepo holds only the platform repo's own app — the marketing site (`apps/web`). DeLuca's was extracted to its own repo (`bcns-client-delucas`).
 
 ## Deploy
 

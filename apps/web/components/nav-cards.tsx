@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Card, CardContent, Container } from "@bcns/ui";
+import { Card, CardContent, Container } from "@nseluga/ui";
 import { siteContent } from "@/lib/content";
 
 export function NavCards() {

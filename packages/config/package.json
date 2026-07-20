@@ -1,8 +1,10 @@
 {
-  "name": "@bcns/config",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@nseluga/config",
+  "version": "0.1.0",
   "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "files": [
     "eslint",
     "tailwind",

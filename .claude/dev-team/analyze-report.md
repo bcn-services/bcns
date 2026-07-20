@@ -1,66 +1,42 @@
 # Analysis Report
-**Task:** B2 — Registry rework: nav cards, two-founder about, pricing shape, /work holding state
-**Date:** 2026-07-14
+**Task:** Map monorepo workspace-package conventions so A1 can add `packages/app-core/` (`@bcns/app-core`) and A2 can scaffold `templates/hosted-web/`.
+**Date:** 2026-07-19
 
 ## Relevant Files
-
-- `apps/web/lib/content.ts` — all section interfaces + `siteContent` registry; primary change target for every B2 item
-- `apps/web/components/nav-cards.tsx` — NavCards component; cards array is hardcoded inline (not registry-driven); change target for (a)
-- `apps/web/components/about-founder.tsx` — reads `siteContent.aboutFounder`; destructures `eyebrow, title, description, cardTitleBio, cardTitleCredentials, bio, credentials`; renders SectionHeading + 2-card grid (Bio card / Credentials card); full rewrite for (b)
-- `apps/web/components/past-work.tsx` — reads `siteContent.pastWork`; destructures `eyebrow, title, description, items`; maps items → Card grid (`title`, `outcome`, `link?`); change target for (d) holding state
-- `apps/web/components/reviews.tsx` — reads `siteContent.reviews`; destructures `eyebrow, title, description, items`; maps items → Card grid (`quote`, `author`, `role`, `company`); change target for (d) holding state
-- `apps/web/components/pricing.tsx` — reads `siteContent.pricing`; destructures `eyebrow, title, description, tiers`; maps tiers → Card grid (`name`, `price`, `description`, `features[]`); `price` is already a free string; no structural change needed, only registry data for (c)
-- `apps/web/__tests__/content-registry.test.mjs` — validates 6 core section keys, required fields, all strings are `[SLOT: ...]` or step numbers, no siteConfig duplication; must be updated/extended for new section shapes
-- `apps/web/__tests__/b1-multi-page-routing.test.mjs` — line 156 asserts `about page has AboutFounder`; will break if the export is renamed; update the assertion alongside any component rename
-- `apps/web/app/about/page.tsx` — imports `AboutFounder`; update import if component export name changes
-- `apps/web/app/work/page.tsx` — imports `PastWork` and `Reviews`; no changes needed
-- `apps/web/app/pricing/page.tsx` — imports `Pricing` and `Faq`; no changes needed
+- `pnpm-workspace.yaml` — globs ONLY `apps/*` + `packages/*`. `templates/*` NOT in graph (confirmed by templates/README). A1 pkg auto-picked-up; A2 template is NOT a workspace member.
+- `package.json` (root) — `packageManager: pnpm@9.15.0`, `engines.node >=18.18.0`; scripts all `turbo run *` (BROKEN here per baseline — use per-package `corepack pnpm`). devDeps: prettier, turbo, typescript ^5.6.3. No root test script.
+- `turbo.json` — tasks: build (`dependsOn ["^build"]`, outputs `dist/**` + `.next/**`), dev, start, lint (`^build`), typecheck (`^build`), clean. **No `test` task** — package `test` scripts run via `pnpm --filter`, not turbo.
+- `packages/config/package.json` — `@bcns/config`, `type: module`, exports map (below). NO build/lint/test scripts (source-only JS/JSON consumed directly). Base A1 extends.
+- `packages/config/tsconfig/{base,react-library,nextjs}.json` — base: `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `esModuleInterop`, `target ES2022`, `module ESNext`, `moduleResolution Bundler`, `isolatedModules`, `declaration: true`; base does NOT set `noEmit`. react-library/nextjs add `noEmit: true`.
+- `packages/ui/package.json` + `tsconfig.json` — closest template for a source-only TS package (below). NO build step; consumed as raw `.ts` via exports.
+- `apps/delucas/` — has `@anthropic-ai/sdk ^0.39.0` (lock: 0.39.0) AND the test recipe A1 needs: `tsx` ^4.23.1 for `.mjs` tests importing `.ts`.
+- `apps/delucas/tests/*.test.mjs` — pure-Node test pattern to copy (node:assert/strict, hand-rolled `test()`, run via `tsx tests/foo.test.mjs`).
+- `templates/README.md` — states templates are intentionally OUT of the install graph until promoted to `apps/`.
 
 ## Data Flow
+- Packages are **source-only, not built**: `@bcns/config` and `@bcns/ui` expose raw `.ts`/`.js` via `exports`; consumers (web, delucas) compile them through their own bundler/tsc. No `dist/` for config/ui. `@bcns/app-core` should follow: export `./src/index.ts` directly, no build step.
+- Consumption: dependents list `"@bcns/config": "workspace:*"` (devDep) + `"@bcns/ui": "workspace:*"` (dep); tsconfig `extends "@bcns/config/tsconfig/<preset>.json"`; eslint `import { base } from "@bcns/config/eslint/base"`.
 
-Registry (`content.ts`) → component destructures section key → renders JSX. No async, no server fetch — pure static import. All B2 changes follow the same pattern: (1) add/reshape interfaces in `content.ts`, (2) update `siteContent` object to match, (3) update consuming component to read new shape.
+## Patterns to Follow (GROUND TRUTH — copy exactly)
+- **`@bcns/app-core` package.json** (model on ui, drop React): name `@bcns/app-core`, `version 0.0.0`, `private true`, `type module`, `exports { ".": "./src/index.ts" }`, scripts `{lint:"eslint .", typecheck:"tsc --noEmit", test:<tsx chain>, clean:"rm -rf .turbo node_modules"}`, deps `{"@anthropic-ai/sdk":"^0.39.0"}`, devDeps `{"@bcns/config":"workspace:*","tsx":"^4.23.1","typescript":"^5.6.3","eslint":"^9.15.0","@types/node":"^22.9.0"}`.
+- **`@bcns/app-core` tsconfig.json** (ui's, swap preset to base + add noEmit since no JSX): `{"extends":"@bcns/config/tsconfig/base.json","compilerOptions":{"baseUrl":".","noEmit":true},"include":["src/**/*.ts"],"exclude":["node_modules","dist"]}`. base.json does NOT set noEmit — MUST add it for typecheck-only pkg.
+- **eslint.config.mjs** (copy ui's verbatim): `import { base } from "@bcns/config/eslint/base";` newline `export default base;`
+- **`@bcns/config` exports** (extend via `"./tsconfig/base.json"`; eslint via `"./eslint/base"`): tsconfig entries map `"./tsconfig/base.json": "./tsconfig/base.json"`.
+- Every pkg: `version 0.0.0`, `private: true`, `type: module`.
 
-## Patterns to Follow
-
-- Every interface lives at top of `content.ts` before `SiteContent`; named `*Content`, `*Item`, `*Tier` conventions
-- `SiteContent` interface aggregates all section keys; adding a new key requires adding it to both the interface and the `siteContent` object
-- All string values in `siteContent` must be `[SLOT: ...]` placeholders or step-number strings (enforced by `content-registry.test.mjs` Test 4 — `SLOT_RE = /^\[SLOT: [^\]]+\]$/`)
-- Arrays use `[]` type (open-ended) for variable-length; tuples (`[A, A, A]`) only for fixed-length like `proofPoints`
-- Components import from `@/lib/content` and `@bcns/ui`; icons from `lucide-react` inside component files (not registry)
-- Section wrapper: `<section id="..." className="border-t border-border/60 py-24 sm:py-28">` wrapped in `<Container>`, opens with `<SectionHeading eyebrow title description />`
-- NavCards uses `<Container>` + `<ul role="list">` + `<Link>` wrapping `<Card>`; no SectionHeading (it's a nav widget, not a content section)
+## Test conventions
+- **No package uses vitest/jest** (neither installed; no vitest in `node_modules/.bin`). Two patterns exist: (1) web app `node --experimental-strip-types --test __tests__/*.mjs` (Node built-in runner, imports `.ts`); (2) delucas `tsx tests/*.test.mjs` with `node:assert/strict` + hand-rolled `test()`, NO runner.
+- **For pure-TS `@bcns/app-core`, use the delucas `tsx` pattern** — `tsx` already a workspace dep (^4.23.1, in lock), runs `.mjs` importing `../src/x.ts` with zero config, non-zero exit on failure. Do NOT add vitest. `pnpm --filter @bcns/app-core test` runs the chain.
+- **`test` script MUST be an explicit `&&` chain like delucas** (`tsx tests/a.test.mjs && tsx tests/b.test.mjs`) — bare glob `tsx tests/*.test.mjs` runs only the first file / mis-expands under zsh. Web-style `node --experimental-strip-types --test tests/*.mjs` also works with zero deps if A1 prefers no `tsx` dep.
+- Mock `@anthropic-ai/sdk` via dependency injection / passed-in client — delucas tests are pure, no network.
 
 ## Likely Changes
-
-### (a) navCards — registry-driven NavCards
-- `content.ts`: add `NavCardItem { label: string; description: string; href: string }` + `NavCardsContent { items: NavCardItem[] }` interfaces; add `navCards` key to `SiteContent` and `siteContent` with 3–4 SLOT entries
-- `nav-cards.tsx`: replace `const cards = [...] as const` with `siteContent.navCards.items`; field names `label/description/href` already match current inline shape — drop `as const`
-
-### (b) Two-founder about
-- `content.ts`: add `FounderItem { name: string; roleLine: string; photo?: string; bio: string; credentials: string[] }` interface; replace `AboutFounderContent` with `AboutContent { eyebrow: string; title: string; description: string; founders: [FounderItem, FounderItem]; whyBcns: string }`; rename key in `SiteContent` and `siteContent` from `aboutFounder` → `about`
-- `about-founder.tsx`: full rewrite — destructure from `siteContent.about`; render two founder sub-cards (name, roleLine, bio, credentials[]) + whyBcns block; component export rename optional (e.g. `AboutSection`) but must update all references if renamed
-- `apps/web/app/about/page.tsx`: update import if component is renamed
-- `apps/web/__tests__/b1-multi-page-routing.test.mjs` line 156: update `"AboutFounder"` string check to new export name if renamed
-
-### (c) Pricing shape — 3-card with tier-3 as AI consulting day-rate
-- `content.ts`: `PricingTier.price` is already `string` (free-string) — no interface change needed; `tiers` is already `PricingTier[]` (open array) supporting exactly 3 entries; only update `siteContent.pricing.tiers` data when copy is ready
-- `pricing.tsx`: no structural change required; `price` already renders as `<p className="text-2xl font-bold">{price}</p>` — free string renders fine
-
-### (d) holdingState for pastWork + reviews
-- `content.ts`: add `HoldingState { title: string; body: string; ctaLabel: string }` interface; add `holdingState?: HoldingState` to `PastWorkContent` and `ReviewsContent`; add SLOT values to `siteContent.pastWork.holdingState` and `siteContent.reviews.holdingState`
-- `past-work.tsx`: destructure `holdingState` alongside `items`; add conditional: `items.length === 0` → render holding state card using `holdingState.title / .body / .ctaLabel`; else render existing grid unchanged
-- `reviews.tsx`: same conditional pattern as `past-work.tsx`
-
-### (e) Per-page metadata
-- `content.ts`: `PageMeta { title: string; description: string }` and `PageMetaRegistry { home, services, work, pricing, about }` already exist and are fully stubbed — no changes needed to the registry shape
-- Check `apps/web/app/*/page.tsx` files: if they are not yet reading from `siteContent.pageMeta` for their `export const metadata`, wire them up
+- A1: create `packages/app-core/{package.json,tsconfig.json,eslint.config.mjs,src/index.ts,tests/*.test.mjs}`; run `corepack pnpm install` at root to link + register `@bcns/app-core`.
+- A2: create `templates/hosted-web/` — NOT a workspace pkg (glob excludes templates). Stays out of install graph by design.
 
 ## Risks
-
-- `content-registry.test.mjs` Test 1 hardcodes only 6 core section keys — adding `navCards` / renaming `aboutFounder` → `about` won't break Test 1, but the test won't cover new keys; add assertions for `navCards`, `about`, and `holdingState` fields in the B2 QA test
-- Test 4 recurses the entire `siteContent` object — `holdingState` fields and `FounderItem` string fields must all be `[SLOT: ...]` placeholders; `photo` field should be `undefined` or a SLOT (empty string would fail the regex)
-- `b1-multi-page-routing.test.mjs` line 156 checks for the string `"AboutFounder"` in `app/about/page.tsx` source — if the component is renamed, this assertion fails silently at the QA gate; update that line at the same time as the rename
-- `nav-cards.tsx` currently uses `as const` on the inline array giving literal types for `href`; removing it is safe — `NavCardItem.href` will be `string`, which is what `next/link`'s `href` prop accepts
-- `FounderItem.founders` is a 2-tuple `[FounderItem, FounderItem]` — TypeScript will enforce exactly 2 founders; if the registry ever needs 1 or 3, the tuple must be relaxed to `FounderItem[]`
-- No existing tests cover NavCards rendering, AboutFounder rendering logic, PastWork/Reviews holding state, or pricing tier count — the B2 QA test file must add all of these assertions from scratch
-- `pageMeta` already exists fully stubbed; (e) is likely a wiring task in page files, not a registry task — verify each `app/*/page.tsx` actually exports `metadata` reading from registry before marking (e) done
+- **`templates/*` deliberately outside workspace glob** — A2's `templates/hosted-web/package.json` won't be installed/linked; `workspace:*` deps inside won't resolve unless glob extended. Confirm A2 intent (clone-starter vs. live member); default is clone-starter (leave glob alone).
+- Root turbo scripts BROKEN (baseline): verify A1 with `corepack pnpm --filter @bcns/app-core test|typecheck|lint`, never root `pnpm test`.
+- base.json sets `declaration: true` + no `noEmit`; app-core tsconfig MUST override `noEmit: true` (react-library/nextjs presets do; base does not).
+- `@anthropic-ai/sdk` pinned `^0.39.0` in delucas — match exactly for lockfile consistency.
+- `tsx` glob expansion quirk — use explicit `&&` test chain (see Test conventions).

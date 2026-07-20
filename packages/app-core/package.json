@@ -1,0 +1,30 @@
+{
+  "name": "@nseluga/app-core",
+  "version": "0.1.0",
+  "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "src"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx tests/pricing.test.mjs && tsx tests/subscription.test.mjs && tsx tests/anthropic.test.mjs && tsx tests/qa-app-core.test.mjs && tsx tests/fix-app-core.test.mjs",
+    "clean": "rm -rf .turbo node_modules"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@nseluga/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "eslint": "^9.15.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,138 +1,109 @@
-# Fix Report — P5 Dashboard
-**Date:** 2026-07-15
-**Findings addressed:** 4 of 4: 0 QA failures + 3 Important + 1 Minor review findings
+# Fix Report
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 2 of 2 actionable Minor review findings (W1 pricing)
 
 ## Changes Made
-- `main.ts:431–443` — added field allowlist + per-field type validation to `db:updateRecurringRule` before passing to `updateRecurringRule`; allowed fields: `amount_cents`, `day_of_month`, `vendor`, `category`, `end_date`, `is_active`; wrapped in existing try/catch returning `{ok, error}` — review Important (security / validate at boundaries)
-- `main.ts:305–308` — changed `return { ok: false, error: "…" }` on bad month input to `throw new Error("…")` so the renderer's catch path handles it and the return type stays `Transaction[]` throughout — review Important (reliability / explicit over implicit)
-- `BannerList.tsx:28–32` — removed `dismissedError` from `useEffect` dep array; effect now runs only when `currentError` changes, eliminating the no-op re-run after every dismiss — review Important (reliability / handle errors at boundaries)
-- `TransactionList.tsx` — added `deleteError` state; surfaces delete failures via `<p>` element above the table (same visual pattern as `editError`); clears on cancel — review Minor (reliability / don't assume success)
-
-## Disputed
-None.
-
-## Deferred
-None.
+- apps/web/components/pricing.tsx:27 — replaced magic `index === 2` with `isConsulting = !setup` so the render branches on data shape (build tiers have setup/monthly/seats; consulting has price), preventing blank `<p>` on reorder — review Minor.
+- apps/web/__tests__/w1-pricing.test.mjs:62-90 — added "criterion 1b" asserting pricing.tsx renders `{setup}/{monthly}/{seats}` (+consulting `{price}`) and, when a build exists, the six money strings in built `pricing.html`; gates component drift the registry-only tests missed — review Minor.
 
 ## Verification
-- `pnpm --filter @delucas/app typecheck` — PASS
-- `pnpm --filter @delucas/app lint` — PASS
-- All 113 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 23 dashboard)
-
----
-# Fix Report — P6 Settings, backup, first-run
-**Date:** 2026-07-15
-**Findings addressed:** 6 of 6: 0 QA failures + 6 review findings (1 Critical + 2 Important + 3 Minor)
-
-## Changes Made
-- `main.ts:50–65` — added `ALLOWED_SETTINGS_KEYS = new Set([...])` with all 9 valid keys at module level — review Critical
-- `main.ts:705` — added allowlist guard in `settings:set`; throws on any key not in the set — review Critical
-- `backup.ts:117–128` — restructured `runBackup`: copy in own try/catch with early return on failure; rotation and status update only after copy succeeds — review Important
-- `main.ts:729–752` — restructured `backup:triggerNow`: copy in own try/catch, rotation after success only, calls `setBackupStatus({ lastBackup: today, error: null })` to sync in-memory state — review Important
-- `backup.ts:32–37` — added `setBackupStatus(update)` export to allow main.ts to update the module-private singleton — supporting change for Important fix #3
-- `backup.ts:113–128` — added JSDoc on `runBackup` noting `copyFileSync` skips WAL sidecars; recommends `db.backup(dest)` for production — review Minor
-- `electron-builder.config.mjs:20` — added `asarUnpack: ["**/*.node"]` to unpack native binaries from asar archive — review Minor
-- `Settings.tsx:78` — replaced silent catch with `console.error("[Settings] failed to load", settingKey, err)` — review Minor
+- corepack pnpm lint + typecheck + build all green; `/pricing` prerendered static.
+- Suite: 4 gate tests (a4,b1,b3,b4) green; w1-pricing 8/8 (was 7, +1 new); exactly the 4 pre-existing stale files still fail (a2-fix, a2-new, b2, content-registry) — no new failures.
+- Python check on built HTML: all six strings ($1,000/$149/$3,000/$349/$20/15) FOUND.
 
 ## Disputed
-None.
+none.
 
 ## Deferred
-None.
+- content.ts:317,332 duplicate `price` on build tiers — reviewer marked acceptable (kept for type/b3 stability); left unchanged per instructions.
+
+---
+# Fix Report — W2 hosted framing
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 2 of 2 (1 review Important + 1 review Minor)
+
+## Changes Made
+- apps/web/lib/content.ts:278 — reworded contact copy from present-tense self-serve "you can export it any time" to service/intent "we'll export it and hand it over whenever you ask" (no unbuilt-feature guarantee; still satisfies W2 #4 data-ownership+export) — review Important.
+- apps/web/lib/content.ts:353 — renamed "Plain-English handoff notes" to "Plain-English project notes" to avoid drift from site-wide hosting reframe — review Minor.
 
 ## Verification
-- `pnpm --filter @delucas/app typecheck` — PASS
-- `pnpm --filter @delucas/app lint` — PASS
-- All 133 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 23 dashboard + 10 backup + 10 settings)
-
----
-# Fix Report — P1 App Scaffold
-**Date:** 2026-07-15
-**Findings addressed:** 5 of 5: 0 QA failures + 5 review findings (2 Important + 3 Minor)
-
-## Changes Made
-- `apps/delucas/src/shell-electron/main.ts:26` — `sandbox: false` → `sandbox: true`; Chromium process sandbox restored — review Important
-- `apps/delucas/src/shell-electron/main.ts:32,34` — replaced `void win.loadURL/loadFile(...)` with `.catch(err => console.error('[main] load failed', err))` to surface load failures — review Minor
-- `apps/delucas/src/shell-electron/main.ts:86-107` — wrapped `createWindow()` in try/catch inside `app.whenReady` and `activate` handlers; calls `app.quit()` with logged error on failure — review Minor
-- `apps/delucas/tests/import-boundary.test.mjs:15-16,41-44` — extended scan to also cover `src/bridge/` (excluding `preload.ts`); now catches forbidden imports in `mockBridge.ts` and `BridgeInterface.ts` — review Important
-- `apps/delucas/src/bridge/BridgeInterface.ts:19` — added comment on `db.query` flagging that ipcMain handler must use parameterized queries only and must never pass raw client SQL to SQLite — review Minor
+- corepack pnpm lint + typecheck + build all green.
+- Suite: a4/b1/b3/b4 + all w1 + all w2 pass; exactly the 4 pre-existing files fail (a2-fix, a2-new, b2, content-registry) — no new failures.
+- Python: content.ts has 0 em-dashes; "Use it forever, free" and "whether we work together or not" absent. W2 test #4 unchanged — reworded copy retains "your data" + "export" tokens the `/export/` assertion matches.
 
 ## Disputed
-None.
+none.
 
 ## Deferred
-None.
+none.
+
+---
+# Fix Report — A1 pricing.ts hardening
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 3 of 3 review findings (1 Important + 2 Minor)
+
+## Changes Made
+- packages/app-core/src/pricing.ts:11-14 — `TierPricing` fields `setupCents`/`monthlyCents` made `readonly` — review Important.
+- packages/app-core/src/pricing.ts:23-26 — deep-froze `PRICING`: `Object.freeze` on the map AND each tier object (kept `as const`), so runtime mutation throws in strict mode and the source-of-truth stays intact — review Important.
+- packages/app-core/src/pricing.ts:33 — `formatUsd` now renders exact cents when present (149_99→$149.99) via integer cents/mod math, bare whole dollars otherwise (149_00→$149, 1_000_00→$1,000 preserved) — review Minor.
+- packages/app-core/src/pricing.ts:33 — added `Number.isFinite` guard (throws on NaN/±Infinity, mirroring seat guard); negatives format as credits (-20_00→"-$20") deliberately, not thrown — review Minor.
+- packages/app-core/tests/fix-app-core.test.mjs — new: freeze holds (map + nested tier, mutation throws & value intact), cents rendering, whole-dollar contract, NaN/Infinity guard, negative credits (10 tests); wired into package.json test chain.
 
 ## Verification
-- `pnpm --filter @delucas/app typecheck` — PASS
-- `pnpm --filter @delucas/app lint` — PASS
-- `node apps/delucas/tests/import-boundary.test.mjs` — PASS (4 files checked, 0 violations)
-
----
-# Fix Report — P2 Data model + P&L core
-**Date:** 2026-07-15
-**Findings addressed:** 7 of 7: 0 QA failures + 7 review findings (2 Critical, 4 Important, 1 Minor)
-
-## Changes Made
-- `main.ts:81` — Added `Array.isArray(params)` guard in `db:query`; rejects non-array params with thrown error before spread — review Critical
-- `main.ts:100–133` — `db:insertTransaction`: full runtime validation (amount_cents positive integer; direction/category/source checked against closed Sets); try/catch returning `{ ok, error }` structured response — review Critical
-- `queries.ts:27–51` — `getTransactionsByMonth`: added `/^\d{4}-\d{2}$/` regex guard before LIKE; added new `getTransactionsInRange(db, from, to)` with date range `>=`/`<=` — review Important
-- `main.ts:146–159` — `db:get12MonthSeries`: replaced unbounded `getTransactions()` with 12-month window via `getTransactionsInRange(fromDate, toDate)` — review Important
-- `recurring.ts:83–114` — Wrapped each rule's month loop in `db.transaction(...)` to prevent partial materialization on crash — review Important
-- `main.ts:226–231` — `settings:set`: rejects non-string/non-number values before `String()` coercion; throws descriptive error — review Important
-- `main.ts` (all read-path handlers) — Wrapped `db:query`, `db:getTransactions`, `db:getTransactionsByMonth`, `db:getMonthPnl`, `db:get12MonthSeries`, `db:getSummary`, `db:getRecurringRules`, `db:materializeRecurring`, `db:isEmailProcessed`, `settings:get` in try/catch with `console.error` logging — review Minor
+- corepack pnpm --filter @bcns/app-core test — all green (engineer + QA 20 + fix 10); lint + typecheck clean.
+- corepack pnpm --filter web build succeeds; web's 4 gate tests (a4,b1,b3,b4) still green.
+- grep confirmed no consumer relies on old rounding — `formatUsd` used only within app-core tests.
 
 ## Disputed
-None.
+none.
 
 ## Deferred
-None — all 7 findings addressed. typecheck, lint, and all 43 tests pass on `feat/delucas-p1-scaffold`.
+none.
+
 ---
-# Fix Report — P3 Ingestion framework
-**Date:** 2026-07-15
-**Findings addressed:** 6 of 6: 0 QA failures + 6 review findings (2 Critical + 3 Important + 1 Minor)
+# Fix Report — A2 webhook fail-closed (security)
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 2 of 2 review findings (1 Important + 1 Minor)
 
 ## Changes Made
-- `ingestion/llm.ts:65` — hoisted `new Anthropic({ timeout: 30_000 })` to module scope; removed per-call instantiation — review Critical + Minor 6
-- `main.ts:307` — added `path.resolve()` + home-dir containment check on `ingestion:processPdf`; strips resolved path from forwarded error messages — review Critical
-- `main.ts:282` — added `/^\d{4}-\d{2}-\d{2}$/.test(tx.date)` to `submitManual` validation block — review Important
-- `main.ts:330` — added `/^\d{4}-\d{2}-\d{2}$/.test(tx.date)` to `confirmImport` validation block — review Important
-- `ingestion/pdf.ts:39–65` — wrapped page-render block in `try/finally`; calls `pdfDocument.destroy()` in finally — review Important
-- `ingestion/runner.ts:44–46` — added comment documenting that `failed` counts source-level errors, not per-transaction failures — review Important
-
-## Disputed
-None.
-
-## Deferred
-None.
+- templates/hosted-web/app/api/stripe/webhook/route.ts:35-70 — fail-closed: when `STRIPE_WEBHOOK_SECRET` IS set the route now returns 501 "signature verification not wired" and never reaches `handleStripeEvent`; secret-unset dev path processes the event but returns `signatureVerified:false` + `mode:"unverified-dev"` — review Important.
+- templates/hosted-web/app/api/stripe/webhook/route.ts:60 — dropped the misleading `signatureVerified:verificationConfigured` (true); no path ever claims verified — review Minor (folded into Important fix).
+- templates/hosted-web/app/api/stripe/webhook/route.ts:1-30 — prominent fail-closed security comment documenting both modes + how to wire `stripe.webhooks.constructEvent`.
+- templates/hosted-web/DEPLOY.md:28 — added SECURITY note: template refuses when secret set; wire real verification before production.
+- templates/hosted-web/tests/webhook-route.test.mjs — new: secret-set->501 (no decision/verified leak), secret-unset->correct suspend/provision + unverified markers, malformed->400, never `signatureVerified:true` (5 tests); wired into `test` script.
 
 ## Verification
-- `pnpm --filter @delucas/app typecheck` — PASS
-- `pnpm --filter @delucas/app lint` — PASS
-- All 68 tests pass (22 pnl + 21 db + 25 ingestion)
----
-# Fix Report — P4 (Email / IMAP ingestion)
-**Date:** 2026-07-15
-**Findings addressed:** 8 of 8 review findings (0 QA failures + 8 review findings)
-
-## Changes Made
-- `imap.ts:136–145` — added `MAX_ATTACHMENT_BYTES` (20 MB); `streamToBuffer` tracks accumulated size, calls `destroy?.()`, rejects with logged error on overflow — review Critical
-- `imap.ts:174` — added `MAX_BATCH_SIZE = 50`; loop breaks at `results.length >= MAX_BATCH_SIZE` so at most 50 unprocessed messages downloaded per run — review Critical
-- `imap.ts:206–209` — download failure `catch` block now calls `recordProcessed(db, messageId)` to prevent infinite retry on permanently broken attachments — review Minor
-- `main.ts:109` / `email.ts` — `getImapConfig` guards `parseInt` with `Number.isNaN`; calls `setEmailError("Invalid IMAP port in settings")` and returns null; `setEmailError()` exported from `email.ts` — review Important
-- `email.ts:43–47` — added JSDoc on `emailStatus` documenting process-lifetime/reset-on-restart as intentional for v1 — review Important
-- `main.ts:493–507` — moved startup ingestion block to after `createWindow()` (with `return` on window failure) so IMAP timeout no longer delays window open — review Important
-- `vendor-mapping.ts:74–80` — added JSDoc on `resolveCategory` documenting first-match-wins and insertion-order control — review Minor
-- `review-queue.ts:33–34` — added JSDoc on `queue` and `nextId` documenting in-memory-only, reset-on-restart as intentional for v1 — review Important / Minor
+- `pnpm --filter @bcns/hosted-web-template` test 19/19 (was 14, +5), build/lint/typecheck all green.
+- Live smoke on :3100 — secret SET -> POST past_due = HTTP 501 refusal (no decision); secret UNSET -> HTTP 200 `{"decision":"suspend",...,"signatureVerified":false,"mode":"unverified-dev"}`; server killed, port clear (no orphan).
+- `pnpm --filter web` build green; `pnpm --filter @bcns/app-core` test 10/10 green.
 
 ## Disputed
-None.
+none.
 
 ## Deferred
-None.
+none.
+
+---
+# Fix Report — A4 app-core doc description
+**Branch:** dev-team/model-migration-run
+**Date:** 2026-07-19
+**Findings addressed:** 1 of 1 QA bug (A4 C4)
+
+## Changes Made
+- CLAUDE.md:12 — replaced inaccurate "auth, DB, AI client, billing helpers" with "pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client" — QA bug.
+- README.md:23 — same correction (tree-diagram phrasing), matching `packages/app-core/src/index.ts` exports (PRICING/monthlyCharge, decideAccess/decideFromEvent, createAnthropicClient) — no auth, no DB — QA bug.
 
 ## Verification
-- `pnpm --filter @delucas/app typecheck` — PASS
-- `pnpm --filter @delucas/app lint` — PASS
-- All 91 tests pass (22 pnl + 21 db + 25 ingestion + 22 email + 1 import-boundary)
----
+- Confirmed against `packages/app-core/src/index.ts`: only pricing/subscription/anthropic exports — no auth/DB.
+- grep "auth, DB" in CLAUDE.md + README.md — 0 matches.
+- corepack pnpm --filter web build — EXIT=0, all routes prerendered static.
+
+## Disputed
+none.
+
+## Deferred
+none.

@@ -1,8 +1,12 @@
 # bcns
 
-Monorepo for **bcns** — a software studio that builds custom software for
-local small businesses. This repo currently contains the marketing website; it's
-scaffolded so client apps and shared code can be added later without rework.
+Platform monorepo for **bcns** — a software studio that builds custom software
+for local small businesses. This repo holds the marketing site, the shared
+packages, and the client-app template source. **Client apps do not live
+here** — each client business gets its own repo generated from
+`templates/hosted-web/`, consuming the shared packages by version. See
+[`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
+for the delivery model and rationale.
 
 ---
 
@@ -10,12 +14,14 @@ scaffolded so client apps and shared code can be added later without rework.
 
 ```
 bcns/
-├─ apps/
+├─ apps/              # Platform-owned apps only (not client apps)
 │  └─ web/            # The landing website (Next.js App Router + TS + Tailwind)
 ├─ packages/
-│  ├─ ui/             # Shared React component library (@bcns/ui)
-│  └─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@bcns/config)
-├─ templates/         # Reserved for future app starters (not a workspace yet)
+│  ├─ ui/             # Shared React component library (@nseluga/ui)
+│  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@nseluga/config)
+│  └─ app-core/       # @nseluga/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client
+├─ templates/
+│  └─ hosted-web/     # Starter for spinning up a new client repo (@nseluga/hosted-web-template)
 ├─ package.json       # Root scripts + workspace dev dependencies
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
@@ -29,8 +35,8 @@ bcns/
 - **[Next.js](https://nextjs.org/) 14 (App Router) + TypeScript (strict)** — the site.
 - **[Tailwind CSS](https://tailwindcss.com/)** with dark-mode-ready HSL theme tokens.
 - **shadcn/ui-style components** + **[Lucide](https://lucide.dev/) icons**, with
-  shared primitives living in `@bcns/ui`.
-- **ESLint (flat config) + Prettier**, shared from `@bcns/config` and
+  shared primitives living in `@nseluga/ui`.
+- **ESLint (flat config) + Prettier**, shared from `@nseluga/config` and
   runnable from the repo root via Turbo.
 
 ---
@@ -129,8 +135,18 @@ lean.)
 
 ## Adding a client app later
 
-1. Create `apps/<client-name>/` (it's auto-picked-up by the workspace glob).
-2. Depend on the shared packages: `"@bcns/ui": "workspace:*"` and
-   `"@bcns/config": "workspace:*"`.
-3. Extend the shared configs (see how `apps/web` wires up `tsconfig`, `eslint`,
-   `tailwind`, and `prettier`).
+Client apps are **not** added to this monorepo. Each new client business gets
+**its own repo**, generated from `templates/hosted-web/`. See
+[`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
+for the full delivery model and rationale.
+
+1. Generate a new repo from `templates/hosted-web/`
+   (`@nseluga/hosted-web-template`) — pre-wired to the hosting stack and shared
+   packages.
+2. Consume the shared packages **by version** (normal dependencies, not
+   `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
+3. Propagate shared improvements by publishing a new package version and bumping
+   it in each client repo — no copy-paste per app.
+
+`apps/` in this repo holds only the platform's own app (`apps/web`). DeLuca's
+lives in its own repo, `bcns-client-delucas`.

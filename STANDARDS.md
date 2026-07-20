@@ -2,7 +2,22 @@
 
 Project-specific efficiency, reliability, and resilience conventions observed in this codebase. These extend the global review standards and do not duplicate them.
 
+## Platform Repo & Shared Packages
+
+- **Shared packages publish to GitHub Packages.** `@nseluga/app-core`, `@nseluga/ui`, `@nseluga/config` are published (private) to `npm.pkg.github.com`; each carries a `publishConfig.registry` and a `files` list that ships its source. Bump the version and `pnpm -r publish --no-git-checks` to propagate; client repos consume by semver range, never `workspace:*`.
+- **Packages ship raw TypeScript, no build step.** Consumers must transpile them — Next apps via `transpilePackages`, Vite/Electron apps by aliasing `@nseluga/ui` to the installed `src` entry. Do not add a compile step without also updating every consumer.
+- **Installs require a classic PAT** with `read:packages` — the `gh` CLI OAuth token can publish but 403s on downloads. Auth lives in the machine's `~/.npmrc` (or `GITHUB_TOKEN` env), never committed.
+- **Scope = account owner (temporary).** The `@nseluga` scope exists only because GitHub Packages ties npm scope to the owning account; migrating to a `bcns` org (rename `@nseluga/*` → `@bcns/*`) is deferred. The `@bcns` brand lives in repo names, not the package scope.
+
 ## Electron Security
+
+> These apply to **client desktop repos** (e.g. `bcns-client-delucas`) — the
+> platform repo no longer contains an Electron app. Kept here as the shared standard.
+>
+> Native-module note: `better-sqlite3` (and other native deps) can only be built
+> for one ABI at a time — run tests on the **Node** build (`pnpm rebuild better-sqlite3`),
+> run/package the app on the **Electron** build (`electron-builder install-app-deps`).
+> Switching contexts requires a rebuild.
 
 - **Electron BrowserWindow sandbox**: all BrowserWindow instances must set `sandbox: true`; preload `contextBridge` works under sandbox and does not require `sandbox: false`.
 - **IPC boundary test coverage**: the import-boundary static-analysis test must scan every source directory whose output is bundled into the renderer (at minimum `src/renderer/` and `src/bridge/`), not just `src/renderer/`.
