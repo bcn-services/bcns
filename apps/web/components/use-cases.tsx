@@ -28,10 +28,22 @@ export function UseCases() {
           {items.map(({ tag, title: caseTitle, description: caseDescription }, index) => {
             const Icon = useCaseIcons[index];
             if (!Icon) return null;
+            const headerGradients = [
+              "bg-gradient-to-br from-accent/70 to-transparent",
+              "bg-gradient-to-bl from-accent/60 to-transparent",
+              "bg-gradient-to-tr from-accent/60 to-transparent",
+              "bg-gradient-to-b from-primary/18 to-transparent",
+            ] as const;
+            const iconColors = [
+              "text-accent-foreground/80",
+              "text-accent-foreground/80",
+              "text-accent-foreground/80",
+              "text-primary/70",
+            ] as const;
             return (
               <Card key={index} className={`group h-full overflow-hidden transition-shadow hover:shadow-md${index === 3 ? " border-primary/30" : ""}`}>
-                <div className="relative flex items-center justify-center h-20 bg-gradient-to-b from-accent/60 to-transparent">
-                  <Icon className="size-9 text-accent-foreground/80 transition-colors duration-200 group-hover:text-primary" aria-hidden />
+                <div className={`relative flex items-center justify-center h-20 ${headerGradients[index]}`}>
+                  <Icon className={`size-9 ${iconColors[index]} transition-colors duration-200 group-hover:text-primary`} aria-hidden />
                   <span className="absolute top-3 right-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     {tag}
                   </span>
