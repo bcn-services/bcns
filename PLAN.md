@@ -79,7 +79,7 @@
     in numeric ranges) and no banned buzzwords/"SaaS"/"we help".
   - Existing passing tests remain passing; `pnpm lint && pnpm typecheck && pnpm build` green.
 
-### W2 — Replace the now-false ownership / "runs without us" claims with honest hosted framing · `status: not started` · `track: full`
+### W2 — Replace the now-false ownership / "runs without us" claims with honest hosted framing · `status: done` · `track: full`
 
 - **task:** Under the hosted model the client no longer owns/runs the software, so
   several current claims are false and must be corrected in `content.ts`.
