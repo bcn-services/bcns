@@ -9,7 +9,11 @@ export function ContactSection() {
   const { eyebrow, title, description, highlights } = siteContent.contactSection;
 
   return (
-    <section id="contact" className="border-t border-border/60 py-24 sm:py-28">
+    <section id="contact" className="relative border-t border-border/60 py-24 sm:py-28">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(65%_80%_at_50%_50%,hsl(var(--primary)/0.14),transparent_75%)]"
+      />
       <Container>
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
           <div className="flex flex-col gap-8">
