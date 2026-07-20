@@ -90,3 +90,10 @@
 - **What worked:** Review's completeness grep (own/yours/forever/handoff/keep/runs) across the WHOLE registry caught the truthfulness risk — the right check for a truth-in-marketing correction. Distinguishing "one-time setup" (correct, matches W1) from "one-time handoff" (wrong) required reading each survivor in context, not blind replace.
 - **What failed:** Engineer's first pass over-promised a feature that doesn't exist (self-serve export). LESSON below.
 - **Remember next run:** site.ts OG/Twitter metadata contains em-dashes (pre-existing, out of W-scope) — don't flag content.ts em-dash checks against rendered HTML; check content.ts source only. b3-copy-wiring locks exact hero/contact/process strings — W2's changed strings happened not to be b3-locked, but always read b3 before editing copy.
+
+## 2026-07-19 — dev-team-auto — W3 "How hosting works" explanation
+- **Outcome:** DONE — 1 build attempt, QA PASS (light track, no review pass, branch dev-team/model-migration-run, commit acd3259)
+- **What happened:** Sonnet engineer appended faq.items[4] (monthly-fee coverage: hosting/uptime/backups/security patches/bug fixes/tweaks + own-servers/any-device), [5] (BYO-Anthropic-key, AI optional, billed by Anthropic), [6] (stop-paying: hosting stops, data exported/handed over). Appended so indices 0–3 stayed stable → b3 green with no edits. QA PASS, w3-hosting-explanation.test.mjs.
+- **What worked:** APPENDING new faq.items (not inserting) keeps b3's index-based assertions green — the right pattern for adding FAQ entries. Since /pricing renders <Faq/>, FAQ content satisfies "rendered on /pricing" criteria without a separate pricing block.
+- **What failed:** nothing.
+- **Remember next run:** W4 must mirror faq.items[4..6] Q/A into CONTENT.md (b4 substring-matches the Q strings). pricing.html contains 12 pre-existing em-dashes from the site.ts metadata tagline "bcns — Custom software..." in <head>/RSC flight data — NOT content copy; always scope em-dash checks to `content.ts` source or `git diff`, never the full rendered HTML.

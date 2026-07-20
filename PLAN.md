@@ -103,7 +103,7 @@
     (rendered text contains a data-ownership/export statement).
   - `content.ts` stays em-dash-free and buzzword-free; existing tests pass; build green.
 
-### W3 — Add a "how hosting works" explanation (what recurring covers, what happens if you stop) · `status: not started` · `track: light`
+### W3 — Add a "how hosting works" explanation (what recurring covers, what happens if you stop) · `status: done` · `track: light`
 
 - **task:** Add content that explains the managed-hosting model honestly, in the
   registry (new FAQ entries and/or a short pricing-page block). Cover: **what the

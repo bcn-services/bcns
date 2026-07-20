@@ -1,5 +1,5 @@
 # QA Report
-**Task:** W2 — Replace false ownership / "runs without us" claims with honest hosted framing in content.ts
+**Task:** W3 — "how hosting works" explanation (monthly-fee coverage, BYO-Anthropic-key, stop-paying) via faq.items[4..6]
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
 **Gate mode:** tests+behavioral
@@ -7,18 +7,20 @@
 ## VERDICT: PASS
 
 ## Criteria Checked
-- 1. `Use it forever, free` gone; hero proof point says bcns hosts/runs it — Python grep count 0 in content.ts; `hero.proofPoints[1]` = "We host it and keep it running"; verbatim in built index.html — PASS
-- 2. `whether we work together or not` gone — Python grep count 0 in content.ts and absent in all 5 built pages — PASS
-- 3. No rendered page claims client owns code / software runs independently — old phrases absent from built HTML for /, /pricing, /about, /services, /work — PASS
-- 4. Contact highlight says data is client's + exportable — `highlights[2]` "Your data is always yours... export it any time" renders on home — PASS
-- 5. content.ts em-dash-free + no "SaaS" / "we help" — Python exact-string checks all clean — PASS
-- 6. a4/b1/b3/b4 still PASS; lint+typecheck+build green; 4 pre-existing failures unchanged (no new) — verified — PASS
+- C1 monthly-fee coverage (hosting, backups, bug fixes) — registry item found + built `.next/server/app/pricing.html` contains "hosting"/"backup"/"bug fix" (also "security patch") via Python exact-string — PASS
+- C2 BYO-Anthropic-key + AI optional — faq item asserts "anthropic key" + optional/omittable + "bills you directly"; confirmed in rendered HTML — PASS
+- C3 stop-paying → hosting stops AND data exported/handed over — faq item asserts hosting stops/"goes offline" + "export"/"hand it over"; confirmed in rendered HTML — PASS
+- C4 new copy em-dash-free + buzzword-free — 3 new faq items em-dash/SaaS/"we help" free; `git diff` on content.ts adds 0 em-dashes — PASS
+- C5 gating tests + green build — a4/b1/b3/b4 PASS; lint + typecheck + build all green; 4 pre-existing failures (a2-fix-verification, a2-new-sections, b2-registry-rework, content-registry) unchanged, no new failures — PASS
+
+## Note on the one HTML em-dash (not a defect)
+Python flagged 12 em-dashes in `pricing.html`, all pre-existing site-metadata tagline ("bcns — Custom software... — built to fit...") in `<head>` og/twitter/description tags + the RSC flight-data echo. `git diff worktree-model-migration -- content.ts` shows 0 em-dashes added by W3; all three new FAQ render segments are em-dash-free. C4 scopes to new copy, which is clean.
 
 ## Failures
 none
 
 ## Tests Added
-- `apps/web/__tests__/w2-hosted-framing.test.mjs` — 9 node:test subtests (all pass) covering criteria 1–5 at registry level (hero.proofPoints, contactSection.highlights, howItWorks.items[2]) plus absence greps against content.ts source.
+- `apps/web/__tests__/w3-hosting-explanation.test.mjs` — 7 tests: registry-level assertions for the 3 new faq.items (C1–C3), behavioral presence check against built `pricing.html` (C1), em-dash/buzzword scan on new copy (C4), append-not-renumber guard (items[0] unchanged, len>=7). All 7 PASS.
 
 ## Not Verifiable
-- none. Note: built HTML for all pages contains em-dashes, but they originate in `lib/site.ts` OG/Twitter metadata (pre-existing, outside W2 scope). Criterion 5 scopes em-dash-freedom to content.ts, which is clean.
+none
