@@ -381,6 +381,21 @@ export const siteContent: SiteContent = {
         answer:
           "No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.",
       },
+      {
+        question: "What does the monthly fee cover?",
+        answer:
+          "The monthly fee keeps your tool running and cared for. It covers hosting, uptime, daily backups, security patches, bug fixes, and small tweaks along the way. We run it on our own servers, so you and your team reach it from any device with a login. You never manage a server or an update yourself.",
+      },
+      {
+        question: "Does my tool use AI, and how does that get billed?",
+        answer:
+          "AI is optional. If your tool uses AI features, you bring your own Anthropic key, and Anthropic bills you directly for what those features use. You stay in control of that cost, and you can leave AI out entirely if you'd rather not use it.",
+      },
+      {
+        question: "What happens if I stop paying the monthly fee?",
+        answer:
+          "Hosting stops, so the live tool goes offline. Your data is always yours. Before we shut anything down, we export your data and hand it over so you keep everything the tool held. No lock-in, no games.",
+      },
     ],
   },
 
