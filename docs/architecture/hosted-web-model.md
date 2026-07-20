@@ -98,8 +98,9 @@ Reasons for the reversal:
   one client.
 
 The bcns monorepo remains the **platform repo**: it holds the marketing site
-(`apps/web`), DeLuca's (`apps/delucas`), the shared packages, and the template
-source. Client apps live outside it.
+(`apps/web`), the shared packages, and the template source. Client apps live
+outside it — including DeLuca's, which was extracted to its own repo
+`bcns-client-delucas` (its desktop-app exception is documented in `SETUP.md`).
 
 ### Shared-package + template propagation
 

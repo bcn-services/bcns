@@ -4,12 +4,13 @@ All repos live under **github.com/nseluga** (personal account, no org). **Privat
 
 ## Repo topology
 
-- **bcns** — the platform repo (this one): marketing site (`apps/web`), DeLuca's
-  (`apps/delucas`), shared packages (`packages/*`), and the template source
-  (`templates/hosted-web/`).
+- **bcns** — the platform repo (this one): marketing site (`apps/web`), shared
+  packages (`packages/*`), and the template source (`templates/hosted-web/`). No
+  client apps live here.
 - **bcns-app-template** — standalone GitHub *Template Repository*, generated from
   `templates/hosted-web/`. "Use this template" spins up a client repo.
 - **bcns-client-<slug>** — one repo per client business, generated from the template.
+  Current: `bcns-client-delucas` (DeLuca's — extracted from this monorepo).
 
 ## Naming convention
 
@@ -53,8 +54,10 @@ consuming repo's `.npmrc`:
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
-`GITHUB_TOKEN` = a PAT with `read:packages` (publishing also needs `write:packages`).
-Never commit the token — supply it via env.
+`GITHUB_TOKEN` = a **classic** PAT with `read:packages` (publishing also needs
+`write:packages`). **Important:** the `gh` CLI OAuth token (`gho_…`) can *publish* but
+returns **403 on downloads** from GitHub Packages — installs require a classic PAT with
+`read:packages`. Never commit the token — supply it via env.
 
 **Packages ship as TypeScript** (no build step). Client Next apps must transpile them:
 
@@ -82,6 +85,8 @@ legacy **desktop (Electron) app**, not a hosted web app. So it:
   (self-hosted / client-run, "build once"),
 - still gets its own repo (`bcns-client-delucas`) and consumes `@nseluga/*` by version.
 
-Migration is plumbing only: extract `apps/delucas` from this monorepo into its own
-repo, repoint `@nseluga/*` deps from `workspace:*` to published versions, and preserve
-history (`git subtree split`). Deferred until packages are published.
+**Status: extracted (2026-07-20).** `apps/delucas` was moved out to
+[`bcns-client-delucas`](https://github.com/nseluga/bcns-client-delucas) with full
+history (`git subtree split`); `@nseluga/*` deps repointed from `workspace:*` to
+published versions; Vite/electron-vite aliases repointed at the installed package.
+Verified standalone: typecheck + unit tests + `electron-vite build` all pass.

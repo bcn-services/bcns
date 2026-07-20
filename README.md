@@ -1,8 +1,8 @@
 # bcns
 
 Platform monorepo for **bcns** — a software studio that builds custom software
-for local small businesses. This repo holds the marketing site, DeLuca's, the
-shared packages, and the client-app template source. **Client apps do not live
+for local small businesses. This repo holds the marketing site, the shared
+packages, and the client-app template source. **Client apps do not live
 here** — each client business gets its own repo generated from
 `templates/hosted-web/`, consuming the shared packages by version. See
 [`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
@@ -15,8 +15,7 @@ for the delivery model and rationale.
 ```
 bcns/
 ├─ apps/              # Platform-owned apps only (not client apps)
-│  ├─ web/            # The landing website (Next.js App Router + TS + Tailwind)
-│  └─ delucas/        # DeLuca's, a platform-owned app
+│  └─ web/            # The landing website (Next.js App Router + TS + Tailwind)
 ├─ packages/
 │  ├─ ui/             # Shared React component library (@nseluga/ui)
 │  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@nseluga/config)
@@ -149,5 +148,5 @@ for the full delivery model and rationale.
 3. Propagate shared improvements by publishing a new package version and bumping
    it in each client repo — no copy-paste per app.
 
-`apps/` in this repo holds only the platform's own apps (`apps/web`,
-`apps/delucas`).
+`apps/` in this repo holds only the platform's own app (`apps/web`). DeLuca's
+lives in its own repo, `bcns-client-delucas`.

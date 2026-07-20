@@ -4,9 +4,8 @@ Project-level guidance for Claude Code agents working in this repo.
 
 ## What this repo is
 
-bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, DeLuca's, the shared packages, and the client-app template source. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
+bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the client-app template source. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
 - `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
-- `apps/delucas/` — DeLuca's, a platform-owned app
 - `packages/ui/` — shared React component library (`@nseluga/ui`)
 - `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@nseluga/config`)
 - `packages/app-core/` — shared application core (`@nseluga/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
@@ -69,7 +68,7 @@ Client apps are **not** added to this monorepo. Each new client business gets **
 2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
 3. Propagate shared improvements by publishing a new package version and bumping it in each client repo — no copy-paste, no hand-editing per app.
 
-`apps/` in this monorepo holds only the platform repo's own apps — the marketing site (`apps/web`) and DeLuca's (`apps/delucas`).
+`apps/` in this monorepo holds only the platform repo's own app — the marketing site (`apps/web`). DeLuca's was extracted to its own repo (`bcns-client-delucas`).
 
 ## Deploy
 
