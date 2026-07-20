@@ -1,28 +1,28 @@
 # QA Report
-**Task:** A2 — Scaffold `templates/hosted-web/` hosted-app starter wired to `@bcns/app-core` (`@bcns/hosted-web-template`).
+**Task:** PLAN.md A3 — Architecture decision record for the hosted-web business & delivery model (`docs/architecture/hosted-web-model.md`)
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
-**Gate mode:** tests+behavioral (live smoke pass)
+**Gate mode:** tests+behavioral (docs item = content-presence verification + build-not-broken)
 
 ## VERDICT: PASS
 
 ## Criteria Checked
-- Build + live 200 — `pnpm --filter @bcns/hosted-web-template build` OK; `next start` on :3100, AI off + no keys, home GET → **200** — PASS
-- AI opt-in boundary — existing `ai-optin.test.mjs` proves flag OFF (with/without key) never calls the factory, and has the control case (flag ON + key → 1 call); 5/5 green — PASS
-- Webhook live → suspend/provision — POST `past_due`→`suspend` (200), `active`→`provision` (200), `canceled`→`suspend` (200); routes through app-core `decideFromEvent`/`decideAccess` (unit-confirmed) — PASS
-- Webhook unit → A1 logic — `webhook.test.mjs` + new QA tests assert handler decisions via `@bcns/app-core` — PASS
-- No secrets — grep of committed `templates/hosted-web/` files: no real `sk_live`/`sk_test`/`pk_live`/`whsec_`/`sk-ant-` values (only placeholders + fake test keys); `.env.example` documents DATABASE_URL, Clerk, Stripe, ANTHROPIC_API_KEY — PASS
-- No regressions — `Dockerfile`+`DEPLOY.md` exist; `pnpm --filter web build` OK; app-core test 10/10; template lint + typecheck clean; 4 web baseline tests (a4,b1,b3,b4) 4/4 — PASS
-
-## Live Smoke HTTP Codes
-- `GET /` (AI off, no keys) → 200
-- `POST /api/stripe/webhook` past_due → 200 `{"decision":"suspend"}`
-- `POST /api/stripe/webhook` active → 200 `{"decision":"provision"}`
-- `POST /api/stripe/webhook` canceled → 200 `{"decision":"suspend"}`
-- Server killed after run; port 3100 confirmed clear (no orphan).
+- ADR file exists — `docs/architecture/hosted-web-model.md` present (6.8 KB) — PASS
+- Pricing model — `$1,000`/`$3,000` setup, `$149`/`$349` monthly, `15` seats then `$20`/seat all found — PASS
+- BYOK-AI documented — dedicated "bring-your-own-key" section (client key, Anthropic-billed, Haiku default, encrypted) — PASS
+- Hosting stack — `Coolify` + `Hetzner` + `Cloudflare` + `Neon` + `Clerk` + `Stripe` all found — PASS
+- Operating cost figure — "~$25–75/mo (~10 clients)", revisit trigger "~$150–200/mo" — PASS
+- ≥2 risks/mitigations — risk/mitigation table has 4 entries (blast radius, DDoS, lock-in, secrets) — PASS
+- Per-client repo decision — documented as "one repo per client business" — PASS
+- Explicit Part II reversal — "reverses/supersedes the Part II 'monorepo, separate repos rejected' decision" (Status header + Repo model) — PASS
+- Package/template propagation — versioned `@bcns/*` packages + `templates/hosted-web/` starter + version-bump propagation — PASS
+- Valid Markdown — starts with H1, balanced code fences — PASS
+- References `@bcns/app-core` and `templates/hosted-web/` — both present — PASS
+- `corepack pnpm --filter web build` succeeds — exit 0, all pages compiled — PASS
+- No regression — 4 baseline-passing web tests (a4, b1, b3, b4) still green — PASS
 
 ## Tests Added
-- `templates/hosted-web/tests/qa-hosted-web.test.mjs` — webhook active→provision & canceled→suspend through handler; env safe defaults when no keys (no throw, all undefined, AI off) + whitespace-as-unset; AI-on control case invoking injected factory once with the configured key. Wired into `test` script. Full suite 14/14 green.
+- `docs/architecture/__tests__/hosted-web-model.check.mjs` — node --test content-presence checks (18 assertions: all required strings + Part II reversal + ≥2 risk rows + Markdown validity); 18/18 pass. Committed 3cac7b5.
 
 ## Not Verifiable
 none

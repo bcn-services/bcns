@@ -190,7 +190,7 @@
   - `.env.example` documents `DATABASE_URL`, Clerk, Stripe, and `ANTHROPIC_API_KEY`, and the repo contains no real secret values (grep for obvious key prefixes returns none).
   - A `Dockerfile` and `DEPLOY.md` exist describing the Coolify/Cloudflare/Neon/Clerk deploy; `pnpm lint && pnpm typecheck && pnpm build` green across the workspace.
 
-### A3 — Architecture decision record for the hosted-web model · `status: not started` · `track: light`
+### A3 — Architecture decision record for the hosted-web model · `status: done` · `track: light`
 
 - **task:** Add `docs/architecture/hosted-web-model.md` capturing the locked
   decisions from the table above as an ADR: the pricing/seat model, BYOK-AI, the
