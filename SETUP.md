@@ -1,0 +1,78 @@
+# bcns — Platform & Client Repo Setup
+
+All repos live under **github.com/nseluga** (personal account, no org). **Private by default.**
+
+## Repo topology
+
+- **bcns** — the platform repo (this one): marketing site (`apps/web`), DeLuca's
+  (`apps/delucas`), shared packages (`packages/*`), and the template source
+  (`templates/hosted-web/`).
+- **bcns-app-template** — standalone GitHub *Template Repository*, generated from
+  `templates/hosted-web/`. "Use this template" spins up a client repo.
+- **bcns-client-<slug>** — one repo per client business, generated from the template.
+
+## Naming convention
+
+- Platform: `bcns`
+- Template: `bcns-app-template`
+- Client apps: `bcns-client-<slug>`, where `<slug>` is the kebab-case business name.
+  - Coventry Hills → `bcns-client-coventry-hills`
+  - DeLuca's → `bcns-client-delucas`
+- Rationale: with everything on a personal account (no org namespace), the `bcns-`
+  prefix clusters and sorts the studio's repos together on the profile.
+
+## Shared packages (@bcns/*)
+
+`@bcns/app-core`, `@bcns/ui`, `@bcns/config` live here and publish **privately** to
+GitHub Packages (`npm.pkg.github.com`) under `nseluga`. Clients never receive them —
+apps are hosted on our VPS, so only machines we control ever install them.
+
+**Propagation:** improve a package → `pnpm publish` a new version → bump the range /
+`npm update @bcns/app-core` in each client repo. No copy-paste.
+
+**Publishing (from this repo, on a machine we control):**
+
+1. One-time: give the `gh` token package scopes — `gh auth refresh -s read:packages,write:packages`.
+2. Bump the package `version`, then publish. `pnpm publish` reads each package's
+   `publishConfig.registry` and rewrites `workspace:*` deps to real versions.
+
+**Installing in an environment we control (laptop / Coolify build box).** Add to the
+consuming repo's `.npmrc`:
+
+```
+@bcns:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+`GITHUB_TOKEN` = a PAT with `read:packages` (publishing also needs `write:packages`).
+Never commit the token — supply it via env.
+
+**Packages ship as TypeScript** (no build step). Client Next apps must transpile them:
+
+```js
+// next.config.mjs
+transpilePackages: ['@bcns/app-core', '@bcns/ui', '@bcns/config']
+```
+
+## Spinning up a new client (e.g. Coventry Hills)
+
+1. github.com/nseluga/bcns-app-template → **Use this template** → name
+   `bcns-client-<slug>`, **Private**.
+2. Clone, add `.npmrc` (above), `pnpm install`.
+3. Configure env: Clerk (auth), Stripe (billing), Neon (Postgres), optional Anthropic
+   BYOK key. See the template `README.md` / `DEPLOY.md`.
+4. Deploy to Coolify on the Hetzner VPS; front with Cloudflare.
+
+## Exception — DeLuca's (`bcns-client-delucas`)
+
+DeLuca's follows the **one-repo-per-client + shared-packages** convention but is a
+legacy **desktop (Electron) app**, not a hosted web app. So it:
+
+- is **not** generated from `bcns-app-template` (no Next.js/hosted-web scaffold),
+- is **not** deployed to our Coolify/Hetzner VPS and carries no monthly-hosting line
+  (self-hosted / client-run, "build once"),
+- still gets its own repo (`bcns-client-delucas`) and consumes `@bcns/*` by version.
+
+Migration is plumbing only: extract `apps/delucas` from this monorepo into its own
+repo, repoint `@bcns/*` deps from `workspace:*` to published versions, and preserve
+history (`git subtree split`). Deferred until packages are published.
