@@ -1,31 +1,28 @@
 # Engineer Report
-**Task:** W3 — Add a "how hosting works" explanation (managed-hosting model) to the content registry
+**Task:** W4 — Mirror all W1–W3 copy changes from `content.ts` into `apps/web/CONTENT.md` 1:1
 **Branch:** dev-team/model-migration-run
 **Date:** 2026-07-19
 
 ## Design Decisions
-- Delivered entirely via **new `faq.items` entries** (no new interfaces, no JSX, no pricing tier). `/pricing` renders `<Faq/>`, so FAQ copy satisfies AC1 (monthly-fee explanation on the pricing page) — lowest-risk `light`-track path.
-- **Appended** 3 items (indices 4–6); existing indices 0–3 untouched, so b3's `faq.items[0]` assertion and all index-based checks stay green.
-- Stayed consistent with W1 (setup+monthly+seats) and W2 (hosted/managed, truthful): no unbuilt features stated as present-tense guarantees; AI framed as optional/opt-in.
-- No component changes: copy lives only in the registry (single source of truth); components already `.map()` `faq.items`.
+- Light-track docs mirror; no architecture/API/data-model work. Diffed CONTENT.md field-by-field against the CURRENT `content.ts` (read the source, not just the summary).
+- Documented the new optional `PricingTier` fields (`setup`/`monthly`/`seats`) as per-tier `#### … _(optional)_` blocks under tiers[0] and tiers[1]; noted tiers[2] (AI consulting, day-rate) omits them — matching the registry where only build tiers carry them.
+- Refreshed stale hardcoded `Currently` price values (tiers[0] $2,000–$5,000 → $1,000 setup; tiers[1] $5,000–$15,000 → $3,000 setup). Free-string fields never verbatim-mirrored in CONTENT.md (hero proofPoints, contact highlights) describe purpose only, so W1/W2 hosted-framing edits to those needed no value change.
+- FAQ is open-ended (`items[n]`), so the three new W3 entries add array entries, not new field paths. Added a "Seeded questions" list (indices 0–6) capturing all seven Q&As incl. monthly-fee coverage, BYO-Anthropic-key, and stop-paying/data-export; bumped intro "5 pre-seeded" → "7".
+- Cross-check: added 3 rows (`tiers[0..1].setup/monthly/seats`); bumped stated total 77 → 80. FAQ items stay under the generic `items[n]` rows — documented that explicitly.
 
 ## Files Changed
-- `apps/web/lib/content.ts` — appended 3 `faq.items` entries (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff).
-
-## New registry entries added (W4 must mirror in CONTENT.md)
-- `siteContent.faq.items[4]` — Q: "What does the monthly fee cover?" (hosting, uptime, daily backups, security patches, bug fixes, small tweaks; runs on our servers, any device).
-- `siteContent.faq.items[5]` — Q: "Does my tool use AI, and how does that get billed?" (AI optional; client brings own Anthropic key; Anthropic bills directly; can omit).
-- `siteContent.faq.items[6]` — Q: "What happens if I stop paying the monthly fee?" (hosting stops/offline; data exported and handed over; data always theirs).
-
-## Verification
-- Python check: new copy is em-dash-free, en-dash-free, buzzword-free (no SaaS / "we help").
-- `apps/web`: lint + typecheck + build all green.
-- Tests: gating files a4, b1, b3, b4 PASS; 4 pre-existing failures unchanged (25 total / 21 pass / 4 fail).
-- Rendered `pricing.html` confirmed to contain AC1 (hosting/backups/bug fixes), AC2 (Anthropic key + AI optional), AC3 (hosting stops + data exported).
+- `apps/web/CONTENT.md` — added setup/monthly/seats tier docs; refreshed stale tier prices; added seeded-FAQ list (7 entries) + intro count; +3 cross-check rows and 77→80 total; updated footer date/summary.
 
 ## Deferred / Out of Scope
-- `apps/web/CONTENT.md` NOT touched — W4 mirrors the 3 new fields above (b4 will need those Q-strings present).
-- No pricing-page JSX block added; a FAQ entry already satisfies AC1, avoiding new interfaces/components.
+- Docs-only item: did not touch `content.ts` or components. Did not re-derive the legacy "77" (the table has 79 rows; some collapse concepts) — applied the accurate +3 delta relative to their baseline.
+- Pre-existing em-dashes in CONTENT.md prose/headers left as-is (no-em-dash voice rule targets live site copy, not this docs file); new FAQ list uses the file's existing em-dash separator convention.
+
+## Orphan Fields Found + Resolved
+- Orphans (registry field with no CONTENT.md entry): `setup`, `monthly`, `seats` on tiers[0]/[1] — resolved by adding field docs + cross-check rows. No reverse orphans (no CONTENT.md field absent from registry). Python spot-check confirms all new names/values present and stale values ($2,000–$5,000, $5,000–$15,000, Build & handoff, Yours to use, Use it forever, free) absent.
+
+## Verification
+- `corepack pnpm build` green; `corepack pnpm lint` clean.
+- Tests: 28 pass / 4 fail. Gate tests a4, b1, b3, **b4 (mirror gate)** PASS; the 4 pre-existing stale failures (a2-fix-verification, a2-new-sections, b2-registry-rework, content-registry) unchanged.
 
 ## Flags for Reviewer
-- None structural — content-only, additive. Confirm the 3 appended FAQ items read at 3rd–8th grade and stay truthful about the managed-hosting model.
+- b4 uses substring matching, so it does NOT enforce presence of `setup`/`monthly`/`seats` — the 1:1 guarantee here is documentation-level, verified by the spot-check script, not an automated gate.
