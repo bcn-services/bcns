@@ -93,6 +93,9 @@ export interface PricingTier {
   id?: string;
   name: string;
   price: string;
+  setup?: string;
+  monthly?: string;
+  seats?: string;
   description: string;
   features: string[];
 }
@@ -311,7 +314,10 @@ export const siteContent: SiteContent = {
     tiers: [
       {
         name: "Standard build",
-        price: "$2,000–$5,000",
+        price: "$1,000 setup",
+        setup: "$1,000 one-time setup",
+        monthly: "$149/mo",
+        seats: "Includes up to 15 users, then $20/user per month.",
         description:
           "A single-purpose tool: a booking page, a report generator, one automation.",
         features: [
@@ -323,7 +329,10 @@ export const siteContent: SiteContent = {
       },
       {
         name: "Advanced build",
-        price: "$5,000–$15,000",
+        price: "$3,000 setup",
+        setup: "$3,000 one-time setup",
+        monthly: "$349/mo",
+        seats: "Includes up to 15 users, then $20/user per month.",
         description:
           "A system your business runs on: multiple workflows, logins, data that stays in sync.",
         features: [
@@ -355,7 +364,7 @@ export const siteContent: SiteContent = {
       {
         question: "How much will my project cost?",
         answer:
-          "Every project gets a fixed quote after the free consult. Standard builds run $2,000 to $5,000. Advanced builds run $5,000 to $15,000. The quote is the price. No hourly surprises.",
+          "Every build has a one-time setup fee plus a flat monthly fee that keeps it running and supported. Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. You get the exact numbers in a fixed quote after the free consult. No hourly surprises.",
       },
       {
         question: "How long does a build take?",
@@ -453,7 +462,7 @@ export const siteContent: SiteContent = {
     pricing: {
       title: "Pricing | bcns",
       description:
-        "Standard builds from $2,000 to $5,000. Advanced builds from $5,000 to $15,000. AI consulting at $800 per day. Fixed quotes, no hourly surprises.",
+        "Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. AI consulting at $800 per day. Fixed quotes, no hourly surprises.",
     },
     about: {
       title: "About bcns | Two Founders, Custom Software",

@@ -1,66 +1,43 @@
 # Analysis Report
-**Task:** B2 — Registry rework: nav cards, two-founder about, pricing shape, /work holding state
-**Date:** 2026-07-14
+**Task:** Shared codebase map for website content-migration series (W1–W4) in `apps/web`
+**Date:** 2026-07-19
 
 ## Relevant Files
+- `apps/web/lib/content.ts` — SINGLE SOURCE OF TRUTH. `export const siteContent: SiteContent`. Interfaces (L16–177) then registry (L183–464). Edit values here.
+- `apps/web/CONTENT.md` — 1:1 mirror (905 lines). Per-field `**Field:** key.path` docs + Cross-check table (L800–882, "Total registry fields: 77") + remaining `[INPUT:]` slots (L891–898). W4 updates this 1:1.
+- `apps/web/app/pricing/page.tsx` — renders `/pricing`: `<SiteHeader/> <Pricing/> <Faq/> <SiteFooter/>`; metadata from `siteContent.pageMeta.pricing`.
+- `apps/web/components/pricing.tsx` — `Pricing()`; destructures `siteContent.pricing` {eyebrow,title,description,tiers}; maps `tiers` (index 2 = "isConsulting" styling), renders name/price/description/features[].
+- `apps/web/components/faq.tsx` — `Faq()`; `siteContent.faq` {eyebrow,title,description,items}; maps items {question,answer}.
+- `apps/web/components/hero.tsx` — `Hero()`; `siteContent.hero`; maps `proofPoints` to `<li>` (rendered on Home only).
+- `apps/web/components/contact-section.tsx` — `ContactSection()`; `siteContent.contactSection`; maps `highlights` (icons by index: MessageSquare,Clock,Mail).
+- Test harness: `apps/web/__tests__/*.mjs` (8 files). Run: `node --experimental-strip-types --test __tests__/*.mjs`.
 
-- `apps/web/lib/content.ts` — all section interfaces + `siteContent` registry; primary change target for every B2 item
-- `apps/web/components/nav-cards.tsx` — NavCards component; cards array is hardcoded inline (not registry-driven); change target for (a)
-- `apps/web/components/about-founder.tsx` — reads `siteContent.aboutFounder`; destructures `eyebrow, title, description, cardTitleBio, cardTitleCredentials, bio, credentials`; renders SectionHeading + 2-card grid (Bio card / Credentials card); full rewrite for (b)
-- `apps/web/components/past-work.tsx` — reads `siteContent.pastWork`; destructures `eyebrow, title, description, items`; maps items → Card grid (`title`, `outcome`, `link?`); change target for (d) holding state
-- `apps/web/components/reviews.tsx` — reads `siteContent.reviews`; destructures `eyebrow, title, description, items`; maps items → Card grid (`quote`, `author`, `role`, `company`); change target for (d) holding state
-- `apps/web/components/pricing.tsx` — reads `siteContent.pricing`; destructures `eyebrow, title, description, tiers`; maps tiers → Card grid (`name`, `price`, `description`, `features[]`); `price` is already a free string; no structural change needed, only registry data for (c)
-- `apps/web/__tests__/content-registry.test.mjs` — validates 6 core section keys, required fields, all strings are `[SLOT: ...]` or step numbers, no siteConfig duplication; must be updated/extended for new section shapes
-- `apps/web/__tests__/b1-multi-page-routing.test.mjs` — line 156 asserts `about page has AboutFounder`; will break if the export is renamed; update the assertion alongside any component rename
-- `apps/web/app/about/page.tsx` — imports `AboutFounder`; update import if component export name changes
-- `apps/web/app/work/page.tsx` — imports `PastWork` and `Reviews`; no changes needed
-- `apps/web/app/pricing/page.tsx` — imports `Pricing` and `Faq`; no changes needed
+## Ground-Truth Field Paths (exact current values)
+- Hero proof point: `siteContent.hero.proofPoints[1]` = `"Use it forever, free"` (tuple of 3; [0]="Fixed quote before work starts", [2]="Free 30-minute consult").
+- Contact "Yours to use": `siteContent.contactSection.highlights[2].title` = `"Yours to use"`; `.description` = `"Your data and accounts stay yours. It keeps running whether we work together or not."`
+- FAQ cost Q: `siteContent.faq.items[0].question` = `"How much will my project cost?"`; `.answer` = `"Every project gets a fixed quote after the free consult. Standard builds run $2,000 to $5,000. Advanced builds run $5,000 to $15,000. The quote is the price. No hourly surprises."`
+- Process/handoff step: `siteContent.howItWorks.items[2].title` = `"Build & handoff"` (step "03"); `.description` mentions 30 days of fixes.
+- Pricing tier type: `interface PricingTier { id?; name; price; description; features: string[] }` (content.ts L92–98); section `interface PricingContent` (L100–105); registry `siteContent.pricing` (L306–348). Tiers: [0] "Standard build" `$2,000–$5,000`, [1] "Advanced build" `$5,000–$15,000`, [2] "AI consulting" `$800 / day`. Prices use en-dash `–` (use Python for exact-string checks).
 
 ## Data Flow
-
-Registry (`content.ts`) → component destructures section key → renders JSX. No async, no server fetch — pure static import. All B2 changes follow the same pattern: (1) add/reshape interfaces in `content.ts`, (2) update `siteContent` object to match, (3) update consuming component to read new shape.
+`content.ts` (typed const) → imported `from "@/lib/content"` by each component + each `app/**/page.tsx` → destructured, `.map()`ed → JSX. Icons live in components (mapped by array index), NOT registry. No runtime/data fetching; all static. CONTENT.md is docs-only, read only by tests (b4, content-registry), never imported by app.
 
 ## Patterns to Follow
+- Registry is the ONLY place to edit copy; components/pages never hardcode strings. Match existing key nesting exactly.
+- Voice rules (baseline.md): no em-dashes; en-dash only in numeric ranges; no buzzwords/"SaaS"/"we help"; no invented facts.
+- Fixed tuples (do NOT change length): hero.proofPoints[3], howItWorks.items[3], useCases.items[4], contactSection.highlights[3], about.founders[2], navCards.items[4]. Open-ended: pricing.tiers, faq.items, pastWork.items, reviews.items, features[].
+- CONTENT.md structure per field: `### fieldName` + `- **Field:** path` + Purpose/Tone/Length. Update Cross-check table + field count if adding/removing fields.
 
-- Every interface lives at top of `content.ts` before `SiteContent`; named `*Content`, `*Item`, `*Tier` conventions
-- `SiteContent` interface aggregates all section keys; adding a new key requires adding it to both the interface and the `siteContent` object
-- All string values in `siteContent` must be `[SLOT: ...]` placeholders or step-number strings (enforced by `content-registry.test.mjs` Test 4 — `SLOT_RE = /^\[SLOT: [^\]]+\]$/`)
-- Arrays use `[]` type (open-ended) for variable-length; tuples (`[A, A, A]`) only for fixed-length like `proofPoints`
-- Components import from `@/lib/content` and `@bcns/ui`; icons from `lucide-react` inside component files (not registry)
-- Section wrapper: `<section id="..." className="border-t border-border/60 py-24 sm:py-28">` wrapped in `<Container>`, opens with `<SectionHeading eyebrow title description />`
-- NavCards uses `<Container>` + `<ul role="list">` + `<Link>` wrapping `<Card>`; no SectionHeading (it's a nav widget, not a content section)
-
-## Likely Changes
-
-### (a) navCards — registry-driven NavCards
-- `content.ts`: add `NavCardItem { label: string; description: string; href: string }` + `NavCardsContent { items: NavCardItem[] }` interfaces; add `navCards` key to `SiteContent` and `siteContent` with 3–4 SLOT entries
-- `nav-cards.tsx`: replace `const cards = [...] as const` with `siteContent.navCards.items`; field names `label/description/href` already match current inline shape — drop `as const`
-
-### (b) Two-founder about
-- `content.ts`: add `FounderItem { name: string; roleLine: string; photo?: string; bio: string; credentials: string[] }` interface; replace `AboutFounderContent` with `AboutContent { eyebrow: string; title: string; description: string; founders: [FounderItem, FounderItem]; whyBcns: string }`; rename key in `SiteContent` and `siteContent` from `aboutFounder` → `about`
-- `about-founder.tsx`: full rewrite — destructure from `siteContent.about`; render two founder sub-cards (name, roleLine, bio, credentials[]) + whyBcns block; component export rename optional (e.g. `AboutSection`) but must update all references if renamed
-- `apps/web/app/about/page.tsx`: update import if component is renamed
-- `apps/web/__tests__/b1-multi-page-routing.test.mjs` line 156: update `"AboutFounder"` string check to new export name if renamed
-
-### (c) Pricing shape — 3-card with tier-3 as AI consulting day-rate
-- `content.ts`: `PricingTier.price` is already `string` (free-string) — no interface change needed; `tiers` is already `PricingTier[]` (open array) supporting exactly 3 entries; only update `siteContent.pricing.tiers` data when copy is ready
-- `pricing.tsx`: no structural change required; `price` already renders as `<p className="text-2xl font-bold">{price}</p>` — free string renders fine
-
-### (d) holdingState for pastWork + reviews
-- `content.ts`: add `HoldingState { title: string; body: string; ctaLabel: string }` interface; add `holdingState?: HoldingState` to `PastWorkContent` and `ReviewsContent`; add SLOT values to `siteContent.pastWork.holdingState` and `siteContent.reviews.holdingState`
-- `past-work.tsx`: destructure `holdingState` alongside `items`; add conditional: `items.length === 0` → render holding state card using `holdingState.title / .body / .ctaLabel`; else render existing grid unchanged
-- `reviews.tsx`: same conditional pattern as `past-work.tsx`
-
-### (e) Per-page metadata
-- `content.ts`: `PageMeta { title: string; description: string }` and `PageMetaRegistry { home, services, work, pricing, about }` already exist and are fully stubbed — no changes needed to the registry shape
-- Check `apps/web/app/*/page.tsx` files: if they are not yet reading from `siteContent.pageMeta` for their `export const metadata`, wire them up
+## Test Harness — pass/fail split (per baseline)
+- PASS (must stay green): `a4-legal-pages`, `b1-multi-page-routing`, `b3-copy-wiring`, `b4-content-md`.
+- FAIL (STALE, pre-existing, assert OLD shape): `a2-fix-verification` + `a2-new-sections` (reference removed `siteContent.aboutFounder`), `b2-registry-rework` (asserts about/navCards holdingState — partially current but fails), `content-registry` (asserts removed `siteContent.problemSolution` L116 + `deliveryModels` L118). Don't resurrect unless your item's `done when:` names them.
+- **content-registry.test.mjs = the completeness/mirror validator** (asserts every section key exists + tuple lengths); currently STALE/FAILING because it expects `problemSolution`/`deliveryModels` which were cut from the registry.
+- **b4-content-md.test.mjs = CONTENT.md↔registry mirror gate** (PASSING): asserts every `Object.keys(siteContent)` top-level key + leaf field names appear in CONTENT.md, plus `/work` flip phrase + `[INPUT:` convention. W4 must keep both green.
+- b3-copy-wiring asserts exact strings: hero.headline, faq.items[0].question, pastWork.holdingState.title, tier names — editing those requires updating b3.
 
 ## Risks
-
-- `content-registry.test.mjs` Test 1 hardcodes only 6 core section keys — adding `navCards` / renaming `aboutFounder` → `about` won't break Test 1, but the test won't cover new keys; add assertions for `navCards`, `about`, and `holdingState` fields in the B2 QA test
-- Test 4 recurses the entire `siteContent` object — `holdingState` fields and `FounderItem` string fields must all be `[SLOT: ...]` placeholders; `photo` field should be `undefined` or a SLOT (empty string would fail the regex)
-- `b1-multi-page-routing.test.mjs` line 156 checks for the string `"AboutFounder"` in `app/about/page.tsx` source — if the component is renamed, this assertion fails silently at the QA gate; update that line at the same time as the rename
-- `nav-cards.tsx` currently uses `as const` on the inline array giving literal types for `href`; removing it is safe — `NavCardItem.href` will be `string`, which is what `next/link`'s `href` prop accepts
-- `FounderItem.founders` is a 2-tuple `[FounderItem, FounderItem]` — TypeScript will enforce exactly 2 founders; if the registry ever needs 1 or 3, the tuple must be relaxed to `FounderItem[]`
-- No existing tests cover NavCards rendering, AboutFounder rendering logic, PastWork/Reviews holding state, or pricing tier count — the B2 QA test file must add all of these assertions from scratch
-- `pageMeta` already exists fully stubbed; (e) is likely a wiring task in page files, not a registry task — verify each `app/*/page.tsx` actually exports `metadata` reading from registry before marking (e) done
+- Editing hero.headline / faq.items[0].question / tier names / pastWork.holdingState.title breaks PASSING b3-copy-wiring — update assertions in lockstep.
+- b4 uses `contentMd.includes(key)` substring match; removing a section key from content.ts without removing its CONTENT.md mention still passes, but adding a new section key requires a CONTENT.md mention or b4 fails.
+- En-dashes in prices: shell grep silently mismatches; use Python or `scripts/readability-check.py`.
+- Turbo root scripts broken; use `corepack pnpm <cmd>` inside `apps/web`. Tests need `--experimental-strip-types` (import `.ts`).
+- content-registry (stale mirror validator) will keep failing until someone re-syncs it to the current registry shape — a natural W-series target but only if an item names it.
