@@ -29,17 +29,15 @@ export function UseCases() {
             const Icon = useCaseIcons[index];
             if (!Icon) return null;
             return (
-              <Card key={index} className={`group h-full transition-shadow hover:shadow-md${index === 3 ? " border-primary/30 bg-primary/[0.03]" : ""}`}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-transform group-hover:-translate-y-0.5">
-                      <Icon className="size-5" aria-hidden />
-                    </span>
-                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {tag}
-                    </span>
-                  </div>
-                  <CardTitle className="mt-3 text-base">{caseTitle}</CardTitle>
+              <Card key={index} className={`group h-full overflow-hidden transition-shadow hover:shadow-md${index === 3 ? " border-primary/30" : ""}`}>
+                <div className="relative flex items-center justify-center h-20 bg-gradient-to-b from-accent/60 to-transparent">
+                  <Icon className="size-9 text-accent-foreground/80 transition-colors duration-200 group-hover:text-primary" aria-hidden />
+                  <span className="absolute top-3 right-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {tag}
+                  </span>
+                </div>
+                <CardHeader className="pt-4">
+                  <CardTitle className="text-base">{caseTitle}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="leading-relaxed">{caseDescription}</CardDescription>
