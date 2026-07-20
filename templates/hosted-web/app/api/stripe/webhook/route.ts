@@ -16,7 +16,7 @@
  *   2. STRIPE_WEBHOOK_SECRET is UNSET (local dev / not yet configured) → process
  *      the event so the endpoint stays runnable without keys, but mark the
  *      response honestly: signatureVerified:false, mode:"unverified-dev". The
- *      provision/suspend DECISION still routes through @bcns/app-core's pure
+ *      provision/suspend DECISION still routes through @nseluga/app-core's pure
  *      logic via handleStripeEvent, so it is unit-testable and identical to
  *      production decision behavior.
  *
@@ -24,7 +24,7 @@
  */
 
 import { NextResponse } from "next/server";
-import type { StripeSubscriptionEvent, SubStatus } from "@bcns/app-core";
+import type { StripeSubscriptionEvent, SubStatus } from "@nseluga/app-core";
 import { handleStripeEvent } from "@/lib/webhook";
 import { getConfig } from "@/lib/env";
 

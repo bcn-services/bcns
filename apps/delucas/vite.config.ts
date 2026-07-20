@@ -15,8 +15,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Resolve @bcns/ui source-level exports (no build step on the package)
-      "@bcns/ui": path.resolve(__dirname, "../../packages/ui/src/index.ts"),
+      // Resolve @nseluga/ui source-level exports (no build step on the package)
+      "@nseluga/ui": path.resolve(__dirname, "../../packages/ui/src/index.ts"),
     },
   },
   build: {

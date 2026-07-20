@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@bcns/config/tsconfig/react-library.json",
+  "extends": "@nseluga/config/tsconfig/react-library.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

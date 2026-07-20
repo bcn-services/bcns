@@ -39,7 +39,7 @@ auth. Assumes the app has been extracted to its own repo (see README).
    > `parseEvent` + `handleStripeEvent`, to enable the endpoint. With the secret
    > **unset** (local dev), the route processes events but marks the response
    > `signatureVerified: false`, `mode: "unverified-dev"`. The provision/suspend
-   > decision routes through `@bcns/app-core` in both wired and dev cases.
+   > decision routes through `@nseluga/app-core` in both wired and dev cases.
 5. **Cloudflare** — add the app's domain, proxy (orange-cloud) it to the Coolify
    host, and enable "Full (strict)" TLS. Coolify issues the origin cert.
 

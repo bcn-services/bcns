@@ -10,7 +10,7 @@
  * import-boundary test can prove non-invocation when the flag is off.
  */
 
-import { createAnthropicClient } from "@bcns/app-core";
+import { createAnthropicClient } from "@nseluga/app-core";
 import { getConfig, type AppConfig } from "./env";
 
 /**

@@ -1,5 +1,5 @@
 {
-  "extends": "@bcns/config/tsconfig/base.json",
+  "extends": "@nseluga/config/tsconfig/base.json",
   "compilerOptions": {
     "baseUrl": ".",
     "noEmit": true

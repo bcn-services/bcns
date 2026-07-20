@@ -23,12 +23,12 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.39.0
         version: 0.39.0
-      '@bcns/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       '@napi-rs/canvas':
         specifier: ^1.0.2
         version: 1.0.2
+      '@nseluga/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       better-sqlite3:
         specifier: ^9.6.0
         version: 9.6.0
@@ -57,7 +57,7 @@ importers:
         specifier: ^2.5.4
         version: 2.6.1
     devDependencies:
-      '@bcns/config':
+      '@nseluga/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/better-sqlite3':
@@ -108,7 +108,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@bcns/ui':
+      '@nseluga/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       class-variance-authority:
@@ -136,7 +136,7 @@ importers:
         specifier: ^2.5.4
         version: 2.6.1
     devDependencies:
-      '@bcns/config':
+      '@nseluga/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/node':
@@ -170,7 +170,7 @@ importers:
         specifier: ^0.39.0
         version: 0.39.0
     devDependencies:
-      '@bcns/config':
+      '@nseluga/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
@@ -235,7 +235,7 @@ importers:
         specifier: ^2.5.4
         version: 2.6.1
     devDependencies:
-      '@bcns/config':
+      '@nseluga/config':
         specifier: workspace:*
         version: link:../config
       '@types/react':
@@ -253,10 +253,10 @@ importers:
 
   templates/hosted-web:
     dependencies:
-      '@bcns/app-core':
+      '@nseluga/app-core':
         specifier: workspace:*
         version: link:../../packages/app-core
-      '@bcns/ui':
+      '@nseluga/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       next:
@@ -269,7 +269,7 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
     devDependencies:
-      '@bcns/config':
+      '@nseluga/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/node':

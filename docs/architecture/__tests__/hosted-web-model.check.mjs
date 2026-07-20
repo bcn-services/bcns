@@ -10,7 +10,7 @@ const t = readFileSync(adr, "utf8");
 const required = [
   "$1,000", "$149", "$3,000", "$349", "$20", "15", "Part II",
   "Coolify", "Hetzner", "Cloudflare", "Neon", "Clerk", "Stripe",
-  "@bcns/app-core", "templates/hosted-web",
+  "@nseluga/app-core", "templates/hosted-web",
 ];
 
 for (const s of required) {

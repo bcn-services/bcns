@@ -34,7 +34,7 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
       alias: {
-        "@bcns/ui": path.resolve(__dirname, "../../packages/ui/src/index.ts"),
+        "@nseluga/ui": path.resolve(__dirname, "../../packages/ui/src/index.ts"),
       },
     },
     build: {

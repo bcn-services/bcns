@@ -1,7 +1,7 @@
 /**
  * Webhook decision test: proves the handler routes provision/suspend through
- * @bcns/app-core's pure logic. A `past_due` event must map to `suspend`.
- * Run with: corepack pnpm --filter @bcns/hosted-web-template test
+ * @nseluga/app-core's pure logic. A `past_due` event must map to `suspend`.
+ * Run with: corepack pnpm --filter @nseluga/hosted-web-template test
  */
 
 import { test } from "node:test";

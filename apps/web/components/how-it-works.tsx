@@ -1,5 +1,5 @@
 import { Search, Hammer, Rocket } from "lucide-react";
-import { Container, SectionHeading } from "@bcns/ui";
+import { Container, SectionHeading } from "@nseluga/ui";
 import { siteContent } from "@/lib/content";
 
 const stepIcons = [Search, Hammer, Rocket] as const;

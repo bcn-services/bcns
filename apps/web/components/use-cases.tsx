@@ -7,7 +7,7 @@ import {
   CardTitle,
   Container,
   SectionHeading,
-} from "@bcns/ui";
+} from "@nseluga/ui";
 import { siteContent } from "@/lib/content";
 
 const useCaseIcons = [CalendarClock, Boxes, LineChart, Sparkles] as const;

@@ -1,5 +1,5 @@
 {
-  "name": "@bcns/hosted-web-template",
+  "name": "@nseluga/hosted-web-template",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -12,14 +12,14 @@
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
-    "@bcns/app-core": "workspace:*",
-    "@bcns/ui": "workspace:*",
+    "@nseluga/app-core": "workspace:*",
+    "@nseluga/ui": "workspace:*",
     "next": "14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@bcns/config": "workspace:*",
+    "@nseluga/config": "workspace:*",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

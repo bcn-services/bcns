@@ -1,5 +1,5 @@
 /**
- * @bcns/app-core — shared application core: pricing/billing math,
+ * @nseluga/app-core — shared application core: pricing/billing math,
  * subscription access decisions, and the BYOK Anthropic client factory.
  */
 

@@ -1,2 +1,2 @@
-// Root Prettier config re-exports the shared config from @bcns/config.
-export { default } from "@bcns/config/prettier";
+// Root Prettier config re-exports the shared config from @nseluga/config.
+export { default } from "@nseluga/config/prettier";

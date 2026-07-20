@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   // Compile the shared workspace UI package from source.
-  transpilePackages: ["@bcns/ui"],
+  transpilePackages: ["@nseluga/ui"],
 };
 
 export default nextConfig;
