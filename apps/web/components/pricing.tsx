@@ -9,6 +9,7 @@ import {
   SectionHeading,
 } from "@nseluga/ui";
 import { SectionAtmosphere } from "@/components/section-atmosphere";
+import { Reveal } from "@/components/reveal";
 import { siteContent } from "@/lib/content";
 
 export function Pricing() {
@@ -21,17 +22,26 @@ export function Pricing() {
         <SectionHeading
           eyebrow={eyebrow}
           title={title}
+          accent="monthly"
           description={description}
         />
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid items-start gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {tiers.map(({ name, price, setup, monthly, seats, description: tierDescription, features }, index) => {
             // Branch on data shape, not array position: build tiers carry
             // setup/monthly/seats; the consulting tier carries a single price.
             const isConsulting = !setup;
             const isAdvanced = !isConsulting && index === 1;
+            // Featured Advanced tier: accent ring + elevated surface + glow so it
+            // reads as the recommended tier before you reach the price (no new hue).
+            const featuredClasses = isAdvanced
+              ? " border-primary/50 bg-card shadow-xl shadow-primary/15 ring-2 ring-primary/50"
+              : isConsulting
+                ? " border-t-2 border-t-primary border-primary/30 bg-secondary/60"
+                : "";
             return (
-              <Card key={index} className={`h-full${isConsulting ? " border-t-2 border-t-primary border-primary/30 bg-secondary/60" : isAdvanced ? " border-t-2 border-t-primary/70 bg-secondary/30" : ""}`}>
+              <Reveal as="div" key={index} variant="pop" delay={index * 120} className="h-full">
+                <Card className={`group hover-lift h-full${featuredClasses}`}>
                 <CardHeader>
                   {isConsulting && (
                     <div className="mb-3 flex items-center gap-2">
@@ -63,7 +73,8 @@ export function Pricing() {
                     ))}
                   </ul>
                 </CardContent>
-              </Card>
+                </Card>
+              </Reveal>
             );
           })}
         </div>
