@@ -49,7 +49,7 @@ export function UseCases() {
                   </span>
                 </div>
                 <CardHeader className="pt-4">
-                  <CardTitle className="text-base">{caseTitle}</CardTitle>
+                  <CardTitle className="text-base lg:min-h-[2.75rem]">{caseTitle}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="leading-relaxed">{caseDescription}</CardDescription>
