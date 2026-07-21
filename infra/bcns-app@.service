@@ -1,0 +1,28 @@
+# One unit per client app: systemctl enable --now bcns-app@<slug>
+# %i is the client slug == the Unix user == /srv/<slug>. Installed once per
+# droplet by bootstrap.sh; clients are added by onboard-client.sh.
+[Unit]
+Description=BCNS client app: %i
+After=network.target
+# Don't restart-loop on a rebooted droplet that has no release deployed yet.
+ConditionPathExists=/srv/%i/current
+
+[Service]
+User=%i
+Group=%i
+WorkingDirectory=/srv/%i/current
+EnvironmentFile=/srv/%i/env
+# Next standalone entrypoint; reads PORT/HOSTNAME from env.
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+MemoryMax=512M
+# Hardening: read-only OS, private /tmp, no privilege escalation.
+ProtectSystem=strict
+ReadWritePaths=/srv/%i
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
