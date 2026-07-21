@@ -8,6 +8,7 @@ import {
   SectionHeading,
 } from "@nseluga/ui";
 import { SectionAtmosphere } from "@/components/section-atmosphere";
+import { Reveal } from "@/components/reveal";
 import { siteContent } from "@/lib/content";
 
 export function AboutFounder() {
@@ -20,15 +21,17 @@ export function AboutFounder() {
         <SectionHeading
           eyebrow={eyebrow}
           title={title}
+          accent="people"
           description={description}
         />
 
         <div className="mt-14 grid gap-8 lg:grid-cols-2">
-          {founders.map((founder) => {
+          {founders.map((founder, index) => {
             const initials = founder.name.split(" ").map((w: string) => w[0]).join("");
             return (
-            <Card key={founder.name} className="relative h-full overflow-hidden">
-              <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-primary/40" aria-hidden />
+            <Reveal as="div" key={founder.name} variant="pop" delay={index * 140} className="h-full">
+            <Card className="group hover-lift relative h-full overflow-hidden">
+              <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-primary/40 transition-colors duration-300 group-hover:bg-primary" aria-hidden />
               <CardHeader className="pl-8">
                 <div className="flex items-center gap-4 mb-2">
                   <div
@@ -57,14 +60,26 @@ export function AboutFounder() {
                 </ul>
               </CardContent>
             </Card>
+            </Reveal>
             );
           })}
         </div>
 
         {whyBcns && (
-          <blockquote className="mx-auto mt-14 max-w-2xl rounded-xl border border-primary/20 bg-primary/[0.04] px-8 py-6 text-center text-lg leading-relaxed text-foreground/80">
-            {whyBcns}
-          </blockquote>
+          <Reveal className="mx-auto mt-16 max-w-3xl">
+            <blockquote className="relative rounded-2xl border-l-2 border-primary bg-secondary/40 px-10 py-8 pt-10 text-center">
+              {/* Large opening mark — serif accent, low opacity, behind the text. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-5 top-1 select-none font-serif-accent text-7xl italic leading-none text-primary/25"
+              >
+                &ldquo;
+              </span>
+              <p className="relative text-pretty text-xl font-medium leading-relaxed text-foreground/90 sm:text-2xl">
+                {whyBcns}
+              </p>
+            </blockquote>
+          </Reveal>
         )}
       </Container>
     </section>
