@@ -34,7 +34,7 @@ export function Reviews() {
               <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_32px_hsl(var(--primary)/0.15)]">
                 <MessageSquare className="size-8" aria-hidden />
               </div>
-              <p className="text-2xl font-bold">{holdingState.title}</p>
+              <p className="text-xl font-semibold">{holdingState.title}</p>
               <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
               <Link
                 href={holdingState.ctaHref}

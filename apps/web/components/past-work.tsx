@@ -9,13 +9,15 @@ import {
   Container,
   SectionHeading,
 } from "@nseluga/ui";
+import { SectionAtmosphere } from "@/components/section-atmosphere";
 import { siteContent } from "@/lib/content";
 
 export function PastWork() {
   const { eyebrow, title, description, items, holdingState } = siteContent.pastWork;
 
   return (
-    <section id="past-work" className="border-t border-border/60 pt-16 pb-16 sm:pt-20 sm:pb-20">
+    <section id="past-work" className="relative overflow-hidden border-t border-border/60 pt-16 pb-16 sm:pt-20 sm:pb-20">
+      <SectionAtmosphere variant="work" />
       <Container>
         <SectionHeading
           eyebrow={eyebrow}
@@ -34,7 +36,7 @@ export function PastWork() {
               <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_32px_hsl(var(--primary)/0.15)]">
                 <Clock className="size-8" aria-hidden />
               </div>
-              <p className="text-2xl font-bold">{holdingState.title}</p>
+              <p className="text-xl font-semibold">{holdingState.title}</p>
               <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
               <Link
                 href={holdingState.ctaHref}

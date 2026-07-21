@@ -7,13 +7,15 @@ import {
   Container,
   SectionHeading,
 } from "@nseluga/ui";
+import { SectionAtmosphere } from "@/components/section-atmosphere";
 import { siteContent } from "@/lib/content";
 
 export function AboutFounder() {
   const { eyebrow, title, description, founders, whyBcns } = siteContent.about;
 
   return (
-    <section id="about" className="border-t border-border/60 pt-16 pb-24 sm:pt-20 sm:pb-28">
+    <section id="about" className="relative overflow-hidden border-t border-border/60 pt-16 pb-24 sm:pt-20 sm:pb-28">
+      <SectionAtmosphere variant="about" />
       <Container>
         <SectionHeading
           eyebrow={eyebrow}

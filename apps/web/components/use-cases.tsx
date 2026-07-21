@@ -8,6 +8,7 @@ import {
   Container,
   SectionHeading,
 } from "@nseluga/ui";
+import { SectionAtmosphere } from "@/components/section-atmosphere";
 import { siteContent } from "@/lib/content";
 
 const useCaseIcons = [CalendarClock, Boxes, LineChart, Sparkles] as const;
@@ -16,7 +17,8 @@ export function UseCases() {
   const { eyebrow, title, description, items } = siteContent.useCases;
 
   return (
-    <section id="examples" className="border-t border-border/60 bg-secondary/70 pt-12 pb-16 sm:pt-16 sm:pb-20">
+    <section id="examples" className="relative overflow-hidden border-t border-border/60 bg-secondary/70 pt-12 pb-16 sm:pt-16 sm:pb-20">
+      <SectionAtmosphere variant="services" />
       <Container>
         <SectionHeading
           eyebrow={eyebrow}

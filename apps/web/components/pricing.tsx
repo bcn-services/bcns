@@ -8,13 +8,15 @@ import {
   Container,
   SectionHeading,
 } from "@nseluga/ui";
+import { SectionAtmosphere } from "@/components/section-atmosphere";
 import { siteContent } from "@/lib/content";
 
 export function Pricing() {
   const { eyebrow, title, description, tiers } = siteContent.pricing;
 
   return (
-    <section id="pricing" className="border-t border-border/60 pt-16 pb-24 sm:pt-20 sm:pb-28">
+    <section id="pricing" className="relative overflow-hidden border-t border-border/60 pt-16 pb-24 sm:pt-20 sm:pb-28">
+      <SectionAtmosphere variant="pricing" />
       <Container>
         <SectionHeading
           eyebrow={eyebrow}
