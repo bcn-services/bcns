@@ -1,58 +1,132 @@
-brand: nate-personal
-launch: pnpm --filter @bcns/web dev
+brand: bcns
+launch: pnpm --filter web dev
 url: http://localhost:3000
 
-> **Run from the Claude Code terminal, not cowork.** Use Claude-in-Chrome for all viewing and
-> screenshots: load its tools via ToolSearch, open a new tab, navigate to each page URL, and use the
-> computer tool to screenshot before and after every change. The loop depends on actually seeing the
-> rendered page — never skip the screenshot step or trust the diff alone.
+> **Run from the Claude Code terminal, not cowork.** Use Claude-in-Chrome for all viewing
+> and screenshots: load its tools via ToolSearch, open a tab, navigate to each page URL, and
+> screenshot before and after every change. The loop depends on actually seeing rendered
+> pixels — never skip the screenshot step or trust the diff alone. Work on this branch
+> (`layout-loop-2026-07-20`); never edit or merge to `main`.
 
-> **Goal of this pass.** The site's structure and copy are final and good, and the aesthetic
-> direction is right. What's missing is richness: the pages read as generic because the space is
-> filled only with words and small icons. Keep the current aesthetic and the current structure
-> (simple landing page, separate tabs for each topic) — do not redesign. Add detail, visual
-> interest, a human feel, and natural motion so each page looks professionally crafted instead of
-> templated.
+> **Direction — "Bold, executed with precision."** Push the styling and motion to the Bold
+> end (big confident display type, a serif-italic accent word, the branded signature motif,
+> strong-but-purposeful animation) — but hold every change to the discipline of the
+> Restrained option: one accent only, tight alignment to the grid, generous whitespace, no
+> clutter, no second accent hue, nothing gaudy. Marketable and alive, not busy. When a Bold
+> move and a precision rule conflict, precision wins — dial the Bold move back until it reads
+> as intentional, not loud.
 
-> **Reference sites — study both before starting; here is exactly what to take from each:**
-> - **ozoneproject.com** — the *human, alive* quality. Expressive large type, real personality,
->   ambient background motion, and layered scroll animation. Take from it: things move and feel
->   placed by a person, not auto-laid-out. This is the "human feel and natural animation" the site
->   is missing.
-> - **openx.com** — the *professional polish*. Purposeful, varied sections, refined gradients and
->   depth, confident and trustworthy. Take from it: every section looks intentional, and sections
->   differ from one another instead of repeating one card pattern down the page.
-> - **The synthesis to aim for:** OpenX's polish plus Ozone's warmth and motion. Less generic, more
->   to look at beyond words and icons, with flow between sections. Match this level of quality, not
->   their specific brands — the palette and voice stay `nate-personal`.
+> **Reference — l2details.com.** Borrow its *techniques*, not its skin: cinematic dark field,
+> two-tone headline (one italic accent word), editorial rule-line eyebrows, a signature
+> animated emblem, heavy scroll-reveal, big stat/number treatment. bcns keeps its OWN brand —
+> pastel-blue (#7CB3FF) on charcoal-purple (#15131F), sans base, **no photography** (brand
+> rule). No serif body, no gold, no car imagery. Craft governs discipline; brand governs
+> color/type.
 
-> **Cross-page craft (apply on every page):**
-> - Replace empty space with visual substance — gradients, texture, illustrated accents, layered
->   depth — not just more whitespace.
-> - Give every card or feature block a visual artifact beyond a small icon: an illustrated glyph, a
->   gradient badge, a patterned header, or a small graphic.
-> - Add motion with restraint: scroll-triggered entrances (fade-up, stagger), meaningful hover
->   states, and at least one ambient animation in each hero or feature area.
-> - Make sections feel connected — deliberate transitions and rhythm so the page flows top to bottom.
-> - Presentation only. Never edit copy, data, props, logic, or routing. `[INPUT: …]` strings are
->   content placeholders — style them as normal text, never change them.
+> **Already landed on this branch — do NOT redo:**
+> - Distinct background pattern per tab (home = grid, services = blue dot matrix,
+>   about = diagonal hairlines, pricing = concentric rings, work = crosshatch) via
+>   `components/section-atmosphere.tsx`. Keep; only extend if a page rework needs it.
+> - Empty-state cards on /work constrained to `max-w-3xl`; use-case card bodies aligned;
+>   /work holding-state titles set to the site `text-xl font-semibold` convention.
+> - `components/signature-motif.tsx` (orbiting-nodes emblem) exists and is proven in the
+>   style lab. Reuse it; do not rebuild.
+
+> **Guardrails (every page):**
+> - Presentation only. Never edit copy, data, props, logic, or routing. `[INPUT: …]` strings
+>   are content placeholders — style as normal text, never change or invent them.
+> - `siteContent` / `site.ts` are the source of truth for copy — never edit through them.
+> - Respect `prefers-reduced-motion`: all motion must no-op cleanly (the global reduce-motion
+>   rule already zeroes transitions; JS-driven reveals must check the media query and render
+>   the final state immediately).
+> - Objective gates before any page is "done": text contrast ≥ WCAG AA; no overflow / overlap
+>   / clipping; layout holds at mobile AND desktop; motion degrades gracefully.
+> - One change per pass, screenshot before/after, commit each pass with the change-log line.
+
+---
+
+## Phase 0 — Shared foundation (build FIRST, before the per-page loops)
+
+These are prerequisites the page items depend on. Land them, screenshot the style-lab or a
+representative page to confirm, then commit before starting page loops.
+
+- Wire the serif accent font globally: add `Fraunces` (italic) via `next/font/google` in
+  `app/layout.tsx` as `--font-serif-accent`; expose a `font-serif-accent` family in the
+  Tailwind preset (`packages/config/tailwind/index.ts`). Used for exactly ONE accent word per
+  headline, always in `text-primary`, never for body or more than one word.
+- Build `components/reveal.tsx` — a `"use client"` wrapper using a single IntersectionObserver
+  that adds the `animate-fade-up` on enter and unobserves. Props: `delay` (ms) for stagger,
+  `as` for element type. Under `prefers-reduced-motion`, skip the observer and render final
+  state. This powers scroll-reveal + staggered entrance everywhere.
+- Add motion keyframes to the preset: `drift` (slow translate/scale loop for ambient glows)
+  and `shimmer` (for placeholder cards). `spin` / `ping` / `pulse` already exist.
+- Standardize hover utilities as shared classes/variants: card hover-lift
+  (`-translate-y-0.5` + shadow bump), link/arrow slide (`group-hover:translate-x-1`),
+  icon-tile brighten. Apply consistently, not ad hoc per component.
+- Extend `SectionHeading` (`packages/ui/src/section-heading.tsx`) to optionally render a
+  serif-italic accent segment and larger display sizes, without breaking existing callers
+  (accent is opt-in; default unchanged).
+
+> **⚠️ AUTONOMOUS RUN — STOP HERE** — review the foundation (fonts loading, Reveal working,
+> motif placement, reduced-motion) before the per-page visual loops touch real pages.
+
+---
+
+## Per-page loops
 
 - page: /
-  notes: Hero reads flat — give it depth with an ambient animated element (gradient orb, mesh, or motion graphic) behind it, and stagger the proof-point badges in on load. The three nav cards are the primary interaction: give each a visual beyond the arrow (gradient fill, illustrated pattern, or a distinct motif) so the trio feels crafted. The contact section is a plain form on white — add a warm accent (background wash, stripe, or illustrated element).
+  notes: Hero — raise the headline to bold display scale and set ONE word as the serif-italic
+    blue accent (precision: only one). Place `SignatureMotif` subtly in a hero corner behind
+    content (low opacity, does not fight the headline). Stagger the proof-point row and the
+    four nav cards in on load/scroll via `Reveal`. Nav-card hover: top-border accent sweep +
+    lift + icon brighten (reuse the shared hover utilities). Reveal the split contact section.
+    Keep the existing grid+glow hero atmosphere. Discipline check: still one accent, headline
+    dominant, whitespace intact.
   status: not started
 
 - page: /services
-  notes: The four use-case cards are icon-only — give each a richer visual (illustrated glyph, gradient + icon, or a patterned card header) and stagger them in on scroll. The how-it-works steps need a visual connector (animated line, arc, or weighted numbered badge) and a staggered entrance, so the process reads as a flow rather than three stacked blocks.
+  notes: THE PROCESS (how-it-works) is the priority — rebuild it from three stacked blocks into
+    a connected flow: numbered node badges on a running connector line (horizontal on desktop,
+    vertical on mobile) that draws/fills in as the section scrolls into view, with steps
+    revealing in sequence (stagger). Use-case cards: staggered reveal + hover lift; keep the
+    aligned body baseline already fixed. Serif-italic accent word in the section title.
+    Precision: the connector must land on a shared axis and the node badges align to it exactly.
   status: not started
 
 - page: /pricing
-  notes: The three cards need texture to tell tiers apart before the price is read — subtle gradient fills, an accent border treatment, or a patterned header band. The AI consulting card should look genuinely distinct from the two build tiers (different background, accent, or shape — not just a label). Add a hover lift or glow to all cards. FAQ items should animate open and closed.
+  notes: FAQ — convert the flat two-column card grid into an accordion (expand/collapse with an
+    animated height + chevron rotate; one or multi open is fine). Pricing cards: strengthen the
+    featured "Advanced build" tier with a precise treatment (accent ring or elevated surface —
+    not a new hue) so it reads as featured before the price; keep the AI day-rate card's chip
+    differentiation. Hover glow/lift on all three cards. Reveal + stagger the row.
   status: not started
 
 - page: /about
-  notes: The founder cards look unfinished without photos — add a placeholder visual treatment (gradient avatar backdrop, styled initials, or an illustrated portrait frame) so the layout reads as designed, not awaiting content. Frame the whyBcns paragraph as a highlight (pull-quote, accent border, or background block) rather than body copy. Add a subtle decorative element (grid, dot pattern, or soft shape) behind the two columns for depth.
+  notes: Founder cards — reveal + hover lift; keep matched heights. Frame the whyBcns statement
+    ("Small businesses get two bad options…") as a deliberate pull-quote (accent border or
+    lifted block with a large opening mark), not plain centered body. Serif-italic accent word
+    in "The people behind bcns". `[INPUT: …]` credentials stay as-is, styled as normal text.
+    Keep the diagonal-hairline atmosphere.
   status: not started
 
 - page: /work
-  notes: Both holding-state panels need character so they read as intentional, not empty — give each an illustrated or ambient graphic (a build/construction motif for past work, a speech-bubble or star motif for reviews). Make the CTA button on each panel prominent. A subtle pulse or shimmer can signal the panels are live and waiting for the first client.
+  notes: Give the two holding panels character so they read as intentional, not empty: add an
+    ambient/branded graphic per panel (the `SignatureMotif` or a build/reviews motif) and a
+    subtle shimmer so they signal "live, awaiting first client." Reviews empty state can become
+    2–3 placeholder quote cards with a shimmer sweep rather than one box. Make each panel CTA
+    prominent (primary weight). Reveal on scroll. Keep the crosshatch atmosphere and the
+    max-w-3xl framing.
   status: not started
+
+---
+
+## Phase F — Finalize (after all pages pass)
+
+- Delete the throwaway `app/style-lab/page.tsx` preview route and `components/signature-motif.tsx`
+  ONLY if the motif ended up unused (it should be used — keep it if any page adopted it).
+- Re-run `pnpm --filter web lint` and `typecheck`; confirm the diff is presentation-only
+  (no copy/data/prop/logic/routing changes).
+- Verify `prefers-reduced-motion` (emulate in devtools) removes all motion cleanly.
+- Update `LAYOUT_LOOP_REPORT.md` with baseline/final per page, the chosen direction
+  (Bold + precision), animations shipped, and any flagged taste forks. Do NOT merge — leave
+  for morning sign-off, then Nate merges.
