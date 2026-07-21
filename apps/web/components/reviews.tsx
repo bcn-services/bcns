@@ -24,12 +24,17 @@ export function Reviews() {
         />
 
         {items.length === 0 ? (
-          <div className="mx-auto mt-14 max-w-3xl overflow-hidden rounded-2xl border border-border/60 bg-background/40">
-            <div className="flex flex-col items-center gap-6 px-8 py-16 text-center sm:px-16 sm:py-20">
-              <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <MessageSquare className="size-6" aria-hidden />
+          <div className="relative mx-auto mt-14 max-w-3xl overflow-hidden rounded-2xl border border-border/60 bg-background/40">
+            {/* ambient glow from icon center */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_30%,hsl(var(--primary)/0.12),transparent_70%)]"
+            />
+            <div className="relative flex flex-col items-center gap-6 px-8 py-16 text-center sm:px-16 sm:py-20">
+              <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_32px_hsl(var(--primary)/0.15)]">
+                <MessageSquare className="size-8" aria-hidden />
               </div>
-              <p className="text-xl font-semibold">{holdingState.title}</p>
+              <p className="text-2xl font-bold">{holdingState.title}</p>
               <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
               <Link
                 href={holdingState.ctaHref}
