@@ -9,7 +9,26 @@ import {
   Container,
   SectionHeading,
 } from "@nseluga/ui";
+import { Reveal } from "@/components/reveal";
 import { siteContent } from "@/lib/content";
+
+/** Decorative shimmer skeleton of a testimonial — signals "reviews live here soon". */
+function QuoteSkeleton() {
+  return (
+    <div aria-hidden className="rounded-xl border border-border/60 bg-background/40 p-6">
+      <div className="mb-4 size-8 rounded-md bg-secondary shimmer-surface animate-shimmer" />
+      <div className="space-y-2.5">
+        <div className="h-3 rounded bg-secondary shimmer-surface animate-shimmer" />
+        <div className="h-3 w-11/12 rounded bg-secondary shimmer-surface animate-shimmer" />
+        <div className="h-3 w-4/5 rounded bg-secondary shimmer-surface animate-shimmer" />
+      </div>
+      <div className="mt-6 flex items-center gap-3">
+        <div className="size-9 rounded-full bg-secondary shimmer-surface animate-shimmer" />
+        <div className="h-3 w-1/3 rounded bg-secondary shimmer-surface animate-shimmer" />
+      </div>
+    </div>
+  );
+}
 
 export function Reviews() {
   const { eyebrow, title, description, items, holdingState } = siteContent.reviews;
@@ -24,25 +43,30 @@ export function Reviews() {
         />
 
         {items.length === 0 ? (
-          <div className="relative mx-auto mt-14 max-w-3xl overflow-hidden rounded-2xl border border-border/60 bg-background/40">
-            {/* ambient glow from icon center */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_30%,hsl(var(--primary)/0.12),transparent_70%)]"
-            />
-            <div className="relative flex flex-col items-center gap-6 px-8 py-16 text-center sm:px-16 sm:py-20">
-              <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_32px_hsl(var(--primary)/0.15)]">
-                <MessageSquare className="size-8" aria-hidden />
+          <div className="mt-14">
+            {/* Placeholder testimonial cards — shimmer skeletons that read as
+                "reviews will land here", staggered in on scroll. */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <Reveal key={i} variant="pop" delay={i * 120} className={i === 2 ? "sm:col-span-2 lg:col-span-1" : ""}>
+                  <QuoteSkeleton />
+                </Reveal>
+              ))}
+            </div>
+
+            <Reveal delay={200} className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-5 text-center">
+              <div className="flex size-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_32px_hsl(var(--primary)/0.15)]">
+                <MessageSquare className="size-7" aria-hidden />
               </div>
               <p className="text-xl font-semibold">{holdingState.title}</p>
               <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
               <Link
                 href={holdingState.ctaHref}
-                className="inline-flex items-center rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+                className="hover-glow animate-glow-pulse inline-flex items-center rounded-md bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground"
               >
                 {holdingState.ctaLabel}
               </Link>
-            </div>
+            </Reveal>
           </div>
         ) : (
           <div className="mt-14 grid gap-6 sm:grid-cols-2">
