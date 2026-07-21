@@ -53,3 +53,35 @@ export function createAnthropicClient(cfg: ByokConfig, deps: ByokDeps = {}): Ant
   });
   return client;
 }
+
+/** Config for the opt-in AI gate. Apps pass their own env-derived values. */
+export interface AiGateConfig {
+  /** Master switch for the opt-in AI feature. Default OFF. */
+  aiEnabled: boolean;
+  anthropicApiKey?: string;
+}
+
+/** Test seam: swap the underlying client factory. */
+export interface AiGateDeps {
+  createClient?: typeof createAnthropicClient;
+}
+
+/**
+ * Return an Anthropic client ONLY when the AI feature is opted in and a key
+ * is present; otherwise null. When aiEnabled is off this returns before the
+ * factory is referenced, so the client is never constructed — the
+ * import-boundary guarantee client apps test against.
+ */
+export function maybeCreateAnthropicClient(
+  config: AiGateConfig,
+  deps: AiGateDeps = {},
+): Anthropic | null {
+  if (!config.aiEnabled) {
+    return null;
+  }
+  if (!config.anthropicApiKey) {
+    return null;
+  }
+  const createClient = deps.createClient ?? createAnthropicClient;
+  return createClient({ apiKey: config.anthropicApiKey });
+}

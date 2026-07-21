@@ -26,7 +26,30 @@ export {
 export {
   type ByokDeps,
   type ByokConfig,
+  type AiGateConfig,
+  type AiGateDeps,
   DEFAULT_MODEL,
   MissingApiKeyError,
   createAnthropicClient,
+  maybeCreateAnthropicClient,
 } from "./anthropic";
+
+export {
+  type HealthConfig,
+  type DbStatus,
+  type HealthReport,
+  type DbPing,
+  pingSupabase,
+  evaluateHealth,
+} from "./health";
+
+export {
+  type SignatureVerifier,
+  type ProcessedEventStore,
+  type WebhookOutcome,
+  unverifiedVerifier,
+  createMemoryEventStore,
+  processWebhook,
+} from "./webhooks";
+
+export { type StorageAdapter } from "./storage";

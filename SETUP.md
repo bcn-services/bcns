@@ -9,11 +9,11 @@ All repos live under **github.com/nseluga** (personal account, no org). **Privat
 
 ## Repo topology
 
-- **bcns** — the platform repo (this one): marketing site (`apps/web`), shared
-  packages (`packages/*`), and the template source (`templates/hosted-web/`). No
-  client apps live here.
-- **bcns-app-template** — standalone GitHub *Template Repository*, generated from
-  `templates/hosted-web/`. "Use this template" spins up a client repo.
+- **bcns** — the platform repo (this one): marketing site (`apps/web`) and shared
+  packages (`packages/*`). No client apps or template source live here.
+- **bcns-app-template** — standalone GitHub *Template Repository*, the **canonical
+  template** (the old `templates/hosted-web/` copy here was deleted after the two
+  diverged). New client repos come from it via the `/new-client-repo` skill.
 - **bcns-client-<slug>** — one repo per client business, generated from the template.
   Current: `bcns-client-delucas` (DeLuca's — extracted from this monorepo).
 
@@ -73,12 +73,21 @@ transpilePackages: ['@nseluga/app-core', '@nseluga/ui', '@nseluga/config']
 
 ## Spinning up a new client (e.g. Coventry Hills)
 
+Preferred: run the **`/new-client-repo`** Claude Code skill
+(`~/os/skills/new-client-repo/`). It interviews for slug / display name / config
+decisions, creates the private repo from `bcns-app-template`, stamps the
+customization points listed in the template's `TEMPLATE.md`, verifies the build,
+pushes, and creates the os project index entry.
+
+Manual fallback:
+
 1. github.com/nseluga/bcns-app-template → **Use this template** → name
    `bcns-client-<slug>`, **Private**.
-2. Clone, add `.npmrc` (above), `pnpm install`.
-3. Configure env: Clerk (auth), Stripe (billing), Neon (Postgres), optional Anthropic
-   BYOK key. See the template `README.md` / `DEPLOY.md`.
-4. Deploy to Coolify on the Hetzner VPS; front with Cloudflare.
+2. Clone, `pnpm install` (needs `GITHUB_TOKEN` = classic PAT with `read:packages`, above).
+3. Apply the customization points in the template's `TEMPLATE.md`.
+4. Configure env per the template `.env.example`: Supabase (per-client project),
+   optional Anthropic BYOK key. See the template `README.md` / `DEPLOY.md`.
+5. Deploy per the template `DEPLOY.md`: DigitalOcean droplet + PM2, front with Cloudflare.
 
 ## Exception — DeLuca's (`bcns-client-delucas`)
 
