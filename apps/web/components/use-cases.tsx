@@ -9,6 +9,7 @@ import {
   SectionHeading,
 } from "@nseluga/ui";
 import { SectionAtmosphere } from "@/components/section-atmosphere";
+import { Reveal } from "@/components/reveal";
 import { siteContent } from "@/lib/content";
 
 const useCaseIcons = [CalendarClock, Boxes, LineChart, Sparkles] as const;
@@ -23,6 +24,7 @@ export function UseCases() {
         <SectionHeading
           eyebrow={eyebrow}
           title={title}
+          accent="shaped"
           description={description}
         />
 
@@ -43,20 +45,22 @@ export function UseCases() {
               "text-primary/70",
             ] as const;
             return (
-              <Card key={index} className={`group h-full overflow-hidden transition-shadow hover:shadow-md${index === 3 ? " border-primary/30" : ""}`}>
-                <div className={`relative flex items-center justify-center h-20 ${headerGradients[index]}`}>
-                  <Icon className={`size-9 ${iconColors[index]} transition-colors duration-200 group-hover:text-primary`} aria-hidden />
-                  <span className="absolute top-3 right-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {tag}
-                  </span>
-                </div>
-                <CardHeader className="pt-4">
-                  <CardTitle className="text-base lg:min-h-[2.75rem]">{caseTitle}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="leading-relaxed">{caseDescription}</CardDescription>
-                </CardContent>
-              </Card>
+              <Reveal as="div" key={index} variant="pop" delay={index * 110} className="h-full">
+                <Card className={`group hover-lift h-full overflow-hidden${index === 3 ? " border-primary/30" : ""}`}>
+                  <div className={`relative flex items-center justify-center h-20 overflow-hidden ${headerGradients[index]}`}>
+                    <Icon className={`size-9 ${iconColors[index]} transition-[transform,color] duration-300 ease-out group-hover:scale-110 group-hover:text-primary`} aria-hidden />
+                    <span className="absolute top-3 right-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {tag}
+                    </span>
+                  </div>
+                  <CardHeader className="pt-4">
+                    <CardTitle className="text-base lg:min-h-[2.75rem]">{caseTitle}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="leading-relaxed">{caseDescription}</CardDescription>
+                  </CardContent>
+                </Card>
+              </Reveal>
             );
           })}
         </div>
