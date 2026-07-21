@@ -1,10 +1,11 @@
 # bcns
 
 Platform monorepo for **bcns** — a software studio that builds custom software
-for local small businesses. This repo holds the marketing site, the shared
-packages, and the client-app template source. **Client apps do not live
-here** — each client business gets its own repo generated from
-`templates/hosted-web/`, consuming the shared packages by version. See
+for local small businesses. This repo holds the marketing site and the shared
+packages. **Client apps do not live here** — each client business gets its own
+repo generated from the standalone
+[`bcns-app-template`](https://github.com/nseluga/bcns-app-template) Template
+Repository, consuming the shared packages by version. See
 [`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
 for the delivery model and rationale.
 
@@ -19,9 +20,7 @@ bcns/
 ├─ packages/
 │  ├─ ui/             # Shared React component library (@nseluga/ui)
 │  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@nseluga/config)
-│  └─ app-core/       # @nseluga/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client
-├─ templates/
-│  └─ hosted-web/     # Starter for spinning up a new client repo (@nseluga/hosted-web-template)
+│  └─ app-core/       # @nseluga/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client + AI opt-in gate, health probe, webhook hygiene, storage interface
 ├─ package.json       # Root scripts + workspace dev dependencies
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
@@ -136,13 +135,15 @@ lean.)
 ## Adding a client app later
 
 Client apps are **not** added to this monorepo. Each new client business gets
-**its own repo**, generated from `templates/hosted-web/`. See
+**its own repo**, generated from the
+[`bcns-app-template`](https://github.com/nseluga/bcns-app-template) Template
+Repository — preferably via the `/new-client-repo` Claude Code skill (see
+`SETUP.md`). See
 [`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
 for the full delivery model and rationale.
 
-1. Generate a new repo from `templates/hosted-web/`
-   (`@nseluga/hosted-web-template`) — pre-wired to the hosting stack and shared
-   packages.
+1. Generate a new repo from `bcns-app-template` — pre-wired to the hosting
+   stack and shared packages.
 2. Consume the shared packages **by version** (normal dependencies, not
    `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
 3. Propagate shared improvements by publishing a new package version and bumping
