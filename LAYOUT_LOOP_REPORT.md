@@ -1,152 +1,170 @@
-# Layout Loop Report — bcns visual richness pass
+# Layout Loop Report — bcns marketing site (2026-07-20 run)
 
-**Branch:** `layout-loop-bcns`  
-**Run date:** 2026-07-20  
-**Brand:** bcns  
-**Pages covered:** `/`, `/services`, `/about`, `/pricing`, `/work`  
-**Total passes:** 9 (across 4 pages; /work intentionally skipped)
+**Branch:** `layout-loop-2026-07-20` (worktree `.claude/worktrees/layout-loop-night`)
+**Base:** `main` @ a5edbdc (which already includes the prior visual-richness pass)
+**Run date:** 2026-07-20 (overnight)
+**Brand:** bcns · **Craft:** `~/os/knowledge/library/design-language/craft.md`
+**Queue:** Home → About → Services → Pricing → Work
+**Changes:** 3 commits across 2 pages. **You review + merge — I did not merge.**
+
+> Context: the prior layout-loop run polished Home/Services/About/Pricing and
+> **merged to main**, so tonight's baseline already carried that work. Re-running
+> found those four largely converged; the real opportunity was `/work` (the prior
+> run intentionally skipped it) plus one alignment fix on Services. I made changes
+> only where I could name a concrete craft/brand gap — no churn on converged pages.
+> (The previous run's report is preserved in git history on `main`.)
+
+---
+
+## Summary table
+
+| Page | Passes | Changes | Stopping condition |
+|------|--------|---------|--------------------|
+| Home | 0 | none | Converged — no nameable flaw vs craft+brand |
+| About | 0 | none | Converged — remaining weaknesses are copy gaps (out of edit fence) |
+| Services | 1 | card body alignment | Converged after fix |
+| Pricing | 0 | none | Converged — one candidate left as a logged taste fork |
+| Work | 2 | width constraint + twin unification | Diminishing returns after 2 passes |
 
 ---
 
 ## Page: `/` (home)
 
-### Baseline
-Hero section with dark grid texture and radial glow (subtle, 20% opacity). Four nav cards below with plain arrow links — no visual differentiation between destinations. Contact section on the raw dark field with no treatment distinguishing it as an action zone.
+**Baseline = final (no change).** Fresh-eye diagnosis found the page resolved by the
+prior merged pass: dominant centered headline (P1), single pastel-blue accent on the
+primary CTA (P11 / brand accent rule), grid texture + radial glow carrying character
+(P7), uniform nav cards with icon header zones (P4), a strong split contact section
+(form card lifted off the field — figure/ground), and contact details correctly in
+the footer (P10).
 
-### Changes
+Candidate flaws I tested and rejected: muted subtext contrast (~6.6:1, passes AA);
+low-contrast secondary CTA (intentional so the primary dominates — P1); large grid
+band above the hero eyebrow (atmospheric, grid "puts the void to use" — P3, not slack).
 
-**Pass 1 — Nav cards: distinct icon + gradient header per destination**  
-Added `Wrench / FolderOpen / Tag / Users` icons (size-8) per card inside a `from-primary/10` gradient header zone (h-20). Each card now has a visual anchor specific to its destination. Icons transition from `text-primary/60` to `text-primary` on hover, reinforcing the existing border-t-primary hover interaction.
-
-**Pass 2 — Hero: deepen ambient glow for atmospheric depth**  
-Increased the central radial gradient from 20% → 28% opacity and added a second off-center glow (75% / 20% position, 10% opacity). The hero atmosphere is now visibly blue-purple above the headline, turning the empty header zone into branded depth rather than a flat void.
-
-**Pass 3 — Contact section: subtle ambient glow to zone the CTA area**  
-Added a centered radial gradient (`primary/0.14`) behind the contact section. Effect is intentionally subtle — the dark field resists visible tinting without becoming intrusive. Mainly signals "action zone" without overpowering the form card.
-
-### Stopping condition
-Diminishing returns — Pass 3's glow change is marginal on the dark field. The two structural improvements (icons + hero glow) are solid; the contact section glow is a fine signal but not transformative.
-
-### Rubric
-| Goal | Result |
-|------|--------|
-| Uniquely styled | ✅ Hero glow + grid + nav card icons differentiate clearly from baseline |
-| Intuitive | ✅ Primary CTA is dominant; nav cards have distinct per-destination icons |
-| Simple | ✅ Clean structure, no visual noise added |
-| Aesthetically pleasing | ✅ Hero has atmosphere; nav cards have character |
-
-**Objective gates:** Text contrast ✅ WCAG AA (near-white on dark field). No overflow/clipping ✅. Mobile breakpoints unverified in-pixel (resize tool couldn't change viewport), but responsive Tailwind classes are standard and unchanged.
-
----
-
-## Page: `/services`
-
-### Baseline
-Four use-case cards with small icon-in-box (size-10 wrapper, size-5 icon). Category label top-right. No visual differentiation between cards. How-it-works section had three steps with no visual connector — read as independent blocks.
-
-### Changes
-
-**Pass 4 — Use-case cards: large icon in gradient header zone**  
-Replaced the small `size-10/size-5` icon-in-box with a `h-20 from-accent/60` gradient header zone containing a `size-9` centered icon. Tag label moved to absolute top-right of the header zone. Consistent with nav-card icon pattern on home page.
-
-**Pass 5 — How-it-works: arrow connectors between steps**  
-Restructured the 3-column step grid from `md:grid-cols-3` to `md:grid-cols-[1fr_auto_1fr_auto_1fr]`, inserting `ArrowRight` (text-border, size-5) connectors between steps. Hidden on mobile. The process now reads as a directed flow.
-
-**Pass 6 — Use-case cards: per-card gradient direction differentiation**  
-Varied gradient directions across the four cards (br/bl/tr/b) to create subtle visual differentiation. The AI consulting card uses `from-primary/18` for a blue header instead of purple, with `text-primary/70` icon — distinguishing it from the three service cards.
-
-### Stopping condition
-Diminishing returns — gradient direction variations are subtle at card width. Cards differ by icon shape, category label, and AI card's blue tint. Further differentiation would push into individual-card bespoke styling.
-
-### Rubric
-| Goal | Result |
-|------|--------|
-| Uniquely styled | ✅ Cards have gradient headers + per-card icon; AI card visually distinct |
-| Intuitive | ✅ Process has clear flow direction; categories are legible |
-| Simple | ✅ Clean grid structure unchanged |
-| Aesthetically pleasing | ✅ Cards have visual character; process reads as a journey |
-
-**Objective gates:** Contrast ✅. No overflow ✅. Mobile: grid collapses to sm:grid-cols-2 which is standard; process connector divs hidden at mobile breakpoint ✅.
-
-### Flagged decisions
-- Gradient direction differentiation (Pass 6): chose subtle visual variety over identical cards, though the difference is modest. Alternative: per-card border-t-2 at varying primary opacities. Flag if you want stronger differentiation.
-
----
+**Stopping condition:** converged — could not name a concrete gap that wasn't already
+resolved. No manufactured changes (anti-oscillation).
 
 ## Page: `/about`
 
-### Baseline
-Two founder cards with just name and role — no photo/avatar visual. Brandon's card had `[INPUT: ...]` placeholder credentials. whyBcns paragraph was plain centered muted text at the bottom.
+**Baseline = final (no change).** Two matched-height founder cards (P8 paired sizing),
+split-focus composition, blue role labels as the accent, centered statement card with
+correct figure/ground, footer contact placement correct.
 
-### Changes
+**Not fixed (out of scope):** Brandon's card shows `[INPUT: ...]` placeholders. These
+are **copy gaps** (flagged in the brand file's "known gaps"), not visual gaps — the
+edit fence forbids touching copy, so they remain for you to fill. No visual invention.
 
-**Pass 7 — Founder cards: gradient initials avatar placeholder**  
-Added a `size-14 rounded-xl` badge with gradient backdrop (`from-primary/25 to-accent/60`) showing styled initials ("NS" / "BC") beside each founder's name and role. The cards now read as designed rather than awaiting content.
+**Stopping condition:** converged; the only weaknesses are content, not layout.
 
-**Pass 8 — whyBcns: framed as pull-quote blockquote block**  
-Changed the plain centered muted paragraph to a `rounded-xl blockquote` with `border-primary/20` + `bg-primary/[0.04]` background. Text promoted to `foreground/80`. Reads as a deliberate highlight rather than body copy afterthought.
+## Page: `/services`
 
-### Stopping condition
-Converged — both passes addressed the two named gaps in the plan. No remaining structural/visual issues.
+### Change — Pass 1: align use-case card body text (commit `7d50971`)
+**Gap (P8, alignment / paired sizing):** the four use-case card titles wrap to
+different line counts ("Scheduling & booking systems" and "Inventory & back-office
+automation" = 2 lines; "Dashboards & reporting" and "AI consulting" = 1 line), so the
+body paragraphs started at **different vertical positions** across the row — a ragged
+internal rhythm.
 
-### Rubric
-| Goal | Result |
-|------|--------|
-| Uniquely styled | ✅ Avatar badges and blockquote are distinctive design elements |
-| Intuitive | ✅ Name + role clearly anchored by avatar; mission statement visually prominent |
-| Simple | ✅ Two clean cards; no decoration beyond the avatar treatment |
-| Aesthetically pleasing | ✅ Cards look designed; blockquote gives the page a finishing element |
+**Fix:** added `lg:min-h-[2.75rem]` to the `CardTitle` so every title reserves two
+lines of space at the 4-column breakpoint. Presentation-only.
 
-### Note
-Brandon's `[INPUT: ...]` placeholder credentials are a content gap, not a design gap — not changed.
+**Evidence (verified in-pixel):** after the change, all four body paragraphs start on a
+shared baseline (~y207 at the 4-col layout), regardless of title length. The Process
+section below (3 numbered steps with arrow connectors) was already clean and aligned.
 
----
+**Stopping condition:** converged after one fix; no further nameable flaw.
 
 ## Page: `/pricing`
 
-### Baseline
-Three pricing cards with equal visual weight. Standard and Advanced cards looked identical — no hierarchy cue toward the more capable tier.
+**Baseline = final (no change).** Three matched-height cards; the middle "Advanced
+build" carries a blue top-border tier accent (prior pass) as a subtle featured signal;
+the AI day-rate card is differentiated with a chip header (P4 — zoning justified because
+the day rate is a genuinely different pricing model). Prices use weight, not the accent,
+keeping the single blue accent disciplined (P11). Reuses the shared contact section below.
 
-### Changes
+**Flagged taste fork (decide-and-log):** I considered strengthening the featured card's
+dominance beyond the thin top border (e.g. a full primary ring / elevation). I **left it
+as-is** because the copy does not label any tier "most popular," and inflating a tier the
+content doesn't call featured would misrepresent the offer. Flag if you'd prefer a
+stronger featured treatment — that's a content+design decision I didn't want to make for you.
 
-**Pass 9 — Advanced build card: blue top border visual tier accent**  
-Added `border-t-2 border-t-primary/70 + bg-secondary/30` to the Advanced card (index 1). Standard stays plain, Advanced gets a blue accent, AI consulting retains its full primary accent + secondary background — three-level visual hierarchy.
+**Stopping condition:** converged.
 
-### Stopping condition
-Converged — one targeted change created clear tier hierarchy. Further changes would be cosmetic.
+## Page: `/work`  ← primary target (untouched by the prior run)
 
-### Rubric
-| Goal | Result |
-|------|--------|
-| Uniquely styled | ✅ Three tiers now have distinct visual treatments |
-| Intuitive | ✅ Eye is drawn to Advanced → AI consulting by ascending visual weight |
-| Simple | ✅ Minimal addition — one class change per card |
-| Aesthetically pleasing | ✅ Consistent with site's primary border-t-primary pattern |
+`/work` = `PastWork` (empty holding state) + `Reviews` (empty holding state) + footer.
+Both sections are empty by design (no case studies / testimonials yet — brand "known gaps").
+
+### Change — Pass 1: constrain empty-state cards to `max-w-3xl` (commit `3b4bfab`)
+**Gap (P3, slack space):** both holding cards spanned the **full container width
+(~1300px)** while their content (icon, heading, body, CTA) was a narrow centered column —
+so each read as an oversized void with content floating in it, and the page composition
+felt empty and unintentional.
+
+**Fix:** constrained both wrappers to a centered `max-w-3xl` (`mx-auto max-w-3xl`).
+**Evidence:** content now fills a sensible ~768px frame; the horizontal slack is gone
+and the composition reads as intentional (verified in-pixel on both cards).
+
+### Change — Pass 2: unify Reviews empty-state with Past Work (commit `fb5769b`)
+**Gap (P4 uniform repeated modules / P8 structural discipline):** the two holding cards
+are the same visual role but were styled inconsistently — Past Work had a `size-16`
+square glowing icon tile, `text-2xl` bold title, and an ambient radial glow; Reviews had
+a smaller `size-12` circle tile, `text-xl` semibold title, and no glow.
+
+**Fix:** matched Reviews to the richer Past Work treatment (square glowing tile, larger
+icon, `text-2xl` bold title, ambient glow), keeping its section-appropriate card
+background so figure/ground still separates it from the `bg-secondary` section.
+**Evidence:** the two cards now read as twins differing only by icon + copy (verified
+in-pixel); the added glow also gives Reviews more character (P7).
+
+**Stopping condition:** diminishing returns after 2 passes. Remaining candidate (minor
+vertical slack within each card) is marginal and now proportional to the narrower width;
+no strong concrete flaw left. The duplicate "Book a free consult" CTA on both cards is
+**copy** (out of the edit fence) — flag if you want one card to use different CTA text.
 
 ---
 
-## Page: `/work`
+## Rubric self-assessment (changed pages)
 
-**No changes made.** The page shows an intentional empty-state: clock icon, "Our first builds are in progress" message, and a consult CTA. This is a content gap (per brand file: "Past Work section empty — first portfolio entry pending"), not a design gap. The empty-state is well-structured and needed no styling adjustment.
+| Goal | Services | Work |
+|------|----------|------|
+| **Uniquely styled to Nate** | ✅ brand tokens only; blue accent disciplined | ✅ glowing tiles + radial glow + brand tokens; not generic |
+| **Intuitive** | ✅ card scan-line now consistent | ✅ one heading + one CTA per card; clear |
+| **Simple** | ✅ alignment tidied, nothing added | ✅ tighter frames, consistent twins, less void |
+| **Aesthetically pleasing** | ✅ shared body baseline (P8) | ✅ intentional composition, matched modules (P4/P8) |
 
----
+## Objective gates
 
-## Summary of files changed
+- **Contrast (WCAG AA):** ✅ near-white / muted-foreground on the charcoal-purple field
+  passes AA (home muted subtext measured ~6.6:1); no new text colors introduced.
+- **Overflow / overlap / clipping:** ✅ none — verified in-pixel on every changed view.
+- **Mobile breakpoint:** ⚠️ **not pixel-verified.** The Chrome extension's `resize_window`
+  reports success but the captured viewport stays desktop-width (same limitation the prior
+  run hit). Mitigation: my only additions are `max-w-3xl mx-auto` (on a 390px screen the
+  768px max simply yields "fill available width" — no overflow) and `lg:min-h-[…]` (applies
+  only at `lg`, zero mobile effect). Both are **mobile-safe by construction**; existing
+  `sm:`/`lg:` responsive classes are untouched. Worth a quick real-device glance before merge.
 
-| File | Passes |
-|------|--------|
-| `apps/web/components/nav-cards.tsx` | 1 |
-| `apps/web/components/hero.tsx` | 2 |
-| `apps/web/components/contact-section.tsx` | 3 |
-| `apps/web/components/use-cases.tsx` | 4, 6 |
-| `apps/web/components/how-it-works.tsx` | 5 |
-| `apps/web/components/about-founder.tsx` | 7, 8 |
-| `apps/web/components/pricing.tsx` | 9 |
+## Correctness / lane check
 
-## To merge
+- `pnpm --filter web lint` → clean.
+- Diff is **presentation-only** across all 3 files (className / purely-visual wrapper
+  changes; a content-grep of the diff returned zero copy/prop/data/logic lines). Rendered
+  text and shown values are provably unchanged.
 
-Review and merge when ready — this branch does NOT merge itself:
-```
-git checkout main
-git merge layout-loop-bcns
+## Failures
+
+None. Dev server ran cleanly for the whole session; no page hit graceful-failure.
+
+## How to review & merge
+
+```bash
+cd ~/bcns
+git worktree list                      # see the layout-loop-night worktree
+git log main..layout-loop-2026-07-20   # the 3 commits
+git diff main..layout-loop-2026-07-20  # the full diff (3 files)
+# to merge after you're satisfied:
+git merge layout-loop-2026-07-20
+# cleanup when done:
+git worktree remove .claude/worktrees/layout-loop-night
 ```
