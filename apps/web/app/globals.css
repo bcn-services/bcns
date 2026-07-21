@@ -64,6 +64,51 @@
   }
 }
 
+@layer components {
+  /*
+   * Shared interaction utilities — applied consistently instead of re-authored
+   * per component. Motion is subtle/purposeful and inherits the global
+   * reduce-motion no-op.
+   */
+
+  /* Card hover: gentle lift + shadow bump. Put on the card root. */
+  .hover-lift {
+    @apply transition-[transform,box-shadow] duration-200 ease-out;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-0.5 shadow-lg shadow-primary/5;
+  }
+
+  /* Arrow/link slide: put on an inline arrow inside a `.group` parent. */
+  .link-slide {
+    @apply transition-transform duration-200 ease-out;
+  }
+  .group:hover .link-slide {
+    @apply translate-x-1;
+  }
+
+  /* Icon-tile brighten: put on an icon tile inside a `.group` parent. */
+  .icon-brighten {
+    @apply transition-colors duration-200 ease-out;
+  }
+  .group:hover .icon-brighten {
+    @apply bg-primary/15 text-primary;
+  }
+
+  /* Placeholder shimmer surface — pair with `animate-shimmer`. */
+  .shimmer-surface {
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      hsl(var(--primary) / 0.08) 45%,
+      hsl(var(--primary) / 0.14) 50%,
+      hsl(var(--primary) / 0.08) 55%,
+      transparent 80%
+    );
+    background-size: 200% 100%;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
