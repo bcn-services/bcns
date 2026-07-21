@@ -67,9 +67,6 @@ representative page to confirm, then commit before starting page loops.
   serif-italic accent segment and larger display sizes, without breaking existing callers
   (accent is opt-in; default unchanged).
 
-> **⚠️ AUTONOMOUS RUN — STOP HERE** — review the foundation (fonts loading, Reveal working,
-> motif placement, reduced-motion) before the per-page visual loops touch real pages.
-
 ---
 
 ## Per-page loops
