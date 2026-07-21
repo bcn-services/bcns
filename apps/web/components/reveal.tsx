@@ -2,11 +2,23 @@
 
 import * as React from "react";
 
+/** Entrance animation variants — map to keyframes in the Tailwind preset. */
+type RevealVariant = "fade-up" | "pop" | "fade-right" | "fade-left";
+
+const VARIANT_CLASS: Record<RevealVariant, string> = {
+  "fade-up": "animate-fade-up",
+  pop: "animate-pop",
+  "fade-right": "animate-fade-right",
+  "fade-left": "animate-fade-left",
+};
+
 type RevealProps<T extends React.ElementType> = {
   /** Element/component to render as the reveal wrapper. Defaults to `div`. */
   as?: T;
   /** Entrance delay in ms — use to stagger a row of siblings. */
   delay?: number;
+  /** Entrance animation. Defaults to `fade-up`; `pop` for springy focal reveals. */
+  variant?: RevealVariant;
   children: React.ReactNode;
   className?: string;
 };
@@ -22,6 +34,7 @@ type RevealProps<T extends React.ElementType> = {
 export function Reveal<T extends React.ElementType = "div">({
   as,
   delay = 0,
+  variant = "fade-up",
   children,
   className = "",
   ...rest
@@ -62,7 +75,7 @@ export function Reveal<T extends React.ElementType = "div">({
       ref={ref}
       // Pre-reveal: invisible and nudged down; on reveal, fade-up animation runs
       // and lands the element at its natural position.
-      className={`${shown ? "animate-fade-up" : "opacity-0"} ${className}`.trim()}
+      className={`${shown ? VARIANT_CLASS[variant] : "opacity-0"} ${className}`.trim()}
       style={delay ? { animationDelay: `${delay}ms` } : undefined}
       {...rest}
     >

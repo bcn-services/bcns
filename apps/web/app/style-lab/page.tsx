@@ -23,14 +23,15 @@ export default function StyleLab() {
         />
       </section>
 
-      {/* Reveal + stagger */}
+      {/* Reveal + stagger (pop variant) */}
       <section className="space-y-6">
-        <h2 className="font-display text-2xl font-bold">Reveal — staggered entrance</h2>
+        <h2 className="font-display text-2xl font-bold">Reveal — pop-in, staggered</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Reveal
               key={i}
-              delay={i * 120}
+              variant="pop"
+              delay={i * 140}
               className="group hover-lift rounded-lg border border-border bg-card p-6"
             >
               <div className="icon-brighten mb-4 inline-flex size-10 items-center justify-center rounded-md bg-secondary text-muted-foreground">
@@ -38,11 +39,21 @@ export default function StyleLab() {
               </div>
               <p className="font-display font-semibold">Card {i + 1}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Hover to lift; icon tile brightens. Reveals on scroll into view.
+                Pops up on scroll; lifts + glows on hover, icon tile pops.
               </p>
             </Reveal>
           ))}
         </div>
+      </section>
+
+      {/* CTA glow */}
+      <section className="flex flex-wrap items-center gap-6">
+        <button className="hover-glow animate-glow-pulse rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground">
+          Book a free consult
+        </button>
+        <span className="text-sm text-muted-foreground">
+          Idle glow-pulse; intensifies on hover.
+        </span>
       </section>
 
       {/* Signature motif */}

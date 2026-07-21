@@ -61,9 +61,26 @@ const preset = {
         "serif-accent": ["var(--font-serif-accent)", "Georgia", "serif"],
       },
       keyframes: {
+        // Pronounced rise: bigger travel + slight scale, lands with an expo-out
+        // ease so it decelerates hard into place (reads as confident, not floaty).
         "fade-up": {
-          from: { opacity: "0", transform: "translateY(12px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+          from: { opacity: "0", transform: "translateY(34px) scale(0.97)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        // Pop: scales up from small with a back-ease overshoot for a springy entrance.
+        pop: {
+          "0%": { opacity: "0", transform: "translateY(20px) scale(0.8)" },
+          "60%": { opacity: "1", transform: "translateY(0) scale(1.04)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        // Horizontal reveals for alternating / side-entering content.
+        "fade-right": {
+          from: { opacity: "0", transform: "translateX(-40px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "fade-left": {
+          from: { opacity: "0", transform: "translateX(40px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
         },
         // Slow ambient loop for background glows/emblems (decorative, low amplitude).
         drift: {
@@ -75,11 +92,20 @@ const preset = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        // Pulsing accent glow — for CTAs / focal elements that should breathe.
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0.35)" },
+          "50%": { boxShadow: "0 0 28px 4px hsl(var(--primary) / 0.30)" },
+        },
       },
       animation: {
-        "fade-up": "fade-up 0.6s ease-out both",
+        "fade-up": "fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
+        pop: "pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        "fade-right": "fade-right 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-left": "fade-left 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
         drift: "drift 9s ease-in-out infinite",
         shimmer: "shimmer 2.2s linear infinite",
+        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
       },
     },
   },

@@ -71,12 +71,12 @@
    * reduce-motion no-op.
    */
 
-  /* Card hover: gentle lift + shadow bump. Put on the card root. */
+  /* Card hover: pronounced lift + scale + accent glow. Put on the card root. */
   .hover-lift {
-    @apply transition-[transform,box-shadow] duration-200 ease-out;
+    @apply transition-[transform,box-shadow,border-color] duration-300 ease-out;
   }
   .hover-lift:hover {
-    @apply -translate-y-0.5 shadow-lg shadow-primary/5;
+    @apply -translate-y-1.5 scale-[1.02] border-primary/40 shadow-xl shadow-primary/20;
   }
 
   /* Arrow/link slide: put on an inline arrow inside a `.group` parent. */
@@ -84,15 +84,25 @@
     @apply transition-transform duration-200 ease-out;
   }
   .group:hover .link-slide {
-    @apply translate-x-1;
+    @apply translate-x-1.5;
   }
 
-  /* Icon-tile brighten: put on an icon tile inside a `.group` parent. */
+  /* Icon-tile brighten + pop: put on an icon tile inside a `.group` parent. */
   .icon-brighten {
-    @apply transition-colors duration-200 ease-out;
+    @apply transition-[transform,background-color,color] duration-300 ease-out;
   }
   .group:hover .icon-brighten {
-    @apply bg-primary/15 text-primary;
+    @apply -translate-y-0.5 scale-110 bg-primary/20 text-primary;
+  }
+
+  /* CTA / focal glow on hover — accent halo that intensifies. */
+  .hover-glow {
+    @apply transition-shadow duration-300 ease-out;
+  }
+  .hover-glow:hover {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.5),
+      0 0 32px 2px hsl(var(--primary) / 0.35);
   }
 
   /* Placeholder shimmer surface — pair with `animate-shimmer`. */
