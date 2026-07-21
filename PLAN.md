@@ -79,7 +79,7 @@ representative page to confirm, then commit before starting page loops.
     lift + icon brighten (reuse the shared hover utilities). Reveal the split contact section.
     Keep the existing grid+glow hero atmosphere. Discipline check: still one accent, headline
     dominant, whitespace intact.
-  status: not started
+  status: done
 
 - page: /services
   notes: THE PROCESS (how-it-works) is the priority — rebuild it from three stacked blocks into
@@ -88,7 +88,7 @@ representative page to confirm, then commit before starting page loops.
     revealing in sequence (stagger). Use-case cards: staggered reveal + hover lift; keep the
     aligned body baseline already fixed. Serif-italic accent word in the section title.
     Precision: the connector must land on a shared axis and the node badges align to it exactly.
-  status: not started
+  status: done
 
 - page: /pricing
   notes: FAQ — convert the flat two-column card grid into an accordion (expand/collapse with an
@@ -96,7 +96,7 @@ representative page to confirm, then commit before starting page loops.
     featured "Advanced build" tier with a precise treatment (accent ring or elevated surface —
     not a new hue) so it reads as featured before the price; keep the AI day-rate card's chip
     differentiation. Hover glow/lift on all three cards. Reveal + stagger the row.
-  status: not started
+  status: done
 
 - page: /about
   notes: Founder cards — reveal + hover lift; keep matched heights. Frame the whyBcns statement
@@ -104,7 +104,7 @@ representative page to confirm, then commit before starting page loops.
     lifted block with a large opening mark), not plain centered body. Serif-italic accent word
     in "The people behind bcns". `[INPUT: …]` credentials stay as-is, styled as normal text.
     Keep the diagonal-hairline atmosphere.
-  status: not started
+  status: done
 
 - page: /work
   notes: Give the two holding panels character so they read as intentional, not empty: add an
@@ -113,7 +113,7 @@ representative page to confirm, then commit before starting page loops.
     2–3 placeholder quote cards with a shimmer sweep rather than one box. Make each panel CTA
     prominent (primary weight). Reveal on scroll. Keep the crosshatch atmosphere and the
     max-w-3xl framing.
-  status: not started
+  status: done
 
 ---
 

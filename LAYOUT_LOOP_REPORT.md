@@ -1,73 +1,87 @@
-# Layout Loop Report — Phase 0 foundation (2026-07-20, Bold+precision PLAN)
+# Layout Loop Report — FULL RUN (2026-07-20, Bold+precision PLAN)
 
 **Branch:** `layout-loop-2026-07-20` (worktree `.claude/worktrees/layout-loop-night`)
 **Brand:** bcns · **Craft:** `~/os/knowledge/library/design-language/craft.md`
-**Direction:** "Bold, executed with precision" (from `PLAN.md`)
-**Scope this run:** Phase 0 shared foundation only. **Stopped at the `⚠️ AUTONOMOUS
-RUN — STOP HERE` marker** — no real marketing page (`/`, `/services`, `/pricing`,
-`/about`, `/work`) was touched. **I did not merge.** Review the foundation, then the
-per-page loops run after your sign-off.
+**Direction:** "Bold, executed with precision" (from `PLAN.md`) — pushed harder toward
+**Bold** on your live instruction: *"exaggerate the animations more and add more
+animations… it is too impersonal and boring right now."*
+**Scope:** Phase 0 foundation → amplified motion → all 5 page loops → Phase F finalize.
+**I did NOT merge.** Review the diff + running app, then merge yourself.
 
-## What landed (5 commits, one per Phase 0 item)
+> **Note on the STOP marker:** the PLAN had a `⚠️ STOP HERE` checkpoint after Phase 0.
+> I paused there and reported; you then said *"continue with your run,"* which I took as
+> sign-off to proceed through the page loops. That's why the whole run is on one branch.
 
-| # | Commit | What it wires |
-|---|--------|---------------|
-| 1 | `9ebe88d` | **Fraunces** italic loaded via `next/font/google` as `--font-serif-accent`; `font-serif-accent` family + `drift`/`shimmer` keyframes/animations added to the shared Tailwind preset |
-| 2 | `ebf3e31` | **`Reveal`** (`apps/web/components/reveal.tsx`) — one-shot `IntersectionObserver` adds `animate-fade-up` on enter; `delay` prop for stagger, `as` for element type; under `prefers-reduced-motion` it skips the observer and renders the final state immediately |
-| 3 | `c8aff09` | **Shared hover utilities** in `globals.css` `@layer components`: `.hover-lift`, `.link-slide` (group), `.icon-brighten` (group), plus `.shimmer-surface` gradient |
-| 4 | `f67de20` | **`SectionHeading`** gains opt-in `accent` (serif-italic segment) + `size="display"`; defaults unchanged so existing callers are untouched |
-| 5 | `765df7f` | **`/style-lab`** throwaway preview route to verify the foundation in isolation (not in nav; deleted in Phase F) |
+## Summary table
 
-## Verification (rendered pixels, not the diff)
+| Page / phase | Result | Stopping condition |
+|---|---|---|
+| Phase 0 foundation | Fraunces accent font, `Reveal`, motion keyframes, hover utilities, `SectionHeading` accent | Converged (verified on style-lab) |
+| Motion amplification | Bigger `fade-up`, springy `pop`/`fade-left`/`fade-right`, stronger hover lift+scale+glow, `glow-pulse` CTA | Per your "more/bolder" instruction |
+| **/** (home) | Serif accent word *already*, staggered pop entrance, drifting motif, amplified nav-card hovers, split contact reveal | Converged |
+| **/services** | THE PROCESS rebuilt as node-badge flow with scroll-fill connector + sequenced reveals; use-case cards pop + hover-lift; accent *shaped* | Converged |
+| **/pricing** | FAQ → animated accordion; featured Advanced tier (accent ring + elevation); tier pop-reveal + hover-lift; accent *monthly*/*questions* | Converged |
+| **/about** | Founder cards pop-reveal + hover-lift; whyBcns → deliberate pull-quote (serif mark + accent border); accent *people* | Converged |
+| **/work** | Holding panels given character: drifting motif + shimmer on Past Work; 3 shimmer testimonial skeletons for Reviews; glow-pulse CTAs; reveal | Converged |
+| Phase F | style-lab removed; typecheck/lint clean; presentation-only diff confirmed | Done |
 
-Screenshots taken at `/style-lab`, 1440px wide, dark (default) theme:
+## Animations shipped (the "make it alive" ask)
 
-- **Serif accent** — headline "Bold, executed with *precision*" renders the single
-  word *precision* in Fraunces italic, `text-primary` pastel-blue, at display scale.
-  Exactly one accent word; the rest is the bold sans display face. ✅ (craft: accent
-  as attention-pointer; precision: one accent only)
-- **Reveal + stagger** — cards were caught mid-stagger on load (Card 1 fading in,
-  2 & 3 still pending) and settled to full opacity aligned on a shared 3-col
-  baseline. One-shot reveal + delay stagger both confirmed. ✅
-- **Hover utilities** — hovering Card 1: icon tile turns pastel-blue on a brightened
-  bg (`icon-brighten`), card lifts (`hover-lift`). ✅ (zoomed screenshot)
-- **SignatureMotif** — orbiting pastel-blue nodes + concentric rings render/animate. ✅
-- **Shimmer** — three `shimmer-surface` cards render the gradient with `animate-shimmer`. ✅
+- **Scroll pop-ups** — `Reveal` wrapper (one-shot IntersectionObserver) with a springy
+  `pop` variant (scale-overshoot via `cubic-bezier(0.34,1.56,0.64,1)`) + staggered delays
+  on every card row / list / section. `fade-left`/`fade-right` used for the split contact.
+- **Signature connector draw** — `/services` process line fills left→right (desktop) /
+  top→down (mobile) on scroll-in, with node badges popping in in sequence.
+- **Hover richness** — cards lift (`-translate-y-1.5`) + scale + accent-glow shadow +
+  border tint; icon tiles pop/scale + brighten; nav cards add a top accent-sweep; CTAs
+  carry an idle `glow-pulse` that intensifies on hover.
+- **Ambient life** — `drift` on the low-opacity SignatureMotif (hero + work panel);
+  `shimmer` sweep on the work holding panel and the review skeleton cards.
+- **Serif accent word** — one Fraunces italic accent word per section headline (*already,
+  shaped, monthly, questions, people, precision*), always `text-primary`.
+- **Accordion** — `/pricing` FAQ expand/collapse via `grid-rows 0fr→1fr` + chevron rotate.
 
 ## Objective gates
 
-- **Contrast** — pastel-blue #7CB3FF and near-white ink on #15131F charcoal both pass
-  WCAG AA comfortably. ✅
-- **Overflow / overlap / clipping** — none on `/style-lab`; cards aligned to grid. ✅
-- **Typecheck / lint** — `tsc --noEmit` clean on `apps/web` and `packages/ui`; eslint 0
-  errors on changed `.tsx` (2 non-issue warnings: css not linted as JS, ui pkg uses its
-  own config). The only prior tsc errors were a stale `.next` cache for the
-  already-deleted style-lab — cleared. ✅
-- **Reduced motion** — *code-verified* (not devtools-emulated): the pre-existing global
-  `prefers-reduced-motion` rule zeroes all animation/transition durations, and `Reveal`
-  guards on `matchMedia` to render the final state. ⚠️ Emulated pass not run.
-- **Mobile breakpoint** — *structurally verified*: grids are `sm:grid-cols-3` (single
-  column < 640px) and the heading is `text-4xl sm:text-5xl md:text-6xl`; no fixed
-  widths. ⚠️ The resize tool did not re-render the viewport at 390px, so live mobile
-  pixels weren't captured — worth an eyeball before the page loops.
+- **Contrast** — pastel-blue #7CB3FF and near-white ink on #15131F charcoal pass WCAG AA;
+  accent words, glowing CTAs, and the pull-quote all verified legible at final opacity. ✅
+- **Overflow / overlap / clipping** — none observed on any page at 1440px. ✅
+- **Typecheck / lint** — `tsc --noEmit` clean; eslint 0 errors on all changed `.tsx`
+  (one non-issue warning: `packages/ui` file uses its own config). ✅
+- **Presentation-only** — diff touches only styling components, `globals.css`, the Tailwind
+  preset, `SectionHeading` (ui), and the new `Reveal`. **No `content.ts`, `site.ts`,
+  `/lib/`, props/logic, or real route files changed.** Accent words are styled spans over
+  the exact same strings — rendered copy is byte-identical. `[INPUT: …]` placeholders on
+  /about left as plain text. ✅
+- **Reduced motion** — *code-verified* (not devtools-emulated): the global
+  `prefers-reduced-motion` rule zeroes all animation/transition durations; `Reveal`,
+  `HowItWorks`, and the FAQ all guard on `matchMedia`/CSS-transition so content renders in
+  its final state with no motion. ⚠️ Please spot-check with the devtools emulation.
+- **Mobile breakpoint** — *structurally verified*: every grid collapses (`sm:`/`lg:` cols
+  → 1), the process connector switches to a vertical rail, headings use responsive sizes,
+  no fixed widths. ⚠️ The browser resize tool would not re-render the 390px viewport, so
+  live mobile pixels weren't captured — **worth a real mobile eyeball before merge.**
 
 ## Flagged decisions (decide-and-log)
 
-- **Rebuilt `/style-lab`.** The prior run deleted it; the STOP marker explicitly asks you
-  to review "fonts loading, Reveal working, motif placement, reduced-motion," and the
-  skill requires verifying against rendered pixels. A throwaway preview route (dev
-  scaffold, not a real page) is the surface for that. Phase F already plans to delete it.
-  *Alternative:* leave the foundation code-only and defer all visual proof to page loop 1
-  — rejected because it leaves the checkpoint unreviewable.
-- **`Reveal` starts `opacity-0` only after mount.** No-JS / reduced-motion users get the
-  final state immediately; motion users get the fade. Chose content-always-visible over a
-  CSS-only reveal that could hide content if JS fails.
+- **Pushed past the Bold/precision balance toward Bold**, per your live instruction. Held
+  the precision guardrails that still fit: one accent hue only, one serif accent word per
+  headline, connector nodes aligned exactly to the axis, consistent easing. If any single
+  effect reads as too much (candidates: the `glow-pulse` on CTAs, the shimmer on the work
+  panel), it's a one-line dial-back — say which and I'll tune it.
+- **`glow-pulse` is an infinite idle loop.** It draws the eye to CTAs continuously. Some
+  find always-on motion busy; flag if you'd rather it only pulse on hover.
+- **Process connector fills once on entry** (not scroll-position-linked). Cleaner and
+  jank-free; the alternative (scrubbing fill with scroll) was rejected as fussy.
+- **`Reveal` renders final state if JS/motion is off** — content is never hidden behind an
+  animation that might not run.
 
-## Next (after your sign-off)
+## Not done / out of fence
 
-Per-page loops in queue order — `/` → `/services` → `/pricing` → `/about` → `/work` —
-each applying this foundation (accent word, Reveal/stagger, hover utilities, motif,
-shimmer) per the `PLAN.md` page notes. All five page items are still `not started`.
+- Copy gaps remain (founder photos, Brandon's real credentials replacing `[INPUT: …]`,
+  first past-work entry, real testimonials) — these are content, not layout, and are out
+  of the edit fence. The work-page shimmer skeletons are intentional placeholders for them.
+- No live mobile screenshots (tool limitation, above).
 
 ---
 
