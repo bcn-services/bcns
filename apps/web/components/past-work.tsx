@@ -24,7 +24,7 @@ export function PastWork() {
         />
 
         {items.length === 0 ? (
-          <div className="relative mt-14 overflow-hidden rounded-2xl border border-border/60 bg-secondary/40">
+          <div className="relative mx-auto mt-14 max-w-3xl overflow-hidden rounded-2xl border border-border/60 bg-secondary/40">
             {/* ambient glow from icon center */}
             <div
               aria-hidden

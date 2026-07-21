@@ -24,7 +24,7 @@ export function Reviews() {
         />
 
         {items.length === 0 ? (
-          <div className="mt-14 overflow-hidden rounded-2xl border border-border/60 bg-background/40">
+          <div className="mx-auto mt-14 max-w-3xl overflow-hidden rounded-2xl border border-border/60 bg-background/40">
             <div className="flex flex-col items-center gap-6 px-8 py-16 text-center sm:px-16 sm:py-20">
               <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <MessageSquare className="size-6" aria-hidden />
