@@ -1,3 +1,76 @@
+# Layout Loop Report — Phase 0 foundation (2026-07-20, Bold+precision PLAN)
+
+**Branch:** `layout-loop-2026-07-20` (worktree `.claude/worktrees/layout-loop-night`)
+**Brand:** bcns · **Craft:** `~/os/knowledge/library/design-language/craft.md`
+**Direction:** "Bold, executed with precision" (from `PLAN.md`)
+**Scope this run:** Phase 0 shared foundation only. **Stopped at the `⚠️ AUTONOMOUS
+RUN — STOP HERE` marker** — no real marketing page (`/`, `/services`, `/pricing`,
+`/about`, `/work`) was touched. **I did not merge.** Review the foundation, then the
+per-page loops run after your sign-off.
+
+## What landed (5 commits, one per Phase 0 item)
+
+| # | Commit | What it wires |
+|---|--------|---------------|
+| 1 | `9ebe88d` | **Fraunces** italic loaded via `next/font/google` as `--font-serif-accent`; `font-serif-accent` family + `drift`/`shimmer` keyframes/animations added to the shared Tailwind preset |
+| 2 | `ebf3e31` | **`Reveal`** (`apps/web/components/reveal.tsx`) — one-shot `IntersectionObserver` adds `animate-fade-up` on enter; `delay` prop for stagger, `as` for element type; under `prefers-reduced-motion` it skips the observer and renders the final state immediately |
+| 3 | `c8aff09` | **Shared hover utilities** in `globals.css` `@layer components`: `.hover-lift`, `.link-slide` (group), `.icon-brighten` (group), plus `.shimmer-surface` gradient |
+| 4 | `f67de20` | **`SectionHeading`** gains opt-in `accent` (serif-italic segment) + `size="display"`; defaults unchanged so existing callers are untouched |
+| 5 | `765df7f` | **`/style-lab`** throwaway preview route to verify the foundation in isolation (not in nav; deleted in Phase F) |
+
+## Verification (rendered pixels, not the diff)
+
+Screenshots taken at `/style-lab`, 1440px wide, dark (default) theme:
+
+- **Serif accent** — headline "Bold, executed with *precision*" renders the single
+  word *precision* in Fraunces italic, `text-primary` pastel-blue, at display scale.
+  Exactly one accent word; the rest is the bold sans display face. ✅ (craft: accent
+  as attention-pointer; precision: one accent only)
+- **Reveal + stagger** — cards were caught mid-stagger on load (Card 1 fading in,
+  2 & 3 still pending) and settled to full opacity aligned on a shared 3-col
+  baseline. One-shot reveal + delay stagger both confirmed. ✅
+- **Hover utilities** — hovering Card 1: icon tile turns pastel-blue on a brightened
+  bg (`icon-brighten`), card lifts (`hover-lift`). ✅ (zoomed screenshot)
+- **SignatureMotif** — orbiting pastel-blue nodes + concentric rings render/animate. ✅
+- **Shimmer** — three `shimmer-surface` cards render the gradient with `animate-shimmer`. ✅
+
+## Objective gates
+
+- **Contrast** — pastel-blue #7CB3FF and near-white ink on #15131F charcoal both pass
+  WCAG AA comfortably. ✅
+- **Overflow / overlap / clipping** — none on `/style-lab`; cards aligned to grid. ✅
+- **Typecheck / lint** — `tsc --noEmit` clean on `apps/web` and `packages/ui`; eslint 0
+  errors on changed `.tsx` (2 non-issue warnings: css not linted as JS, ui pkg uses its
+  own config). The only prior tsc errors were a stale `.next` cache for the
+  already-deleted style-lab — cleared. ✅
+- **Reduced motion** — *code-verified* (not devtools-emulated): the pre-existing global
+  `prefers-reduced-motion` rule zeroes all animation/transition durations, and `Reveal`
+  guards on `matchMedia` to render the final state. ⚠️ Emulated pass not run.
+- **Mobile breakpoint** — *structurally verified*: grids are `sm:grid-cols-3` (single
+  column < 640px) and the heading is `text-4xl sm:text-5xl md:text-6xl`; no fixed
+  widths. ⚠️ The resize tool did not re-render the viewport at 390px, so live mobile
+  pixels weren't captured — worth an eyeball before the page loops.
+
+## Flagged decisions (decide-and-log)
+
+- **Rebuilt `/style-lab`.** The prior run deleted it; the STOP marker explicitly asks you
+  to review "fonts loading, Reveal working, motif placement, reduced-motion," and the
+  skill requires verifying against rendered pixels. A throwaway preview route (dev
+  scaffold, not a real page) is the surface for that. Phase F already plans to delete it.
+  *Alternative:* leave the foundation code-only and defer all visual proof to page loop 1
+  — rejected because it leaves the checkpoint unreviewable.
+- **`Reveal` starts `opacity-0` only after mount.** No-JS / reduced-motion users get the
+  final state immediately; motion users get the fade. Chose content-always-visible over a
+  CSS-only reveal that could hide content if JS fails.
+
+## Next (after your sign-off)
+
+Per-page loops in queue order — `/` → `/services` → `/pricing` → `/about` → `/work` —
+each applying this foundation (accent word, Reveal/stagger, hover utilities, motif,
+shimmer) per the `PLAN.md` page notes. All five page items are still `not started`.
+
+---
+
 # Layout Loop Report — bcns marketing site (2026-07-20 run)
 
 **Branch:** `layout-loop-2026-07-20` (worktree `.claude/worktrees/layout-loop-night`)
