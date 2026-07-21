@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Bricolage_Grotesque } from "next/font/google";
+import { Inter, Bricolage_Grotesque, Fraunces } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { siteConfig } from "@/lib/site";
 import "./globals.css";
@@ -15,6 +15,16 @@ const bricolage = Bricolage_Grotesque({
   variable: "--font-display",
   display: "swap",
   weight: ["400", "600", "700", "800"],
+});
+
+// Serif accent face — used for exactly ONE italic accent word per headline
+// (never for body). Exposed as `font-serif-accent` in the Tailwind preset.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-serif-accent",
+  display: "swap",
+  style: ["italic"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -62,7 +72,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${bricolage.variable} font-sans`}>
+      <body className={`${inter.variable} ${bricolage.variable} ${fraunces.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
