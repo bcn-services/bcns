@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bcns — Soft Product</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --field:#F1F3F7; --surface:#FFFFFF; --ink:#1B2230; --ink-2:#5F6B7E;
+  --line:#E2E7EF; --brand:#2E6BE6; --brand-ink:#1B4FB8;
+  --mint:#DCF2E7; --butter:#FBEFD2; --blush:#F7E2E4; --sky:#DEE9FC;
+  --r-lg:26px; --r-md:18px; --r-sm:12px;
+  --shadow:0 2px 4px rgba(27,34,48,.04),0 12px 28px -8px rgba(27,34,48,.10);
+  --shadow-lg:0 4px 8px rgba(27,34,48,.05),0 24px 48px -12px rgba(27,34,48,.14);
+  --gut:clamp(20px,5vw,72px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased}
+body{background:var(--field);color:var(--ink);font-family:Figtree,system-ui,sans-serif;font-size:16.5px;line-height:1.6}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1220px;margin:0 auto;padding:0 var(--gut)}
+h1,h2,h3,.disp{font-family:Outfit,system-ui,sans-serif;letter-spacing:-.028em}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:7px 15px;border-radius:999px;background:var(--sky);color:var(--brand-ink);font-size:13px;font-weight:600}
+
+header{position:sticky;top:14px;z-index:40;margin-top:14px}
+.hbar{display:flex;align-items:center;justify-content:space-between;gap:20px;height:66px;padding:0 12px 0 22px;background:rgba(255,255,255,.86);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:10px;font-family:Outfit;font-weight:700;font-size:20px}
+.logo i{width:30px;height:30px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:#fff;font-size:14px;font-weight:700}
+.hbar nav{display:flex;gap:26px}
+.hbar nav a{font-size:15px;color:var(--ink-2);font-weight:500}
+.hbar nav a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 24px;border-radius:999px;font-family:Outfit;font-weight:600;font-size:15px;background:var(--brand);color:#fff;border:1px solid var(--brand);transition:transform .16s ease,background .16s,box-shadow .16s;box-shadow:var(--shadow)}
+.btn:hover{background:var(--brand-ink);border-color:var(--brand-ink);transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:#fff;border-color:#C9D3E2}
+.btn.sm{height:40px;padding:0 18px;font-size:14px}
+
+/* hero */
+.hero{padding:clamp(40px,6vw,84px) 0 clamp(28px,4vw,44px);text-align:center}
+h1{font-size:clamp(34px,5.4vw,66px);line-height:1.05;font-weight:600;max-width:17ch;margin:22px auto 0}
+h1 span{color:var(--brand)}
+.lede{margin:20px auto 0;color:var(--ink-2);font-size:clamp(16px,1.5vw,19.5px);max-width:54ch}
+.ctas{margin-top:32px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.proof{margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:14px;color:var(--ink-2);font-weight:500}
+.chip b{color:var(--brand);font-size:15px}
+
+.heroshot{margin-top:clamp(32px,4vw,52px)}
+.imgslot{background:linear-gradient(150deg,#E7ECF5,#DCE4F1);border:1px solid var(--line);border-radius:var(--r-lg);position:relative;display:flex;align-items:flex-end;padding:16px;overflow:hidden;box-shadow:var(--shadow)}
+.imgslot::before{content:attr(data-label);position:absolute;top:14px;left:18px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8898B0;font-weight:600}
+.imgslot p{font-size:12px;line-height:1.5;color:#586579;background:rgba(255,255,255,.9);padding:11px 13px;border-radius:var(--r-sm);box-shadow:var(--shadow)}
+
+/* sections */
+section{padding:clamp(44px,6vw,84px) 0}
+.sechead{text-align:center;max-width:62ch;margin:0 auto clamp(30px,4vw,48px)}
+h2{font-size:clamp(26px,3.6vw,44px);line-height:1.1;font-weight:600;margin-top:14px}
+.sechead p{margin-top:14px;color:var(--ink-2);font-size:17px}
+
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(14px,1.6vw,22px)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 24px 30px;box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.tile{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:22px}
+.card h3{margin-top:20px;font-size:19px;font-weight:600;line-height:1.25}
+.card p{margin-top:9px;color:var(--ink-2);font-size:15px}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.6vw,22px)}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:28px 26px 32px;box-shadow:var(--shadow);position:relative}
+.step .n{width:44px;height:44px;border-radius:14px;background:var(--sky);color:var(--brand-ink);display:grid;place-items:center;font-family:Outfit;font-weight:700;font-size:17px}
+.step h3{margin-top:20px;font-size:20px;font-weight:600}
+.step p{margin-top:9px;color:var(--ink-2);font-size:15px}
+
+/* pricing */
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.8vw,24px);align-items:start}
+.tier{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:30px 28px 34px;box-shadow:var(--shadow);display:flex;flex-direction:column;height:100%}
+.tier.mark{border-color:var(--brand);box-shadow:var(--shadow-lg);position:relative}
+.tier.mark::after{content:"Most chosen";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-size:12px;font-weight:600;padding:5px 14px;border-radius:999px;white-space:nowrap}
+.tier h3{font-size:17px;font-weight:600}
+.price{margin-top:18px;display:flex;align-items:baseline;gap:8px}
+.price b{font-family:Outfit;font-size:clamp(38px,4.4vw,54px);line-height:1;font-weight:600;letter-spacing:-.04em}
+.price span{font-size:14px;color:var(--ink-2)}
+.mo{margin-top:8px;font-size:16px;color:var(--ink-2)}
+.mo b{color:var(--ink);font-weight:600}
+.seats{margin-top:10px;font-size:13px;color:var(--ink-2);background:var(--field);padding:9px 13px;border-radius:var(--r-sm)}
+.tier .desc{margin-top:16px;color:var(--ink-2);font-size:15px}
+.tier ul{list-style:none;margin-top:20px;display:flex;flex-direction:column;gap:11px;flex:1}
+.tier li{font-size:15px;display:flex;gap:11px;align-items:flex-start;line-height:1.45}
+.tier li i{flex:0 0 20px;width:20px;height:20px;border-radius:999px;background:var(--mint);color:#1E7A4F;display:grid;place-items:center;font-size:11px;font-style:normal;margin-top:2px;font-weight:700}
+.tier .btn{margin-top:26px;width:100%}
+
+/* faq */
+.faq{max-width:800px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 22px;box-shadow:var(--shadow)}
+summary{cursor:pointer;list-style:none;font-family:Outfit;font-weight:600;font-size:17px;display:flex;justify-content:space-between;gap:16px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:22px;color:var(--brand);font-weight:400;line-height:1}
+details[open] summary::after{content:"–"}
+details p{margin-top:12px;color:var(--ink-2);font-size:15.5px}
+
+/* holding */
+.holding{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:clamp(26px,3.5vw,46px);box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1.1fr;gap:clamp(24px,4vw,52px);align-items:center}
+.holding h3{font-size:clamp(21px,2.4vw,30px);font-weight:600;max-width:20ch}
+.holding p{margin-top:12px;color:var(--ink-2);font-size:16px;max-width:46ch}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.slots .imgslot{aspect-ratio:4/3;border-radius:var(--r-md)}
+
+/* contact */
+.contact{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);display:grid;grid-template-columns:.95fr 1.05fr;overflow:hidden}
+.c-left{padding:clamp(28px,3.5vw,48px);background:linear-gradient(170deg,var(--sky),#EEF4FE)}
+.c-left h2{margin-top:12px}
+.c-left > p{margin-top:14px;color:var(--ink-2);font-size:16px}
+.hl{margin-top:26px;display:flex;flex-direction:column;gap:14px}
+.hl div{background:rgba(255,255,255,.72);border-radius:var(--r-md);padding:15px 17px}
+.hl b{display:block;font-family:Outfit;font-size:16px;font-weight:600}
+.hl span{font-size:14.5px;color:var(--ink-2)}
+.c-right{padding:clamp(28px,3.5vw,48px)}
+form{display:flex;flex-direction:column;gap:16px}
+label{display:block;font-size:14px;font-weight:600;margin-bottom:7px}
+input,textarea{width:100%;font:inherit;font-size:15.5px;padding:13px 16px;background:var(--field);border:1px solid transparent;border-radius:var(--r-md);color:var(--ink)}
+input::placeholder,textarea::placeholder{color:#93A1B5}
+input:focus,textarea:focus{outline:none;background:#fff;border-color:var(--brand);box-shadow:0 0 0 4px rgba(46,107,230,.14)}
+textarea{min-height:132px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+footer{padding:44px 0 52px}
+.frow{display:flex;justify-content:space-between;gap:26px;flex-wrap:wrap;align-items:flex-start}
+footer nav{display:flex;gap:22px}
+footer a,footer p{font-size:14.5px;color:var(--ink-2)}
+footer a:hover{color:var(--ink)}
+@media(max-width:940px){
+  .cards,.steps,.tiers{grid-template-columns:1fr}
+  .holding,.contact{grid-template-columns:1fr}
+  .hbar nav{display:none}
+  .two{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap"><div class="hbar">
+    <a class="logo" href="#"><i>b</i>bcns</a>
+    <nav><a href="#build">What we build</a><a href="#process">How it works</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav>
+    <a class="btn sm" href="#contact">Book a free consult</a>
+  </div></div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow">✦ Custom software for local businesses</span>
+    <h1>Software built around how your business <span>already</span> works</h1>
+    <p class="lede">Off-the-shelf tools make you change your process. We build tools that fit it. Scoped, quoted, and delivered.</p>
+    <div class="ctas">
+      <a class="btn" href="#contact">Book a free consult</a>
+      <a class="btn ghost" href="#build">See what we build</a>
+    </div>
+    <div class="proof">
+      <span class="chip"><b>✓</b> Fixed quote before work starts</span>
+      <span class="chip"><b>✓</b> We host it and keep it running</span>
+      <span class="chip"><b>✓</b> Free 30-minute consult</span>
+    </div>
+    <div class="heroshot">
+      <div class="imgslot" style="aspect-ratio:16/9" data-label="Product"
+        data-image-intent="Bright, friendly product screenshot mock floating on a pale blue-grey field: a simple booking calendar web app with soft white cards, generous rounded corners, one blue accent, a few pastel status tiles. Shot straight on with a soft diffuse drop shadow beneath. Clean, uncluttered, no dense data. 16:9.">
+        <p><strong>IMAGE INTENT</strong> — Friendly product mock on pale blue-grey: simple booking calendar, soft white cards, big radii, one blue accent, pastel status tiles. Straight on, soft diffuse shadow. 16:9.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="build">
+  <div class="wrap">
+    <div class="sechead">
+      <span class="eyebrow">What we build</span>
+      <h2>Tools shaped to your business, not the other way around</h2>
+      <p>Four kinds of problems we solve most. If yours isn't here, ask anyway.</p>
+    </div>
+    <div class="cards">
+      <article class="card"><div class="tile" style="background:var(--sky)">📅</div><h3>Scheduling &amp; booking</h3><p>Take appointments the way you already do, with deposits, reminders, and a calendar that matches your real workflow.</p></article>
+      <article class="card"><div class="tile" style="background:var(--mint)">📦</div><h3>Inventory &amp; back office</h3><p>Replace the spreadsheet juggling: ordering, invoicing, and tracking that update themselves.</p></article>
+      <article class="card"><div class="tile" style="background:var(--butter)">📊</div><h3>Dashboards &amp; reporting</h3><p>One screen that shows how the business is doing. Sales, costs, trends. No exporting anything.</p></article>
+      <article class="card"><div class="tile" style="background:var(--blush)">✨</div><h3>AI consulting</h3><p>A working session to find where AI actually saves you time, then set it up with you. Priced per day.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="process">
+  <div class="wrap">
+    <div class="sechead">
+      <span class="eyebrow">How it works</span>
+      <h2>Three steps from first call to finished tool</h2>
+      <p>You'll know the price and the plan before anything gets built.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Free consult</h3><p>A 30-minute conversation about how your business runs and where the friction is. No jargon.</p></div>
+      <div class="step"><div class="n">2</div><h3>Scope &amp; quote</h3><p>We write up exactly what we'll build, what it costs, and when it lands. You approve first.</p></div>
+      <div class="step"><div class="n">3</div><h3>Build &amp; launch</h3><p>We build it, launch it, and walk your team through it. From there we host, run, and maintain it.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="sechead">
+      <span class="eyebrow">Pricing</span>
+      <h2>Two build sizes. A setup fee, then monthly to run it.</h2>
+      <p>Each build has a one-time setup fee and a flat monthly fee that covers hosting and support. Exact numbers come in a fixed quote after the free consult.</p>
+    </div>
+    <div class="tiers">
+      <div class="tier">
+        <h3>Standard build</h3>
+        <div class="price"><b>$1,000</b><span>setup</span></div>
+        <p class="mo">then <b>$149</b> / month</p>
+        <p class="seats">Includes up to 15 users, then $20/user per month.</p>
+        <p class="desc">A single-purpose tool: a booking page, a report generator, one automation.</p>
+        <ul>
+          <li><i>✓</i>One core workflow, built end to end</li>
+          <li><i>✓</i>Delivered in about a week</li>
+          <li><i>✓</i>30 days of fixes and tweaks included</li>
+          <li><i>✓</i>One year of bug fixes, free</li>
+        </ul>
+        <a class="btn ghost" href="#contact">Get a fixed quote</a>
+      </div>
+      <div class="tier mark">
+        <h3>Advanced build</h3>
+        <div class="price"><b>$3,000</b><span>setup</span></div>
+        <p class="mo">then <b>$349</b> / month</p>
+        <p class="seats">Includes up to 15 users, then $20/user per month.</p>
+        <p class="desc">A system your business runs on: multiple workflows, logins, data that stays in sync.</p>
+        <ul>
+          <li><i>✓</i>Multiple connected workflows</li>
+          <li><i>✓</i>Delivered in two to three weeks</li>
+          <li><i>✓</i>30 days of fixes and tweaks included</li>
+          <li><i>✓</i>One year of bug fixes, free</li>
+        </ul>
+        <a class="btn" href="#contact">Get a fixed quote</a>
+      </div>
+      <div class="tier">
+        <h3>AI consulting</h3>
+        <div class="price"><b>$800</b><span>/ day</span></div>
+        <p class="mo">Booked by the day</p>
+        <p class="seats">Sessions run on-site or remote.</p>
+        <p class="desc">Working sessions to find and set up AI where it pays for itself.</p>
+        <ul>
+          <li><i>✓</i>Audit of where AI fits your operation</li>
+          <li><i>✓</i>Hands-on setup, not a slide deck</li>
+          <li><i>✓</i>Plain-English project notes</li>
+        </ul>
+        <a class="btn ghost" href="#contact">Book a day</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="work">
+  <div class="wrap">
+    <div class="holding">
+      <div>
+        <span class="eyebrow">Past work</span>
+        <h3 style="margin-top:14px">Our first builds are in progress</h3>
+        <p>We're building for our first clients right now. Case studies land here as projects wrap — each covers the problem, what we built, and what changed.</p>
+        <a class="btn" style="margin-top:22px" href="#contact">Want to be one of them?</a>
+      </div>
+      <div class="slots">
+        <div class="imgslot" data-label="Case 01"
+          data-image-intent="Warm, friendly photo of a small salon front desk with a tablet showing a soft rounded booking app; plants and daylight, pastel-leaning palette of cream, sage and light blue. Cheerful and calm, no faces in focus. 4:3.">
+          <p><strong>IMAGE INTENT</strong> — Salon front desk, tablet with rounded booking app, plants and daylight, cream/sage/light-blue. No faces in focus. 4:3.</p>
+        </div>
+        <div class="imgslot" data-label="Case 02"
+          data-image-intent="Friendly photo of a small workshop bench with a laptop open to a simple inventory list, tools neatly arranged, bright soft daylight, pastel-neutral palette. Approachable, uncluttered. 4:3.">
+          <p><strong>IMAGE INTENT</strong> — Workshop bench, laptop with a simple inventory list, tools arranged, bright soft daylight, pastel-neutral. 4:3.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sechead">
+      <span class="eyebrow">FAQ</span>
+      <h2>The questions we'd ask too</h2>
+      <p>Anything else, ask in the form and we'll answer straight.</p>
+    </div>
+    <div class="faq">
+      <details open><summary>How much will my project cost?</summary><p>Every build has a one-time setup fee plus a flat monthly fee that keeps it running and supported. Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. No hourly surprises.</p></details>
+      <details><summary>How long does a build take?</summary><p>Most single tools ship in about a week. Larger connected systems take two to three weeks. You get a delivery date with the quote, and we tell you right away if anything threatens it.</p></details>
+      <details><summary>What does the monthly fee cover?</summary><p>Hosting, uptime, daily backups, security patches, bug fixes, and small tweaks along the way. We run it on our own servers, so you and your team reach it from any device with a login. You never manage a server or an update yourself.</p></details>
+      <details><summary>What happens if I stop paying the monthly fee?</summary><p>Hosting stops, so the live tool goes offline. Your data is always yours. Before we shut anything down, we export your data and hand it over so you keep everything the tool held. No lock-in, no games.</p></details>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap">
+    <div class="contact">
+      <div class="c-left">
+        <span class="eyebrow" style="background:#fff">Get in touch</span>
+        <h2>Tell us what's slowing you down</h2>
+        <p>Send a few sentences about your business and the problem. We'll reply within one business day with next steps, and honest advice, even if that advice is you don't need custom software.</p>
+        <div class="hl">
+          <div><b>Free consult</b><span>A 30-minute call about how your business runs. No pitch, no obligation.</span></div>
+          <div><b>Fixed quote</b><span>You approve the exact price before any work starts.</span></div>
+          <div><b>Your data</b><span>We host and maintain the app for you. Your data is always yours, and we'll export it and hand it over whenever you ask.</span></div>
+        </div>
+      </div>
+      <div class="c-right">
+        <form onsubmit="return false">
+          <div class="two">
+            <div><label for="p-n">Name</label><input id="p-n" placeholder="Your name"></div>
+            <div><label for="p-b">Business</label><input id="p-b" placeholder="Business name"></div>
+          </div>
+          <div><label for="p-e">Email</label><input id="p-e" type="email" placeholder="you@business.com"></div>
+          <div><label for="p-m">What's slowing you down?</label><textarea id="p-m" placeholder="A few sentences is plenty."></textarea></div>
+          <button class="btn" style="height:52px;cursor:pointer">Send it over</button>
+          <p style="font-size:14px;color:var(--ink-2);text-align:center">We reply within one business day.</p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap frow">
+    <div><a class="logo" href="#"><i>b</i>bcns</a><p style="margin-top:8px">Custom software for local businesses.</p></div>
+    <nav><a href="#build">What we build</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="#contact">Contact</a></nav>
+    <p>© 2026 bcns</p>
+  </div>
+</footer>
+</body>
+</html>

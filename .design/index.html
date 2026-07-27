@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bcns — Round 1 · six directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F1012;--panel:#17191C;--ink:#EDEEF0;--ink-2:#93999F;--line:#26292E;--accent:#E8480B}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Archivo,system-ui,sans-serif;font-size:15px;line-height:1.55}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1560px;margin:0 auto;padding:0 clamp(18px,3vw,40px)}
+header{border-bottom:1px solid var(--line);padding:26px 0 22px;position:sticky;top:0;background:rgba(15,16,18,.94);backdrop-filter:blur(10px);z-index:20}
+h1{font-size:22px;letter-spacing:-.02em;font-weight:700}
+header p{margin-top:5px;color:var(--ink-2);font-size:13.5px;max-width:88ch}
+.bar{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar button{font:inherit;font-size:12.5px;font-weight:600;padding:7px 13px;background:transparent;color:var(--ink-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.bar button:hover{color:var(--ink);border-color:#3A3E45}
+.bar button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.bar span{font-size:12px;color:#666C74;margin-left:6px}
+
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.6vw,22px);padding:26px 0 60px}
+.grid.two{grid-template-columns:repeat(2,1fr)}
+.grid.one{grid-template-columns:1fr}
+figure{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+figcaption{padding:14px 16px 15px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.meta h2{font-size:15.5px;font-weight:700;letter-spacing:-.015em}
+.meta .look{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:5px}
+.meta p{margin-top:6px;color:var(--ink-2);font-size:12.5px;max-width:52ch}
+.open{flex:0 0 auto;font-size:12px;font-weight:600;padding:6px 11px;border:1px solid var(--line);border-radius:6px;color:var(--ink-2);white-space:nowrap}
+.open:hover{color:var(--ink);border-color:#3A3E45}
+.view{position:relative;background:#000;height:520px;overflow:hidden}
+.grid.two .view{height:660px}
+.grid.one .view{height:820px}
+iframe{position:absolute;top:0;left:0;border:0;width:1440px;transform-origin:0 0;background:#fff}
+.n{position:absolute;top:10px;left:10px;z-index:5;width:24px;height:24px;border-radius:5px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.2);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+footer{border-top:1px solid var(--line);padding:20px 0 40px;color:var(--ink-2);font-size:12.5px}
+@media(max-width:1100px){.grid,.grid.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>bcns — Round 1 · six directions</h1>
+    <p>Same page, same copy, six looks. Whole pages, not mood boards: hero, what we build, process, pricing, past-work holding, contact, footer. Every image is a placeholder carrying its image intent in the markup. Not ranked — pick the one that feels right and we'll vary its body next.</p>
+    <div class="bar">
+      <button data-cols="3" class="on">3 across</button>
+      <button data-cols="2">2 across</button>
+      <button data-cols="1">Full width</button>
+      <span>Click any title to open a draft full size.</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid" id="grid">
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Swiss utility</p>
+          <h2>01 — Modular grid, hairlines, one signal</h2>
+          <p>Near-monochrome paper, square corners, rules instead of shadows, prices set as large tabular numerals. Reads as a consultancy that sends real quotes.</p>
+        </div>
+        <a class="open" href="01-swiss-utility.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">1</span><iframe src="01-swiss-utility.html" loading="lazy" title="Swiss utility"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Warm editorial</p>
+          <h2>02 — Photo leads, serif display, wide margins</h2>
+          <p>Sand and bone sampled from the imagery, Newsreader serif at size, hairline dividers instead of cards. Reads as a boutique studio run by people.</p>
+        </div>
+        <a class="open" href="02-warm-editorial.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">2</span><iframe src="02-warm-editorial.html" loading="lazy" title="Warm editorial"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Technical blueprint</p>
+          <h2>03 — Instrument panel, mono labels, corner ticks</h2>
+          <p>Near-black with hairline frames, uppercase mono micro-labels and one green signal doing all the pointing. Reads as engineers you'd trust with your operations.</p>
+        </div>
+        <a class="open" href="03-technical-blueprint.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">3</span><iframe src="03-technical-blueprint.html" loading="lazy" title="Technical blueprint"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Soft product</p>
+          <h2>04 — Light, rounded, friendly</h2>
+          <p>White cards on a tinted field, full-pill controls, pastel category tiles, an open FAQ. The least intimidating option for a non-technical shop owner.</p>
+        </div>
+        <a class="open" href="04-soft-product.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">4</span><iframe src="04-soft-product.html" loading="lazy" title="Soft product"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Chromatic dark</p>
+          <h2>05 — Deep field, glass surfaces, one high-chroma CTA</h2>
+          <p>Saturated dark treated as space, translucent panels, teal accent (deliberately not the blue-purple everyone ships). Reads as a modern product company.</p>
+        </div>
+        <a class="open" href="05-chromatic-dark.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">5</span><iframe src="05-chromatic-dark.html" loading="lazy" title="Chromatic dark"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Current, refined</p>
+          <h2>06 — Your palette and type, restructured</h2>
+          <p>Same charcoal-purple, pastel blue, Bricolage and the Fraunces accent word. Fixes what's structural: a real hero column, an actual argument instead of four nav cards, contact with no dead half, tighter radii, calmer atmosphere.</p>
+        </div>
+        <a class="open" href="06-current-refined.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">6</span><iframe src="06-current-refined.html" loading="lazy" title="Current refined"></iframe></div>
+    </figure>
+
+  </div>
+</div>
+
+<footer class="wrap">Drafts live in <code>.design/</code>. Round 2 varies the body of whichever one you pick; round 3 swaps real imagery into the placeholder slots.</footer>
+
+<script>
+const grid = document.getElementById('grid');
+function fit(){
+  document.querySelectorAll('.view').forEach(v=>{
+    const f = v.querySelector('iframe');
+    const s = v.clientWidth / 1440;
+    f.style.transform = `scale(${s})`;
+    f.style.height = (v.clientHeight / s) + 'px';
+  });
+}
+document.querySelectorAll('.bar button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.bar button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    grid.className = 'grid' + (b.dataset.cols==='2'?' two':b.dataset.cols==='1'?' one':'');
+    requestAnimationFrame(fit);
+  });
+});
+window.addEventListener('resize',fit);
+window.addEventListener('load',fit);
+fit();
+</script>
+</body>
+</html>
