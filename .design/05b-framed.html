@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bcns — 05b · Framed sections</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="05-base.css">
+<style>
+/* ===== 05b body: each section is its own framed slab =====
+   Instead of one continuous scroll, the body reads as a stack of discrete
+   panels — each with a header band, its own interior, and air between them.
+   The glass material does the separating, so the page feels assembled from
+   parts rather than poured. Most "product company" of the three. */
+
+.stack{display:flex;flex-direction:column;gap:clamp(18px,2.4vw,32px);padding-bottom:clamp(40px,5vw,80px)}
+
+.slab{overflow:hidden}
+.band{display:flex;align-items:center;justify-content:space-between;gap:24px;
+  padding:20px clamp(22px,2.6vw,34px);border-bottom:1px solid var(--line);
+  background:linear-gradient(rgba(255,255,255,.035),transparent)}
+.band .bl{display:flex;align-items:center;gap:14px}
+.band .ix{font-family:Sora;font-size:11.5px;font-weight:700;color:var(--cyan);font-variant-numeric:tabular-nums;
+  border:1px solid rgba(37,224,200,.35);border-radius:7px;padding:5px 9px;line-height:1}
+.band h2{margin:0;font-size:clamp(17px,1.7vw,21px);font-weight:600;letter-spacing:-.02em}
+.band .bnote{font-size:13.5px;color:var(--ink-2);text-align:right;max-width:44ch}
+
+.inner{padding:clamp(24px,3vw,40px)}
+.lead{font-size:clamp(21px,2.5vw,32px);font-family:Sora;font-weight:600;letter-spacing:-.03em;line-height:1.12;max-width:22ch}
+.lead span{color:var(--cyan)}
+.sub{margin-top:12px;color:var(--ink-2);font-size:16px;max-width:56ch}
+
+/* build: 2×2 inside the frame, divided by hairlines instead of gaps */
+.quad{margin-top:28px;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.quad > div{padding:24px 26px 28px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);transition:background .2s}
+.quad > div:hover{background:rgba(255,255,255,.028)}
+.quad .k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);font-weight:600}
+.quad h3{margin-top:18px;font-size:18.5px;font-weight:600;line-height:1.25}
+.quad p{margin-top:9px;color:var(--ink-2);font-size:14.5px}
+
+/* process: three framed sub-panels in a row */
+.trio{margin-top:28px;display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,1.5vw,18px)}
+.sub-panel{border:1px solid var(--line);border-radius:14px;padding:22px 22px 26px;background:rgba(255,255,255,.022)}
+.sub-panel .n{font-family:Sora;font-size:clamp(28px,3.2vw,40px);line-height:1;font-weight:800;color:var(--cyan);opacity:.85}
+.sub-panel h3{margin-top:16px;font-size:18.5px;font-weight:600}
+.sub-panel p{margin-top:8px;color:var(--ink-2);font-size:14.5px}
+
+/* pricing: three framed columns, the middle one lifted by material not glow */
+.tiers{margin-top:28px;display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,1.5vw,18px)}
+.tier{border:1px solid var(--line);border-radius:14px;padding:26px 24px 30px;display:flex;flex-direction:column;background:rgba(255,255,255,.022)}
+.tier.mark{border-color:rgba(37,224,200,.45);background:linear-gradient(155deg,rgba(37,224,200,.11),rgba(255,255,255,.02))}
+.tier h3{font-size:15px;font-weight:600;color:var(--ink-2)}
+.tier.mark h3{color:var(--cyan)}
+.price{margin-top:18px;display:flex;align-items:baseline;gap:8px}
+.price b{font-family:Sora;font-size:clamp(32px,3.6vw,46px);line-height:1;font-weight:700;letter-spacing:-.045em}
+.price span{font-size:13.5px;color:var(--ink-2)}
+.mo{margin-top:8px;font-size:15.5px;color:var(--ink-2)}
+.mo b{color:var(--ink);font-weight:600}
+.seats{margin-top:9px;font-size:12.5px;color:var(--ink-2)}
+.tier .desc{margin-top:15px;color:var(--ink-2);font-size:14.5px}
+.tier ul{list-style:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;flex:1}
+.tier li{font-size:14px;padding-left:19px;position:relative;line-height:1.45}
+.tier li::before{content:"✦";position:absolute;left:0;color:var(--cyan);font-size:10px;top:3px}
+.tier .btn{margin-top:24px;width:100%}
+
+/* work: split frame */
+.split{display:grid;grid-template-columns:1fr 1.1fr;gap:clamp(22px,3.4vw,48px);align-items:center}
+.split h3{font-size:clamp(20px,2.3vw,28px);font-weight:700;max-width:20ch}
+.split p{margin-top:11px;color:var(--ink-2);font-size:15.5px;max-width:44ch}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.slots .imgslot{aspect-ratio:4/3}
+
+@media(max-width:940px){
+  .quad,.trio,.tiers,.split{grid-template-columns:1fr}
+  .band{flex-direction:column;align-items:flex-start;gap:10px}
+  .band .bnote{text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="field"></div>
+
+<header>
+  <div class="wrap hrow">
+    <a class="logo" href="#"><i></i>bcns</a>
+    <nav><a href="#build">What we build</a><a href="#process">Process</a><a href="#pricing">Pricing</a><a href="#work">Work</a></nav>
+    <a class="btn sm" href="#contact">Book a free consult</a>
+  </div>
+</header>
+
+<main>
+<!-- HERO — identical across 05a / 05b / 05c -->
+<section class="hero">
+  <div class="wrap herogrid">
+    <div>
+      <span class="eyebrow"><i></i> Custom software for local businesses</span>
+      <h1>Software built around how your business <span>already</span> works</h1>
+      <p class="lede">Off-the-shelf tools make you change your process. We build tools that fit it. Scoped, quoted, and delivered.</p>
+      <div class="ctas">
+        <a class="btn" href="#contact">Book a free consult</a>
+        <a class="btn ghost" href="#build">See what we build</a>
+      </div>
+      <div class="proof">
+        <div class="pcard"><b>Fixed quote</b><span>Approved before work starts</span></div>
+        <div class="pcard"><b>We host it</b><span>And keep it running</span></div>
+        <div class="pcard"><b>Free consult</b><span>30 minutes, no obligation</span></div>
+      </div>
+    </div>
+    <div class="imgslot" style="aspect-ratio:5/6" data-label="Hero"
+      data-image-intent="A translucent glass slab floating at a three-quarter angle in deep near-black space, a clean booking-app interface refracted inside it, edges catching a cyan-teal rim light. Volumetric depth, soft caustics on the surrounding dark field, no logos or legible text. Cool teal and deep navy only, no purple. 5:6 portrait.">
+      <p><strong>IMAGE INTENT</strong>: Translucent glass slab at a three-quarter angle in near-black space, a booking UI refracted inside, cyan-teal rim light, soft caustics. Teal/navy only, no purple. 5:6.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BODY — variant B -->
+<div class="wrap stack">
+
+  <section class="slab glass" id="build" style="padding:0">
+    <div class="band">
+      <div class="bl"><span class="ix">01</span><h2>What we build</h2></div>
+      <p class="bnote">Four kinds of problems we solve most. If yours isn't here, ask anyway.</p>
+    </div>
+    <div class="inner">
+      <p class="lead">Tools shaped to your business, not the <span>other way</span> around</p>
+      <div class="quad">
+        <div><p class="k">Bookings</p><h3>Scheduling &amp; booking systems</h3><p>Take appointments the way you already do, with deposits, reminders, and a calendar that matches your real workflow.</p></div>
+        <div><p class="k">Operations</p><h3>Inventory &amp; back-office automation</h3><p>Replace the spreadsheet juggling: ordering, invoicing, and tracking that update themselves.</p></div>
+        <div><p class="k">Insight</p><h3>Dashboards &amp; reporting</h3><p>One screen that shows how the business is doing. Sales, costs, trends, without exporting anything.</p></div>
+        <div><p class="k">AI</p><h3>AI consulting</h3><p>A working session to find where AI actually saves you time, then set it up with you. Priced per day.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slab glass" id="process" style="padding:0">
+    <div class="band">
+      <div class="bl"><span class="ix">02</span><h2>The process</h2></div>
+      <p class="bnote">You'll know the price and the plan before anything gets built.</p>
+    </div>
+    <div class="inner">
+      <p class="lead">Three steps from first call to <span>finished</span> tool</p>
+      <div class="trio">
+        <div class="sub-panel"><div class="n">01</div><h3>Free consult</h3><p>A 30-minute conversation about how your business runs and where the friction is. No jargon.</p></div>
+        <div class="sub-panel"><div class="n">02</div><h3>Scope &amp; quote</h3><p>We write up exactly what we'll build, what it costs, and when it lands. You approve first.</p></div>
+        <div class="sub-panel"><div class="n">03</div><h3>Build &amp; launch</h3><p>We build it, launch it, and walk your team through it. From there we host, run, and maintain it.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slab glass" id="pricing" style="padding:0">
+    <div class="band">
+      <div class="bl"><span class="ix">03</span><h2>Pricing</h2></div>
+      <p class="bnote">Exact numbers arrive in a fixed quote after the free consult. No hourly surprises.</p>
+    </div>
+    <div class="inner">
+      <p class="lead">Two build sizes. A setup fee, then <span>monthly</span> to run it.</p>
+      <p class="sub">Each build has a one-time setup fee and a flat monthly fee that covers hosting and support.</p>
+      <div class="tiers">
+        <div class="tier">
+          <h3>Standard build</h3>
+          <div class="price"><b class="num">$1,000</b><span>setup</span></div>
+          <p class="mo">then <b class="num">$149</b> / month</p>
+          <p class="seats num">Up to 15 users, then $20/user per month.</p>
+          <p class="desc">A single-purpose tool: a booking page, a report generator, one automation.</p>
+          <ul><li>One core workflow, built end to end</li><li>Delivered in about a week</li><li>30 days of fixes and tweaks included</li><li>One year of bug fixes, free</li></ul>
+          <a class="btn ghost" href="#contact">Get a fixed quote</a>
+        </div>
+        <div class="tier mark">
+          <h3>Advanced build</h3>
+          <div class="price"><b class="num">$3,000</b><span>setup</span></div>
+          <p class="mo">then <b class="num">$349</b> / month</p>
+          <p class="seats num">Up to 15 users, then $20/user per month.</p>
+          <p class="desc">A system your business runs on: multiple workflows, logins, data that stays in sync.</p>
+          <ul><li>Multiple connected workflows</li><li>Delivered in two to three weeks</li><li>30 days of fixes and tweaks included</li><li>One year of bug fixes, free</li></ul>
+          <a class="btn" href="#contact">Get a fixed quote</a>
+        </div>
+        <div class="tier">
+          <h3>AI consulting</h3>
+          <div class="price"><b class="num">$800</b><span>/ day</span></div>
+          <p class="mo">Booked by the day</p>
+          <p class="seats">Sessions run on-site or remote.</p>
+          <p class="desc">Working sessions to find and set up AI where it pays for itself.</p>
+          <ul><li>Audit of where AI fits your operation</li><li>Hands-on setup, not a slide deck</li><li>Plain-English project notes</li></ul>
+          <a class="btn ghost" href="#contact">Book a day</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slab glass" id="work" style="padding:0">
+    <div class="band">
+      <div class="bl"><span class="ix">04</span><h2>Past work</h2></div>
+      <p class="bnote">What we've built, and what it changed for the businesses using it.</p>
+    </div>
+    <div class="inner">
+      <div class="split">
+        <div>
+          <h3>Our first builds are in progress</h3>
+          <p>We're building for our first clients right now. Case studies land here as projects wrap — each covers the problem, what we built, and what changed.</p>
+          <a class="btn" style="margin-top:20px" href="#contact">Want to be one of them?</a>
+        </div>
+        <div class="slots">
+          <div class="imgslot" data-label="Case 01"
+            data-image-intent="Dark product shot: a floating glass card at a slight angle holding a minimal appointment list, deep navy-black surroundings, cyan-teal edge light and a faint reflection below. No legible branding. 4:3.">
+            <p><strong>IMAGE INTENT</strong>: Floating glass card holding a minimal appointment list, navy-black surround, teal edge light. 4:3.</p>
+          </div>
+          <div class="imgslot" data-label="Case 02"
+            data-image-intent="Dark product shot: two translucent panels overlapping in space showing a spare revenue chart, teal accent line, deep navy-black field, volumetric haze. No legible branding. 4:3.">
+            <p><strong>IMAGE INTENT</strong>: Two overlapping translucent panels showing a spare revenue chart, teal accent line, volumetric haze. 4:3.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slab glass" id="contact" style="padding:0">
+    <div class="band">
+      <div class="bl"><span class="ix">05</span><h2>Get in touch</h2></div>
+      <p class="bnote">We reply within one business day.</p>
+    </div>
+    <div class="inner">
+      <div class="contact">
+        <div>
+          <p class="lead">Tell us what's <span>slowing you down</span></p>
+          <p class="sub">Send a few sentences about your business and the problem. We'll reply within one business day with next steps, and honest advice, even if that advice is you don't need custom software.</p>
+          <div class="hl">
+            <div><b>Free consult</b><span>A 30-minute call about how your business runs. No pitch, no obligation.</span></div>
+            <div><b>Fixed quote</b><span>You approve the exact price before any work starts.</span></div>
+            <div><b>Your data</b><span>We host and maintain the app for you. Your data is always yours, and we'll export it and hand it over whenever you ask.</span></div>
+          </div>
+        </div>
+        <form style="padding:0" onsubmit="return false">
+          <div class="two">
+            <div><label for="b-n">Name</label><input id="b-n" placeholder="Your name"></div>
+            <div><label for="b-b">Business</label><input id="b-b" placeholder="Business name"></div>
+          </div>
+          <div><label for="b-e">Email</label><input id="b-e" type="email" placeholder="you@business.com"></div>
+          <div><label for="b-m">What's slowing you down?</label><textarea id="b-m" placeholder="A few sentences is plenty."></textarea></div>
+          <button class="btn" style="height:52px;cursor:pointer">Send it over</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap frow">
+    <div><a class="logo" href="#"><i></i>bcns</a><p style="margin-top:8px">Custom software for local businesses.</p></div>
+    <nav><a href="#build">What we build</a><a href="#pricing">Pricing</a><a href="#work">Work</a><a href="#contact">Contact</a></nav>
+    <p>© 2026 bcns</p>
+  </div>
+</footer>
+</body>
+</html>

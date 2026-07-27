@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bcns — Round 2 · three bodies for Chromatic Dark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F1012;--panel:#17191C;--ink:#EDEEF0;--ink-2:#93999F;--line:#26292E;--accent:#25E0C8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Archivo,system-ui,sans-serif;font-size:15px;line-height:1.55}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1560px;margin:0 auto;padding:0 clamp(18px,3vw,40px)}
+header{border-bottom:1px solid var(--line);padding:26px 0 22px;position:sticky;top:0;background:rgba(15,16,18,.94);backdrop-filter:blur(10px);z-index:20}
+h1{font-size:22px;letter-spacing:-.02em;font-weight:700}
+header p{margin-top:5px;color:var(--ink-2);font-size:13.5px;max-width:92ch}
+.bar{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar button{font:inherit;font-size:12.5px;font-weight:600;padding:7px 13px;background:transparent;color:var(--ink-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.bar button:hover{color:var(--ink);border-color:#3A3E45}
+.bar button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.bar span{font-size:12px;color:#666C74;margin-left:6px}
+.bar a.back{font-size:12.5px;color:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:7px 13px;font-weight:600}
+.bar a.back:hover{color:var(--ink);border-color:#3A3E45}
+
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.6vw,22px);padding:26px 0 60px}
+.grid.two{grid-template-columns:repeat(2,1fr)}
+.grid.one{grid-template-columns:1fr}
+figure{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+figcaption{padding:14px 16px 15px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.meta h2{font-size:15.5px;font-weight:700;letter-spacing:-.015em}
+.meta .look{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:5px}
+.meta p{margin-top:6px;color:var(--ink-2);font-size:12.5px;max-width:52ch}
+.meta .best{margin-top:8px;font-size:12px;color:#7E8794}
+.meta .best b{color:var(--ink);font-weight:600}
+.open{flex:0 0 auto;font-size:12px;font-weight:600;padding:6px 11px;border:1px solid var(--line);border-radius:6px;color:var(--ink-2);white-space:nowrap}
+.open:hover{color:var(--ink);border-color:#3A3E45}
+.view{position:relative;background:#000;height:560px;overflow:hidden}
+.grid.two .view{height:700px}
+.grid.one .view{height:860px}
+iframe{position:absolute;top:0;left:0;border:0;width:1440px;transform-origin:0 0;background:#070A12}
+.n{position:absolute;top:10px;left:10px;z-index:5;height:24px;padding:0 8px;border-radius:5px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.2);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.note{border-top:1px solid var(--line);padding:18px 0 44px;color:var(--ink-2);font-size:12.5px;max-width:96ch}
+.note b{color:var(--ink)}
+@media(max-width:1100px){.grid,.grid.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>bcns — Round 2 · three bodies for Chromatic Dark</h1>
+    <p>Direction 05 is locked. The hero, header, contact and footer are byte-identical across all three (they share <code>05-base.css</code>), so what you're comparing is strictly how the middle of the page reads. Pick one and we move to imagery.</p>
+    <div class="bar">
+      <button data-cols="3" class="on">3 across</button>
+      <button data-cols="2">2 across</button>
+      <button data-cols="1">Full width</button>
+      <a class="back" href="index.html">← Round 1</a>
+      <span>Scroll inside a frame to see the body change. Click any title for full size.</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid" id="grid">
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Variant A</p>
+          <h2>Index rail</h2>
+          <p>A numbered rail pins at left and tracks scroll, doubling as table of contents and progress. Content runs in one measured column: build as document rows, process as a connected spine, pricing as stacked comparison bars.</p>
+          <p class="best">Best if <b>the page gets long</b> and you want people to never lose their place.</p>
+        </div>
+        <a class="open" href="05a-index-rail.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">A</span><iframe src="05a-index-rail.html" loading="lazy" title="Index rail"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Variant B</p>
+          <h2>Framed sections</h2>
+          <p>Each section is its own glass slab with a numbered header band and its own interior. Air between panels instead of continuous scroll; the material does the separating. Build sits in a hairline-divided 2×2.</p>
+          <p class="best">Best if you want it to read <b>most like a product company</b> — assembled, deliberate, scannable.</p>
+        </div>
+        <a class="open" href="05b-framed.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">B</span><iframe src="05b-framed.html" loading="lazy" title="Framed sections"></iframe></div>
+    </figure>
+
+    <figure>
+      <figcaption>
+        <div class="meta">
+          <p class="look">Variant C</p>
+          <h2>Ledger</h2>
+          <p>Cards dropped entirely. Build becomes ruled line items with reference codes, pricing becomes a real comparison matrix with a row per promise, process becomes a dated run. Densest of the three.</p>
+          <p class="best">Best if you want to look like a studio that <b>sends itemised quotes</b> — which is the promise the copy already makes.</p>
+        </div>
+        <a class="open" href="05c-ledger.html" target="_blank">Open ↗</a>
+      </figcaption>
+      <div class="view"><span class="n">C</span><iframe src="05c-ledger.html" loading="lazy" title="Ledger"></iframe></div>
+    </figure>
+
+  </div>
+</div>
+
+<div class="wrap">
+  <p class="note"><b>What's next after you pick.</b> Round 3 swaps real imagery into the placeholder slots: four generations per slot, side by side, you pick, then variations of the pick. Round 4 wires up the tweaks panel so you adjust accent, type scale, spacing, radius and motion live in the browser instead of asking for a rebuild per change. Then it gets ported into <code>apps/web</code> and a STYLE.md lands at the repo root.</p>
+</div>
+
+<script>
+const grid = document.getElementById('grid');
+function fit(){
+  document.querySelectorAll('.view').forEach(v=>{
+    const f = v.querySelector('iframe');
+    const s = v.clientWidth / 1440;
+    f.style.transform = `scale(${s})`;
+    f.style.height = (v.clientHeight / s) + 'px';
+  });
+}
+document.querySelectorAll('.bar button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.bar button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    grid.className = 'grid' + (b.dataset.cols==='2'?' two':b.dataset.cols==='1'?' one':'');
+    requestAnimationFrame(fit);
+  });
+});
+window.addEventListener('resize',fit);
+window.addEventListener('load',fit);
+fit();
+</script>
+</body>
+</html>
