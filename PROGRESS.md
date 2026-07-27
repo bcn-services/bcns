@@ -9,10 +9,10 @@
 ---
 
 ## Current position
-- **Status:** Platform build & migration phase **complete**. Model migration merged to `main`; `@nseluga/*` packages published to GitHub Packages; `bcns-app-template` is a GitHub Template Repository; DeLuca's extracted to its own repo `bcns-client-delucas`. This repo is now the clean **platform repo** (marketing site + shared packages + template source; no client apps).
-- **Next:** Scope **Coventry Hills** (first hosted client) in a fresh session, then generate `bcns-client-coventry-hills` from the template and build. Author a fresh PLAN in that client repo.
-- **Blockers (Needs-Nate):** First live deploy (Hetzner/Coolify + Cloudflare + Neon + Clerk + Stripe) when Coventry ships; marketing-site copy gaps (founder photos, Brandon's NYU details, first past-work entry). DeLuca's remaining work (packaging/handoff) now tracked in `bcns-client-delucas`.
-- **Last updated:** 2026-07-20 (GitHub plumbing + DeLuca's extraction; see log)
+- **Status:** Platform build, migration, and the marketing-site visual pass are all **complete**. `@nseluga/*` packages published to GitHub Packages; `bcns-app-template` is a GitHub Template Repository; DeLuca's extracted to `bcns-client-delucas`; the template purpose split landed (app-core 0.2.0 absorbs shared client logic, stale in-repo template copy dropped). This repo is the clean **platform repo** (marketing site + shared packages).
+- **Next:** Build the **past-work case study system** on the marketing site — clickable cards → `/work/[slug]` detail pages, with screenshots captured from locally-hosted client apps running clean seeded demo data. See `PLAN.md`.
+- **Blockers (Needs-Nate):** Written client permission from L2 Detailz and DeLuca's before either is named publicly; real case study copy (every narrative field ships as `[INPUT: …]`); L2 Detailz launch + DNS cutover before its live link can be published. First live deploy of a client app pending. DeLuca's packaging/handoff tracked in `bcns-client-delucas`.
+- **Last updated:** 2026-07-27 (layout-loop full run + template split logged; new PLAN.md for case studies)
 
 > **Note:** The DeLuca's milestone rows below are historical — that app now lives
 > in `bcns-client-delucas`, where its packaging/handoff work continues.
@@ -51,6 +51,22 @@
 | V4 — `/about` visual pass | ✅ done — name text-xl, role accent, credential dot bullets, whyBcns centered; 965a5ab |
 | V5 — `/work` visual pass | ✅ done — both holding states promoted to bordered panels with icons; 953a7ab |
 
+### v3 — Layout-loop full run, "Bold, executed with precision" (layout-loop, 2026-07-20)
+| Item | Status | Notes |
+|------|--------|-------|
+| Phase 0 — Shared foundation | ✅ done — Fraunces serif-accent font wired globally, `components/reveal.tsx` (single IntersectionObserver + reduced-motion no-op), `drift`/`shimmer` keyframes in the Tailwind preset, shared hover-lift/glow utilities, `SectionHeading` opt-in serif accent; 6d0ab30, 6acd891, 3e91ade |
+| `/` home loop | ✅ done — serif-accent headline word, staggered pop reveals, drifting signature motif, amplified nav-card hovers; 5dce555 |
+| `/services` loop | ✅ done — THE PROCESS rebuilt as a node-badge flow with a scroll-fill connector; use-case cards pop-reveal + hover-lift; f6614e0 |
+| `/pricing` loop | ✅ done — FAQ flat grid → animated accordion; featured Advanced tier (accent ring + elevated surface); 18416ff |
+| `/about` loop | ✅ done — founder cards pop-reveal + hover-lift; whyBcns reframed as a pull-quote (large serif mark + accent border); 2a14fb0 |
+| `/work` loop | ✅ done — holding panels given character: drifting motif + shimmer sweep on Past Work, 3 shimmer testimonial skeletons for Reviews, glow-pulse CTAs; a8ea3dd |
+| Phase F — Finalize | ✅ done — throwaway `/style-lab` route deleted (motif kept, in real use); `LAYOUT_LOOP_REPORT.md` written with per-page baseline/final; f0304f7, 9f49db8 |
+
+### v4 — Template purpose split (2026-07-21)
+| Item | Status | Notes |
+|------|--------|-------|
+| app-core 0.2.0 absorbs shared client logic | ✅ done — health probe, webhook pipeline, storage interface, and AI opt-in gate moved out of the template into the package so fixes propagate by version bump; stale in-repo `templates/hosted-web/` copy deleted (`bcns-app-template` is canonical); 79221e1, merged PR #12 (453ee53) |
+
 ### Part III — DeLuca's pizza app (dev-team-auto)
 | Item | Status | Notes |
 |------|--------|-------|
@@ -80,6 +96,14 @@ Legend: ⬜ Not started · 🟡 In progress · ✅ Done · ⛔ Blocked
 ---
 
 ## Log (newest first)
+
+- **2026-07-27** — 📋 **PLAN.md replaced: past-work case study system.** The prior `PLAN.md` was the finished layout-loop plan (every page `status: done`, outcome captured in `LAYOUT_LOOP_REPORT.md`); its results are now recorded in the v3 milestone table above, and the file was replaced with a fresh dev-team plan rather than left in place — a fully-`done` plan gets re-picked-up by the next `/dev-team-auto` run. New plan: make Past Work cards clickable through to `/work/[slug]` detail pages, and illustrate them with screenshots captured from locally-hosted client apps running **clean seeded demo data** (never real customer records). Decisions taken in the planning session: agents capture all screenshots including DeLuca's Electron shell (Nate's call, over the flagged headless-reliability risk); all narrative copy ships as `[INPUT: …]` placeholders so no client outcome is fabricated on a live marketing site; client permission is a hard gate below the stop marker. Screenshot scope fixed at DeLuca's main dashboard (1) and L2 Detailz public frontend + admin calendar (2). No code written yet.
+
+- **2026-07-21** — ✅ **Template purpose split (branch work, PR #12).** Split responsibilities cleanly: **packages = all shared logic**, **template = pure runnable skeleton**. `@nseluga/app-core` 0.2.0 absorbed the health probe, webhook pipeline, storage interface, and AI opt-in gate that had been living in the template, so a fix now propagates to every client repo with a version bump instead of a copy-paste. The stale in-repo `templates/hosted-web/` copy was deleted — the standalone `bcns-app-template` Template Repository is canonical, and the new `/new-client-repo` skill creates + stamps + verifies client repos from it. Commits 79221e1, merged as 453ee53.
+
+  **Note — unpushed local commit:** `7b4d678` ("infra: droplet provisioning as code — bootstrap, onboard, systemd unit, nightly backups") exists on the local `main` only and is not in `origin/main`. It needs review and a push, or it will be lost on the next clean checkout.
+
+- **2026-07-20** — ✅ **Marketing site layout-loop full run complete — "Bold, executed with precision."** Ran the full `/layout-loop` on `apps/web` across all five pages and merged to `main`. Shared foundation first (Phase 0): Fraunces serif-italic accent font wired globally as `--font-serif-accent`, `components/reveal.tsx` as the single IntersectionObserver powering every scroll reveal (with a `prefers-reduced-motion` no-op path), `drift`/`shimmer` keyframes added to the Tailwind preset, hover-lift/glow standardized as shared utilities, and `SectionHeading` extended with an opt-in serif accent segment. Then one loop per page: home (accent headline word, staggered reveals, drifting motif), services (THE PROCESS rebuilt as a connected node-badge flow with a scroll-fill connector), pricing (FAQ → animated accordion, featured Advanced tier), about (founder card reveals, whyBcns as a pull-quote), work (holding panels given a drifting motif + shimmer sweep so they read as intentional rather than empty). Phase F deleted the throwaway `/style-lab` route and wrote `LAYOUT_LOOP_REPORT.md`. **All presentation-only** — no copy, data, props, logic, or routing changed. Two open review flags carried in the report: mobile and reduced-motion spot-checks. Commits 6d0ab30 → 9f49db8.
 
 - **2026-07-20** — ✅ **GitHub plumbing complete + DeLuca's extracted (interactive session).** Got the platform onto GitHub under the personal account `nseluga` (no org) and split client apps into their own repos.
 

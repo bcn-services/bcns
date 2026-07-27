@@ -1,129 +1,136 @@
-brand: bcns
-launch: pnpm --filter web dev
-url: http://localhost:3000
+# PLAN.md — Past-work case study system
 
-> **Run from the Claude Code terminal, not cowork.** Use Claude-in-Chrome for all viewing
-> and screenshots: load its tools via ToolSearch, open a tab, navigate to each page URL, and
-> screenshot before and after every change. The loop depends on actually seeing rendered
-> pixels — never skip the screenshot step or trust the diff alone. Work on this branch
-> (`layout-loop-2026-07-20`); never edit or merge to `main`.
+**Status:** The marketing site is built and visually finished (layout-loop run merged 2026-07-20).
+`/work` still renders its empty holding panel because `siteContent.pastWork.items` is `[]`.
+This plan turns that section into real case studies: clickable cards → `/work/[slug]` detail
+pages, illustrated with screenshots captured from locally-hosted client apps running **clean
+seeded demo data**.
 
-> **Direction — "Bold, executed with precision."** Push the styling and motion to the Bold
-> end (big confident display type, a serif-italic accent word, the branded signature motif,
-> strong-but-purposeful animation) — but hold every change to the discipline of the
-> Restrained option: one accent only, tight alignment to the grid, generous whitespace, no
-> clutter, no second accent hue, nothing gaudy. Marketable and alive, not busy. When a Bold
-> move and a precision rule conflict, precision wins — dial the Bold move back until it reads
-> as intentional, not loud.
+**Context:** `CLAUDE.md` (stack, conventions, `content.ts`-is-source-of-truth rule) ·
+`LAYOUT_LOOP_REPORT.md` (the visual system these pages must match) ·
+`PROGRESS.md` (log + current position) ·
+`~/os/projects/bcns/README.md` (platform index).
 
-> **Reference — l2details.com.** Borrow its *techniques*, not its skin: cinematic dark field,
-> two-tone headline (one italic accent word), editorial rule-line eyebrows, a signature
-> animated emblem, heavy scroll-reveal, big stat/number treatment. bcns keeps its OWN brand —
-> pastel-blue (#7CB3FF) on charcoal-purple (#15131F), sans base, **no photography** (brand
-> rule). No serif body, no gold, no car imagery. Craft governs discipline; brand governs
-> color/type.
+## Global rules — apply to every item
 
-> **Already landed on this branch — do NOT redo:**
-> - Distinct background pattern per tab (home = grid, services = blue dot matrix,
->   about = diagonal hairlines, pricing = concentric rings, work = crosshatch) via
->   `components/section-atmosphere.tsx`. Keep; only extend if a page rework needs it.
-> - Empty-state cards on /work constrained to `max-w-3xl`; use-case card bodies aligned;
->   /work holding-state titles set to the site `text-xl font-semibold` convention.
-> - `components/signature-motif.tsx` (orbiting-nodes emblem) exists and is proven in the
->   style lab. Reuse it; do not rebuild.
-
-> **Guardrails (every page):**
-> - Presentation only. Never edit copy, data, props, logic, or routing. `[INPUT: …]` strings
->   are content placeholders — style as normal text, never change or invent them.
-> - `siteContent` / `site.ts` are the source of truth for copy — never edit through them.
-> - Respect `prefers-reduced-motion`: all motion must no-op cleanly (the global reduce-motion
->   rule already zeroes transitions; JS-driven reveals must check the media query and render
->   the final state immediately).
-> - Objective gates before any page is "done": text contrast ≥ WCAG AA; no overflow / overlap
->   / clipping; layout holds at mobile AND desktop; motion degrades gracefully.
-> - One change per pass, screenshot before/after, commit each pass with the change-log line.
+- **Never publish real customer data.** Every screenshot and every fixture row uses invented
+  names, addresses, phone numbers, and emails. No capture may come from a deployed instance,
+  a production database, or a real client account. This is the point of the whole plan — an
+  item that ships a real customer's details is a failed item regardless of how it looks.
+- **Never invent a client outcome.** Agents do not write case study narrative. Every narrative
+  field ships as an `[INPUT: …]` placeholder for Nate to fill, matching the convention already
+  used across `lib/content.ts` and `CONTENT.md`. A plausible-sounding metric on a live
+  marketing site is a lie about a real business.
+- **`apps/web/lib/content.ts` is the single source of truth for copy.** Never hardcode strings
+  into components. `apps/web/CONTENT.md` is its 1:1 mirror — update both in the same item.
+- **Brand rules still hold** (see `LAYOUT_LOOP_REPORT.md`): one accent hue, pastel-blue
+  `#7CB3FF` on charcoal-purple `#15131F`, no photography. Product UI screenshots are not
+  photography and are allowed; stock or lifestyle imagery is not.
+- **Match the existing visual system** — `components/reveal.tsx` for scroll-in, the shared
+  hover-lift/glow utilities, `SectionHeading`'s opt-in serif accent. Do not invent a second
+  motion vocabulary or rebuild `signature-motif.tsx`.
+- **Two client repos are in scope** and are named per item: `~/bcns-client-delucas` and
+  `~/bcns-client-l2detailz`. Work in the repo the item names; never cross-commit.
+- Respect `prefers-reduced-motion`; hold text contrast to WCAG AA; layout must survive mobile
+  and desktop.
 
 ---
 
-## Phase 0 — Shared foundation (build FIRST, before the per-page loops)
+- task: Wire a runnable `test` script for the marketing site so the existing suite can gate the loop
+  done when:
+    - `pnpm --filter web test` runs every `apps/web/__tests__/*.mjs` file via `node --test` and exits non-zero when any test fails
+    - `pnpm test` from the repo root runs it through Turbo (a `test` task added to `turbo.json`)
+    - All 12 existing test files in `apps/web/__tests__/` pass
+  speed: N/A — build tooling, no data-size dependence
+  status: not started
+  track: light
 
-These are prerequisites the page items depend on. Land them, screenshot the style-lab or a
-representative page to confirm, then commit before starting page loops.
+- task: Extend `PastWorkItem` in `apps/web/lib/content.ts` with case study detail fields and mirror them in `CONTENT.md`
+  done when:
+    - `PastWorkItem` carries `slug`, `problem`, `approach`, `outcome`, and `screenshots` (array of `{ src, alt, caption }`) alongside the existing optional `link`; `pnpm --filter web typecheck` passes
+    - `siteContent.pastWork.items` holds exactly two entries with slugs `delucas` and `l2detailz`, and every narrative field on both is an `[INPUT: …]` placeholder string
+    - A test asserts every slug is unique and matches `^[a-z0-9-]+$`; adding a duplicate slug fails it
+    - `CONTENT.md` documents every new field 1:1 with the registry and the existing mirror test (`w4-content-mirror.test.mjs`) passes
+    - Existing passing tests remain passing
+  speed: N/A — compile-time static object, no data-size dependence
+  status: not started
+  track: full
 
-- Wire the serif accent font globally: add `Fraunces` (italic) via `next/font/google` in
-  `app/layout.tsx` as `--font-serif-accent`; expose a `font-serif-accent` family in the
-  Tailwind preset (`packages/config/tailwind/index.ts`). Used for exactly ONE accent word per
-  headline, always in `text-primary`, never for body or more than one word.
-- Build `components/reveal.tsx` — a `"use client"` wrapper using a single IntersectionObserver
-  that adds the `animate-fade-up` on enter and unobserves. Props: `delay` (ms) for stagger,
-  `as` for element type. Under `prefers-reduced-motion`, skip the observer and render final
-  state. This powers scroll-reveal + staggered entrance everywhere.
-- Add motion keyframes to the preset: `drift` (slow translate/scale loop for ambient glows)
-  and `shimmer` (for placeholder cards). `spin` / `ping` / `pulse` already exist.
-- Standardize hover utilities as shared classes/variants: card hover-lift
-  (`-translate-y-0.5` + shadow bump), link/arrow slide (`group-hover:translate-x-1`),
-  icon-tile brighten. Apply consistently, not ad hoc per component.
-- Extend `SectionHeading` (`packages/ui/src/section-heading.tsx`) to optionally render a
-  serif-italic accent segment and larger display sizes, without breaking existing callers
-  (accent is opt-in; default unchanged).
+- task: Add the `apps/web/app/work/[slug]/page.tsx` dynamic route rendering one case study
+  done when:
+    - `/work/delucas` and `/work/l2detailz` return 200 and render that item's problem, approach, and outcome text sourced from `siteContent.pastWork.items`
+    - An unknown slug such as `/work/nope` renders the Next.js 404 (via `notFound()`), not a 500 and not an empty page
+    - `generateStaticParams` emits exactly one path per registry item, so `pnpm --filter web build` prerenders both pages statically
+    - Page title and meta description come from the item, following the `pageMeta` pattern already used in `app/work/page.tsx`
+    - Median of 5 production renders of `/work/delucas` stays under 1s with both items in the registry
+    - Existing passing tests remain passing
+  status: not started
+  track: full
 
----
+- task: Make each Past Work card in `apps/web/components/past-work.tsx` link to its detail page
+  done when:
+    - Each rendered card is wrapped in a Next `<Link>` to `/work/<slug>`; a click anywhere on the card navigates there, and keyboard Enter on the focused card does the same
+    - No nested anchors: the existing external `link` anchor inside the card body is moved out of (or removed from) the card `<Link>` wrapper, and a test asserts no `<a>` is rendered inside another `<a>`
+    - The card exposes a visible focus ring meeting WCAG AA contrast against the card surface
+    - The `items.length === 0` holding-state branch renders exactly as it does today when the registry has no items
+    - Existing passing tests remain passing
+  status: not started
+  track: light
 
-## Per-page loops
+- task: Seed the DeLuca's mock bridge in `~/bcns-client-delucas` with an invented demo dataset
+  done when:
+    - An opt-in demo fixture (e.g. `VITE_DEMO_SEED=1 pnpm dev`) supplies the mock bridge with at least 3 months of invented transactions across every category, so the Dashboard tab renders non-zero Money in / Spent / Profit and a populated bar chart instead of today's zeros
+    - Default `pnpm dev` behaviour is unchanged — without the flag the mock bridge returns what it returns today
+    - A test asserts the fixture contains no real vendor or business name from the client's production data and that every dollar figure is invented
+    - Median of 5 Dashboard tab renders with the fixture loaded stays under 1s
+    - Existing 8-file test suite (`pnpm test`) remains passing
+  status: not started
+  track: full
+  flag: data-path
+  parallel-group: seeds
 
-- page: /
-  notes: Hero — raise the headline to bold display scale and set ONE word as the serif-italic
-    blue accent (precision: only one). Place `SignatureMotif` subtly in a hero corner behind
-    content (low opacity, does not fight the headline). Stagger the proof-point row and the
-    four nav cards in on load/scroll via `Reveal`. Nav-card hover: top-border accent sweep +
-    lift + icon brighten (reuse the shared hover utilities). Reveal the split contact section.
-    Keep the existing grid+glow hero atmosphere. Discipline check: still one accent, headline
-    dominant, whitespace intact.
-  status: done
+- task: Add a demo seed fixture to `~/bcns-client-l2detailz` that populates bookings, jobs, and the calendar
+  done when:
+    - A new `supabase/demo-seed.sql`, kept out of `supabase/migrations/` so it can never run against production, inserts at least 12 jobs spread across a single month with invented customer names, street addresses, and phone numbers
+    - Applying it through the existing `supabase/local-test/run.sh` harness leaves the admin calendar month view showing jobs on at least 8 distinct days
+    - A test asserts every phone number in the fixture falls in the 555 reserved range and no customer name in it appears in `0004_seed.sql` or any production export
+    - Reference data still comes only from `0004_seed.sql` — the demo fixture adds customer/job rows and redefines no package or settings row
+    - Median of 5 renders of the admin calendar month view stays under 1s with the fixture loaded
+  status: not started
+  track: full
+  flag: data-path
+  parallel-group: seeds
 
-- page: /services
-  notes: THE PROCESS (how-it-works) is the priority — rebuild it from three stacked blocks into
-    a connected flow: numbered node badges on a running connector line (horizontal on desktop,
-    vertical on mobile) that draws/fills in as the section scrolls into view, with steps
-    revealing in sequence (stagger). Use-case cards: staggered reveal + hover lift; keep the
-    aligned body baseline already fixed. Serif-italic accent word in the section title.
-    Precision: the connector must land on a shared axis and the node badges align to it exactly.
-  status: done
+- task: Capture the three case study screenshots from the locally-hosted apps running their demo fixtures
+  done when:
+    - `apps/web/public/case-studies/` contains exactly three PNGs — `delucas-dashboard.png`, `l2detailz-frontend.png`, `l2detailz-calendar.png`
+    - Each is captured through Claude-in-Chrome from the locally running app with its demo fixture loaded, never from a deployed instance: DeLuca's Dashboard tab at `localhost:3001` (`pnpm dev` is plain Vite browser mode via the mock bridge — do **not** build or boot the Electron shell), L2's public marketing homepage at `localhost:3100`, and L2's admin calendar month view at `localhost:3100`
+    - Every image is at least 1200px wide, under 400KB, and a read of each confirms no real customer name, address, phone number, or email is visible
+    - A test asserts all three files exist on disk and that each `screenshots[].src` value in the registry resolves to one of them
+  speed: N/A — one-time asset capture, not a runtime path
+  status: not started
+  track: full
+  flag: data-path
 
-- page: /pricing
-  notes: FAQ — convert the flat two-column card grid into an accordion (expand/collapse with an
-    animated height + chevron rotate; one or multi open is fine). Pricing cards: strengthen the
-    featured "Advanced build" tier with a precise treatment (accent ring or elevated surface —
-    not a new hue) so it reads as featured before the price; keep the AI day-rate card's chip
-    differentiation. Hover glow/lift on all three cards. Reveal + stagger the row.
-  status: done
+- task: Render each case study's screenshots on its detail page with `next/image`
+  done when:
+    - Each `/work/[slug]` page renders its registry `screenshots[]` entries via `next/image`, each with its non-empty descriptive `alt` and its caption rendered below the image
+    - Images below the fold are lazy-loaded and `pnpm --filter web build` completes with no `next/image` warnings
+    - A registry `screenshots[].src` pointing at a missing file fails the build rather than rendering a broken image
+    - Images match the existing visual system: `Reveal` scroll-in, rounded surface and border consistent with the card treatment, and they hold layout at mobile and desktop without overflow
+    - Median of 5 production renders of `/work/l2detailz` (2 images) stays under 1s
+    - Existing passing tests remain passing
+  status: not started
+  track: full
 
-- page: /about
-  notes: Founder cards — reveal + hover lift; keep matched heights. Frame the whyBcns statement
-    ("Small businesses get two bad options…") as a deliberate pull-quote (accent border or
-    lifted block with a large opening mark), not plain centered body. Serif-italic accent word
-    in "The people behind bcns". `[INPUT: …]` credentials stay as-is, styled as normal text.
-    Keep the diagonal-hairline atmosphere.
-  status: done
+> **⚠️ AUTONOMOUS RUN — STOP HERE**
 
-- page: /work
-  notes: Give the two holding panels character so they read as intentional, not empty: add an
-    ambient/branded graphic per panel (the `SignatureMotif` or a build/reviews motif) and a
-    subtle shimmer so they signal "live, awaiting first client." Reviews empty state can become
-    2–3 placeholder quote cards with a shimmer sweep rather than one box. Make each panel CTA
-    prominent (primary weight). Reveal on scroll. Keep the crosshatch atmosphere and the
-    max-w-3xl framing.
-  status: done
-
----
-
-## Phase F — Finalize (after all pages pass)
-
-- Delete the throwaway `app/style-lab/page.tsx` preview route and `components/signature-motif.tsx`
-  ONLY if the motif ended up unused (it should be used — keep it if any page adopted it).
-- Re-run `pnpm --filter web lint` and `typecheck`; confirm the diff is presentation-only
-  (no copy/data/prop/logic/routing changes).
-- Verify `prefers-reduced-motion` (emulate in devtools) removes all motion cleanly.
-- Update `LAYOUT_LOOP_REPORT.md` with baseline/final per page, the chosen direction
-  (Bold + precision), animations shipped, and any flagged taste forks. Do NOT merge — leave
-  for morning sign-off, then Nate merges.
+- task: Replace every `[INPUT: …]` placeholder in the past-work registry with real client-approved copy and publish
+  done when:
+    - Written permission from L2 Detailz and from DeLuca's is recorded before either business is named on a public page; if either declines, that entry is anonymized to a sector description instead
+    - No `[INPUT:` string remains anywhere in `siteContent.pastWork`, and `CONTENT.md` matches
+    - L2 Detailz's live URL is set as its `link` only after its DNS cutover has completed
+    - Each case study states one quantified outcome that the client has confirmed
+  speed: N/A — copy only
+  status: not started
+  track: trivial
