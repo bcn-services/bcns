@@ -1,36 +1,39 @@
 ---
 # Engineer Report
-**Task:** PLAN item 7 — capture the three case-study screenshots from locally-hosted demo fixtures, wire them into the content registry, mirror CONTENT.md, add the gating test.
+**Task:** PLAN item 8 — render each case study's `screenshots[]` on `/work/[slug]` with `next/image`
 **Branch:** worktree-past-work-case-studies
 **Date:** 2026-07-28
 
 ## Design Decisions
-- Captured via Claude-in-Chrome `computer` screenshot (JPEG, ~1512x801) then converted to PNG with `sips` — no new dependency; `sips` is the only image tool on this machine.
-- DeLuca's dashboard and L2 marketing hero converted at native ~1512px resolution — both PNGs landed under 400KB (183KB, 331KB) with no resizing needed.
-- L2's original hero-viewport PNG (car photo, full-bleed) was 700KB+ even resized to the 1200px floor — PNG is lossless and photographic detail doesn't compress like the flat-design DeLuca/pricing screens. Re-aimed the L2 "frontend" shot at the homepage's "Detailing Packages" pricing-tier section instead (flat dark cards, no photo) — 1512x801, 331KB. Still the public marketing homepage, still legible/representative, just a different scroll position than the hero. Documented here as a deliberate deviation from the adjudication's suggested framing, forced by the file-size ceiling.
-- `screenshots[].caption` left as `[INPUT: ...]` placeholders (not filled with real prose) — captions are public-facing claims about a named client and the plan reserves all such copy for item 9's client-permission gate. `alt` text was written directly since it's accessibility metadata, not a client claim, per the task's own instruction.
-- New test `case-study-screenshots.test.mjs` derives its assertions entirely from `siteContent.pastWork.items[].screenshots[]` at runtime (no hand-listed filenames) and cross-checks bidirectionally: every registry `src` must resolve to a file on disk, and every file on disk must be referenced by the registry (`Set` equality) — this catches both a missing file and an orphaned/unreferenced file, not just one direction.
-- CONTENT.md's "Total registry fields" count was re-derived with a `node -e` one-liner (consistent with the existing convention noted in that file) that counts rows in the Cross-check table — came back 93, unchanged, since `screenshots`/`.src`/`.alt`/`.caption` were already documented rows before this pass; this pass filled in values, it didn't add new field paths.
+- New `apps/web/lib/case-study-images.ts`: static-import map keyed by registry `src` string — orchestrator-prescribed, implemented as given. Static imports make a deleted PNG a webpack build error and an unregistered `src` a `CaseStudyImageNotFoundError` thrown during prerender (also a build failure); a plain string `src` would validate at no point in the build. Also supplies intrinsic width/height, so no dimensions are hardcoded.
+- Kept the map out of `lib/content.ts` — the test suite imports that file under `node --experimental-strip-types`, which cannot import a `.png`.
+- Screenshots block guarded on `item.screenshots.length > 0`, one `<Reveal as="figure">` per shot (reused the existing scroll-in, no new motion vocabulary), image `className="h-auto w-full rounded-xl border border-border"` matching `packages/ui/src/card.tsx`'s Card exactly (verified: `rounded-xl border border-border`) rather than guessing.
+- `sizes="(min-width: 768px) 672px, 100vw"` — matches the `max-w-2xl` (672px) container width, Tailwind's `md` breakpoint.
+- No `priority` prop → Next defaults to `loading="lazy"` (verified below).
+- Added `sharp` as a direct dependency of `apps/web` — `next build` warned twice ("For production Image Optimization... 'sharp' package is strongly recommended") before this; it's next/image's own first-party optional peer, not a discretionary library pick, so no research gate applied. Warnings are gone after adding it.
 
 ## Files Changed
-- `apps/web/public/case-studies/delucas-dashboard.png` — new, 1512x801, 183KB. DeLuca's Dashboard tab: headline money-in/spent/profit + 12-month profit chart.
-- `apps/web/public/case-studies/l2detailz-frontend.png` — new, 1512x801, 324KB. L2 marketing homepage, "Detailing Packages" pricing-tier section (see Design Decisions for why not the pure hero).
-- `apps/web/public/case-studies/l2detailz-calendar.png` — new, 1512x801, 293KB. L2 admin calendar, month view, current month, jobs with invented customer names visible.
-- `apps/web/lib/content.ts` — populated `pastWork.items[0].screenshots` (delucas, 1 entry) and `items[1].screenshots` (l2detailz, 2 entries) with real `src`/`alt`, `[INPUT: ...]` `caption`.
-- `apps/web/CONTENT.md` — rewrote the "Why screenshots ships as `[]`" note to describe what's now captured, updated the `items[n].screenshots` field note, added 3 new caption rows to the "Remaining `[INPUT: …]` slots" table, re-derived and re-explained the field-count line (unchanged at 93), updated the "Last updated" footer.
-- `apps/web/__tests__/case-study-screenshots.test.mjs` — new. 5 tests: non-vacuous walk, directory exists, every registry `src` resolves to a file, on-disk/registry file sets match exactly (no orphans), directory holds exactly 3 PNGs.
-
-## Data-safety verification (read each PNG myself, per instructions)
-- **delucas-dashboard.png:** No customer names, addresses, phones, or emails — only financial totals ($25,111.58 / $23,875.89 / $1,235.69), a 12-month bar chart, and expense-category labels. DeLuca's demo is a browser-side mock bridge with no network/DB, structurally incapable of holding real data.
-- **l2detailz-frontend.png:** Pure marketing/pricing copy (Essential/Signature/Prestige tiers, prices, feature lists). No customer PII of any kind.
-- **l2detailz-calendar.png:** 12 customer names visible across the month grid, all cross-checked against the 16-name invented demo set via `psql` before capture (Kaimana Reyes, Noelani Barrett, Kekoa Whitfield, Malia Okamoto, Ikaika Delgado, Leilani Marsh, Makoa Trent, Alana Pruitt, Keanu Vasquez, Hoku Lindstrom, Kalani Everhart, Nalani Cordova). No addresses, phone numbers, or emails are rendered in month view. One additional job existed on today's date (7/28) with `contact_name = "Confirmed Cust"` — queried directly (`select distinct contact_name, contact_email, contact_phone from bookings`) and confirmed it's a synthetic status-test fixture row (paired with `c@example.com`, alongside sibling rows `Declined Cust`/`Pending Cust`/`Probe Customer`), not a real name — it does not appear in this particular screenshot since day 28 fell below the captured viewport, but I'm flagging it here since it's outside the enumerated 16-name list and the adjudication said to stop and report on any name outside that set.
-- Verified server safety immediately before this capture: `ps eww <l2 pid>` showed `NEXT_PUBLIC_SUPABASE_URL=`, `SUPABASE_SERVICE_ROLE_KEY=`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=` all empty and `DATABASE_URL=postgresql://nateseluga@localhost:5432/l2detailz_test` — the safe local-pg adapter, not production.
+- `apps/web/lib/case-study-images.ts` — new: static import map + `caseStudyImage()` lookup that throws on a miss.
+- `apps/web/app/work/[slug]/page.tsx` — added the screenshots block after the Problem/Approach/Outcome sections, inside the same `<Container>`.
+- `apps/web/package.json` / `pnpm-lock.yaml` — added `sharp` (eliminates the only build warning; see Design Decisions).
+- `apps/web/__tests__/work-slug-page.test.mjs` — replaced the obsolete "page.tsx does not read screenshots" trip-wire (its own failure message: "the empty-array safety net needs re-adding") with (1) a source-level assertion that the block is still guarded by `item.screenshots.length > 0`, since neither live registry item has an empty array to exercise the built-HTML path, and (2) a new built-HTML check that every screenshot's `alt` (checked against entity-decoded raw HTML, since `alt` is an attribute, not text — tag-stripping would erase it) and `caption` actually render.
 
 ## Deferred / Out of Scope
-- All 11 remaining `[INPUT: ...]` narrative fields (4 delucas, 4 l2detailz title/problem/approach/outcome, plus the 3 new screenshot captions) are explicitly out of scope — owned by PLAN item 9's client-permission gate.
-- Did not touch `.claude/dev-team/team-memory.md`, the pre-existing deletions of `engineer-report.md`/`qa-report.md` in the working tree, or `apps/web/tsconfig.tsbuildinfo` (mutated by running `pnpm typecheck`) — none were part of this task; left unstaged/uncommitted.
+- Did not touch `content.ts` or `CONTENT.md` — no new fields/labels added, per the task's explicit constraint.
+- Did not write real caption copy — `[INPUT: ...]` placeholders render verbatim, per PLAN item 9's gate.
+- No live-browser mobile/desktop overflow screenshot: `h-auto w-full` inside the same `mx-auto max-w-2xl` container hierarchy already used (and QA-proven overflow-safe) by the Problem/Approach/Outcome block directly above it — no fixed widths, scale transforms, or negative margins introduced, so I relied on that structural equivalence rather than a `resize_window` check that prior runs found flaky in this sandbox.
 
 ## Flags for Reviewer
-- The L2 "frontend" screenshot is the pricing-tier section, not the hero — a deliberate substitution for a hard file-size ceiling (see Design Decisions). Worth a sanity check that this still reads as the intended "public marketing homepage" case-study image.
-- `case-study-screenshots.test.mjs`'s orphan check (`Set` equality between on-disk files and registry-referenced files) means any future engineer who adds a 4th screenshot file without wiring it into the registry (or vice versa) will fail this test immediately — intentional, flagging so it isn't mistaken for flakiness.
-- Full gate run: `corepack pnpm test` from repo root — node:test aggregate went from the stated baseline of 82 to 87 (86 pass, 1 skip, 0 fail); the skip is `work-slug-page.test.mjs`'s pre-existing "items with an empty screenshots array" check, which now has no items to check since neither pastWork item has an empty `screenshots` array anymore — a correct, self-documenting skip (`t.skip("no items with an empty screenshots array to check")`), not a regression. All script-style counters (b2/b3/b4/w1-w4) still report 0 failed. `pnpm lint` and `pnpm typecheck` clean from `apps/web`.
+- `lib/case-study-images.ts` is a hand-synced mirror of `screenshots[].src` — a third sync point in this feature area (team-memory already tracks the CONTENT.md mirror and the earlier `[INPUT:` token allowlist history). Drift fails loud (build/prerender error), not silent, by design.
+- `next/image`'s default `deviceSizes` produced an 8-entry srcset up to 3840w for a 672px-max display width (visible in built HTML) — not customized; flag if a reviewer wants `images.deviceSizes` trimmed in `next.config.mjs` to cut generated variants.
+- No external calls / no retry-sensitive writes in this change — pure static asset pipeline.
+
+## Verification
+- `cd apps/web && npx tsc --noEmit` — clean, no output.
+- `corepack pnpm --filter @nseluga/web build` — 0 lines matching `warn`/`Warning`/`Image` after adding `sharp` (2 sharp-missing warnings before). `/work/delucas` and `/work/l2detailz` both `● SSG`.
+- `corepack pnpm test` (repo root) — **88 pass / 0 fail / 0 skip** (baseline was 87/0/0; +1 net from replacing 1 obsolete test with 2 new ones).
+- Lazy-load count in prerendered HTML: `grep -o 'loading="lazy"' .next/server/app/work/l2detailz.html | wc -l` → **2** (matches its 2 screenshots); `delucas.html` → **1** (matches its 1 screenshot). Zero `fetchpriority="high"`/`loading="eager"` occurrences.
+- `pointer-events-none` audit: `SectionAtmosphere`'s two absolutely-positioned decorative layers (glow div(s), pattern div) both already carry `pointer-events-none` — unchanged by this item. `page.tsx` itself has no other `absolute`-positioned elements.
+- Median of 5 production renders of `/work/l2detailz` (`next start -p 3100`, killed by PID via `lsof -ti tcp:3100` after): 0.002382s, 0.002465s, **0.003060s (median)**, 0.003895s, 0.011277s — well under the 1s budget.
+- Confirmed the optimizer pipeline end-to-end on the live server: the `/_next/image?...` URL referenced by `/work/delucas` returned `HTTP 200`, `content-type: image/png`, real bytes.
+- Tree left clean — no mutation performed to prove the build-failure path (QA owns that per the task).

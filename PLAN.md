@@ -126,7 +126,7 @@ seeded demo data**.
     - Existing passing tests remain passing
   risk: a missing image file breaks the build, or a layout/overflow bug is obvious on first page load
   difficulty: low — standard next/image usage matching the existing card treatment
-  status: not started
+  status: done
 
 > **⚠️ AUTONOMOUS RUN — STOP HERE**
 
