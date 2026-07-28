@@ -346,10 +346,18 @@ fabricated metric on a live marketing site is a false claim about a real
 business. Fill each field only with the real, confirmed detail for that
 client, then remove the `[INPUT: …]` wrapper.
 
-**Why `screenshots` ships as `[]` on both entries:** a placeholder `src`
-would point at an image file that doesn't exist yet — screenshots get
-captured in a later pass. An empty array avoids shipping a broken image
-reference; populate it once real screenshot files exist.
+**Screenshots:** both entries now carry real screenshot files, captured
+locally from each app's demo fixture (never from a deployed instance) and
+committed to `apps/web/public/case-studies/`. `delucas` has one shot
+(`delucas-dashboard.png`); `l2detailz` has two (`l2detailz-frontend.png`,
+`l2detailz-calendar.png`). Each `src` points at a file that exists —
+verified by `apps/web/__tests__/case-study-screenshots.test.mjs`, which
+walks the registry and asserts every `screenshots[].src` resolves to a real
+file. `alt` text is real, descriptive accessibility copy (not a client
+claim, so it's filled in directly). `caption` still ships as an
+`[INPUT: …]` placeholder — captions are public-facing prose about a named
+client and stay behind the same anti-fabrication rule as `title`/`problem`/
+`approach`/`outcome` until Nate confirms the wording.
 
 **Why `link` is omitted on both entries:** it's optional, and
 `past-work.tsx` renders `{link}` as the visible anchor text — a placeholder
@@ -416,7 +424,7 @@ Each entry has:
 #### items[n].screenshots
 - **Field:** `pastWork.items[n].screenshots`
 - **Purpose:** Array of `{ src, alt, caption }` objects shown alongside the case study
-- **Note:** Ships as `[]` on both current entries — screenshot capture is a later pass. See "Why `screenshots` ships as `[]`" above before adding placeholder paths.
+- **Note:** `delucas` has 1 entry, `l2detailz` has 2. See "Screenshots" above for how these were captured and what's still `[INPUT: …]`.
 
 ##### items[n].screenshots[m].src
 - **Field:** `pastWork.items[n].screenshots[m].src`
@@ -1041,7 +1049,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 93 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. That is 92 before this pass + the 1 new `pastWork.caseStudy.backLabel` field added here for the `/work/[slug]` detail page's back-to-work link. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 93 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. Unchanged by this pass: `screenshots`/`screenshots[m].src`/`.alt`/`.caption` were already rows before the three case-study screenshots were captured — this pass filled in values (populating `delucas`/`l2detailz`'s `screenshots` arrays), it did not add new field paths. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
 The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff) live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
@@ -1068,16 +1076,22 @@ turnaround, response-time, support-window, and page-meta slots are filled.
 | `pastWork.items[1].problem` (l2detailz) | `[INPUT: l2detailz problem]` |
 | `pastWork.items[1].approach` (l2detailz) | `[INPUT: l2detailz approach]` |
 | `pastWork.items[1].outcome` (l2detailz) | `[INPUT: l2detailz outcome]` |
+| `pastWork.items[0].screenshots[0].caption` (delucas dashboard) | `[INPUT: delucas dashboard screenshot caption]` |
+| `pastWork.items[1].screenshots[0].caption` (l2detailz frontend) | `[INPUT: l2detailz frontend screenshot caption]` |
+| `pastWork.items[1].screenshots[1].caption` (l2detailz calendar) | `[INPUT: l2detailz calendar screenshot caption]` |
 
-DeLuca's and L2 Detailz are real bcns clients — fill these eight slots only
-with confirmed detail from each client, never drafted or invented copy.
+DeLuca's and L2 Detailz are real bcns clients — fill these eleven slots only
+with confirmed detail from each client, never drafted or invented copy. The
+three screenshot captions must not state or imply any dollar figure,
+customer count, or business outcome — the numbers visible in the screenshots
+themselves are invented demo-fixture data, not confirmed client results.
 
 **`reviews.items`** is still an empty array, not a placeholder — add entries
 to it to flip reviews live. `pastWork.items` is no longer empty (it holds
-the two case-study slots above); its `screenshots` field on both entries is
-an empty array by design (see the Past Work section) and stays that way
-until real screenshot files exist.
+the two case-study slots above); its `screenshots` arrays are no longer
+empty either — `delucas` has 1 real screenshot, `l2detailz` has 2, all
+captured from each app's local demo fixture (see the Past Work section).
 
 ---
 
-_Last updated: 2026-07-27 (Added `pastWork.caseStudy.backLabel` — the label on the `/work/[slug]` detail page's back-to-work link, alongside the existing `problemLabel`/`approachLabel`/`outcomeLabel` section labels). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-07-28 (Captured the three case-study screenshots — `delucas-dashboard.png`, `l2detailz-frontend.png`, `l2detailz-calendar.png` — from each app's local demo fixture and populated `pastWork.items[0].screenshots` / `pastWork.items[1].screenshots` with real `src`/`alt` values; `caption` stays `[INPUT: …]` pending client permission). Source of truth: `apps/web/lib/content.ts`._

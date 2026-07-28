@@ -309,7 +309,13 @@ export const siteContent: SiteContent = {
         problem: "[INPUT: delucas problem]",
         approach: "[INPUT: delucas approach]",
         outcome: "[INPUT: delucas outcome]",
-        screenshots: [],
+        screenshots: [
+          {
+            src: "/case-studies/delucas-dashboard.png",
+            alt: "DeLuca's dashboard showing monthly money in, spent, and profit totals above a 12-month profit bar chart and an expenses-by-category breakdown.",
+            caption: "[INPUT: delucas dashboard screenshot caption]",
+          },
+        ],
       },
       {
         slug: "l2detailz",
@@ -317,7 +323,18 @@ export const siteContent: SiteContent = {
         problem: "[INPUT: l2detailz problem]",
         approach: "[INPUT: l2detailz approach]",
         outcome: "[INPUT: l2detailz outcome]",
-        screenshots: [],
+        screenshots: [
+          {
+            src: "/case-studies/l2detailz-frontend.png",
+            alt: "L2 Detailz marketing site showing the Essential, Signature, and Prestige detailing package cards with pricing and included services.",
+            caption: "[INPUT: l2detailz frontend screenshot caption]",
+          },
+          {
+            src: "/case-studies/l2detailz-calendar.png",
+            alt: "L2 Detailz admin calendar in month view with scheduled detailing jobs listed across the days of the month.",
+            caption: "[INPUT: l2detailz calendar screenshot caption]",
+          },
+        ],
       },
     ],
     holdingState: {
