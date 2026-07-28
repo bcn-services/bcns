@@ -150,19 +150,18 @@ test("every rendered narrative field is still an [INPUT: ...] placeholder (no fa
   }
 });
 
-// --- Empty screenshots array must not break the route ---
-test("items with an empty screenshots array still render a non-empty built page", (t) => {
-  const emptyScreenshotItems = items.filter((i) => i.screenshots.length === 0);
-  if (emptyScreenshotItems.length === 0) {
-    t.skip("no items with an empty screenshots array to check");
-    return;
-  }
-  for (const item of emptyScreenshotItems) {
-    const htmlPath = resolve(root, `.next/server/app/work/${item.slug}.html`);
-    if (!existsSync(htmlPath)) {
-      t.skip(`no build output at ${htmlPath}`);
-      return;
-    }
-    assert.ok(readFileSync(htmlPath, "utf8").length > 1000, `${item.slug}.html looks too small / possibly broken`);
-  }
+// --- `screenshots` is a registry field the /work/[slug] page does not read (no
+// component under apps/web/components or apps/web/app references it as of this
+// pass) — so its presence or absence can never affect this route's output. The
+// prior version of this test asserted that empty-array items still render,
+// conditioned on such an item existing; with both registry items now non-empty
+// that condition can never be true again, permanently skipping with zero
+// coverage. Assert the real, always-executing invariant instead: this page's
+// source doesn't branch on `screenshots` at all, so wiring it into the UI
+// later is a page.tsx change, not a silent behavior change here. ---
+test("page.tsx does not read item.screenshots (route output cannot depend on the field's contents)", () => {
+  assert.ok(
+    !pageSrc.includes("screenshots"),
+    "page.tsx now references item.screenshots — the empty-array safety net needs re-adding (see git history for the removed test) since output can vary with the field's contents",
+  );
 });
