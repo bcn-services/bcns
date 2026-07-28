@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { Container, SectionHeading } from "@nseluga/ui";
+import { Card, Container, SectionHeading } from "@nseluga/ui";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SectionAtmosphere } from "@/components/section-atmosphere";
@@ -97,15 +97,17 @@ export default function CaseStudyPage({ params }: CaseStudyPageProps) {
 
             {item.screenshots.length > 0 && (
               <div className="mx-auto mt-14 max-w-2xl space-y-10">
-                {item.screenshots.map((shot) => (
-                  <Reveal as="figure" key={shot.src}>
-                    <Image
-                      src={caseStudyImage(shot.src)}
-                      alt={shot.alt}
-                      sizes="(min-width: 768px) 672px, 100vw"
-                      className="h-auto w-full rounded-xl border border-border"
-                    />
-                    <figcaption className="mt-3 text-sm text-muted-foreground">
+                {item.screenshots.map((shot, index) => (
+                  <Reveal as="figure" key={shot.src} delay={index * 120}>
+                    <Card className="p-2 sm:p-3">
+                      <Image
+                        src={caseStudyImage(shot.src)}
+                        alt={shot.alt}
+                        sizes="(min-width: 768px) 672px, 100vw"
+                        className="h-auto w-full rounded-lg"
+                      />
+                    </Card>
+                    <figcaption className="mt-3 text-center text-sm text-muted-foreground">
                       {shot.caption}
                     </figcaption>
                   </Reveal>
