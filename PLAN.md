@@ -109,7 +109,7 @@ seeded demo data**.
     - A test asserts all three files exist on disk and that each `screenshots[].src` value in the registry resolves to one of them
   speed: N/A — one-time asset capture, not a runtime path
   status: not started
-  track: full
+  track: light
   flag: data-path
 
 - task: Render each case study's screenshots on its detail page with `next/image`
