@@ -5,7 +5,7 @@
  * Checks:
  * 1. Zero [SLOT: occurrences in content.ts (static analysis)
  * 2. Zero [SLOT: on any rendered page (built HTML)
- * 3. Every [INPUT: string on rendered pages matches appendix-defined tokens
+ * 3. Every [INPUT: string on rendered pages matches a token derived from siteContent
  * 4. Spot-check: hero headline, nav card titles, pricing card names, FAQ q1, /work holding title
  */
 
@@ -50,18 +50,34 @@ function skipSection(name) {
 }
 
 // ---------------------------------------------------------------------------
-// Appendix-defined [INPUT: tokens — every INPUT on a rendered page must be one of these
+// Registry-derived [INPUT: tokens — every INPUT on a rendered page must be one
 // ---------------------------------------------------------------------------
-// C1 pass: these resolved slots are now filled. Only Needs-Nate slots remain.
-const APPENDIX_INPUT_TOKENS = new Set([
-  // C1 pass: all pricing/turnaround/response-time/meta slots are now filled.
-  // Only Needs-Nate slots remain as [INPUT: ...].
-  "[INPUT: photo]",
-  "[INPUT: credential 2]",
-  "[INPUT: credential 3]",
-  "[INPUT: business experience summary]",
-  "[INPUT: NYU program]",
-]);
+// Derived by walking siteContent, never hand-listed: a legitimate token is by
+// definition a string in the registry, and a hand-synced allowlist false-fails
+// on every token added afterwards (that already cost one fix cycle this pass).
+const INPUT_TOKEN_RE = /\[INPUT:[^\]]+\]/g;
+
+const REGISTRY_INPUT_TOKENS = new Set();
+(function collectTokens(node) {
+  if (typeof node === "string") {
+    for (const token of node.match(INPUT_TOKEN_RE) || []) REGISTRY_INPUT_TOKENS.add(token);
+  } else if (node && typeof node === "object") {
+    // Object.values covers arrays too — elements are the values.
+    for (const value of Object.values(node)) collectTokens(value);
+  }
+})(siteContent);
+
+// React HTML-escapes rendered text, so a token containing ' & " < > comes back
+// from the built HTML as an entity and would never match the registry string.
+// Decode &amp; last so an escaped-entity literal isn't double-decoded.
+const decodeEntities = (s) =>
+  s
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 
 // ---------------------------------------------------------------------------
 // [1] Zero [SLOT: in content.ts (static)
@@ -108,10 +124,17 @@ if (!buildExists) {
 // ---------------------------------------------------------------------------
 // [3] Every [INPUT: on rendered pages matches appendix tokens
 // ---------------------------------------------------------------------------
-console.log("\n[3] Rendered pages: all [INPUT: tokens are appendix-defined");
+console.log("\n[3] Rendered pages: all [INPUT: tokens are registry-defined");
+
+// Guards the walk itself: an empty set would mean the derivation silently broke.
+assert(
+  "registry-derived [INPUT: token set is non-empty",
+  REGISTRY_INPUT_TOKENS.size > 0,
+  `derived ${REGISTRY_INPUT_TOKENS.size} token(s) from siteContent`
+);
 
 if (!buildExists) {
-  skipSection("[3] Rendered pages: all [INPUT: tokens are appendix-defined");
+  skipSection("[3] Rendered pages: all [INPUT: tokens are registry-defined");
 } else {
   for (const route of routes) {
     const htmlPath = resolve(buildDir, route);
@@ -122,12 +145,13 @@ if (!buildExists) {
       continue; // already failed in [2]
     }
     // Extract all [INPUT: ...] occurrences (greedy to closing bracket)
-    const inputMatches = html.match(/\[INPUT:[^\]]+\]/g) || [];
-    for (const token of inputMatches) {
+    const inputMatches = html.match(INPUT_TOKEN_RE) || [];
+    for (const raw of inputMatches) {
+      const token = decodeEntities(raw);
       assert(
-        `${route}: "${token}" is appendix-defined`,
-        APPENDIX_INPUT_TOKENS.has(token),
-        `unknown INPUT token`
+        `${route}: "${token}" is registry-defined`,
+        REGISTRY_INPUT_TOKENS.has(token),
+        `unknown INPUT token (raw in HTML: "${raw}")`
       );
     }
   }
@@ -238,9 +262,26 @@ if (!buildExists) {
     assert("work.html readable", false);
   }
   if (workHtml) {
+    // items is now seeded, so /work renders the case-study grid, not the
+    // holding state — assert the grid's placeholder titles are present.
+    // (Registry-level holding-state assertion stays at [4] above, unchanged.)
+    const workText = stripTags(workHtml);
     assert(
-      'work.html contains holding state title "Our first builds are in progress"',
-      stripTags(workHtml).includes("Our first builds are in progress")
+      'work.html contains delucas case-study title placeholder',
+      workText.includes("[INPUT: delucas case study title]")
+    );
+    assert(
+      'work.html contains l2detailz case-study title placeholder',
+      workText.includes("[INPUT: l2detailz case study title]")
+    );
+    // outcome also renders, via CardDescription in past-work.tsx
+    assert(
+      'work.html contains delucas outcome placeholder',
+      workText.includes("[INPUT: delucas outcome]")
+    );
+    assert(
+      'work.html contains l2detailz outcome placeholder',
+      workText.includes("[INPUT: l2detailz outcome]")
     );
   }
 

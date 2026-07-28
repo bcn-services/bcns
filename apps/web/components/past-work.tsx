@@ -66,8 +66,8 @@ export function PastWork() {
           </Reveal>
         ) : (
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map(({ title: workTitle, outcome, link }) => (
-              <Card key={workTitle} className="h-full">
+            {items.map(({ slug, title: workTitle, outcome, link }) => (
+              <Card key={slug} className="h-full">
                 <CardHeader>
                   <CardTitle className="text-base">{workTitle}</CardTitle>
                 </CardHeader>

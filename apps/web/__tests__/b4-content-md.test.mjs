@@ -71,7 +71,7 @@ const fieldNames = [
   // ContactSectionContent / ContactHighlightItem
   "highlights",
   // PastWorkContent / PastWorkItem
-  "outcome", "link", "holdingState",
+  "slug", "problem", "approach", "outcome", "screenshots", "src", "alt", "caption", "link", "holdingState",
   // ReviewsContent / ReviewItem
   "quote", "author", "role", "company",
   // PricingContent / PricingTier

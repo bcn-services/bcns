@@ -60,9 +60,19 @@ export interface ContactSectionContent {
   highlights: [ContactHighlightItem, ContactHighlightItem, ContactHighlightItem];
 }
 
+export interface ScreenshotItem {
+  src: string;
+  alt: string;
+  caption: string;
+}
+
 export interface PastWorkItem {
+  slug: string;
   title: string;
+  problem: string;
+  approach: string;
   outcome: string;
+  screenshots: ScreenshotItem[];
   link?: string;
 }
 
@@ -284,7 +294,24 @@ export const siteContent: SiteContent = {
     eyebrow: "Past work",
     title: "Past work",
     description: "What we've built, and what it changed for the businesses using it.",
-    items: [],
+    items: [
+      {
+        slug: "delucas",
+        title: "[INPUT: delucas case study title]",
+        problem: "[INPUT: delucas problem]",
+        approach: "[INPUT: delucas approach]",
+        outcome: "[INPUT: delucas outcome]",
+        screenshots: [],
+      },
+      {
+        slug: "l2detailz",
+        title: "[INPUT: l2detailz case study title]",
+        problem: "[INPUT: l2detailz problem]",
+        approach: "[INPUT: l2detailz approach]",
+        outcome: "[INPUT: l2detailz outcome]",
+        screenshots: [],
+      },
+    ],
     holdingState: {
       title: "Our first builds are in progress",
       body: "We're building for our first clients right now. Case studies land here as projects wrap. Each one covers the problem, what we built, and what changed.",

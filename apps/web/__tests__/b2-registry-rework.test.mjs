@@ -188,8 +188,20 @@ assert(
   reviewsSrc.includes("items.map")
 );
 
-// Registry: items is empty array (holding state is the current path)
-assert("pastWork.items is empty array by default", siteContent.pastWork.items.length === 0);
+// Registry: pastWork.items is now seeded (W5 case-study slots), but the
+// holding state must stay populated so /work still renders correctly if
+// items is ever emptied again — both branches in past-work.tsx stay live.
+// (Slug/placeholder detail on those entries: past-work-case-studies.test.mjs.)
+assert(
+  "pastWork.items is seeded with the 2 case-study entries",
+  siteContent.pastWork.items.length === 2,
+  `got ${siteContent.pastWork.items.length}`
+);
+assert(
+  "pastWork.holdingState.title stays populated (holding-state branch still viable)",
+  typeof siteContent.pastWork.holdingState.title === "string" &&
+    siteContent.pastWork.holdingState.title.trim().length > 0
+);
 assert("reviews.items is empty array by default", siteContent.reviews.items.length === 0);
 
 // Behavioral: verify holding-state renders and item-grid renders via registry simulation

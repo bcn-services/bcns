@@ -337,9 +337,23 @@ fixed tuple.
 Portfolio / proof section. `items` is an open-ended array — add more as
 projects are completed. The `link` field is optional.
 
-**How to flip /work live:** Add an entry to `pastWork.items` — the holding
-state disappears automatically. No code change needed. (Same for
-`reviews.items`.)
+**Current state:** `pastWork.items` holds two case-study slots — `delucas`
+and `l2detailz` — real bcns clients. Every narrative field (`title`,
+`problem`, `approach`, `outcome`) on both ships as an `[INPUT: …]`
+placeholder. **Never replace these with drafted or invented copy** — a
+fabricated metric on a live marketing site is a false claim about a real
+business. Fill each field only with the real, confirmed detail for that
+client, then remove the `[INPUT: …]` wrapper.
+
+**Why `screenshots` ships as `[]` on both entries:** a placeholder `src`
+would point at an image file that doesn't exist yet — screenshots get
+captured in a later pass. An empty array avoids shipping a broken image
+reference; populate it once real screenshot files exist.
+
+**Why `link` is omitted on both entries:** it's optional, and
+`past-work.tsx` renders `{link}` as the visible anchor text — a placeholder
+href would render as a broken, misleading link. Add the field only once a
+real project URL exists.
 
 ### eyebrow
 - **Field:** `pastWork.eyebrow`
@@ -359,26 +373,73 @@ state disappears automatically. No code change needed. (Same for
 - **Tone:** Confident but not boastful
 - **Length:** 1-2 sentences, ≤150 chars
 
-### items[n] — project entries (open-ended array)
+### items[n] — case-study entries (open-ended array)
 
 Each entry has:
+
+#### items[n].slug
+- **Field:** `pastWork.items[n].slug`
+- **Purpose:** Stable, URL-safe identifier for the case study (React list key, future detail-page route)
+- **Tone:** N/A (identifier, not copy)
+- **Note:** Must be unique across `items` and match `^[a-z0-9-]+$`. Current values: `delucas`, `l2detailz`. Set once; do not change after a detail page or external link depends on it.
+- **Length:** Short, lowercase, hyphenated
 
 #### items[n].title
 - **Field:** `pastWork.items[n].title`
 - **Purpose:** Project or engagement name
 - **Tone:** Neutral noun phrase (client-safe if needed)
+- **Note:** Both current entries carry an `[INPUT: …]` placeholder — the display form of a client's name is Nate's call; fill with the real, confirmed title.
 - **Length:** ≤60 chars
+
+#### items[n].problem
+- **Field:** `pastWork.items[n].problem`
+- **Purpose:** What the client's business struggled with before the build — the "why" that motivated the project
+- **Tone:** Specific, client-safe; describe the friction, not a generic pain point
+- **Note:** `[INPUT: …]` placeholder on both current entries. DeLuca's and L2 Detailz are real businesses — never draft or invent this copy; fill only with the confirmed detail.
+- **Length:** 1-2 sentences, ≤150 chars
+
+#### items[n].approach
+- **Field:** `pastWork.items[n].approach`
+- **Purpose:** What bcns built and how it addressed the problem
+- **Tone:** Concrete; name the mechanism, not just "we built software"
+- **Note:** `[INPUT: …]` placeholder on both current entries — same anti-fabrication rule as `problem`.
+- **Length:** 1-2 sentences, ≤150 chars
 
 #### items[n].outcome
 - **Field:** `pastWork.items[n].outcome`
 - **Purpose:** The measurable or qualitative result — the "so what"
 - **Tone:** Specific, evidence-driven; include numbers where possible
+- **Note:** `[INPUT: …]` placeholder on both current entries. Never fill with a plausible-sounding metric — only a number or result the client has confirmed. A fabricated outcome on a live site is a false claim about a real business.
 - **Length:** 1-2 sentences, ≤120 chars
+
+#### items[n].screenshots
+- **Field:** `pastWork.items[n].screenshots`
+- **Purpose:** Array of `{ src, alt, caption }` objects shown alongside the case study
+- **Note:** Ships as `[]` on both current entries — screenshot capture is a later pass. See "Why `screenshots` ships as `[]`" above before adding placeholder paths.
+
+##### items[n].screenshots[m].src
+- **Field:** `pastWork.items[n].screenshots[m].src`
+- **Purpose:** Path or URL to the screenshot image asset
+- **Tone:** N/A (path/URL only)
+- **Length:** Valid path/URL; must point at a file that actually exists — a missing file fails the build
+
+##### items[n].screenshots[m].alt
+- **Field:** `pastWork.items[n].screenshots[m].alt`
+- **Purpose:** Accessible alt text describing the screenshot's content
+- **Tone:** Descriptive, concrete — what does the image show?
+- **Length:** ≤120 chars
+
+##### items[n].screenshots[m].caption
+- **Field:** `pastWork.items[n].screenshots[m].caption`
+- **Purpose:** Visible caption shown under the screenshot
+- **Tone:** Short, factual
+- **Length:** ≤100 chars
 
 #### items[n].link _(optional)_
 - **Field:** `pastWork.items[n].link`
 - **Purpose:** URL to a live project, case study, or write-up
 - **Tone:** N/A (URL only)
+- **Note:** Omitted on both current entries — see "Why `link` is omitted" above.
 - **Length:** Valid URL; omit field entirely if no link exists
 
 ### holdingState — shown when items[] is empty
@@ -406,8 +467,12 @@ Each entry has:
 - **Purpose:** URL for the CTA link (e.g. `/#contact`)
 - **Tone:** N/A (URL only)
 
-> **Adding work:** append `{ title, outcome, link? }` objects to `pastWork.items`.
-> When `items.length > 0`, the holding state is hidden automatically.
+> **Adding work:** append `{ slug, title, problem, approach, outcome, screenshots, link? }`
+> objects to `pastWork.items`. `slug` must be unique and match `^[a-z0-9-]+$`;
+> `screenshots` defaults to `[]`; `link` is optional. When `items.length > 0`,
+> the holding state is hidden automatically — `pastWork.items` is no longer
+> empty as of this pass, so the item grid (not the holding state) is what
+> currently renders on `/work`.
 
 ---
 
@@ -877,9 +942,16 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pastWork.eyebrow` | Past Work — eyebrow |
 | `pastWork.title` | Past Work — title |
 | `pastWork.description` | Past Work — description |
+| `pastWork.items[n].slug` | Past Work — items slug |
 | `pastWork.items[n].title` | Past Work — items title |
+| `pastWork.items[n].problem` | Past Work — items problem |
+| `pastWork.items[n].approach` | Past Work — items approach |
 | `pastWork.items[n].outcome` | Past Work — items outcome |
-| `pastWork.items[n].link` | Past Work — items link |
+| `pastWork.items[n].screenshots` | Past Work — items screenshots |
+| `pastWork.items[n].screenshots[m].src` | Past Work — items screenshots src |
+| `pastWork.items[n].screenshots[m].alt` | Past Work — items screenshots alt |
+| `pastWork.items[n].screenshots[m].caption` | Past Work — items screenshots caption |
+| `pastWork.items[n].link` _(optional)_ | Past Work — items link |
 | `pastWork.holdingState.title` | Past Work — holdingState title |
 | `pastWork.holdingState.body` | Past Work — holdingState body |
 | `pastWork.holdingState.ctaLabel` | Past Work — holdingState ctaLabel |
@@ -934,7 +1006,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 80 (77 + the three optional build-tier fields `setup`, `monthly`, `seats`, present on tiers[0] and tiers[1]). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 89 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. That is 82 before this pass + the 7 new Past Work case-study fields added here: `slug`, `problem`, `approach`, `screenshots`, `screenshots[m].src`, `screenshots[m].alt`, `screenshots[m].caption`. All have a CONTENT.md entry. No orphans in either direction.
 
 The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff) live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
@@ -942,8 +1014,8 @@ The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-yo
 
 ## Remaining `[INPUT: …]` slots (Needs-Nate)
 
-These are the only `[INPUT: …]` slots remaining in `content.ts` after the C1 voice pass.
-All pricing, turnaround, response-time, support-window, and page-meta slots are now filled.
+These are the `[INPUT: …]` slots remaining in `content.ts`. All pricing,
+turnaround, response-time, support-window, and page-meta slots are filled.
 
 | Field | Slot |
 |---|---|
@@ -953,10 +1025,24 @@ All pricing, turnaround, response-time, support-window, and page-meta slots are 
 | `about.founders[1].credentials[0]` | `[INPUT: NYU program]` |
 | `about.founders[1].credentials[1]` | `[INPUT: credential 2]` |
 | `about.founders[1].credentials[2]` | `[INPUT: credential 3]` |
+| `pastWork.items[0].title` (delucas) | `[INPUT: delucas case study title]` |
+| `pastWork.items[0].problem` (delucas) | `[INPUT: delucas problem]` |
+| `pastWork.items[0].approach` (delucas) | `[INPUT: delucas approach]` |
+| `pastWork.items[0].outcome` (delucas) | `[INPUT: delucas outcome]` |
+| `pastWork.items[1].title` (l2detailz) | `[INPUT: l2detailz case study title]` |
+| `pastWork.items[1].problem` (l2detailz) | `[INPUT: l2detailz problem]` |
+| `pastWork.items[1].approach` (l2detailz) | `[INPUT: l2detailz approach]` |
+| `pastWork.items[1].outcome` (l2detailz) | `[INPUT: l2detailz outcome]` |
 
-**First real past-work entry + review** are not placeholders — they are empty arrays
-(`pastWork.items`, `reviews.items`). Add entries to those arrays to flip /work live.
+DeLuca's and L2 Detailz are real bcns clients — fill these eight slots only
+with confirmed detail from each client, never drafted or invented copy.
+
+**`reviews.items`** is still an empty array, not a placeholder — add entries
+to it to flip reviews live. `pastWork.items` is no longer empty (it holds
+the two case-study slots above); its `screenshots` field on both entries is
+an empty array by design (see the Past Work section) and stays that way
+until real screenshot files exist.
 
 ---
 
-_Last updated: 2026-07-19 (W4 mirror: hosted framing, setup/monthly/seats pricing, hosting/BYOK/stop-paying FAQ). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-07-27 (Past Work case-study fields: slug, problem, approach, screenshots added to `PastWorkItem`; `pastWork.items` seeded with `delucas` and `l2detailz` [INPUT: …] slots). Source of truth: `apps/web/lib/content.ts`._

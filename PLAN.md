@@ -42,7 +42,7 @@ seeded demo data**.
     - `pnpm test` from the repo root runs it through Turbo (a `test` task added to `turbo.json`)
     - All 12 existing test files in `apps/web/__tests__/` pass
   speed: N/A — build tooling, no data-size dependence
-  status: not started
+  status: done
   track: light
 
 - task: Extend `PastWorkItem` in `apps/web/lib/content.ts` with case study detail fields and mirror them in `CONTENT.md`

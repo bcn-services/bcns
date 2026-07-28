@@ -21,6 +21,20 @@
 
 ## Milestone status
 
+### v4 — Past-work case study system (dev-team-auto, 2026-07-27, branch `worktree-past-work-case-studies`)
+| Item | Status | Notes |
+|------|--------|-------|
+| 1 — Wire a runnable `test` script | ✅ done [light] — `test` script in apps/web + root, turbo `test` task (dependsOn build, cache false); cleared the 5-file stale-test backlog; 12/12 files green (52 tests, 0 skip); both entry points verified exit-non-zero by probe injection; d47d88c |
+| 2 — Extend `PastWorkItem` with case study fields | ⏳ not started | |
+| 3 — `/work/[slug]` dynamic route | ⏳ not started | |
+| 4 — Link Past Work cards to detail pages | ⏳ not started | |
+| 5 — Seed DeLuca's mock bridge (demo dataset) | ⏳ not started | parallel-group: seeds |
+| 6 — L2 Detailz demo seed fixture | ⏳ not started | parallel-group: seeds |
+| 7 — Capture the three case study screenshots | ⏳ not started | |
+| 8 — Render screenshots with `next/image` | ⏳ not started | |
+| ⚠️ STOP HERE — item 9 (real client copy + publish) is Needs-Nate | | |
+
+
 ### v1 Section 1 — Architecture (complete, old plan A1-A4)
 | Item | Status | Notes |
 |------|--------|-------|

@@ -80,20 +80,21 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-// [4] PastWork and Reviews items use [SLOT: ...] placeholders (no invented copy)
+// [4] PastWork and Reviews items use [SLOT: ...] or [INPUT: ...] placeholders
+//     (no invented copy)
 // ---------------------------------------------------------------------------
-console.log("\n[4] PastWork and Reviews items carry [SLOT: ...] placeholders");
-const SLOT_RE = /\[SLOT:/;
+console.log("\n[4] PastWork and Reviews items carry [SLOT: ...] or [INPUT: ...] placeholders");
+const SLOT_RE = /\[(SLOT|INPUT):/;
 
 for (let i = 0; i < siteContent.pastWork.items.length; i++) {
   const { title, outcome } = siteContent.pastWork.items[i];
   assert(
-    `pastWork.items[${i}].title is a SLOT placeholder`,
+    `pastWork.items[${i}].title is a placeholder`,
     SLOT_RE.test(title),
     `got "${title}"`,
   );
   assert(
-    `pastWork.items[${i}].outcome is a SLOT placeholder`,
+    `pastWork.items[${i}].outcome is a placeholder`,
     SLOT_RE.test(outcome),
     `got "${outcome}"`,
   );
@@ -102,12 +103,12 @@ for (let i = 0; i < siteContent.pastWork.items.length; i++) {
 for (let i = 0; i < siteContent.reviews.items.length; i++) {
   const { quote, author } = siteContent.reviews.items[i];
   assert(
-    `reviews.items[${i}].quote is a SLOT placeholder`,
+    `reviews.items[${i}].quote is a placeholder`,
     SLOT_RE.test(quote),
     `got "${quote}"`,
   );
   assert(
-    `reviews.items[${i}].author is a SLOT placeholder`,
+    `reviews.items[${i}].author is a placeholder`,
     SLOT_RE.test(author),
     `got "${author}"`,
   );
