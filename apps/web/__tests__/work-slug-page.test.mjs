@@ -19,16 +19,19 @@ const pageSrc = readFileSync(resolve(root, "app/work/[slug]/page.tsx"), "utf8");
 const contentMd = readFileSync(resolve(root, "CONTENT.md"), "utf8");
 const { items, caseStudy } = siteContent.pastWork;
 
-function stripAndDecode(html) {
-  let text = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
-  // &amp; decoded LAST so an already-decoded &lt; etc. doesn't get double-unescaped.
-  text = text
+// &amp; decoded LAST so an already-decoded &lt; etc. doesn't get double-unescaped.
+function decodeEntities(text) {
+  return text
     .replace(/&#x27;|&#39;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");
-  return text;
+}
+
+function stripAndDecode(html) {
+  const text = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+  return decodeEntities(text);
 }
 
 test("registry has at least one past-work item (guards against a vacuously-passing empty walk)", () => {
@@ -150,18 +153,41 @@ test("every rendered narrative field is still an [INPUT: ...] placeholder (no fa
   }
 });
 
-// --- `screenshots` is a registry field the /work/[slug] page does not read (no
-// component under apps/web/components or apps/web/app references it as of this
-// pass) — so its presence or absence can never affect this route's output. The
-// prior version of this test asserted that empty-array items still render,
-// conditioned on such an item existing; with both registry items now non-empty
-// that condition can never be true again, permanently skipping with zero
-// coverage. Assert the real, always-executing invariant instead: this page's
-// source doesn't branch on `screenshots` at all, so wiring it into the UI
-// later is a page.tsx change, not a silent behavior change here. ---
-test("page.tsx does not read item.screenshots (route output cannot depend on the field's contents)", () => {
+// --- PLAN item 8 wired `screenshots` into the page (next/image rendering). The prior
+// "page.tsx does not read screenshots" invariant is now obsolete by design — its own
+// failure message pointed here. Re-add the empty-array safety net it warned about:
+// both live registry items have non-empty screenshots arrays (see team-memory), so a
+// built-HTML check can't exercise the empty case without mutating the registry.
+// Assert the source-level guard instead, consistent with this file's other
+// pageSrc.includes(...) checks for behavior the two live items can't exercise. ---
+test("page.tsx guards the screenshots block on item.screenshots.length > 0 (no empty wrapper for an item with no screenshots)", () => {
   assert.ok(
-    !pageSrc.includes("screenshots"),
-    "page.tsx now references item.screenshots — the empty-array safety net needs re-adding (see git history for the removed test) since output can vary with the field's contents",
+    pageSrc.includes("item.screenshots.length > 0"),
+    "page.tsx renders the screenshots wrapper unconditionally — an item with an empty screenshots array would still render an empty spacer",
   );
+});
+
+// --- Screenshots that DO exist must actually render: image alt text + caption.
+// `alt` is an <img> attribute, not text content, so it must be checked against the
+// entity-decoded raw HTML — stripAndDecode's tag-stripping would erase it along with
+// the tag it lives on. `caption` renders as <figcaption> text, so stripAndDecode is
+// the right check for it. ---
+test("built HTML renders every registry screenshot's alt text and caption", (t) => {
+  const paths = items.map((i) => resolve(root, `.next/server/app/work/${i.slug}.html`));
+  if (!paths.every(existsSync)) {
+    t.skip("build output missing");
+    return;
+  }
+  for (const item of items) {
+    const raw = readFileSync(resolve(root, `.next/server/app/work/${item.slug}.html`), "utf8");
+    const decodedRaw = decodeEntities(raw);
+    const text = stripAndDecode(raw);
+    for (const shot of item.screenshots) {
+      assert.ok(
+        decodedRaw.includes(`alt="${shot.alt}"`),
+        `${item.slug}: built HTML is missing alt="${shot.alt}" for ${shot.src}`,
+      );
+      assert.ok(text.includes(shot.caption), `${item.slug}: built HTML is missing caption for ${shot.src}`);
+    }
+  }
 });

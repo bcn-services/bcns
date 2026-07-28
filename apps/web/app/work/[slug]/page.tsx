@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -8,6 +9,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SectionAtmosphere } from "@/components/section-atmosphere";
 import { Reveal } from "@/components/reveal";
 import { siteContent, type PastWorkItem } from "@/lib/content";
+import { caseStudyImage } from "@/lib/case-study-images";
 
 interface CaseStudyPageProps {
   params: { slug: string };
@@ -92,6 +94,24 @@ export default function CaseStudyPage({ params }: CaseStudyPageProps) {
                 </Reveal>
               ))}
             </div>
+
+            {item.screenshots.length > 0 && (
+              <div className="mx-auto mt-14 max-w-2xl space-y-10">
+                {item.screenshots.map((shot) => (
+                  <Reveal as="figure" key={shot.src}>
+                    <Image
+                      src={caseStudyImage(shot.src)}
+                      alt={shot.alt}
+                      sizes="(min-width: 768px) 672px, 100vw"
+                      className="h-auto w-full rounded-xl border border-border"
+                    />
+                    <figcaption className="mt-3 text-sm text-muted-foreground">
+                      {shot.caption}
+                    </figcaption>
+                  </Reveal>
+                ))}
+              </div>
+            )}
           </Container>
         </section>
       </main>
