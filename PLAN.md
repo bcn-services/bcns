@@ -84,7 +84,7 @@ seeded demo data**.
     - A test asserts the fixture contains no real vendor or business name from the client's production data and that every dollar figure is invented
     - Median of 5 Dashboard tab renders with the fixture loaded stays under 1s
     - Existing 8-file test suite (`pnpm test`) remains passing
-  status: not started
+  status: done
   track: full
   flag: data-path
   parallel-group: seeds
@@ -96,7 +96,7 @@ seeded demo data**.
     - A test asserts every phone number in the fixture falls in the 555 reserved range and no customer name in it appears in `0004_seed.sql` or any production export
     - Reference data still comes only from `0004_seed.sql` — the demo fixture adds customer/job rows and redefines no package or settings row
     - Median of 5 renders of the admin calendar month view stays under 1s with the fixture loaded
-  status: not started
+  status: done
   track: full
   flag: data-path
   parallel-group: seeds
