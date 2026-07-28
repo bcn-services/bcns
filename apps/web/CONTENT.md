@@ -48,6 +48,7 @@ interface and the component.
 | Home | `/` | `hero`, `howItWorks`, `useCases`, `contactSection`, `navCards`, `pageMeta.home` |
 | Services | `/services` | `howItWorks`, `useCases`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
+| Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
 | About | `/about` | `about`, `contactSection`, `pageMeta.about` |
 | Privacy | `/privacy` | Static — no content registry fields |
@@ -379,7 +380,7 @@ Each entry has:
 
 #### items[n].slug
 - **Field:** `pastWork.items[n].slug`
-- **Purpose:** Stable, URL-safe identifier for the case study (React list key, future detail-page route)
+- **Purpose:** Stable, URL-safe identifier for the case study (React list key; also the `/work/[slug]` detail-page route param)
 - **Tone:** N/A (identifier, not copy)
 - **Note:** Must be unique across `items` and match `^[a-z0-9-]+$`. Current values: `delucas`, `l2detailz`. Set once; do not change after a detail page or external link depends on it.
 - **Length:** Short, lowercase, hyphenated
@@ -473,6 +474,36 @@ Each entry has:
 > the holding state is hidden automatically — `pastWork.items` is no longer
 > empty as of this pass, so the item grid (not the holding state) is what
 > currently renders on `/work`.
+
+### caseStudy — section labels for the `/work/[slug]` detail page
+
+Structural labels (not narrative copy) shown above each of the three blocks
+on a case study's detail page at `app/work/[slug]/page.tsx`. Same labels on
+every case study — not per-item.
+
+#### caseStudy.backLabel
+- **Field:** `pastWork.caseStudy.backLabel`
+- **Purpose:** Label on the link back to `/work`, shown above the title on every case study detail page. Currently `Back to Work`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-4 words
+
+#### caseStudy.problemLabel
+- **Field:** `pastWork.caseStudy.problemLabel`
+- **Purpose:** Section label above `items[n].problem` on the detail page. Currently `The problem`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-3 words
+
+#### caseStudy.approachLabel
+- **Field:** `pastWork.caseStudy.approachLabel`
+- **Purpose:** Section label above `items[n].approach` on the detail page. Currently `Our approach`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-3 words
+
+#### caseStudy.outcomeLabel
+- **Field:** `pastWork.caseStudy.outcomeLabel`
+- **Purpose:** Section label above `items[n].outcome` on the detail page. Currently `The outcome`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-3 words
 
 ---
 
@@ -956,6 +987,10 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pastWork.holdingState.body` | Past Work — holdingState body |
 | `pastWork.holdingState.ctaLabel` | Past Work — holdingState ctaLabel |
 | `pastWork.holdingState.ctaHref` | Past Work — holdingState ctaHref |
+| `pastWork.caseStudy.backLabel` | Past Work — caseStudy backLabel |
+| `pastWork.caseStudy.problemLabel` | Past Work — caseStudy problemLabel |
+| `pastWork.caseStudy.approachLabel` | Past Work — caseStudy approachLabel |
+| `pastWork.caseStudy.outcomeLabel` | Past Work — caseStudy outcomeLabel |
 | `reviews.eyebrow` | Reviews — eyebrow |
 | `reviews.title` | Reviews — title |
 | `reviews.description` | Reviews — description |
@@ -1006,7 +1041,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 89 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. That is 82 before this pass + the 7 new Past Work case-study fields added here: `slug`, `problem`, `approach`, `screenshots`, `screenshots[m].src`, `screenshots[m].alt`, `screenshots[m].caption`. All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 93 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. That is 92 before this pass + the 1 new `pastWork.caseStudy.backLabel` field added here for the `/work/[slug]` detail page's back-to-work link. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
 The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff) live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
@@ -1045,4 +1080,4 @@ until real screenshot files exist.
 
 ---
 
-_Last updated: 2026-07-27 (Past Work case-study fields: slug, problem, approach, screenshots added to `PastWorkItem`; `pastWork.items` seeded with `delucas` and `l2detailz` [INPUT: …] slots). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-07-27 (Added `pastWork.caseStudy.backLabel` — the label on the `/work/[slug]` detail page's back-to-work link, alongside the existing `problemLabel`/`approachLabel`/`outcomeLabel` section labels). Source of truth: `apps/web/lib/content.ts`._

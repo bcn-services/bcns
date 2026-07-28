@@ -1,23 +1,16 @@
-VERDICT: APPROVED
-Branch: worktree-past-work-case-studies
-Date: 2026-07-27
-Files Reviewed: 5 (apps/web/__tests__/{b3-copy-wiring,b2-registry-rework}.test.mjs, apps/web/CONTENT.md, STANDARDS.md, apps/web/lib/content.ts cross-check)
-Critical: 0
-Important: 0
-Minor: 0
+## VERDICT: CLEAN
+**Branch:** worktree-past-work-case-studies
 
-## Resolved findings (confirmed)
-- IMPORTANT 1 (CONTENT.md drift) — RESOLVED: screenshots container row added at CONTENT.md:950; table now has 91 `|`-rows (89 excl. header/separator), matches "Total registry fields: 89" at line 1009; arithmetic (82+7, 7 names enumerated) reconciles; no other stale count found in file (grep for lingering 80/87 turned up only unrelated "≤80 chars" style guidance).
-- IMPORTANT 2 (hand-synced allowlist) — RESOLVED, deviation verified correct: fixer replaced whole-string `/^\[INPUT: .+\]$/` (my original prescription) with the substring `/\[INPUT:[^\]]+\]/g` regex shared with the HTML-extraction side. Confirmed against content.ts:439,449 — `about.founders[1].bio` and `.credentials[0]` embed the INPUT token mid-string followed by trailing real prose/text; a whole-string walk would never have added these tokens to REGISTRY_INPUT_TOKENS, and since they render on /about, section [3] would false-fail on legitimate content. The deviation is necessary and correct, not a weakening — the HTML side already extracted substrings pre-fix, so registry-side strictness is unchanged, and the actual anti-fabrication gate for delucas/l2detailz narrative fields (whole-string regex) lives untouched in past-work-case-studies.test.mjs.
-- Walk correctness — collectTokens recurses via `Object.values` (covers arrays and nested objects, e.g. founders[].credentials[]), guarded by `typeof node==="object"` with the `node &&` null-check; non-empty-set assertion at b3:130-134 catches total derivation failure. No coverage gap found.
-- Entity-decode order — `&amp;` decoded last is correct: decoding lt/gt/quot/apostrophe entities first cannot spuriously match `&amp;...` substrings (the inserted `amp;` breaks the pattern), so no double-decode corruption; fixer's own probe test (apostrophe token) plus my own trace through an `&`+`'` combined case confirm round-trip fidelity. No token in content.ts today contains `&` inside an `[INPUT: ...]` bracket, so this is defense-in-depth, not exercised by real content — not a gap.
-- Shared `/g/` regex statefulness — INPUT_TOKEN_RE is only ever used via `.match()` (b3:63,148), never `.test()`/`.exec()`; confirmed by grep. `String.prototype.match` resets lastIndex to 0 both before and after a global match per spec, so sharing the object across `collectTokens` and the per-route HTML loop is safe.
-- MINOR 1 (b2 items.length) — RESOLVED: `pastWork.items.length === 2` added at b2-registry-rework.test.mjs:196-199, mutation-provable per fix-report.
-- MINOR 2 (b3 outcome coverage) — RESOLVED: delucas/l2detailz outcome placeholder assertions added at b3-copy-wiring.test.mjs:278-284, alongside the existing title assertions.
-- STANDARDS.md — RESOLVED: rewritten INPUT-convention bullet ("those two surfaces only") and new Content Registry Testing bullets accurately reflect the derived-allowlist implementation; diff confirms only the two prescribed hunks changed, no unrelated edits. No stale rule survives.
+Minor — apps/web/app/work/[slug]/page.tsx:82 — `key={label}` keys the `sections.map()` on label text, not a stable identifier; if `problemLabel`/`approachLabel`/`outcomeLabel` in content.ts were ever edited to the same string, React would warn on duplicate keys and could misreconcile the `Reveal` nodes — fix: `key={index}`, safe here since the array is a compile-time-fixed 3-element literal that never reorders/filters.
 
-## Governing constraint
-No regression: content.ts narrative fields (title/problem/approach/outcome) on both delucas and l2detailz remain literal `[INPUT: ...]` strings, byte-identical to CONTENT.md's Needs-Nate table (14/14 tokens match). content.ts itself was untouched by this fix pass (fix-report's byte-identity claim confirmed via git status — only CONTENT.md, the two test files, and STANDARDS.md changed).
-
-## STANDARDS.md Updates
-None (re-review — see fixer's own STANDARDS.md edits, confirmed accurate above).
+## Verified (confirmed myself, not re-flagged)
+- Labels are `<h2>` — rebuilt and grepped both `.next/server/app/work/{delucas,l2detailz}.html`: `h1`×1, `h2`×3, `h3`×0 on each. Prior Important finding stays closed.
+- Padding ternary (`index === 0 ? "pb-8" : index === sections.length - 1 ? "pt-8" : "py-8"`) is correct at both boundaries for n=3 and generalizes correctly to n=4 (verified by hand-tracing all four index cases) — no fix needed.
+- One `Reveal as="div"` per block (no `delay`) matches this page's vertical stack; `nav-cards.tsx`/`use-cases.tsx` use `delay={i*110}` only because those are horizontal grids — same `Reveal` component, no second motion vocabulary. 3 IntersectionObservers (one per block, one-shot) is the same per-item-observer pattern already used in both those files at n=4; not a regression.
+- `caseStudy.backLabel` — single-sourced from `siteContent.pastWork.caseStudy.backLabel`, no hardcoded copy in `page.tsx`; grepped for stray literal "Back to Work" / raw hex / `style=` in the component — none. Mirrored in CONTENT.md with its literal value and a Cross-check row (`pastWork.caseStudy.backLabel`).
+- Cross-check table re-counted by script (Node, counting `| \`...\`` rows between `## Cross-check` and `Total registry fields:`): **93**, matches the stated "Total registry fields: 93" exactly.
+- Back link: `href="/work"` valid (route exists, builds). `ArrowLeft` is `aria-hidden`; accessible name comes from the `{caseStudy.backLabel}` text node. Computed WCAG non-text contrast for the `focus-visible:ring-ring` token against `ring-offset-background`: dark theme (default) `#7CB3FF` on `#15131F` ≈ 8.6:1; light theme `#1F65C1`-equivalent on `#F6F6F9` ≈ 5.3:1 — both clear the 3:1 bar comfortably (this is not the ~2.4:1 ring flagged previously elsewhere in the repo). Hover/focus transitions (`transition-colors`, `group-hover:-translate-x-1`) are covered by the existing global `@media (prefers-reduced-motion: reduce)` block in `globals.css:139-151` (`transition-duration: 0.001ms !important` on `*`), so no per-component reduced-motion handling is needed.
+- Route mechanics unchanged: `dynamicParams = false`, `notFound()`, `getCaseStudy`, `generateStaticParams`, `generateMetadata` all identical in behavior to the last-reviewed version — this pass didn't touch them. Rebuilt: `● /work/[slug]` SSG, exactly `/work/delucas` + `/work/l2detailz`.
+- No new hardcoded copy, raw hex, inline styles, or hand-maintained data mirror found anywhere in the three changed files.
+- All 4 `[INPUT: ...]` placeholders render verbatim in both built HTML files (grepped: 12 "INPUT" occurrences each, includes title/meta duplicates) — no drafted prose, no "coming soon" fallback, no conditional hiding.
+- Full test suite: 77/77 pass (`pnpm --filter web test`), up from 76 — the one new pass is `backLabel` auto-covered by `work-slug-page.test.mjs`'s `Object.entries(caseStudy)`-driven assertions, no test file edited this pass.

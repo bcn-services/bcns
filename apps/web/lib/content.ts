@@ -76,12 +76,20 @@ export interface PastWorkItem {
   link?: string;
 }
 
+export interface CaseStudyLabels {
+  backLabel: string;
+  problemLabel: string;
+  approachLabel: string;
+  outcomeLabel: string;
+}
+
 export interface PastWorkContent {
   eyebrow: string;
   title: string;
   description: string;
   items: PastWorkItem[];
   holdingState: HoldingState;
+  caseStudy: CaseStudyLabels;
 }
 
 export interface ReviewItem {
@@ -317,6 +325,12 @@ export const siteContent: SiteContent = {
       body: "We're building for our first clients right now. Case studies land here as projects wrap. Each one covers the problem, what we built, and what changed.",
       ctaLabel: "Want to be one of them? Book a free consult.",
       ctaHref: "/#contact",
+    },
+    caseStudy: {
+      backLabel: "Back to Work",
+      problemLabel: "The problem",
+      approachLabel: "Our approach",
+      outcomeLabel: "The outcome",
     },
   },
 

@@ -53,7 +53,7 @@ seeded demo data**.
     - `CONTENT.md` documents every new field 1:1 with the registry and the existing mirror test (`w4-content-mirror.test.mjs`) passes
     - Existing passing tests remain passing
   speed: N/A — compile-time static object, no data-size dependence
-  status: not started
+  status: done
   track: full
 
 - task: Add the `apps/web/app/work/[slug]/page.tsx` dynamic route rendering one case study
@@ -64,7 +64,7 @@ seeded demo data**.
     - Page title and meta description come from the item, following the `pageMeta` pattern already used in `app/work/page.tsx`
     - Median of 5 production renders of `/work/delucas` stays under 1s with both items in the registry
     - Existing passing tests remain passing
-  status: not started
+  status: done
   track: full
 
 - task: Make each Past Work card in `apps/web/components/past-work.tsx` link to its detail page

@@ -15,6 +15,11 @@ export interface SectionHeadingProps {
   accent?: string;
   /** `display` bumps to bold hero-headline sizes; `default` is unchanged. */
   size?: "default" | "display";
+  /**
+   * Heading level for the title. Defaults to `h2` (a section inside a page);
+   * pass `h1` when this heading is the page's single primary heading.
+   */
+  as?: "h1" | "h2" | "h3";
 }
 
 /** Splits `title` around the first occurrence of `accent`, styling only that segment. */
@@ -42,6 +47,7 @@ function SectionHeading({
   className,
   accent,
   size = "default",
+  as: Heading = "h2",
 }: SectionHeadingProps) {
   return (
     <div
@@ -56,7 +62,7 @@ function SectionHeading({
           {eyebrow}
         </span>
       ) : null}
-      <h2
+      <Heading
         className={cn(
           "font-display text-balance font-bold tracking-tight",
           size === "display"
@@ -65,7 +71,7 @@ function SectionHeading({
         )}
       >
         {renderTitle(title, accent)}
-      </h2>
+      </Heading>
       {description ? (
         <p className="text-pretty text-lg text-muted-foreground">{description}</p>
       ) : null}

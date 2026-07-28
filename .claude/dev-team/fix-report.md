@@ -1,34 +1,29 @@
----
 # Fix Report
+## VERDICT: FIXED (1 finding closed in code but NOT locally demonstrable — read Finding 1)
+**Branch:** worktree-past-work-case-studies
 **Date:** 2026-07-27
-**Findings addressed:** 4 of 4 (0 QA failures — QA verdict was PASS + 4 review findings: 2 Important, 2 Minor)
+**Findings addressed:** 3 of 3 (2 QA bugs + 1 review Important). Not committed — orchestrator commits.
 
 ## Changes Made
-- apps/web/CONTENT.md:950 — added the missing `pastWork.items[n].screenshots` container row to the cross-check table — review Important
-- apps/web/CONTENT.md:1009 — field-count arithmetic re-derived from the file: `87 (80 + 7)` → `89` (82 rows at HEAD + 7 new names, now all 7 enumerated incl. `screenshots`); counting method stated inline — review Important
-- apps/web/__tests__/b3-copy-wiring.test.mjs:52-79 — hand-listed `APPENDIX_INPUT_TOKENS` deleted; `REGISTRY_INPUT_TOKENS` now derived by recursive walk of `siteContent` extracting `/\[INPUT:[^\]]+\]/g` — review Important
-- apps/web/__tests__/b3-copy-wiring.test.mjs:73-79 — added `decodeEntities()` (`&#x27; &#39; &quot; &lt; &gt; &amp;`, `&amp;` last) applied to each HTML-extracted token before the Set lookup — review Important
-- apps/web/__tests__/b3-copy-wiring.test.mjs:129-134 — added `REGISTRY_INPUT_TOKENS.size > 0` guard so a broken walk can't silently vacuum the section — review Important
-- apps/web/__tests__/b2-registry-rework.test.mjs:194-199 — added `pastWork.items.length === 2` above the unconditional `holdingState.title` assertion, plus a pointer comment to `past-work-case-studies.test.mjs` — review Minor
-- apps/web/__tests__/b3-copy-wiring.test.mjs:274-283 — added `delucas`/`l2detailz` `outcome` placeholder assertions to the built work.html spot-check alongside `title` — review Minor
-- STANDARDS.md:33,47 — retired the "three byte-identical surfaces" and "`APPENDIX_INPUT_TOKENS` hand-sync hazard" bullets (both stale the moment the allowlist became derived); replaced with the derivation + entity-decode rule — downstream-surface sweep, not a listed finding
-
-## Extraction is substring, not whole-string (deviation from the review's literal wording)
-- Review prescribed `/^\[INPUT: .+\]$/` whole-string matching; `content.ts:447,449` embed tokens mid-string (`about.founders[1].bio`, `credentials[0]`), so a whole-string walk would have missed 2 tokens that DO render on /about and section [3] would have false-failed. Used the same `/\[INPUT:[^\]]+\]/g` regex as the HTML side — symmetric by construction.
-
-## Field-count method and number
-- Counted with python over `CONTENT.md`: lines between `## Cross-check` and `Total registry fields:` starting with `|`, excluding the header and `|---` separator rows. HEAD = 82 rows (prose claimed 80 — already off by 2 before this pass); working tree pre-fix = 88 (prose claimed 87); post-fix = **89**, and the prose now says 89. Prose and table reconcile exactly.
+- `apps/web/app/work/[slug]/page.tsx:26` — QA bug 1 — added `export const dynamicParams = false;` (+ comment); `notFound()` and `getCaseStudy`'s exact-match semantics untouched.
+- `apps/web/CONTENT.md:486,492,498` — QA bug 2 — appended the literal values to the three existing Purpose bullets (`Currently \`The problem\`.` / `Our approach` / `The outcome`), matching the `tiers[0].price` "Currently `…`" pattern. No new rows, so "Total registry fields: 92" stays correct.
+- `packages/ui/src/section-heading.tsx:20,49,64-72` — review Important — optional `as?: "h1"|"h2"|"h3"` prop defaulting to `"h2"`; title tag now `<Heading>`.
+- `apps/web/app/work/[slug]/page.tsx:57` — review Important — `<SectionHeading as="h1" …>`.
+- `apps/web/app/work/[slug]/page.tsx:61,67,73` — review Important — the three section labels `<h2>` → `<h3>`.
 
 ## Verification
-- `corepack pnpm test` (repo root, Turbo builds first) — 3/3 tasks green, `# pass 62 # fail 0 # skipped 0`; b3 46 passed / 0 skipped (+3 assertions), b2 78 passed (+1). TAP total stayed 62 by construction: b2/b3 are script-style files that keep their own counters and are not node:test subtests.
-- `corepack pnpm --filter @nseluga/web typecheck` — clean.
-- **Probe proof (derived allowlist):** injected `[INPUT: temporary probe token]` + `[INPUT: probe's apostrophe token]` into `pastWork.description` (renders on /work), full root `pnpm test` with build → section [3] **PASS** on both, incl. the apostrophe one arriving as `[INPUT: probe&#x27;s apostrophe token]` in raw HTML (verified by grep on `.next/server/app/work.html`). Under the old hand-listed allowlist both would have FAILed. Probe removed, rebuilt, re-run → green.
-- **Mutation proof (b2 Minor 1):** removed the `l2detailz` entry from `content.ts` → `FAIL: pastWork.items is seeded with the 2 case-study entries — got 1`. The assertion is not satisfiable regardless of the code.
-- **Mutation proof (b3 Minor 2):** `delucas.outcome` → `[INPUT: delucas outcome v2]`, full build+test → `FAIL: work.html contains delucas outcome placeholder` (l2detailz still PASS). Same run: section [3] **PASSed** on the never-before-seen `[INPUT: delucas outcome v2]` token with zero test edits — second independent confirmation the derivation self-maintains.
-- All mutations via `cp` to `/tmp/content.ts.bak` + restore + `shasum -a 256 -c` OK (`69c1be83…075a`); no `git checkout`/`stash`/`reset` used anywhere. `apps/web/lib/content.ts` is byte-identical to its pre-session state — no source change was needed.
+- `typecheck` clean. `test` — **76/76 pass, 0 fail, 0 skip** (62 pre-existing + all 14 of QA's `work-slug-page.test.mjs`); every script-style file reports `0 failed, 0 skipped`. No QA assertion was weakened.
+- `build` — `● /work/[slug]` SSG with `/work/delucas` + `/work/l2detailz`; both `.html` on disk (25584B/25618B, pristine sizes). `prerender-manifest.json` confirms `fallback: false` and a `routes` map containing only the 2 canonical paths — i.e. `dynamicParams = false` took effect.
+- Prerendered `delucas.html` heading order: `h1 [INPUT: delucas case study title]` → `h3 The problem` → `h3 Our approach` → `h3 The outcome`. **Exactly 1 `<h1>`** on both slugs.
+- `as` prop is a verified no-op: zero existing `SectionHeading` callers pass `as` (all 9 other call sites grepped; every `as=` in the repo is on `Reveal`), and rebuilt `/`, `/work`, `/pricing`, `/services`, `/about` still render their SectionHeading titles as `h2`. Chose the prop over a literal `<h1>` — visual system stays single-sourced in `packages/ui`.
+- Live `next build && next start` on :3521/:3522 (:3000 untouched): `/work/delucas` 200, `/work/l2detailz` 200, `/work/nope` 404. Servers killed, ports confirmed free, no orphans.
+
+## Deviations / must-read
+- **`/work/DeLucas` and `/work/L2DETAILZ` still return 200 locally and still corrupt the prerendered `.html`.** The prescribed fix is applied and correct; this residue is provably the macOS case-insensitive-filesystem artifact, not a code defect. Discriminating experiment on one clean build: `/work/NoPe` → **404**, `/work/DeLucasX` → **404** (mixed case, no colliding file — hashes OK afterward); `/work/DeLucas` → **200** + corruption (mixed case, colliding file). `fs.existsSync(".next/server/app/work/DeLucas.html")` → `true`, `NoPe.html` → `false`. Chain: Next's file-system incremental cache `readFile`s the cache-key path before the router's `fallback:false` check; on APFS that read resolves to `delucas.html` (200), and the write-back to `DeLucas.html` overwrites it. On Vercel/Linux that read is ENOENT → cache miss → `fallback:false` → 404, exactly like `/work/NoPe`. Per orchestrator instruction I did not design around the filesystem and did **not** make slug matching case-insensitive.
+- Consequence: QA's "case variants 404 + hashes unchanged" criterion **cannot be demonstrated on this machine**. It is satisfied by the manifest and by the non-colliding controls. Re-gate it on Linux/CI if the orchestrator wants a live green.
 
 ## Disputed
-- None.
+- None of the three findings. One incidental correction: the review's rationale says "every other single-topic page in this repo gives its primary heading an explicit h1" — `/work`, `/pricing`, `/services`, `/about` in fact have **no** `h1` (verified in built HTML). The finding itself stands and is applied; the new `as` prop makes those pages a one-word fix each, but they are outside this item's scope and I left them alone.
 
 ## Deferred
 - None.

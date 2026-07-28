@@ -1,40 +1,34 @@
 ---
 # Engineer Report
-**Task:** Extend `PastWorkItem` with case-study detail fields (slug/problem/approach/outcome/screenshots), mirror in CONTENT.md, seed `delucas`+`l2detailz` slots
+**Task:** PLAN.md item 3 — Add `apps/web/app/work/[slug]/page.tsx`, a dynamic route rendering one case study from `siteContent.pastWork.items`.
 **Branch:** worktree-past-work-case-studies
 **Date:** 2026-07-27
 
 ## Design Decisions
-- `PastWorkItem` gained `slug, problem, approach, outcome, screenshots: ScreenshotItem[], link?` (order per spec) — new `ScreenshotItem { src, alt, caption }` interface added alongside it.
-- `screenshots` ships `[]` on both entries — placeholder `src` would point at a nonexistent file and break a later plan item that hard-fails the build on missing screenshot assets.
-- `link` omitted (not placeholder'd) on both entries — it's optional and `past-work.tsx` renders `{link}` as visible anchor text, so a placeholder href would render a broken link.
-- `title/problem/approach/outcome` all ship as `[INPUT: …]` on both real clients (DeLuca's, L2 Detailz) — never drafted copy, per the anti-fabrication constraint; only `slug` is a literal value (prescribed verbatim).
-- `past-work.tsx` hardened `key={workTitle}` → `key={slug}` (optional recommended change) since slug uniqueness is now test-guaranteed and title placeholders alone were a weaker key; `workTitle` stays in the destructure for CardTitle rendering.
+- Single `getCaseStudy(slug)` lookup helper colocated in `page.tsx`, used by `generateStaticParams`, `generateMetadata`, and the page body — prevents lister/guard drift between the three exports (named recurring defect family in this repo).
+- `generateStaticParams` returns exactly `{ slug }` per registry item; `dynamicParams` left at its Next.js default (true) so an unknown slug 404s via `notFound()` rather than being blocked at the router level.
+- New `PastWorkContent.caseStudy: CaseStudyLabels` registry object (`problemLabel`/`approachLabel`/`outcomeLabel`) — keeps the three section labels out of the component per the content-registry rule, mirrored 1:1 into `CONTENT.md`.
+- Reused `SectionAtmosphere variant="work"` and `Reveal` rather than adding a new atmosphere variant or motion vocabulary — same visual family as `/work`.
+- `generateMetadata` sources `title`/`description` from the found item (`item.title` / `item.outcome`); falls back to `pageMeta.work.title` only (no description) when the slug is unknown, so the fallback stays benign and the page body still 404s.
+- Skipped a dedicated back-link (and its CONTENT.md label): `SiteHeader`'s nav already has a persistent "Work" link, so return navigation exists without a new content field — lazier alternative per the task's own "only if you render a back link" carve-out.
 
 ## Files Changed
-- `apps/web/lib/content.ts` — added `ScreenshotItem`, extended `PastWorkItem`, seeded `pastWork.items` with `delucas`/`l2detailz` placeholder entries.
-- `apps/web/components/past-work.tsx` — destructure adds `slug`; `key={workTitle}` → `key={slug}`.
-- `apps/web/CONTENT.md` — new field docs for slug/problem/approach/screenshots(+src/alt/caption); updated "Adding work" blockquote shape; updated cross-check table (+7 rows, total 80→87 with arithmetic spelled out); updated Needs-Nate table (+8 new `[INPUT:]` slots, fixed stale "empty arrays" claim — `pastWork.items` no longer empty, `reviews.items` still is); bumped `_Last updated:_`.
-- `apps/web/__tests__/b2-registry-rework.test.mjs` — L192 rewritten: asserts `holdingState.title` stays populated instead of `items.length === 0` (items is now seeded); `reviews.items` empty-check left unchanged.
-- `apps/web/__tests__/a2-new-sections.test.mjs` — widened `SLOT_RE` to `/\[(SLOT|INPUT):/` so seeded `[INPUT:]` items pass; heading/comment updated; reviews loop left vacuous/unchanged.
-- `apps/web/__tests__/b4-content-md.test.mjs` — `fieldNames` gained `slug, problem, approach, screenshots, src, alt, caption` so the 1:1 mirror is actually enforced.
-- `apps/web/__tests__/past-work-case-studies.test.mjs` (new) — 10 tests: exact count/slugs, uniqueness, `^[a-z0-9-]+$` regex, per-field `^\[INPUT: .+\]$` anti-fabrication regex on title/problem/approach/outcome, screenshots array + shape check.
-- `apps/web/__tests__/a2-fix-verification.test.mjs` — verified only, no edit needed (link omitted takes the passing `else` branch).
+- `apps/web/app/work/[slug]/page.tsx` — new file: Server Component with `getCaseStudy`, `generateStaticParams`, `generateMetadata`, and the page body rendering problem/approach/outcome under registry-sourced labels.
+- `apps/web/lib/content.ts` — added `CaseStudyLabels` interface, `caseStudy` field on `PastWorkContent`, and the three label strings in the registry.
+- `apps/web/CONTENT.md` — new `### caseStudy` subsection under Past Work, 3 new Cross-check rows, new Page-map row for `/work/[slug]`, updated `items[n].slug` note (no longer "future" detail route), re-derived "Total registry fields" 89 → 92 via a throwaway Node script counting Cross-check table rows (not hand-incremented), updated Last-updated line.
 
 ## Deferred / Out of Scope
-- Screenshot files/paths — later plan item, intentionally left as `[]`.
-- Real title/problem/approach/outcome copy — Needs-Nate, cannot be drafted (real clients).
-- `link` field — not added; no real project URL to point at yet.
+- Card-to-detail-page linking (`past-work.tsx` `<Link>` wrapping) is PLAN item 4 — not touched here.
+- Screenshot rendering is PLAN item 8 — `screenshots` array is untouched and unrendered; empty array causes no crash (nothing on this page reads it).
 
 ## Flags for Reviewer
-- None new — no hot paths, DB, or external calls touched; this is a static content-registry + doc change.
-- `/work` now renders the item grid (not holding state) showing literal `[INPUT: …]` text — expected/intended per plan, not a bug.
+- `siteContent.pastWork.items.find()` is O(n) over a 2-item array — fine at this scale, would want a `Map` if the registry ever grows to dozens of case studies.
+- No external calls or retries on this page — pure static registry read, no hardening needed.
 
 ## Verification
-- `corepack pnpm typecheck` (apps/web) — clean.
-- `corepack pnpm --filter @nseluga/web typecheck` (repo root) — clean.
-- `corepack pnpm --filter @nseluga/web test` — 62/62 pass, 0 fail, 0 skip (build present from prior run).
-- Mutation tests (cp-backup + shasum -c restore, never `git checkout --`):
-  - Duplicate slug (`l2detailz`→`delucas`) → tests 2 & 3 in new file FAIL as expected; restored, verified OK.
-  - Invalid-case slug (`delucas`→`DeLucas`) → test 4 (regex) FAILs as expected; restored, verified OK.
-  - Invented outcome prose (`"Cut booking time 40%"`) → both `a2-new-sections` widened check AND new file's anti-fabrication test FAIL as expected; restored, verified OK.
+- `corepack pnpm --filter @nseluga/web typecheck` — clean.
+- `corepack pnpm --filter @nseluga/web build` — route line: `● /work/[slug]` with `├ /work/delucas` and `└ /work/l2detailz` (SSG, not `ƒ`). Both `.next/server/app/work/{delucas,l2detailz}.html` exist on disk.
+- `corepack pnpm --filter @nseluga/web test` — 62/62 node:test pass, 0 fail, 0 skip; all script-style files (`b2`/`b3` etc.) report "Results: N passed, 0 failed" with no SKIP lines (build was present).
+- Live server on port 3411 (3000 was occupied by an unrelated pre-existing process, left untouched): `/work/delucas` → 200, `/work/l2detailz` → 200, `/work/nope` → 404 with real Next 404 body (9554 bytes, not an empty shell). Server killed after verification, port confirmed free.
+- 5 curl timings against `/work/delucas`: 0.0033, 0.0034, 0.0040, 0.0062, 0.0064s — median 0.0040s, well under the 1s bar.
+- Built HTML spot check (delucas): contains `[INPUT: delucas problem/approach/outcome]` verbatim plus all three registry labels ("The problem"/"Our approach"/"The outcome"); `<title>` is `[INPUT: delucas case study title] · bcns` (layout template suffix applied automatically); meta description is `[INPUT: delucas outcome]`.
