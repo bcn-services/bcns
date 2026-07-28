@@ -191,3 +191,25 @@ test("built HTML renders every registry screenshot's alt text and caption", (t) 
     }
   }
 });
+
+// --- CASE_STUDY_IMAGES (lib/case-study-images.ts) is a hand-synced mirror of every
+// registry screenshots[].src. The build only catches registry->map drift (an
+// unregistered src throws during prerender); it catches NOTHING in the other
+// direction — an orphan map entry with no registry reference builds fine. Since this
+// suite runs under `node --experimental-strip-types` and can't import a module that
+// statically imports .png files, read the map file as source text and regex its
+// quoted "/case-studies/..." keys instead. ---
+test("CASE_STUDY_IMAGES (lib/case-study-images.ts) exactly mirrors the registry's screenshot srcs, in both directions", () => {
+  const registrySrcs = new Set(items.flatMap((item) => item.screenshots).map((shot) => shot.src));
+  const mapFileSrc = readFileSync(resolve(root, "lib/case-study-images.ts"), "utf8");
+  const mapSrcs = new Set(
+    [...mapFileSrc.matchAll(/["'](\/case-studies\/[^"']+)["']\s*:/g)].map((m) => m[1]),
+  );
+  assert.ok(registrySrcs.size > 0, "registry screenshots[].src set is empty — comparison would pass vacuously");
+  assert.ok(mapSrcs.size > 0, "CASE_STUDY_IMAGES key set is empty — comparison would pass vacuously");
+  assert.deepEqual(
+    [...mapSrcs].sort(),
+    [...registrySrcs].sort(),
+    `CASE_STUDY_IMAGES keys ${JSON.stringify([...mapSrcs].sort())} != registry srcs ${JSON.stringify([...registrySrcs].sort())}`,
+  );
+});
