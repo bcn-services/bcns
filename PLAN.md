@@ -74,7 +74,7 @@ seeded demo data**.
     - The card exposes a visible focus ring meeting WCAG AA contrast against the card surface
     - The `items.length === 0` holding-state branch renders exactly as it does today when the registry has no items
     - Existing passing tests remain passing
-  status: not started
+  status: done
   track: light
 
 - task: Seed the DeLuca's mock bridge in `~/bcns-client-delucas` with an invented demo dataset

@@ -1,34 +1,30 @@
 ---
 # Engineer Report
-**Task:** PLAN.md item 3 — Add `apps/web/app/work/[slug]/page.tsx`, a dynamic route rendering one case study from `siteContent.pastWork.items`.
+**Task:** Link each Past Work card to its detail page (`/work/<slug>`) — PLAN item 4
 **Branch:** worktree-past-work-case-studies
-**Date:** 2026-07-27
+**Date:** 2026-07-28
 
 ## Design Decisions
-- Single `getCaseStudy(slug)` lookup helper colocated in `page.tsx`, used by `generateStaticParams`, `generateMetadata`, and the page body — prevents lister/guard drift between the three exports (named recurring defect family in this repo).
-- `generateStaticParams` returns exactly `{ slug }` per registry item; `dynamicParams` left at its Next.js default (true) so an unknown slug 404s via `notFound()` rather than being blocked at the router level.
-- New `PastWorkContent.caseStudy: CaseStudyLabels` registry object (`problemLabel`/`approachLabel`/`outcomeLabel`) — keeps the three section labels out of the component per the content-registry rule, mirrored 1:1 into `CONTENT.md`.
-- Reused `SectionAtmosphere variant="work"` and `Reveal` rather than adding a new atmosphere variant or motion vocabulary — same visual family as `/work`.
-- `generateMetadata` sources `title`/`description` from the found item (`item.title` / `item.outcome`); falls back to `pageMeta.work.title` only (no description) when the slug is unknown, so the fallback stays benign and the page body still 404s.
-- Skipped a dedicated back-link (and its CONTENT.md label): `SiteHeader`'s nav already has a persistent "Work" link, so return navigation exists without a new content field — lazier alternative per the task's own "only if you render a back link" carve-out.
+- Wrapper `<div>` per grid cell holds the card `<Link>` and, as a sibling, the optional external `<a>` — avoids nested anchors while keeping one click target for navigation (prescribed shape, no alternative considered).
+- Card `<Link>` carries `rounded-xl` + `ring-offset-background` + the repo's standard `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` pattern (matches `app/work/[slug]/page.tsx:70`) — reused, not invented.
+- `hover-lift` + `group` moved onto `<Card>` (Link is `block`, not the hover target) to match `use-cases.tsx`'s established convention — no new motion vocabulary.
+- No dependency, schema, or content.ts changes — task is presentational only; accessible name comes from existing `CardTitle` text inside the Link.
 
 ## Files Changed
-- `apps/web/app/work/[slug]/page.tsx` — new file: Server Component with `getCaseStudy`, `generateStaticParams`, `generateMetadata`, and the page body rendering problem/approach/outcome under registry-sourced labels.
-- `apps/web/lib/content.ts` — added `CaseStudyLabels` interface, `caseStudy` field on `PastWorkContent`, and the three label strings in the registry.
-- `apps/web/CONTENT.md` — new `### caseStudy` subsection under Past Work, 3 new Cross-check rows, new Page-map row for `/work/[slug]`, updated `items[n].slug` note (no longer "future" detail route), re-derived "Total registry fields" 89 → 92 via a throwaway Node script counting Cross-check table rows (not hand-incremented), updated Last-updated line.
+- `apps/web/components/past-work.tsx` — items-map branch only: each card now wrapped in `<Link href="/work/${slug}">`; external `link` anchor moved to a sibling `<a>` outside the Link; holding-state branch untouched (verified via `git diff`, zero lines touched).
+- `apps/web/__tests__/past-work-card-links.test.mjs` — new file: recursive `.next/server/app` walker (excludes `.claude/`) + `<a>`/`</a>` token-order nesting scanner, vacuous-pass guards, per-slug href check, source-level focus-ring check. All expected values derived from `siteContent` at runtime.
 
 ## Deferred / Out of Scope
-- Card-to-detail-page linking (`past-work.tsx` `<Link>` wrapping) is PLAN item 4 — not touched here.
-- Screenshot rendering is PLAN item 8 — `screenshots` array is untouched and unrendered; empty array causes no crash (nothing on this page reads it).
+- Did not touch `section-atmosphere.tsx` — audited it, both decorative layers already carry `pointer-events-none` (see Flags below). No fix needed.
+- Did not add a `Reveal` wrapper to the items branch — it wasn't there before my change either; out of scope for a link-wiring task.
 
 ## Flags for Reviewer
-- `siteContent.pastWork.items.find()` is O(n) over a 2-item array — fine at this scale, would want a `Map` if the registry ever grows to dozens of case studies.
-- No external calls or retries on this page — pure static registry read, no hardening needed.
+- `section-atmosphere.tsx` verified clean: `glowByVariant` divs and the pattern div are all `aria-hidden` + `pointer-events-none` — nothing can steal clicks from the new card `<Link>`. No change made here.
+- Focus-ring contrast computed via WCAG relative-luminance formula (script-verified, not eyeballed): dark `#7CB3FF` vs `#201D30` = **7.62:1**; light `hsl(214 72% 44%)` (≈`#1F65C1`) vs `#FFFFFF` = **5.69:1**. Both clear the ≥3:1 non-text AA bar with margin; no offset-ring workaround needed.
+- Nested-anchor scanner mutation-tested twice: (1) blanked the Link's `focus-visible:ring-` classes — test failed as expected, reverted, `shasum -c` clean; (2) set `link:` on `delucas`, rebuilt, confirmed the real code passes with the external `<a>` as a sibling — then physically nested the `<a>` back inside the Card/Link (the old bug shape) and reconfirmed the scanner fails loudly (`not ok 3`). Restored both `content.ts` and `past-work.tsx` from `/tmp` backups, `shasum -c` clean, rebuilt clean. Never used `git checkout --`.
+- Card `<Link>` is `block flex-1` inside a `flex h-full flex-col` wrapper — relies on CSS Grid's default `align-items: stretch` to give the wrapper (and thus the Link) a full-row height; no explicit grid-row height styling exists elsewhere in this codebase, consistent with the prescribed shape.
 
 ## Verification
-- `corepack pnpm --filter @nseluga/web typecheck` — clean.
-- `corepack pnpm --filter @nseluga/web build` — route line: `● /work/[slug]` with `├ /work/delucas` and `└ /work/l2detailz` (SSG, not `ƒ`). Both `.next/server/app/work/{delucas,l2detailz}.html` exist on disk.
-- `corepack pnpm --filter @nseluga/web test` — 62/62 node:test pass, 0 fail, 0 skip; all script-style files (`b2`/`b3` etc.) report "Results: N passed, 0 failed" with no SKIP lines (build was present).
-- Live server on port 3411 (3000 was occupied by an unrelated pre-existing process, left untouched): `/work/delucas` → 200, `/work/l2detailz` → 200, `/work/nope` → 404 with real Next 404 body (9554 bytes, not an empty shell). Server killed after verification, port confirmed free.
-- 5 curl timings against `/work/delucas`: 0.0033, 0.0034, 0.0040, 0.0062, 0.0064s — median 0.0040s, well under the 1s bar.
-- Built HTML spot check (delucas): contains `[INPUT: delucas problem/approach/outcome]` verbatim plus all three registry labels ("The problem"/"Our approach"/"The outcome"); `<title>` is `[INPUT: delucas case study title] · bcns` (layout template suffix applied automatically); meta description is `[INPUT: delucas outcome]`.
+1. `corepack pnpm --filter @nseluga/web typecheck` — **PASS**, no errors.
+2. `corepack pnpm build` (repo root, clean `.next`) — **PASS**; `● SSG /work/[slug]` still prerenders exactly `/work/delucas` and `/work/l2detailz`.
+3. `corepack pnpm --filter @nseluga/web test` — **82 pass / 0 fail / 0 skip** (baseline 77 + 5 new tests in `past-work-card-links.test.mjs`, all accounted for).
