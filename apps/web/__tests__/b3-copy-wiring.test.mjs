@@ -10,16 +10,24 @@
  */
 
 import { siteContent } from "../lib/content.ts";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const buildDir = resolve(root, ".next/server/app");
+const buildExists = existsSync(buildDir);
+
+// The layout-loop can wrap individual words of rendered copy in an inline
+// <span> (e.g. an accent word in the headline) — a raw includes() on HTML
+// breaks the moment that happens even though the copy is correct and present.
+// Strip tags first so literal checks assert on rendered text, not raw markup.
+const stripTags = (html) => html.replace(/<[^>]+>/g, "");
 
 let passed = 0;
 let failed = 0;
+let skipped = 0;
 
 function assert(label, condition, detail = "") {
   if (condition) {
@@ -29,6 +37,16 @@ function assert(label, condition, detail = "") {
     console.error(`  FAIL: ${label}${detail ? " — " + detail : ""}`);
     failed++;
   }
+}
+
+// `pnpm --filter web test` alone never builds; `pnpm test` (Turbo) always builds
+// first. Degrade to a loud skip instead of a false red when run standalone
+// against a clean tree with no .next output — the real gate (Turbo) still runs it.
+function skipSection(name) {
+  skipped++;
+  const msg = `SKIPPING: ${name} — build output not found at ${buildDir}. Run \`pnpm build\` first, or run \`pnpm test\` from the repo root (Turbo builds before testing).`;
+  console.error(`\n  ⚠️  ${msg}\n`);
+  console.log(`# SKIP ${msg}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,21 +84,25 @@ console.log("\n[2] Rendered pages: zero [SLOT: in built HTML");
 
 const routes = ["index.html", "about.html", "pricing.html", "services.html", "work.html", "privacy.html", "terms.html"];
 
-for (const route of routes) {
-  const htmlPath = resolve(buildDir, route);
-  let html;
-  try {
-    html = readFileSync(htmlPath, "utf8");
-  } catch {
-    assert(`${route} exists in build`, false, `file not found at ${htmlPath}`);
-    continue;
+if (!buildExists) {
+  skipSection("[2] Rendered pages: zero [SLOT: in built HTML");
+} else {
+  for (const route of routes) {
+    const htmlPath = resolve(buildDir, route);
+    let html;
+    try {
+      html = readFileSync(htmlPath, "utf8");
+    } catch {
+      assert(`${route} exists in build`, false, `file not found at ${htmlPath}`);
+      continue;
+    }
+    const slotCount = (html.match(/\[SLOT:/g) || []).length;
+    assert(
+      `${route}: zero [SLOT:`,
+      slotCount === 0,
+      `found ${slotCount} occurrence(s)`
+    );
   }
-  const slotCount = (html.match(/\[SLOT:/g) || []).length;
-  assert(
-    `${route}: zero [SLOT:`,
-    slotCount === 0,
-    `found ${slotCount} occurrence(s)`
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -88,22 +110,26 @@ for (const route of routes) {
 // ---------------------------------------------------------------------------
 console.log("\n[3] Rendered pages: all [INPUT: tokens are appendix-defined");
 
-for (const route of routes) {
-  const htmlPath = resolve(buildDir, route);
-  let html;
-  try {
-    html = readFileSync(htmlPath, "utf8");
-  } catch {
-    continue; // already failed in [2]
-  }
-  // Extract all [INPUT: ...] occurrences (greedy to closing bracket)
-  const inputMatches = html.match(/\[INPUT:[^\]]+\]/g) || [];
-  for (const token of inputMatches) {
-    assert(
-      `${route}: "${token}" is appendix-defined`,
-      APPENDIX_INPUT_TOKENS.has(token),
-      `unknown INPUT token`
-    );
+if (!buildExists) {
+  skipSection("[3] Rendered pages: all [INPUT: tokens are appendix-defined");
+} else {
+  for (const route of routes) {
+    const htmlPath = resolve(buildDir, route);
+    let html;
+    try {
+      html = readFileSync(htmlPath, "utf8");
+    } catch {
+      continue; // already failed in [2]
+    }
+    // Extract all [INPUT: ...] occurrences (greedy to closing bracket)
+    const inputMatches = html.match(/\[INPUT:[^\]]+\]/g) || [];
+    for (const token of inputMatches) {
+      assert(
+        `${route}: "${token}" is appendix-defined`,
+        APPENDIX_INPUT_TOKENS.has(token),
+        `unknown INPUT token`
+      );
+    }
   }
 }
 
@@ -179,62 +205,68 @@ assert(
 // ---------------------------------------------------------------------------
 console.log("\n[5] Behavioral: hero headline appears in built index.html");
 
-let indexHtml = "";
-try {
-  indexHtml = readFileSync(resolve(buildDir, "index.html"), "utf8");
-} catch {
-  assert("index.html readable", false);
-}
-if (indexHtml) {
-  assert(
-    'index.html contains hero headline verbatim',
-    indexHtml.includes("Software built around how your business already works")
-  );
-  assert(
-    'index.html contains nav card title "What we build"',
-    indexHtml.includes("What we build")
-  );
-  assert(
-    'index.html contains nav card title "Pricing"',
-    indexHtml.includes("Pricing")
-  );
-}
+if (!buildExists) {
+  skipSection("[5] Behavioral: hero headline / nav card titles / holding title / pricing names appear in built HTML");
+} else {
+  let indexHtml = "";
+  try {
+    indexHtml = readFileSync(resolve(buildDir, "index.html"), "utf8");
+  } catch {
+    assert("index.html readable", false);
+  }
+  if (indexHtml) {
+    const indexText = stripTags(indexHtml);
+    assert(
+      'index.html contains hero headline verbatim',
+      indexText.includes("Software built around how your business already works")
+    );
+    assert(
+      'index.html contains nav card title "What we build"',
+      indexText.includes("What we build")
+    );
+    assert(
+      'index.html contains nav card title "Pricing"',
+      indexText.includes("Pricing")
+    );
+  }
 
-// Spot-check /work holding state in built HTML
-let workHtml = "";
-try {
-  workHtml = readFileSync(resolve(buildDir, "work.html"), "utf8");
-} catch {
-  assert("work.html readable", false);
-}
-if (workHtml) {
-  assert(
-    'work.html contains holding state title "Our first builds are in progress"',
-    workHtml.includes("Our first builds are in progress")
-  );
-}
+  // Spot-check /work holding state in built HTML
+  let workHtml = "";
+  try {
+    workHtml = readFileSync(resolve(buildDir, "work.html"), "utf8");
+  } catch {
+    assert("work.html readable", false);
+  }
+  if (workHtml) {
+    assert(
+      'work.html contains holding state title "Our first builds are in progress"',
+      stripTags(workHtml).includes("Our first builds are in progress")
+    );
+  }
 
-// Spot-check /pricing card names in built HTML
-let pricingHtml = "";
-try {
-  pricingHtml = readFileSync(resolve(buildDir, "pricing.html"), "utf8");
-} catch {
-  assert("pricing.html readable", false);
-}
-if (pricingHtml) {
-  assert('pricing.html contains "Standard build"', pricingHtml.includes("Standard build"));
-  assert('pricing.html contains "Advanced build"', pricingHtml.includes("Advanced build"));
-  assert('pricing.html contains "AI consulting"', pricingHtml.includes("AI consulting"));
-  assert(
-    'pricing.html contains FAQ q1',
-    pricingHtml.includes("How much will my project cost?")
-  );
+  // Spot-check /pricing card names in built HTML
+  let pricingHtml = "";
+  try {
+    pricingHtml = readFileSync(resolve(buildDir, "pricing.html"), "utf8");
+  } catch {
+    assert("pricing.html readable", false);
+  }
+  if (pricingHtml) {
+    const pricingText = stripTags(pricingHtml);
+    assert('pricing.html contains "Standard build"', pricingText.includes("Standard build"));
+    assert('pricing.html contains "Advanced build"', pricingText.includes("Advanced build"));
+    assert('pricing.html contains "AI consulting"', pricingText.includes("AI consulting"));
+    assert(
+      'pricing.html contains FAQ q1',
+      pricingText.includes("How much will my project cost?")
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
-console.log(`\nResults: ${passed} passed, ${failed} failed`);
+console.log(`\nResults: ${passed} passed, ${failed} failed, ${skipped} skipped`);
 if (failed > 0) {
   process.exit(1);
 }

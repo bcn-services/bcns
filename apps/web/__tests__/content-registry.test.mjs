@@ -5,7 +5,7 @@
  * Checks:
  * 1. siteContent exports all 6 section keys.
  * 2. Each section has the required string fields.
- * 3. Every string field is a [SLOT: ...] placeholder or a step-number neutral default.
+ * 3. Every string field is non-empty (real copy landed in B3; SLOT/step placeholders still allowed).
  * 4. siteConfig (site.ts) is NOT duplicated inside content.ts.
  */
 
@@ -35,11 +35,12 @@ function assert(label, condition, detail = "") {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SLOT_RE = /^\[SLOT: [^\]]+\]$/;
-const STEP_RE = /^0[1-9]$|^[1-9][0-9]$/; // "01", "02", etc.
-
+// B3 landed real copy across the registry (content-freeze), so the old
+// SLOT-or-step-number invariant no longer holds — real prose is the expected
+// value now. What still matters: no field ships silently empty. (A [SLOT: ...]
+// or step-number string is non-empty too, so it still passes.)
 function isAllowedStringValue(value) {
-  return SLOT_RE.test(value) || STEP_RE.test(value);
+  return value.trim().length > 0;
 }
 
 /**
@@ -68,9 +69,7 @@ function collectStrings(node, path = "") {
 console.log("\n[1] siteContent exports all section keys");
 const REQUIRED_KEYS = [
   "hero",
-  "problemSolution",
   "howItWorks",
-  "deliveryModels",
   "useCases",
   "contactSection",
   "pastWork",
@@ -92,9 +91,7 @@ console.log("\n[2] Each section has required string fields");
 
 const SECTION_REQUIRED_FIELDS = {
   hero: ["badge", "headline", "subheadline", "ctaPrimary", "ctaSecondary", "proofPoints"],
-  problemSolution: ["eyebrow", "title", "description", "items"],
   howItWorks: ["eyebrow", "title", "description", "items"],
-  deliveryModels: ["eyebrow", "title", "description", "items"],
   useCases: ["eyebrow", "title", "description", "items"],
   contactSection: ["eyebrow", "title", "description", "highlights"],
 };
@@ -113,22 +110,20 @@ for (const [section, fields] of Object.entries(SECTION_REQUIRED_FIELDS)) {
 // ---------------------------------------------------------------------------
 console.log("\n[3] Tuple arrays have correct lengths");
 assert("hero.proofPoints is length 3", siteContent.hero.proofPoints.length === 3);
-assert("problemSolution.items is length 3", siteContent.problemSolution.items.length === 3);
 assert("howItWorks.items is length 3", siteContent.howItWorks.items.length === 3);
-assert("deliveryModels.items is length 3", siteContent.deliveryModels.items.length === 3);
 assert("useCases.items is length 4", siteContent.useCases.items.length === 4);
 assert("contactSection.highlights is length 3", siteContent.contactSection.highlights.length === 3);
 
 // ---------------------------------------------------------------------------
-// Test 4 — All string values are [SLOT:...] or neutral structural defaults
+// Test 4 — No string value ships empty
 // ---------------------------------------------------------------------------
-console.log("\n[4] All string values are [SLOT: ...] placeholders or step-number defaults");
+console.log("\n[4] All string values are non-empty (SLOT/step placeholders still allowed)");
 const allStrings = collectStrings(siteContent);
 for (const { path, value } of allStrings) {
   assert(
     `${path} = "${value}"`,
     isAllowedStringValue(value),
-    `not a SLOT or step number`,
+    `empty or whitespace-only string`,
   );
 }
 
