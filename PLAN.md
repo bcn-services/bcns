@@ -114,7 +114,7 @@ seeded demo data**.
   risk: a screenshot capturing a real customer name or address ships to the public site — silent, only caught by manual review before publish
   difficulty: low — mechanical browser capture of already-built pages with fixtures loaded
   speed: N/A — one-time asset capture, not a runtime path
-  status: not started
+  status: done
 
 - task: Render each case study's screenshots on its detail page with `next/image`
   done when:
