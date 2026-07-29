@@ -5,8 +5,8 @@
  * - Strings with "[INPUT: ...]" are real copy. Nate fills them; they render as-is.
  * - Icons stay in component files, mapped by array index.
  * - siteConfig (site.ts) remains the source for name / domain / email.
- * - problemSolution and deliveryModels interfaces are kept for type safety but
- *   their registry entries are removed. Those sections are cut from all pages.
+ * - problemSolution and deliveryModels are gone entirely: the sections were cut
+ *   from the IA, and their interfaces and stub components have been removed.
  */
 
 // ---------------------------------------------------------------------------

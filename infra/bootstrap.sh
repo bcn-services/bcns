@@ -9,7 +9,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ufw fail2ban unattended-upgrades rsync curl gnupg \
-  nginx s3cmd
+  nginx s3cmd openssl
 
 # postgresql-client matching Supabase's Postgres major (17) — Ubuntu's default
 # client is older and pg_dump refuses newer servers. PGDG repo:
@@ -49,6 +49,21 @@ ufw --force enable
 # nginx: TLS termination with a Cloudflare Origin CA cert; per-client vhosts
 # are dropped in by onboard-client.sh. Default server rejects unknown hosts.
 install -d -m 700 /etc/ssl/cloudflare
+
+# Every vhost below references these cert paths, so nginx cannot even load its
+# config until they exist -- and the real Cloudflare Origin CA cert is a manual
+# follow-up (step 2 below). Drop in a self-signed placeholder so nginx stays
+# startable and onboard-client.sh works; installing the real cert overwrites it.
+# Cloudflare in front means this placeholder is never what a visitor sees.
+if [ ! -s /etc/ssl/cloudflare/origin.pem ] || [ ! -s /etc/ssl/cloudflare/origin.key ]; then
+  echo "no Cloudflare origin cert yet -- installing a self-signed placeholder" >&2
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+    -subj "/CN=bcns-placeholder" \
+    -keyout /etc/ssl/cloudflare/origin.key \
+    -out /etc/ssl/cloudflare/origin.pem >/dev/null 2>&1
+  chmod 600 /etc/ssl/cloudflare/origin.key /etc/ssl/cloudflare/origin.pem
+fi
+
 rm -f /etc/nginx/sites-enabled/default
 cat > /etc/nginx/sites-available/00-default <<'EOF'
 server {
@@ -60,6 +75,11 @@ server {
 }
 EOF
 ln -sf /etc/nginx/sites-available/00-default /etc/nginx/sites-enabled/00-default
+
+# Fail here rather than leaving a droplet that looks bootstrapped but whose
+# nginx won't come back after the next reload or reboot.
+nginx -t
+systemctl reload nginx
 
 # App unit template + nightly backups
 install -m 644 "$(dirname "$0")/bcns-app@.service" /etc/systemd/system/

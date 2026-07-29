@@ -4,12 +4,14 @@ Project-level guidance for Claude Code agents working in this repo.
 
 ## What this repo is
 
-bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the client-app template source. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
+bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the droplet provisioning scripts. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
 - `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
 - `packages/ui/` — shared React component library (`@nseluga/ui`)
 - `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@nseluga/config`)
 - `packages/app-core/` — shared application core (`@nseluga/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
-- `templates/hosted-web/` — starter for spinning up a new client repo (`@nseluga/hosted-web-template`); `apps/` holds only the platform's own apps
+- `infra/` — provisioning-as-code for the shared DigitalOcean droplet that hosts **client** apps (bootstrap, per-client onboarding, systemd unit, nightly backups). Nothing here touches `apps/web`.
+- `docs/architecture/` — ADRs. `hosted-web-model.md` is the hosted-web business/delivery decision.
+- `templates/` — placeholder for future app starters; **empty today**. The former `templates/hosted-web/` starter was deleted once its logic moved into `app-core@0.2.0`.
 
 ## Commands
 
@@ -19,6 +21,11 @@ pnpm dev              # dev server at http://localhost:3000
 pnpm build            # production build (all packages via Turbo)
 pnpm lint             # ESLint across all packages
 pnpm typecheck        # tsc --noEmit across all packages
+pnpm test             # test suites across all packages
+
+# Opt-in static export -> apps/web/out/ (plain files, nginx-servable, no Node).
+# Not the default: the default build is what Vercel runs.
+pnpm --filter @nseluga/web export
 pnpm format           # Prettier write
 pnpm format:check     # Prettier check (CI-safe)
 ```
@@ -32,7 +39,7 @@ All commands run from the repo root via Turborepo. There is no need to `cd` into
 **Web app (`apps/web/`):** Next.js 14 App Router, TypeScript strict mode, Tailwind CSS with HSL token theme (light + dark). Page entry is `app/page.tsx`; layout in `app/layout.tsx`. All site-wide constants (name, domain, email, nav items, tagline, description) live in `apps/web/lib/site.ts` — update that file, not individual components.
 
 **Component structure (`apps/web/components/`):**
-- `hero.tsx`, `problem-solution.tsx`, `how-it-works.tsx`, `delivery-models.tsx`, `use-cases.tsx`, `contact-section.tsx` — one file per landing page section
+- `hero.tsx`, `how-it-works.tsx`, `use-cases.tsx`, `pricing.tsx`, `faq.tsx`, `past-work.tsx`, `reviews.tsx`, `about-founder.tsx`, `contact-section.tsx` — one file per page section, each reading its copy from `lib/content.ts`
 - `site-header.tsx`, `site-footer.tsx` — layout chrome
 - `contact-form.tsx` — form with Web3Forms / Formspree backend (env var `NEXT_PUBLIC_CONTACT_ENDPOINT`)
 - `ui/` — primitive shadcn-style components (input, label, textarea)
@@ -58,13 +65,13 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 - Tailwind only — no CSS modules, no inline styles. Use HSL token classes (`bg-background`, `text-foreground`, etc.) from the theme, not raw color classes.
 - Server Components by default in `app/`; add `"use client"` only when state or browser APIs are needed.
 - Shared primitives go in `packages/ui/`, not inline in `apps/web/components/ui/`.
-- `site.ts` is the single source of truth for all marketing copy — keep it that way.
+- `lib/content.ts` is the single source of truth for all marketing copy — keep it that way. `lib/site.ts` holds only name / domain / email / nav. `CONTENT.md` is the field-by-field companion to `content.ts` and must be updated alongside it.
 
 ## Adding a client app later
 
-Client apps are **not** added to this monorepo. Each new client business gets **its own repo**, generated from `templates/hosted-web/`. See `docs/architecture/hosted-web-model.md` for the decision and rationale.
+Client apps are **not** added to this monorepo. Each new client business gets **its own repo**. See `docs/architecture/hosted-web-model.md` for the decision and rationale.
 
-1. Generate a new repo from `templates/hosted-web/` (`@nseluga/hosted-web-template`) — it comes pre-wired to the hosting stack and the shared packages.
+1. Create the new repo and wire it against the shared packages by hand. **There is no starter template today** — `templates/hosted-web/` was deleted once its logic moved into `app-core@0.2.0`, and its replacement (a standalone GitHub Template Repository) does not exist yet.
 2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
 3. Propagate shared improvements by publishing a new package version and bumping it in each client repo — no copy-paste, no hand-editing per app.
 

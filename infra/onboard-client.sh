@@ -5,10 +5,18 @@
 # and enables the unit.
 set -euo pipefail
 
-[ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
+# Args are validated before the root check so an obvious typo fails fast (and so
+# infra/__tests__ can exercise the validation without root). All three values are
+# interpolated into the nginx vhost or the env file, so all three are checked --
+# an unvalidated ';' in port or domain injects nginx directives.
 [ $# -eq 3 ] || { echo "usage: $0 <slug> <port> <domain>" >&2; exit 1; }
 slug="$1"; port="$2"; domain="$3"
 [[ "$slug" =~ ^[a-z0-9-]+$ ]] || { echo "slug must be [a-z0-9-]" >&2; exit 1; }
+[[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ] && [ "$port" -le 65535 ] \
+  || { echo "port must be 1024-65535" >&2; exit 1; }
+[[ "$domain" =~ ^[a-zA-Z0-9.-]+$ ]] || { echo "domain must be [a-zA-Z0-9.-]" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
 
 useradd --system --create-home --home-dir "/srv/$slug" --shell /bin/bash "$slug"
 chmod 750 "/srv/$slug"
@@ -51,7 +59,14 @@ server {
 }
 EOF
 ln -sf "/etc/nginx/sites-available/$slug" "/etc/nginx/sites-enabled/$slug"
-nginx -t && systemctl reload nginx
+# `nginx -t && reload` does NOT abort under `set -e` (a failure on the left of
+# && is exempt), so a bad config used to fall through to the success message.
+if ! nginx -t; then
+  echo "nginx config test failed -- removing $slug vhost and aborting" >&2
+  rm -f "/etc/nginx/sites-enabled/$slug"
+  exit 1
+fi
+systemctl reload nginx
 
 systemctl enable "bcns-app@$slug"
 

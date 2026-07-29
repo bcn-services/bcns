@@ -12,7 +12,9 @@
     "start": "turbo run start",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "turbo run test && pnpm test:docs && pnpm test:infra",
+    "test:docs": "node --test docs/architecture/__tests__/*.mjs",
+    "test:infra": "bash infra/__tests__/infra.check.sh",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore",
     "clean": "turbo run clean"
