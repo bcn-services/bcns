@@ -38,6 +38,9 @@ coverage/
 # guaranteed conflict on any rebase if tracked.
 *.tsbuildinfo
 
+# Static export output (pnpm --filter @nseluga/web export)
+out/
+
 # Vercel
 .vercel
 
