@@ -39,7 +39,7 @@ export function HowItWorks() {
   return (
     <section id="how-it-works" className="border-t border-border/60 bg-secondary/70 py-24 sm:py-28">
       <Container>
-        <SectionHeading eyebrow={eyebrow} title={title} accent="finished" description={description} />
+        <SectionHeading eyebrow={eyebrow} title={title} accent="every" description={description} />
 
         <div ref={ref} className="relative mt-16">
           {/* Desktop: horizontal connector between the three node centers (cols at

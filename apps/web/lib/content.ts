@@ -203,74 +203,74 @@ export interface SiteContent {
 
 export const siteContent: SiteContent = {
   hero: {
-    badge: "Custom software for local businesses",
-    headline: "Software built around how your business already works",
+    badge: "Software custom built for your business",
+    headline: "We build tools around how your business already works",
     subheadline:
-      "Off-the-shelf tools make you change your process. We build tools that fit it. Scoped, quoted, and delivered.",
+      "For businesses that only want to pay for what they actually need",
     ctaPrimary: "Book a free consult",
     ctaSecondary: "See what we build",
     proofPoints: [
-      "Fixed quote before work starts",
-      "We host it and keep it running",
-      "Free 30-minute consult",
+      "We work with you to create a plan",
+      "You test it, we refine it",
+      "Fixed price, agreed before we start",
     ],
   },
 
   howItWorks: {
-    eyebrow: "The process",
-    title: "Three steps from first call to finished tool",
-    description: "You'll know the price and the plan before anything gets built.",
+    eyebrow: "Our process",
+    title: "From first call to your personalized product. We're here to assist at every step.",
+    description: "You communicate your needs, we build you a tool that accomodates them.",
     items: [
       {
         step: "01",
-        title: "Free consult",
+        title: "The call",
         description:
-          "A 30-minute conversation about how your business runs and where the friction is. No jargon.",
+          "A 30-minute conversation about how your business runs and where the friction is at no cost to you. We ask questions to help you figure out exactly what you need.",
       },
       {
         step: "02",
-        title: "Scope & quote",
+        title: "The plan",
         description:
-          "We write up exactly what we'll build, what it costs, and when it lands. You approve first.",
+          "We write up exactly what we'll build, what it costs, and when it lands. You get the chance to review it and make sure it's tailored to your exact needs.",
       },
       {
         step: "03",
-        title: "Build & launch",
+        title: "The build",
         description:
-          "We build it, launch it, and walk your team through it. From there we host, run, and maintain it, so it keeps working without you managing servers or updates.",
+          "We build it, let you test it and refine it until it's right for you. Once launched, we host it, maintain it and support your needs so you can focus on your business.",
       },
     ],
   },
 
   useCases: {
-    eyebrow: "What we build",
-    title: "Tools shaped to your business, not the other way around",
+    eyebrow: "Our services",
+    title: "Tools are meant to serve you, not complicate things further",
     description:
-      "Four kinds of problems we solve most. If yours isn't here, ask anyway.",
+      "Four solutions to common business challenges. If you need something else, we're happy to accomodate you.",
     items: [
       {
         tag: "Bookings",
-        title: "Scheduling & booking systems",
+        title: "Scheduling & Booking Systems",
         description:
-          "Take appointments the way you already do, with deposits, reminders, and a calendar that matches your real workflow.",
+          "Automate deposits, reminders, cancellations and scheduling using the same workflows already in place.",
       },
       {
         tag: "Operations",
-        title: "Inventory & back-office automation",
+        title: "Inventory & Back-Office Automation",
         description:
-          "Replace the spreadsheet juggling: ordering, invoicing, and tracking that update themselves.",
+          "Enhance your spreadsheets. Whether you want to replace or integrate them, we can help you optimize your data management.",
       },
       {
         tag: "Insight",
-        title: "Dashboards & reporting",
+        title: "Dashboards & Reporting",
         description:
-          "One screen that shows how the business is doing. Sales, costs, trends. No exporting anything.",
+          "One place to hold all your business analytics. We can consolidate your data and enable you to easily generate insights that are useful to you.",
       },
       {
-        tag: "AI",
-        title: "AI consulting",
+        tag: "Other",
+        title: "Something Else",
         description:
-          "A working session to find where AI actually saves you time, then set it up with you. Priced per day.",
+          "Your options aren't limited to what we've done before. If you have a pain point, we can build a tool to alleviate it.",
       },
     ],
   },
@@ -279,21 +279,21 @@ export const siteContent: SiteContent = {
     eyebrow: "Get in touch",
     title: "Tell us what's slowing you down",
     description:
-      "Send a few sentences about your business and the problem. We'll reply within one business day with next steps, and honest advice, even if that advice is you don't need custom software.",
+      "Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to create your custom solution.",
     highlights: [
       {
         title: "Free consult",
         description:
-          "A 30-minute call about how your business runs. No pitch, no obligation.",
+          "A 30-minute call about how your business runs. No obligations or cost to you.",
       },
       {
         title: "Fixed quote",
-        description: "You approve the exact price before any work starts.",
+        description: "You approve the exact product and its price before any work starts.",
       },
       {
-        title: "Your data",
+        title: "Your product",
         description:
-          "We host and maintain the app for you. Your data is always yours, and we'll export it and hand it over whenever you ask.",
+          "We host and maintain the app for you. Your data is always yours and we'll hand it over at any time.",
       },
     ],
   },
@@ -354,11 +354,11 @@ export const siteContent: SiteContent = {
   reviews: {
     eyebrow: "Reviews",
     title: "Reviews",
-    description: "What our clients say.",
+    description: "Hear from our past clients about what it was like to work with us.",
     items: [],
     holdingState: {
       title: "No reviews yet. That changes with our first client.",
-      body: "Real names, real businesses, unedited. As soon as our first clients have something to say.",
+      body: "We pride ourselves on quality service and communication. We value your feedback and will share it here as soon as we have it.",
       ctaLabel: "Want to be one of them? Book a free consult.",
       ctaHref: "/#contact",
     },
@@ -366,21 +366,21 @@ export const siteContent: SiteContent = {
 
   pricing: {
     eyebrow: "Pricing",
-    title: "Two build sizes. A setup fee, then monthly to run it.",
+    title: "We charge you for what you actually need and no more.",
     description:
-      "Each build has a one-time setup fee and a flat monthly fee that covers hosting and support. You get the exact numbers in a fixed quote after the free consult.",
+      "Each build has a one-time setup fee and a flat monthly rate for hosting and maintenance.",
     tiers: [
       {
         name: "Standard build",
         price: "$1,000 setup",
-        setup: "$1,000 one-time setup",
+        setup: "$1,000 setup",
         monthly: "$149/mo",
         seats: "Includes up to 15 users, then $20/user per month.",
         description:
-          "A single-purpose tool: a booking page, a report generator, one automation.",
+          "A single-purpose tool to streamline one of your current pain points.",
         features: [
           "One core workflow, built end to end",
-          "Delivered in about a week",
+          "Delivered in one week",
           "30 days of fixes and tweaks included",
           "One year of bug fixes, free",
         ],
@@ -388,13 +388,13 @@ export const siteContent: SiteContent = {
       {
         name: "Advanced build",
         price: "$3,000 setup",
-        setup: "$3,000 one-time setup",
+        setup: "$3,000 setup",
         monthly: "$349/mo",
         seats: "Includes up to 15 users, then $20/user per month.",
         description:
-          "A system your business runs on: multiple workflows, logins, data that stays in sync.",
+          "A highly technical tool or fully integrated system to manage your whole business.",
         features: [
-          "Multiple connected workflows",
+          "A full workflow management system",
           "Delivered in two to three weeks",
           "30 days of fixes and tweaks included",
           "One year of bug fixes, free",
@@ -402,13 +402,13 @@ export const siteContent: SiteContent = {
       },
       {
         name: "AI consulting",
-        price: "$800 / day",
+        price: "$500 / day",
         description:
-          "Working sessions to find and set up AI where it pays for itself.",
+          "Want to learn how to integrate AI into your business? We can teach you modern best practices and practical applications.",
         features: [
-          "Audit of where AI fits your operation",
-          "Hands-on setup, not a slide deck",
-          "Plain-English project notes",
+          "Audit your business for AI opportunities",
+          "Learn how to build impactful AI workflows",
+          "Hands-on training for your team",
         ],
       },
     ],
@@ -420,39 +420,29 @@ export const siteContent: SiteContent = {
     description: "Anything else, ask in the form and we'll answer straight.",
     items: [
       {
-        question: "How much will my project cost?",
+        question: "Do you use AI?",
         answer:
-          "Every build has a one-time setup fee plus a flat monthly fee that keeps it running and supported. Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. You get the exact numbers in a fixed quote after the free consult. No hourly surprises.",
-      },
-      {
-        question: "How long does a build take?",
-        answer:
-          "Most single tools ship in about a week. Larger connected systems take two to three weeks. You get a delivery date with the quote, and we tell you right away if anything threatens it.",
-      },
-      {
-        question: "What happens if something breaks after delivery?",
-        answer:
-          "For the first 30 days, tell us anything that needs fixing or refining and we handle it, no questions asked. After that, genuine bugs in what we built stay free to fix for a year. New features, or changes to things that already work, are quoted separately.",
+          "AI is the most powerful tool on Earth, but it isn't magic. We have created custom AI tools to streamline our workflows and ensure quality products for our clients. It allows us to build faster and more efficiently to tend to your needs when you need it. ",
       },
       {
         question: "Do I need to be technical to work with you?",
         answer:
-          "No. We ask about your business, not your tech. Everything comes with a plain-English walkthrough.",
+          "No. We ask about your business and help you figure out how to streamline your processes. We emphasize clear communication and will ensure you can understand everything you need to about your solution.",
       },
       {
         question: "What does the monthly fee cover?",
         answer:
-          "The monthly fee keeps your tool running and cared for. It covers hosting, uptime, daily backups, security patches, bug fixes, and small tweaks along the way. We run it on our own servers, so you and your team reach it from any device with a login. You never manage a server or an update yourself.",
+          "The monthly fee keeps your tool running and cared for. It covers hosting, uptime, daily backups, security patches and bug fixes. We host it so you and your team can focus on using it.",
       },
       {
-        question: "Does my tool use AI, and how does that get billed?",
+        question: "Does my tool use AI?",
         answer:
-          "AI is optional. If your tool uses AI features, you bring your own Anthropic key, and Anthropic bills you directly for what those features use. You stay in control of that cost, and you can leave AI out entirely if you'd rather not use it.",
+          "AI isn't magic. Some of our builds use AI but only when it is actually the right tool for the job. If you want AI integrated into your product, we can help you implement it.",
       },
       {
-        question: "What happens if I stop paying the monthly fee?",
+        question: "What happens if I want to cancel?",
         answer:
-          "Hosting stops, so the live tool goes offline. Your data is always yours. Before we shut anything down, we export your data and hand it over so you keep everything the tool held. No lock-in, no games.",
+          "You are free to cancel any time. You will retain access for the time payed for and receive all your data once the service ends.",
       },
     ],
   },
@@ -490,27 +480,27 @@ export const siteContent: SiteContent = {
   navCards: {
     items: [
       {
-        title: "What we build",
+        title: "Our Service",
         description:
-          "Booking systems, dashboards, automations, and AI consulting. The problems we solve and how.",
+          "Business management systems, analytics dashboards and workflow automations. The problems we solve and how.",
         href: "/services",
       },
       {
-        title: "Past work",
+        title: "Past Work",
         description:
-          "What we've built, and what it changed for the businesses using it.",
+          "Scheduling apps, revenue trackers and more. What we've built, and what it changed for the businesses using it.",
         href: "/work",
       },
       {
         title: "Pricing",
         description:
-          "Two build sizes and a day rate for AI consulting. And how quoting works.",
+          "Understand our pricing model and what it covers. We charge you for what you actually need and no more.",
         href: "/pricing",
       },
       {
         title: "About",
         description:
-          "Two founders. One builds, one makes sure it's worth building.",
+          "Learn more about the team behind bcns and why we do what we do.",
         href: "/about",
       },
     ],

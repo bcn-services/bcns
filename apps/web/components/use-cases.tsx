@@ -24,7 +24,7 @@ export function UseCases() {
         <SectionHeading
           eyebrow={eyebrow}
           title={title}
-          accent="shaped"
+          accent="you"
           description={description}
         />
 
@@ -33,20 +33,20 @@ export function UseCases() {
             const Icon = useCaseIcons[index];
             if (!Icon) return null;
             const headerGradients = [
-              "bg-gradient-to-br from-accent/70 to-transparent",
+              "bg-gradient-to-br from-accent/60 to-transparent",
               "bg-gradient-to-bl from-accent/60 to-transparent",
-              "bg-gradient-to-tr from-accent/60 to-transparent",
-              "bg-gradient-to-b from-primary/18 to-transparent",
+              "bg-gradient-to-br from-accent/60 to-transparent",
+              "bg-gradient-to-bl from-accent/60 to-transparent",
             ] as const;
             const iconColors = [
               "text-accent-foreground/80",
               "text-accent-foreground/80",
               "text-accent-foreground/80",
-              "text-primary/70",
+              "text-accent-foreground/80",
             ] as const;
             return (
               <Reveal as="div" key={index} variant="pop" delay={index * 110} className="h-full">
-                <Card className={`group hover-lift h-full overflow-hidden${index === 3 ? " border-primary/30" : ""}`}>
+                <Card className="group hover-lift h-full overflow-hidden">
                   <div className={`relative flex items-center justify-center h-20 overflow-hidden ${headerGradients[index]}`}>
                     <Icon className={`size-9 ${iconColors[index]} transition-[transform,color] duration-300 ease-out group-hover:scale-110 group-hover:text-primary`} aria-hidden />
                     <span className="absolute top-3 right-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -54,7 +54,7 @@ export function UseCases() {
                     </span>
                   </div>
                   <CardHeader className="pt-4">
-                    <CardTitle className="text-base lg:min-h-[2.75rem]">{caseTitle}</CardTitle>
+                    <CardTitle className="text-base lg:min-h-[2.75rem] text-center">{caseTitle}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="leading-relaxed">{caseDescription}</CardDescription>

@@ -22,7 +22,7 @@ export function Pricing() {
         <SectionHeading
           eyebrow={eyebrow}
           title={title}
-          accent="monthly"
+          accent="actually"
           description={description}
         />
 
@@ -77,6 +77,13 @@ export function Pricing() {
               </Reveal>
             );
           })}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-muted-foreground">
+          <p>
+            Prices listed are standard starting price and are subject to change. We will provide a fixed quote for your product after our consult.
+          </p>
         </div>
       </Container>
     </section>
