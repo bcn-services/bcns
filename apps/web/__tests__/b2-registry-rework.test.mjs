@@ -132,9 +132,11 @@ const aboutPageSrc = readFileSync(resolve(root, "app/about/page.tsx"), "utf8");
 assert("app/about/page.tsx imports AboutFounder", aboutPageSrc.includes("AboutFounder"));
 
 // Behavioral: confirm founders array has 2 items and each has required shape
+// (real copy landed in B3 — the slots these guarded are now filled, so the
+// surviving invariant is "populated", not "still a placeholder")
 const founders = siteContent.about.founders;
-assert("founders[0] name is a SLOT string", founders[0].name.startsWith("[SLOT:"));
-assert("founders[1] name is a SLOT string", founders[1].name.startsWith("[SLOT:"));
+assert("founders[0] name is a non-empty string", founders[0].name.trim().length > 0);
+assert("founders[1] name is a non-empty string", founders[1].name.trim().length > 0);
 assert(
   "founders[0] and founders[1] are distinct entries",
   founders[0].name !== founders[1].name
@@ -186,8 +188,20 @@ assert(
   reviewsSrc.includes("items.map")
 );
 
-// Registry: items is empty array (holding state is the current path)
-assert("pastWork.items is empty array by default", siteContent.pastWork.items.length === 0);
+// Registry: pastWork.items is now seeded (W5 case-study slots), but the
+// holding state must stay populated so /work still renders correctly if
+// items is ever emptied again — both branches in past-work.tsx stay live.
+// (Slug/placeholder detail on those entries: past-work-case-studies.test.mjs.)
+assert(
+  "pastWork.items is seeded with the 2 case-study entries",
+  siteContent.pastWork.items.length === 2,
+  `got ${siteContent.pastWork.items.length}`
+);
+assert(
+  "pastWork.holdingState.title stays populated (holding-state branch still viable)",
+  typeof siteContent.pastWork.holdingState.title === "string" &&
+    siteContent.pastWork.holdingState.title.trim().length > 0
+);
 assert("reviews.items is empty array by default", siteContent.reviews.items.length === 0);
 
 // Behavioral: verify holding-state renders and item-grid renders via registry simulation
@@ -195,8 +209,8 @@ assert("reviews.items is empty array by default", siteContent.reviews.items.leng
 // Simulate: empty items → holding state copy would be rendered
 const { holdingState: pwHolding } = siteContent.pastWork;
 assert(
-  "pastWork holding state title is non-empty SLOT",
-  pwHolding.title.startsWith("[SLOT:") && pwHolding.title.length > 0
+  "pastWork holding state title is a non-empty string",
+  pwHolding.title.trim().length > 0
 );
 
 // Simulate: non-empty items → grid branch would be rendered
@@ -251,8 +265,8 @@ assert(
 
 // Third tier exists (AI consulting tier implied by B2 spec)
 const tier3 = siteContent.pricing.tiers[2];
-assert("tier-3 name is a SLOT placeholder", tier3.name.startsWith("[SLOT:"));
-assert("tier-3 price is a SLOT placeholder", tier3.price.startsWith("[SLOT:"));
+assert("tier-3 name is a non-empty string", tier3.name.trim().length > 0);
+assert("tier-3 price is a non-empty string", tier3.price.trim().length > 0);
 
 // ---------------------------------------------------------------------------
 // [5] NavCards: registry-driven (not inline array)

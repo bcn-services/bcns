@@ -24,7 +24,7 @@ function assert(label, condition, detail = "") {
 // [1] All 5 new section keys exist in siteContent
 // ---------------------------------------------------------------------------
 console.log("\n[1] siteContent has all 5 new section keys");
-const NEW_KEYS = ["pastWork", "reviews", "pricing", "faq", "aboutFounder"];
+const NEW_KEYS = ["pastWork", "reviews", "pricing", "faq", "about"];
 for (const key of NEW_KEYS) {
   assert(`siteContent.${key} exists`, key in siteContent);
 }
@@ -53,16 +53,20 @@ assert(
 // ---------------------------------------------------------------------------
 // [3] Collection arrays are non-empty (seeded with example entries)
 // ---------------------------------------------------------------------------
-console.log("\n[3] Collection arrays are seeded (non-empty)");
+console.log("\n[3] Collection arrays are seeded (non-empty) OR a holding state covers the gap");
+// pastWork/reviews items are empty pre-launch by design (B2) — the section still
+// has to show *something*, so either real items or a populated holdingState must exist.
 assert(
-  "pastWork.items has >= 1 entry",
-  siteContent.pastWork.items.length >= 1,
-  `got ${siteContent.pastWork.items.length}`,
+  "pastWork has content: non-empty items OR a populated holdingState",
+  siteContent.pastWork.items.length >= 1 ||
+    Boolean(siteContent.pastWork.holdingState?.title?.length > 0),
+  `items=${siteContent.pastWork.items.length}, holdingState=${JSON.stringify(siteContent.pastWork.holdingState)}`,
 );
 assert(
-  "reviews.items has >= 1 entry",
-  siteContent.reviews.items.length >= 1,
-  `got ${siteContent.reviews.items.length}`,
+  "reviews has content: non-empty items OR a populated holdingState",
+  siteContent.reviews.items.length >= 1 ||
+    Boolean(siteContent.reviews.holdingState?.title?.length > 0),
+  `items=${siteContent.reviews.items.length}, holdingState=${JSON.stringify(siteContent.reviews.holdingState)}`,
 );
 assert(
   "pricing.tiers has >= 1 entry",
@@ -76,20 +80,21 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-// [4] PastWork and Reviews items use [SLOT: ...] placeholders (no invented copy)
+// [4] PastWork and Reviews items use [SLOT: ...] or [INPUT: ...] placeholders
+//     (no invented copy)
 // ---------------------------------------------------------------------------
-console.log("\n[4] PastWork and Reviews items carry [SLOT: ...] placeholders");
-const SLOT_RE = /\[SLOT:/;
+console.log("\n[4] PastWork and Reviews items carry [SLOT: ...] or [INPUT: ...] placeholders");
+const SLOT_RE = /\[(SLOT|INPUT):/;
 
 for (let i = 0; i < siteContent.pastWork.items.length; i++) {
   const { title, outcome } = siteContent.pastWork.items[i];
   assert(
-    `pastWork.items[${i}].title is a SLOT placeholder`,
+    `pastWork.items[${i}].title is a placeholder`,
     SLOT_RE.test(title),
     `got "${title}"`,
   );
   assert(
-    `pastWork.items[${i}].outcome is a SLOT placeholder`,
+    `pastWork.items[${i}].outcome is a placeholder`,
     SLOT_RE.test(outcome),
     `got "${outcome}"`,
   );
@@ -98,12 +103,12 @@ for (let i = 0; i < siteContent.pastWork.items.length; i++) {
 for (let i = 0; i < siteContent.reviews.items.length; i++) {
   const { quote, author } = siteContent.reviews.items[i];
   assert(
-    `reviews.items[${i}].quote is a SLOT placeholder`,
+    `reviews.items[${i}].quote is a placeholder`,
     SLOT_RE.test(quote),
     `got "${quote}"`,
   );
   assert(
-    `reviews.items[${i}].author is a SLOT placeholder`,
+    `reviews.items[${i}].author is a placeholder`,
     SLOT_RE.test(author),
     `got "${author}"`,
   );
@@ -112,26 +117,38 @@ for (let i = 0; i < siteContent.reviews.items.length; i++) {
 // ---------------------------------------------------------------------------
 // [5] aboutFounder has required fields
 // ---------------------------------------------------------------------------
-console.log("\n[5] aboutFounder has required fields");
-assert("aboutFounder.eyebrow present", "eyebrow" in siteContent.aboutFounder);
-assert("aboutFounder.title present", "title" in siteContent.aboutFounder);
-assert("aboutFounder.bio present", "bio" in siteContent.aboutFounder);
+console.log("\n[5] about has required fields (aboutFounder restructured into about + founders[] in B2)");
+assert("about.eyebrow present", "eyebrow" in siteContent.about);
+assert("about.title present", "title" in siteContent.about);
 assert(
-  "aboutFounder.credentials is an Array",
-  Array.isArray(siteContent.aboutFounder.credentials),
+  "about.founders[].bio present on every founder",
+  siteContent.about.founders.every((f) => "bio" in f),
+);
+assert(
+  "about.founders[].credentials is an Array on every founder",
+  siteContent.about.founders.every((f) => Array.isArray(f.credentials)),
 );
 
 // ---------------------------------------------------------------------------
 // [6] site.ts nav has all 5 new entries with correct anchors
 // ---------------------------------------------------------------------------
-console.log("\n[6] siteConfig.nav has correct anchors for all 5 new sections");
+// B1 (multi-page routing) replaced the single-page anchor nav this test assumed —
+// each of the 5 sections now lives on its own page instead of a homepage anchor,
+// so the successor check is "nav routes to the page that hosts the section."
+console.log("\n[6] siteConfig.nav routes to the page hosting each of the 5 sections");
 
 const navHrefs = siteConfig.nav.map((n) => n.href);
-const EXPECTED_ANCHORS = ["#past-work", "#reviews", "#pricing", "#faq", "#about"];
-for (const anchor of EXPECTED_ANCHORS) {
+const SECTION_OWNER_ROUTE = {
+  "past-work": "/work",
+  reviews: "/work",
+  pricing: "/pricing",
+  faq: "/pricing",
+  about: "/about",
+};
+for (const [section, route] of Object.entries(SECTION_OWNER_ROUTE)) {
   assert(
-    `nav contains "${anchor}"`,
-    navHrefs.includes(anchor),
+    `nav routes to "${route}" (hosts the ${section} section)`,
+    navHrefs.includes(route),
     `missing; found: ${navHrefs.join(", ")}`,
   );
 }

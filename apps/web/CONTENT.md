@@ -48,6 +48,7 @@ interface and the component.
 | Home | `/` | `hero`, `howItWorks`, `useCases`, `contactSection`, `navCards`, `pageMeta.home` |
 | Services | `/services` | `howItWorks`, `useCases`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
+| Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
 | About | `/about` | `about`, `contactSection`, `pageMeta.about` |
 | Privacy | `/privacy` | Static — no content registry fields |
@@ -337,9 +338,31 @@ fixed tuple.
 Portfolio / proof section. `items` is an open-ended array — add more as
 projects are completed. The `link` field is optional.
 
-**How to flip /work live:** Add an entry to `pastWork.items` — the holding
-state disappears automatically. No code change needed. (Same for
-`reviews.items`.)
+**Current state:** `pastWork.items` holds two case-study slots — `delucas`
+and `l2detailz` — real bcns clients. Every narrative field (`title`,
+`problem`, `approach`, `outcome`) on both ships as an `[INPUT: …]`
+placeholder. **Never replace these with drafted or invented copy** — a
+fabricated metric on a live marketing site is a false claim about a real
+business. Fill each field only with the real, confirmed detail for that
+client, then remove the `[INPUT: …]` wrapper.
+
+**Screenshots:** both entries now carry real screenshot files, captured
+locally from each app's demo fixture (never from a deployed instance) and
+committed to `apps/web/public/case-studies/`. `delucas` has one shot
+(`delucas-dashboard.png`); `l2detailz` has two (`l2detailz-frontend.png`,
+`l2detailz-calendar.png`). Each `src` points at a file that exists —
+verified by `apps/web/__tests__/case-study-screenshots.test.mjs`, which
+walks the registry and asserts every `screenshots[].src` resolves to a real
+file. `alt` text is real, descriptive accessibility copy (not a client
+claim, so it's filled in directly). `caption` still ships as an
+`[INPUT: …]` placeholder — captions are public-facing prose about a named
+client and stay behind the same anti-fabrication rule as `title`/`problem`/
+`approach`/`outcome` until Nate confirms the wording.
+
+**Why `link` is omitted on both entries:** it's optional, and
+`past-work.tsx` renders `{link}` as the visible anchor text — a placeholder
+href would render as a broken, misleading link. Add the field only once a
+real project URL exists.
 
 ### eyebrow
 - **Field:** `pastWork.eyebrow`
@@ -359,26 +382,73 @@ state disappears automatically. No code change needed. (Same for
 - **Tone:** Confident but not boastful
 - **Length:** 1-2 sentences, ≤150 chars
 
-### items[n] — project entries (open-ended array)
+### items[n] — case-study entries (open-ended array)
 
 Each entry has:
+
+#### items[n].slug
+- **Field:** `pastWork.items[n].slug`
+- **Purpose:** Stable, URL-safe identifier for the case study (React list key; also the `/work/[slug]` detail-page route param)
+- **Tone:** N/A (identifier, not copy)
+- **Note:** Must be unique across `items` and match `^[a-z0-9-]+$`. Current values: `delucas`, `l2detailz`. Set once; do not change after a detail page or external link depends on it.
+- **Length:** Short, lowercase, hyphenated
 
 #### items[n].title
 - **Field:** `pastWork.items[n].title`
 - **Purpose:** Project or engagement name
 - **Tone:** Neutral noun phrase (client-safe if needed)
+- **Note:** Both current entries carry an `[INPUT: …]` placeholder — the display form of a client's name is Nate's call; fill with the real, confirmed title.
 - **Length:** ≤60 chars
+
+#### items[n].problem
+- **Field:** `pastWork.items[n].problem`
+- **Purpose:** What the client's business struggled with before the build — the "why" that motivated the project
+- **Tone:** Specific, client-safe; describe the friction, not a generic pain point
+- **Note:** `[INPUT: …]` placeholder on both current entries. DeLuca's and L2 Detailz are real businesses — never draft or invent this copy; fill only with the confirmed detail.
+- **Length:** 1-2 sentences, ≤150 chars
+
+#### items[n].approach
+- **Field:** `pastWork.items[n].approach`
+- **Purpose:** What bcns built and how it addressed the problem
+- **Tone:** Concrete; name the mechanism, not just "we built software"
+- **Note:** `[INPUT: …]` placeholder on both current entries — same anti-fabrication rule as `problem`.
+- **Length:** 1-2 sentences, ≤150 chars
 
 #### items[n].outcome
 - **Field:** `pastWork.items[n].outcome`
 - **Purpose:** The measurable or qualitative result — the "so what"
 - **Tone:** Specific, evidence-driven; include numbers where possible
+- **Note:** `[INPUT: …]` placeholder on both current entries. Never fill with a plausible-sounding metric — only a number or result the client has confirmed. A fabricated outcome on a live site is a false claim about a real business.
 - **Length:** 1-2 sentences, ≤120 chars
+
+#### items[n].screenshots
+- **Field:** `pastWork.items[n].screenshots`
+- **Purpose:** Array of `{ src, alt, caption }` objects shown alongside the case study
+- **Note:** `delucas` has 1 entry, `l2detailz` has 2. See "Screenshots" above for how these were captured and what's still `[INPUT: …]`.
+
+##### items[n].screenshots[m].src
+- **Field:** `pastWork.items[n].screenshots[m].src`
+- **Purpose:** Path or URL to the screenshot image asset
+- **Tone:** N/A (path/URL only)
+- **Length:** Valid path/URL; must point at a file that actually exists — a missing file fails the build
+
+##### items[n].screenshots[m].alt
+- **Field:** `pastWork.items[n].screenshots[m].alt`
+- **Purpose:** Accessible alt text describing the screenshot's content
+- **Tone:** Descriptive, concrete — what does the image show?
+- **Length:** ≤120 chars
+
+##### items[n].screenshots[m].caption
+- **Field:** `pastWork.items[n].screenshots[m].caption`
+- **Purpose:** Visible caption shown under the screenshot
+- **Tone:** Short, factual
+- **Length:** ≤100 chars
 
 #### items[n].link _(optional)_
 - **Field:** `pastWork.items[n].link`
 - **Purpose:** URL to a live project, case study, or write-up
 - **Tone:** N/A (URL only)
+- **Note:** Omitted on both current entries — see "Why `link` is omitted" above.
 - **Length:** Valid URL; omit field entirely if no link exists
 
 ### holdingState — shown when items[] is empty
@@ -406,8 +476,42 @@ Each entry has:
 - **Purpose:** URL for the CTA link (e.g. `/#contact`)
 - **Tone:** N/A (URL only)
 
-> **Adding work:** append `{ title, outcome, link? }` objects to `pastWork.items`.
-> When `items.length > 0`, the holding state is hidden automatically.
+> **Adding work:** append `{ slug, title, problem, approach, outcome, screenshots, link? }`
+> objects to `pastWork.items`. `slug` must be unique and match `^[a-z0-9-]+$`;
+> `screenshots` defaults to `[]`; `link` is optional. When `items.length > 0`,
+> the holding state is hidden automatically — `pastWork.items` is no longer
+> empty as of this pass, so the item grid (not the holding state) is what
+> currently renders on `/work`.
+
+### caseStudy — section labels for the `/work/[slug]` detail page
+
+Structural labels (not narrative copy) shown above each of the three blocks
+on a case study's detail page at `app/work/[slug]/page.tsx`. Same labels on
+every case study — not per-item.
+
+#### caseStudy.backLabel
+- **Field:** `pastWork.caseStudy.backLabel`
+- **Purpose:** Label on the link back to `/work`, shown above the title on every case study detail page. Currently `Back to Work`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-4 words
+
+#### caseStudy.problemLabel
+- **Field:** `pastWork.caseStudy.problemLabel`
+- **Purpose:** Section label above `items[n].problem` on the detail page. Currently `The problem`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-3 words
+
+#### caseStudy.approachLabel
+- **Field:** `pastWork.caseStudy.approachLabel`
+- **Purpose:** Section label above `items[n].approach` on the detail page. Currently `Our approach`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-3 words
+
+#### caseStudy.outcomeLabel
+- **Field:** `pastWork.caseStudy.outcomeLabel`
+- **Purpose:** Section label above `items[n].outcome` on the detail page. Currently `The outcome`.
+- **Tone:** Short, factual noun phrase
+- **Length:** 1-3 words
 
 ---
 
@@ -877,13 +981,24 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pastWork.eyebrow` | Past Work — eyebrow |
 | `pastWork.title` | Past Work — title |
 | `pastWork.description` | Past Work — description |
+| `pastWork.items[n].slug` | Past Work — items slug |
 | `pastWork.items[n].title` | Past Work — items title |
+| `pastWork.items[n].problem` | Past Work — items problem |
+| `pastWork.items[n].approach` | Past Work — items approach |
 | `pastWork.items[n].outcome` | Past Work — items outcome |
-| `pastWork.items[n].link` | Past Work — items link |
+| `pastWork.items[n].screenshots` | Past Work — items screenshots |
+| `pastWork.items[n].screenshots[m].src` | Past Work — items screenshots src |
+| `pastWork.items[n].screenshots[m].alt` | Past Work — items screenshots alt |
+| `pastWork.items[n].screenshots[m].caption` | Past Work — items screenshots caption |
+| `pastWork.items[n].link` _(optional)_ | Past Work — items link |
 | `pastWork.holdingState.title` | Past Work — holdingState title |
 | `pastWork.holdingState.body` | Past Work — holdingState body |
 | `pastWork.holdingState.ctaLabel` | Past Work — holdingState ctaLabel |
 | `pastWork.holdingState.ctaHref` | Past Work — holdingState ctaHref |
+| `pastWork.caseStudy.backLabel` | Past Work — caseStudy backLabel |
+| `pastWork.caseStudy.problemLabel` | Past Work — caseStudy problemLabel |
+| `pastWork.caseStudy.approachLabel` | Past Work — caseStudy approachLabel |
+| `pastWork.caseStudy.outcomeLabel` | Past Work — caseStudy outcomeLabel |
 | `reviews.eyebrow` | Reviews — eyebrow |
 | `reviews.title` | Reviews — title |
 | `reviews.description` | Reviews — description |
@@ -934,7 +1049,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 80 (77 + the three optional build-tier fields `setup`, `monthly`, `seats`, present on tiers[0] and tiers[1]). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 93 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. Unchanged by this pass: `screenshots`/`screenshots[m].src`/`.alt`/`.caption` were already rows before the three case-study screenshots were captured — this pass filled in values (populating `delucas`/`l2detailz`'s `screenshots` arrays), it did not add new field paths. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
 The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff) live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
@@ -942,8 +1057,8 @@ The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-yo
 
 ## Remaining `[INPUT: …]` slots (Needs-Nate)
 
-These are the only `[INPUT: …]` slots remaining in `content.ts` after the C1 voice pass.
-All pricing, turnaround, response-time, support-window, and page-meta slots are now filled.
+These are the `[INPUT: …]` slots remaining in `content.ts`. All pricing,
+turnaround, response-time, support-window, and page-meta slots are filled.
 
 | Field | Slot |
 |---|---|
@@ -953,10 +1068,30 @@ All pricing, turnaround, response-time, support-window, and page-meta slots are 
 | `about.founders[1].credentials[0]` | `[INPUT: NYU program]` |
 | `about.founders[1].credentials[1]` | `[INPUT: credential 2]` |
 | `about.founders[1].credentials[2]` | `[INPUT: credential 3]` |
+| `pastWork.items[0].title` (delucas) | `[INPUT: delucas case study title]` |
+| `pastWork.items[0].problem` (delucas) | `[INPUT: delucas problem]` |
+| `pastWork.items[0].approach` (delucas) | `[INPUT: delucas approach]` |
+| `pastWork.items[0].outcome` (delucas) | `[INPUT: delucas outcome]` |
+| `pastWork.items[1].title` (l2detailz) | `[INPUT: l2detailz case study title]` |
+| `pastWork.items[1].problem` (l2detailz) | `[INPUT: l2detailz problem]` |
+| `pastWork.items[1].approach` (l2detailz) | `[INPUT: l2detailz approach]` |
+| `pastWork.items[1].outcome` (l2detailz) | `[INPUT: l2detailz outcome]` |
+| `pastWork.items[0].screenshots[0].caption` (delucas dashboard) | `[INPUT: delucas dashboard screenshot caption]` |
+| `pastWork.items[1].screenshots[0].caption` (l2detailz frontend) | `[INPUT: l2detailz frontend screenshot caption]` |
+| `pastWork.items[1].screenshots[1].caption` (l2detailz calendar) | `[INPUT: l2detailz calendar screenshot caption]` |
 
-**First real past-work entry + review** are not placeholders — they are empty arrays
-(`pastWork.items`, `reviews.items`). Add entries to those arrays to flip /work live.
+DeLuca's and L2 Detailz are real bcns clients — fill these eleven slots only
+with confirmed detail from each client, never drafted or invented copy. The
+three screenshot captions must not state or imply any dollar figure,
+customer count, or business outcome — the numbers visible in the screenshots
+themselves are invented demo-fixture data, not confirmed client results.
+
+**`reviews.items`** is still an empty array, not a placeholder — add entries
+to it to flip reviews live. `pastWork.items` is no longer empty (it holds
+the two case-study slots above); its `screenshots` arrays are no longer
+empty either — `delucas` has 1 real screenshot, `l2detailz` has 2, all
+captured from each app's local demo fixture (see the Past Work section).
 
 ---
 
-_Last updated: 2026-07-19 (W4 mirror: hosted framing, setup/monthly/seats pricing, hosting/BYOK/stop-paying FAQ). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-07-28 (Captured the three case-study screenshots — `delucas-dashboard.png`, `l2detailz-frontend.png`, `l2detailz-calendar.png` — from each app's local demo fixture and populated `pastWork.items[0].screenshots` / `pastWork.items[1].screenshots` with real `src`/`alt` values; `caption` stays `[INPUT: …]` pending client permission). Source of truth: `apps/web/lib/content.ts`._

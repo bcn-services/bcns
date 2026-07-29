@@ -65,41 +65,22 @@ for (let i = 0; i < siteContent.pastWork.items.length; i++) {
 // ---------------------------------------------------------------------------
 // [2] AboutFounderContent has description?, cardTitleBio, cardTitleCredentials
 // ---------------------------------------------------------------------------
-console.log("\n[2] AboutFounderContent — three new fields present in registry");
+console.log("\n[2] AboutContent — successor fields present in registry (about replaced aboutFounder)");
 
 assert(
-  "aboutFounder.description present",
-  "description" in siteContent.aboutFounder,
-  `keys: ${Object.keys(siteContent.aboutFounder).join(", ")}`,
+  "about.description present",
+  "description" in siteContent.about,
+  `keys: ${Object.keys(siteContent.about).join(", ")}`,
 );
 assert(
-  "aboutFounder.description is a SLOT placeholder (or undefined)",
-  siteContent.aboutFounder.description === undefined ||
-    SLOT_RE.test(siteContent.aboutFounder.description ?? ""),
-  `got "${siteContent.aboutFounder.description}"`,
+  "about.description is a non-empty string (real copy landed in B3)",
+  typeof siteContent.about.description === "string" &&
+    siteContent.about.description.trim().length > 0,
+  `got "${siteContent.about.description}"`,
 );
 
-assert(
-  "aboutFounder.cardTitleBio present",
-  "cardTitleBio" in siteContent.aboutFounder,
-  `keys: ${Object.keys(siteContent.aboutFounder).join(", ")}`,
-);
-assert(
-  "aboutFounder.cardTitleBio is a SLOT placeholder",
-  SLOT_RE.test(siteContent.aboutFounder.cardTitleBio),
-  `got "${siteContent.aboutFounder.cardTitleBio}"`,
-);
-
-assert(
-  "aboutFounder.cardTitleCredentials present",
-  "cardTitleCredentials" in siteContent.aboutFounder,
-  `keys: ${Object.keys(siteContent.aboutFounder).join(", ")}`,
-);
-assert(
-  "aboutFounder.cardTitleCredentials is a SLOT placeholder",
-  SLOT_RE.test(siteContent.aboutFounder.cardTitleCredentials),
-  `got "${siteContent.aboutFounder.cardTitleCredentials}"`,
-);
+// aboutFounder.cardTitleBio / cardTitleCredentials had no successor field after
+// the B2 rework — about-founder.tsx no longer renders per-section card titles.
 
 // ---------------------------------------------------------------------------
 // [3] No hardcoded card titles in about-founder.tsx source
@@ -126,16 +107,8 @@ assert(
   !aboutFounderSrc.includes('"Credentials"') && !aboutFounderSrc.includes("'Credentials'"),
   "found hardcoded title",
 );
-assert(
-  "about-founder.tsx uses {cardTitleBio}",
-  aboutFounderSrc.includes("{cardTitleBio}"),
-  "wiring missing",
-);
-assert(
-  "about-founder.tsx uses {cardTitleCredentials}",
-  aboutFounderSrc.includes("{cardTitleCredentials}"),
-  "wiring missing",
-);
+// {cardTitleBio} / {cardTitleCredentials} wiring checks removed — no successor
+// field after the B2 rework (see note above).
 assert(
   "about-founder.tsx passes description to SectionHeading",
   aboutFounderSrc.includes("description={description}"),

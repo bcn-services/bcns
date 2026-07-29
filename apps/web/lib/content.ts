@@ -60,10 +60,27 @@ export interface ContactSectionContent {
   highlights: [ContactHighlightItem, ContactHighlightItem, ContactHighlightItem];
 }
 
+export interface ScreenshotItem {
+  src: string;
+  alt: string;
+  caption: string;
+}
+
 export interface PastWorkItem {
+  slug: string;
   title: string;
+  problem: string;
+  approach: string;
   outcome: string;
+  screenshots: ScreenshotItem[];
   link?: string;
+}
+
+export interface CaseStudyLabels {
+  backLabel: string;
+  problemLabel: string;
+  approachLabel: string;
+  outcomeLabel: string;
 }
 
 export interface PastWorkContent {
@@ -72,6 +89,7 @@ export interface PastWorkContent {
   description: string;
   items: PastWorkItem[];
   holdingState: HoldingState;
+  caseStudy: CaseStudyLabels;
 }
 
 export interface ReviewItem {
@@ -284,12 +302,52 @@ export const siteContent: SiteContent = {
     eyebrow: "Past work",
     title: "Past work",
     description: "What we've built, and what it changed for the businesses using it.",
-    items: [],
+    items: [
+      {
+        slug: "delucas",
+        title: "[INPUT: delucas case study title]",
+        problem: "[INPUT: delucas problem]",
+        approach: "[INPUT: delucas approach]",
+        outcome: "[INPUT: delucas outcome]",
+        screenshots: [
+          {
+            src: "/case-studies/delucas-dashboard.png",
+            alt: "DeLuca's dashboard showing monthly money in, spent, and profit totals above a 12-month profit bar chart and an expenses-by-category breakdown.",
+            caption: "[INPUT: delucas dashboard screenshot caption]",
+          },
+        ],
+      },
+      {
+        slug: "l2detailz",
+        title: "[INPUT: l2detailz case study title]",
+        problem: "[INPUT: l2detailz problem]",
+        approach: "[INPUT: l2detailz approach]",
+        outcome: "[INPUT: l2detailz outcome]",
+        screenshots: [
+          {
+            src: "/case-studies/l2detailz-frontend.png",
+            alt: "L2 Detailz marketing site showing the Essential, Signature, and Prestige detailing package cards with pricing and included services.",
+            caption: "[INPUT: l2detailz frontend screenshot caption]",
+          },
+          {
+            src: "/case-studies/l2detailz-calendar.png",
+            alt: "L2 Detailz admin calendar in month view with scheduled detailing jobs listed across the days of the month.",
+            caption: "[INPUT: l2detailz calendar screenshot caption]",
+          },
+        ],
+      },
+    ],
     holdingState: {
       title: "Our first builds are in progress",
       body: "We're building for our first clients right now. Case studies land here as projects wrap. Each one covers the problem, what we built, and what changed.",
       ctaLabel: "Want to be one of them? Book a free consult.",
       ctaHref: "/#contact",
+    },
+    caseStudy: {
+      backLabel: "Back to Work",
+      problemLabel: "The problem",
+      approachLabel: "Our approach",
+      outcomeLabel: "The outcome",
     },
   },
 

@@ -66,25 +66,32 @@ export function PastWork() {
           </Reveal>
         ) : (
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map(({ title: workTitle, outcome, link }) => (
-              <Card key={workTitle} className="h-full">
-                <CardHeader>
-                  <CardTitle className="text-base">{workTitle}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="leading-relaxed">{outcome}</CardDescription>
-                  {link && (
-                    <a
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                    >
-                      {link}
-                    </a>
-                  )}
-                </CardContent>
-              </Card>
+            {items.map(({ slug, title: workTitle, outcome, link }) => (
+              <div key={slug} className="flex h-full flex-col">
+                <Link
+                  href={`/work/${slug}`}
+                  className="block flex-1 rounded-xl ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <Card className="group hover-lift h-full">
+                    <CardHeader>
+                      <CardTitle className="text-base">{workTitle}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription className="leading-relaxed">{outcome}</CardDescription>
+                    </CardContent>
+                  </Card>
+                </Link>
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-block rounded-md text-sm text-muted-foreground underline underline-offset-4 ring-offset-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {link}
+                  </a>
+                )}
+              </div>
             ))}
           </div>
         )}
