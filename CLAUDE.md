@@ -79,4 +79,4 @@ Client apps are **not** added to this monorepo. Each new client business gets **
 
 ## Deploy
 
-Vercel free tier via `vercel.json`. Set the three env vars in the Vercel dashboard. No database, no paid services beyond a domain.
+Vercel free tier. The one required project setting is **Root Directory = `apps/web`** — everything else stays on auto-detect, and there is intentionally no `vercel.json` (see README → Deploy). Set the three env vars in the Vercel dashboard. No database, no paid services beyond a domain.

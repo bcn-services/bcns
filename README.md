@@ -24,7 +24,6 @@ bcns/
 ├─ package.json       # Root scripts + workspace dev dependencies
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
-├─ vercel.json        # Vercel deploy config
 ├─ .nvmrc             # Node version (22)
 ```
 
@@ -108,19 +107,24 @@ cp apps/web/.env.example apps/web/.env.local
 
 The only recurring cost is a domain — no databases or paid services.
 
-**One-command deploy** (from the repo root, after `npm i -g vercel`):
+This is a pnpm monorepo, so the deploy hinges on one project setting:
 
-```bash
-vercel        # first run links/creates the project
-vercel --prod # ship to production
-```
+**Project → Settings → Build & Deployment → Root Directory = `apps/web`**
 
-`vercel.json` sets the framework, install/build commands, and output directory
-so the monorepo builds correctly. In the Vercel dashboard, add the environment
-variables above under **Project → Settings → Environment Variables**.
+Leave everything else on auto-detect. Vercel reads the Next.js preset from
+`apps/web`, and because "Include files outside the Root Directory" is on by
+default, it still installs from the workspace root (`pnpm-lock.yaml`,
+`pnpm-workspace.yaml`) so `@nseluga/ui` and `@nseluga/config` resolve.
 
-> If Vercel doesn't auto-detect the app, set **Root Directory = `apps/web`** in
-> project settings and it will use Next.js defaults.
+There is deliberately **no `vercel.json`**. A root-level one is ignored once the
+Root Directory is a subdirectory, and overriding `outputDirectory` to
+`apps/web/.next` fights the Next.js preset instead of helping it — that
+combination is what broke the first deploy.
+
+Then add the environment variables above under **Project → Settings →
+Environment Variables** (`NEXT_PUBLIC_SITE_URL` matters most — left unset it
+emits localhost canonical/OG URLs and a localhost sitemap). Pushes to `main`
+deploy to production via the GitHub integration.
 
 ### Cloudflare Pages (alternative)
 
