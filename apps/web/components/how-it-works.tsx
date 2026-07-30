@@ -46,22 +46,22 @@ export function HowItWorks() {
               1/6, 1/2, 5/6). Track + primary fill that grows left→right on entry. */}
           <div
             aria-hidden
-            className="absolute left-[16.666%] right-[16.666%] top-6 hidden h-0.5 -translate-y-1/2 bg-border md:block"
+            className="absolute left-[16.666%] right-[16.666%] top-10 hidden h-0.5 -translate-y-1/2 bg-border md:block"
           />
           <div
             aria-hidden
-            className={`absolute left-[16.666%] right-[16.666%] top-6 hidden h-0.5 origin-left -translate-y-1/2 bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)] transition-transform duration-[1400ms] ease-out md:block ${
+            className={`absolute left-[16.666%] right-[16.666%] top-10 hidden h-0.5 origin-left -translate-y-1/2 bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)] transition-transform duration-[1400ms] ease-out md:block ${
               active ? "scale-x-100" : "scale-x-0"
             }`}
           />
           {/* Mobile: vertical connector down the left rail of the badges. */}
           <div
             aria-hidden
-            className="absolute bottom-8 left-6 top-8 w-0.5 -translate-x-1/2 bg-border md:hidden"
+            className="absolute bottom-10 left-10 top-10 w-0.5 -translate-x-1/2 bg-border md:hidden"
           />
           <div
             aria-hidden
-            className={`absolute bottom-8 left-6 top-8 w-0.5 origin-top -translate-x-1/2 bg-primary transition-transform duration-[1400ms] ease-out md:hidden ${
+            className={`absolute bottom-10 left-10 top-10 w-0.5 origin-top -translate-x-1/2 bg-primary transition-transform duration-[1400ms] ease-out md:hidden ${
               active ? "scale-y-100" : "scale-y-0"
             }`}
           />
@@ -78,15 +78,15 @@ export function HowItWorks() {
                 >
                   {/* Numbered node badge — sits on the connector; pops in in sequence. */}
                   <span
-                    className={`relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border-2 bg-background shadow-sm transition-[transform,opacity,border-color,color] duration-500 ease-out ${
+                    className={`relative z-10 flex size-20 shrink-0 items-center justify-center rounded-full border-[3px] bg-background shadow-md transition-[transform,opacity,border-color,color] duration-500 ease-out ${
                       active
                         ? "scale-100 border-primary text-primary opacity-100"
                         : "scale-75 border-border text-muted-foreground opacity-0"
                     }`}
                     style={{ transitionDelay: `${delay}ms` }}
                   >
-                    <Icon className="size-6" aria-hidden />
-                    <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold tabular-nums text-primary-foreground">
+                    <Icon className="size-10" aria-hidden />
+                    <span className="absolute -right-1 -top-1 flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground">
                       {index + 1}
                     </span>
                   </span>
@@ -99,8 +99,8 @@ export function HowItWorks() {
                     <span className="text-sm font-semibold tabular-nums text-muted-foreground">
                       {step}
                     </span>
-                    <h3 className="text-xl font-semibold">{stepTitle}</h3>
-                    <p className="text-pretty leading-relaxed text-muted-foreground md:max-w-xs">
+                    <h3 className="text-lg font-semibold">{stepTitle}</h3>
+                    <p className="text-pretty text-sm leading-relaxed text-muted-foreground md:max-w-xs">
                       {stepDescription}
                     </p>
                   </div>

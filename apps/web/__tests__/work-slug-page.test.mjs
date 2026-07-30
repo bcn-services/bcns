@@ -15,6 +15,7 @@ import { siteContent } from "../lib/content.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
+
 const pageSrc = readFileSync(resolve(root, "app/work/[slug]/page.tsx"), "utf8");
 const contentMd = readFileSync(resolve(root, "CONTENT.md"), "utf8");
 const { items, caseStudy } = siteContent.pastWork;
@@ -114,12 +115,12 @@ for (const item of items) {
     const descMatch = html.match(/<meta name="description" content="([^"]*)"/);
     assert.ok(titleMatch, `${item.slug}: no <title> found in built HTML`);
     assert.ok(
-      titleMatch[1].includes(item.title),
+      decodeEntities(titleMatch[1]).includes(item.title),
       `${item.slug}: title "${titleMatch[1]}" doesn't include item.title "${item.title}"`,
     );
     assert.ok(descMatch, `${item.slug}: no meta description found in built HTML`);
     assert.ok(
-      descMatch[1].includes(item.outcome),
+      decodeEntities(descMatch[1]).includes(item.outcome),
       `${item.slug}: meta description doesn't include item.outcome`,
     );
   });
@@ -139,15 +140,22 @@ test("the two case studies have different <title> and meta description", (t) => 
   assert.notEqual(descs[0], descs[1], "both items rendered the same meta description");
 });
 
-// --- Anti-fabrication guard at the route layer: rendered fields must still be [INPUT: ...] placeholders ---
-const INPUT_RE = /^\[INPUT: .+\]$/;
-test("every rendered narrative field is still an [INPUT: ...] placeholder (no fabricated prose slipped in)", () => {
+// --- Route layer: rendered narrative fields must be real copy, not placeholders ---
+// Inverted from the original guard, which required [INPUT: ...] placeholders to keep
+// an agent from inventing prose about a real client. The fields are now filled from
+// detail Nate confirmed, so the useful check is that no placeholder comes back.
+const INPUT_RE = /\[(INPUT|SLOT):/;
+test("every rendered narrative field is real copy (no placeholder regression)", () => {
   for (const item of items) {
     for (const field of ["problem", "approach", "outcome"]) {
-      assert.match(
+      assert.doesNotMatch(
         item[field],
         INPUT_RE,
-        `${item.slug}.${field} = "${item[field]}" is not an [INPUT: ...] placeholder`,
+        `${item.slug}.${field} regressed to a placeholder: "${item[field]}"`,
+      );
+      assert.ok(
+        item[field].trim().length > 0,
+        `${item.slug}.${field} is empty`,
       );
     }
   }

@@ -86,16 +86,18 @@ assert(
 console.log("\n[4] PastWork and Reviews items carry [SLOT: ...] or [INPUT: ...] placeholders");
 const SLOT_RE = /\[(SLOT|INPUT):/;
 
+// pastWork is filled as of the case-study copy pass, so its fields must now be real
+// copy. reviews is still unwritten and keeps the original placeholder guard below.
 for (let i = 0; i < siteContent.pastWork.items.length; i++) {
   const { title, outcome } = siteContent.pastWork.items[i];
   assert(
-    `pastWork.items[${i}].title is a placeholder`,
-    SLOT_RE.test(title),
+    `pastWork.items[${i}].title is real copy, not a placeholder`,
+    !SLOT_RE.test(title) && title.trim().length > 0,
     `got "${title}"`,
   );
   assert(
-    `pastWork.items[${i}].outcome is a placeholder`,
-    SLOT_RE.test(outcome),
+    `pastWork.items[${i}].outcome is real copy, not a placeholder`,
+    !SLOT_RE.test(outcome) && outcome.trim().length > 0,
     `got "${outcome}"`,
   );
 }

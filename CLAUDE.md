@@ -66,6 +66,7 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 - Server Components by default in `app/`; add `"use client"` only when state or browser APIs are needed.
 - Shared primitives go in `packages/ui/`, not inline in `apps/web/components/ui/`.
 - `lib/content.ts` is the single source of truth for all marketing copy — keep it that way. `lib/site.ts` holds only name / domain / email / nav. `CONTENT.md` is the field-by-field companion to `content.ts` and must be updated alongside it.
+- Fonts are self-hosted via `next/font/local` from `apps/web/app/fonts/`. Do **not** switch back to `next/font/google`: it fetches over the network at build time with no timeout in production, so an unreachable Google CDN fails `next build` in CI. To add or update a face, follow `apps/web/app/fonts/README.md`.
 
 ## Adding a client app later
 

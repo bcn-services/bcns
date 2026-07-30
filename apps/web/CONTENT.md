@@ -397,28 +397,37 @@ Each entry has:
 - **Field:** `pastWork.items[n].title`
 - **Purpose:** Project or engagement name
 - **Tone:** Neutral noun phrase (client-safe if needed)
-- **Note:** Both current entries carry an `[INPUT: …]` placeholder — the display form of a client's name is Nate's call; fill with the real, confirmed title.
+- **Note:** Both filled with the client's real name plus what was built ("DeLuca's revenue dashboard", "L2 Detailz booking site and admin"). Both clients approved being named. Avoid the "Name — descriptor" form: em-dashes are banned in `content.ts` and gated by a test.
+- **Renders twice:** card heading on `/work` and the `<h1>` on `/work/[slug]`, so it has to work standalone in both.
 - **Length:** ≤60 chars
+
+#### items[n].tag
+- **Field:** `pastWork.items[n].tag`
+- **Purpose:** Industry plus build type, rendered as a `Badge` on the `/work` card
+- **Tone:** Two short noun phrases joined by a middle dot: "Restaurant · Bookkeeping", "Auto detailing · Booking"
+- **Why it exists:** with only two case studies, showing two different industries side by side is what signals bcns is not a one-vertical shop. Keep the industry first — that is the part a visitor matches against their own business.
+- **Length:** ≤32 chars; it is a pill on a card and wraps badly past that
 
 #### items[n].problem
 - **Field:** `pastWork.items[n].problem`
 - **Purpose:** What the client's business struggled with before the build — the "why" that motivated the project
 - **Tone:** Specific, client-safe; describe the friction, not a generic pain point
-- **Note:** `[INPUT: …]` placeholder on both current entries. DeLuca's and L2 Detailz are real businesses — never draft or invent this copy; fill only with the confirmed detail.
+- **Note:** Filled for both entries from detail Nate confirmed directly. DeLuca's and L2 Detailz are real businesses — never draft or invent this copy; fill only with confirmed detail. That rule still applies to any future entry and to edits of these two.
 - **Length:** 1-2 sentences, ≤150 chars
 
 #### items[n].approach
 - **Field:** `pastWork.items[n].approach`
 - **Purpose:** What bcns built and how it addressed the problem
 - **Tone:** Concrete; name the mechanism, not just "we built software"
-- **Note:** `[INPUT: …]` placeholder on both current entries — same anti-fabrication rule as `problem`.
+- **Note:** Filled for both entries. Same anti-fabrication rule as `problem`. Name the actual mechanism: DeLuca's says "email parsing and direct API access", L2 says "rebuilt his HTML site as a web app", because a specific mechanism is what a skeptical reader can evaluate.
 - **Length:** 1-2 sentences, ≤150 chars
 
 #### items[n].outcome
 - **Field:** `pastWork.items[n].outcome`
-- **Purpose:** The measurable or qualitative result — the "so what"
-- **Tone:** Specific, evidence-driven; include numbers where possible
-- **Note:** `[INPUT: …]` placeholder on both current entries. Never fill with a plausible-sounding metric — only a number or result the client has confirmed. A fabricated outcome on a live site is a false claim about a real business.
+- **Purpose:** The result — the "so what"
+- **Tone:** Specific, evidence-driven.
+- **Current intent — capability, not metrics:** both entries state an ability the owner gained ("He can see monthly revenue…", "He manages scheduling, routes…"). Quantified business results are deliberately deferred until a client confirms real numbers. Do **not** read "evidence-driven" as license to add a figure.
+- **Note:** Never fill with a plausible-sounding metric — only a number or result the client has confirmed. A fabricated outcome on a live site is a false claim about a real business. Also keep it present-tense: no roadmap items ("will be able to once he hires…"), which read as padding.
 - **Length:** 1-2 sentences, ≤120 chars
 
 #### items[n].screenshots
@@ -441,7 +450,8 @@ Each entry has:
 ##### items[n].screenshots[m].caption
 - **Field:** `pastWork.items[n].screenshots[m].caption`
 - **Purpose:** Visible caption shown under the screenshot
-- **Tone:** Short, factual
+- **Tone:** Short, factual. Describe the artifact, not the business — a caption is the one case-study field that can be written from the image itself, which is why the anti-fabrication rule on `problem`/`approach`/`outcome` does not bind here.
+- **Note:** All three filled. Do not restate the `alt` text; it is already read by screen readers, so a duplicate caption wastes the slot.
 - **Length:** ≤100 chars
 
 #### items[n].link _(optional)_
@@ -834,29 +844,31 @@ Each founder entry has:
 
 #### founders[n].photo _(optional)_
 - **Field:** `about.founders[n].photo`
-- **Purpose:** Path or URL to the founder's headshot
-- **Note:** Contains `[INPUT: photo]` — replace with the real asset path or URL when available. Omit field entirely if no photo exists.
-- **Length:** Valid path/URL
+- **Purpose:** Path to the founder's headshot, served from `public/`
+- **Note:** Nate: `/founders/nate-seluga.jpg`. Brandon: field omitted — `about-founder.tsx` falls back to initials, so omit rather than setting a placeholder (a placeholder path renders a broken image). Adding a photo takes two steps: drop the file in `public/founders/`, then register it in `FOUNDER_PHOTOS` in `about-founder.tsx` — next/image needs a static import, so a path alone will not render.
+- **Asset spec:** square crop, shoulders-up, face filling the frame (it renders at 56px), plain background, 512×512 minimum. Shoot both founders in one session so lighting and framing match.
+- **Length:** Valid path under `public/`
 
 #### founders[n].bio
 - **Field:** `about.founders[n].bio`
 - **Purpose:** 1-3 paragraph biography — the founder's story, expertise, and why they do this work
 - **Tone:** Specific/evidence-driven, no marketing fluff
-- **Note:** Nate's bio is written. Brandon's bio leads with `[INPUT: business experience summary]` — fill with the specific businesses/roles when ready.
-- **Length:** 100-300 words; shorter is better if every sentence earns its place
+- **Note:** Both bios are written, no placeholders remain. They carry the founder story (the "why"), since `whyBcns` renders as a short pull quote and has no room for it. Voice is calibrated to the style reference: plain declarative sentences, cause stated explicitly, no marketing adjectives.
+- **Constraint:** Renders as a single `<p>` — the field is one string, so paragraph breaks are not possible. Multi-paragraph bios would require `bio: string[]` plus a `.map()` in the component.
+- **Length:** 100-300 words; shorter is better if every sentence earns its place. Keep the two within ~10 words of each other — the cards sit side by side and a length mismatch reads as one founder having less to say.
 
 #### founders[n].credentials[] (open-ended array)
 - **Field:** `about.founders[n].credentials`
 - **Purpose:** Bullet list of credentials (degrees, former employers, notable achievements)
 - **Tone:** Factual noun phrase
-- **Note:** Nate: one credential line (Harvey Mudd CS) — no placeholders remain. Brandon: `[INPUT: NYU program]`, `[INPUT: credential 2]`, `[INPUT: credential 3]` — fill when confirmed.
+- **Note:** One real credential each — Nate: Harvey Mudd CS; Brandon: NYU economics. No placeholders remain. Keep the counts equal between founders; an unmatched bullet list makes one card look thinner than the other.
 - **Length:** ≤80 chars per item; append strings to add more
 
 ### whyBcns
 - **Field:** `about.whyBcns`
-- **Purpose:** 2-3 sentences explaining why Nate and Brandon started bcns and what they want it to be
-- **Tone:** Personal, honest; written in the voice of the founders
-- **Note:** C1 pass wrote the founding story. Edit in place if the framing evolves.
+- **Purpose:** 2-3 sentences on the conviction behind bcns — the gap the founders keep seeing, not what they want out of the business
+- **Tone:** Personal, honest; written in the voice of the founders. Keep it about the client's problem; framing about the studio's own goals ("we'd rather build X than sell Y") reads as pitching.
+- **Note:** Renders as a centered pull quote at `text-xl`/`sm:text-2xl` (`about-founder.tsx`), so the char cap is a design limit, not a preference. It is unlabeled — no eyebrow or heading — so it reads as a quote rather than a section.
 - **Length:** 2-3 sentences, ≤250 chars
 
 > `founders` is a fixed tuple of exactly 2. Adding a third founder requires updating the interface and the component.

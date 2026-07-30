@@ -69,6 +69,8 @@ export interface ScreenshotItem {
 export interface PastWorkItem {
   slug: string;
   title: string;
+  /** Industry + build type, shown as a Badge on the /work card (e.g. "Restaurant · Bookkeeping"). */
+  tag: string;
   problem: string;
   approach: string;
   outcome: string;
@@ -305,34 +307,45 @@ export const siteContent: SiteContent = {
     items: [
       {
         slug: "delucas",
-        title: "[INPUT: delucas case study title]",
-        problem: "[INPUT: delucas problem]",
-        approach: "[INPUT: delucas approach]",
-        outcome: "[INPUT: delucas outcome]",
+        title: "DeLuca's revenue dashboard",
+        tag: "Restaurant · Bookkeeping",
+        problem:
+          "He was not tracking revenue or costs. The only signal he had about the business was the amount that landed in his bank account.",
+        approach:
+          "A dashboard that fills itself by parsing his email and pulling the rest through direct API access. Recurring items like rent are set once as rules.",
+        outcome:
+          "He can see monthly revenue, spending, and what he is paying for, without doing anything to keep it current.",
         screenshots: [
           {
             src: "/case-studies/delucas-dashboard.png",
             alt: "DeLuca's dashboard showing monthly money in, spent, and profit totals above a 12-month profit bar chart and an expenses-by-category breakdown.",
-            caption: "[INPUT: delucas dashboard screenshot caption]",
+            caption:
+              "The monthly view: money in, money out, profit, and which categories the spending went to.",
           },
         ],
       },
       {
         slug: "l2detailz",
-        title: "[INPUT: l2detailz case study title]",
-        problem: "[INPUT: l2detailz problem]",
-        approach: "[INPUT: l2detailz approach]",
-        outcome: "[INPUT: l2detailz outcome]",
+        title: "L2 Detailz booking site and admin",
+        tag: "Auto detailing · Booking",
+        problem:
+          "Bookings arrived as unsorted email and the schedule was kept by hand, costing time and leaving room for error. He also could not post his own deals.",
+        approach:
+          "We rebuilt his HTML site as a web app with an admin login, so bookings, scheduling, and on-site promotions are managed in one place.",
+        outcome:
+          "He manages scheduling, routes, and site promotions in one place, without the manual hours or the room for error.",
         screenshots: [
           {
             src: "/case-studies/l2detailz-frontend.png",
             alt: "L2 Detailz marketing site showing the Essential, Signature, and Prestige detailing package cards with pricing and included services.",
-            caption: "[INPUT: l2detailz frontend screenshot caption]",
+            caption:
+              "The public site, with the three detailing packages and what each includes.",
           },
           {
             src: "/case-studies/l2detailz-calendar.png",
             alt: "L2 Detailz admin calendar in month view with scheduled detailing jobs listed across the days of the month.",
-            caption: "[INPUT: l2detailz calendar screenshot caption]",
+            caption:
+              "The admin calendar: every booking with its time, package, and vehicle, in month view.",
           },
         ],
       },
@@ -455,26 +468,24 @@ export const siteContent: SiteContent = {
       {
         name: "Nate Seluga",
         roleLine: "Engineering",
-        photo: "[INPUT: photo]",
-        bio: "Nate builds the tools. He cares about fast, simple, and stable, in that order. No bloat, no unnecessary dependencies, nothing that breaks six months after launch. Computer science at Harvey Mudd College.",
+        photo: "/founders/nate-seluga.jpg",
+        bio: "Nate builds the tools. He is drawn to efficiency, and to software optimizes your workflow exactly how you want it to. Time spent inside day-to-day operations showed him how much of a workday goes to operations that could be automated but weren't, due to the inconvenience of change and hesitation to pay for outside solutions that aren't tailored to the existing process. He has extensive experience creating tools to reduce friction in his own work. bcns exists because that toolbox should not stop with the person who built it.",
         credentials: [
           "Computer science, Harvey Mudd College",
         ],
       },
       {
+        // No `photo` yet. The component falls back to initials until one exists.
         name: "Brandon Chung",
         roleLine: "Business & clients",
-        photo: "[INPUT: photo]",
-        bio: "[INPUT: business experience summary]. Brandon owns scoping, communication, and making sure every build earns its cost. He's the reason we don't build things clients don't need.",
+        bio: "Brandon studies economics at New York University and has worked in business evaluation and optimization, including time as an investor. That work comes down to one question asked repeatedly: what enables a business to make money, and what is quietly slowing down that process. He has spent time finding the businesses and projects that already work and identifying what would make them work better. On a bcns project he owns scoping and communication, meaning he is the one who advises you on solutions that are worth building.",
         credentials: [
-          "[INPUT: NYU program], New York University",
-          "[INPUT: credential 2]",
-          "[INPUT: credential 3]",
+          "Economics, New York University",
         ],
       },
     ],
     whyBcns:
-      "Small businesses get two bad options. Software that doesn't fit, or a price only big companies can pay. We build the third one. Custom tools, built lean, straight from the two of us.",
+      "Every business we have worked in runs on some process that could be faster, and the software meant to fix it usually solves a general version of the problem instead of the specific one. We started bcns to close that gap.",
   },
 
   navCards: {

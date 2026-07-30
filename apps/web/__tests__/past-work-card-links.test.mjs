@@ -69,7 +69,12 @@ test("registry has at least one past-work item (guards against a vacuously-passi
 });
 
 test("the card <Link> in past-work.tsx carries a focus-visible:ring- treatment", () => {
-  const linkMatch = pageSrc.match(/<Link\s+href=\{`\/work\/\$\{slug\}`\}\s+className="([^"]*)"/);
+  // Match any interpolation inside the template literal (`${slug}`, `${item.slug}`, …)
+  // rather than one variable name, so renaming the loop binding cannot fail an
+  // assertion that is really about the focus treatment.
+  const linkMatch = pageSrc.match(
+    /<Link\s+href=\{`\/work\/\$\{[^}]+\}`\}\s+className="([^"]*)"/,
+  );
   assert.ok(linkMatch, "could not find the card <Link href={`/work/${slug}`}> in past-work.tsx");
   assert.match(
     linkMatch[1],

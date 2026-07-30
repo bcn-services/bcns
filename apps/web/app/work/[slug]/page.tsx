@@ -95,15 +95,20 @@ export default function CaseStudyPage({ params }: CaseStudyPageProps) {
               ))}
             </div>
 
+            {/* Screenshots sit wider than the max-w-2xl prose column above: they
+                are dense UI captures, and the source files are 1512px, so 896px
+                is the largest display width that stays acceptably sharp at 2x
+                DPR. The `sizes` attribute below must track this width, or the
+                browser downloads a narrower variant and upscales it. */}
             {item.screenshots.length > 0 && (
-              <div className="mx-auto mt-14 max-w-2xl space-y-10">
+              <div className="mx-auto mt-14 max-w-4xl space-y-10">
                 {item.screenshots.map((shot, index) => (
                   <Reveal as="figure" key={shot.src} delay={index * 120}>
                     <Card className="p-2 sm:p-3">
                       <Image
                         src={caseStudyImage(shot.src)}
                         alt={shot.alt}
-                        sizes="(min-width: 768px) 672px, 100vw"
+                        sizes="(min-width: 896px) 896px, 100vw"
                         className="h-auto w-full rounded-lg"
                       />
                     </Card>
