@@ -67,6 +67,21 @@ check "rejects privileged port"     "$(try good 80 ex.com)"                 "1"
 check "rejects uppercase slug"      "$(try BAD 3000 ex.com)"                "1"
 check "rejects wrong arg count"     "$(bash "$here/onboard-client.sh" only-one >/dev/null 2>&1; echo $?)" "1"
 
+# The vhost heredoc needs root to emit, so assert on the template text instead.
+# 00-default is a `return 444` catch-all: drop the www block and every www
+# visitor gets a dropped connection the moment DNS cuts over, while the apex
+# keeps looking healthy.
+echo "onboard-client.sh vhost template"
+vhost=$(cat "$here/onboard-client.sh")
+case "$vhost" in
+  *'server_name www.$domain;'*) ok "www vhost present" ;;
+  *) bad "www vhost missing -- www would hit 00-default's return 444" ;;
+esac
+case "$vhost" in
+  *'return 301 https://$domain\$request_uri;'*) ok "www redirects to apex, preserving the path" ;;
+  *) bad "www block does not 301 to the apex with \$request_uri" ;;
+esac
+
 echo "syntax"
 for f in "$here"/*.sh; do
   bash -n "$f" 2>/dev/null && ok "$(basename "$f") parses" || bad "$(basename "$f") syntax error"
