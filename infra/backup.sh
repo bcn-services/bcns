@@ -4,7 +4,10 @@
 # Retention: 30-day lifecycle rule on the bucket's backups/ prefix (set in DO console).
 set -euo pipefail
 
-BUCKET="${BCNS_BUCKET:-s3://bcns-backups}"
+# Must match the real Spaces bucket. This default was `s3://bcns-backups`, which
+# has never existed -- so every nightly run uploaded into a 404 and the failure
+# was invisible until someone looked in the bucket and found it empty.
+BUCKET="${BCNS_BUCKET:-s3://bcns-web-apps-backups}"
 # Paths are overridable so infra/__tests__ can exercise this without root.
 conf="${BCNS_BACKUP_CONF:-/etc/bcns/backup-dbs}"
 heartbeat="${BCNS_HEARTBEAT_FILE:-/etc/bcns/heartbeat-url}"
