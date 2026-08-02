@@ -96,8 +96,17 @@ Done. Manual follow-ups (one-time):
   2. Cloudflare Origin CA cert (wildcard for the platform domain) ->
      /etc/ssl/cloudflare/origin.pem + origin.key (mode 600), then: nginx -t && systemctl reload nginx
      (client-owned custom domains need their own origin cert + vhost tweak)
-  3. ~/.s3cfg for Spaces (access key, secret, host_base = <region>.digitaloceanspaces.com).
-  4. Spaces bucket: 30-day lifecycle expiration rule on backups/ (retention lives there, not in cron).
+  3. /root/.s3cfg for Spaces, mode 600 (access key, secret,
+     host_base = <region>.digitaloceanspaces.com, host_bucket =
+     %(bucket)s.<region>.digitaloceanspaces.com). Cron runs as root, so it must
+     be /root/.s3cfg -- not the .s3cfg of whoever ran this script.
+     Verify with `s3cmd ls s3://<bucket>/`, NOT `s3cmd ls`: a bucket-scoped key
+     gets 403 listing all buckets, which looks like broken credentials but isn't.
+  4. Spaces bucket: 30-day lifecycle expiration rule on backups/ (retention lives
+     there, not in cron). There is NO console UI for this -- the Settings tab
+     marks lifecycle/versioning as API-only. It needs an S3 PutBucketLifecycle
+     call from a FULL-ACCESS Spaces key; a bucket-scoped key returns 403 even
+     with Read/Write/Delete. Create one, apply the rule, then delete the key.
   5. UptimeRobot heartbeat monitor for backups -> put its ping URL in /etc/bcns/heartbeat-url (mode 600).
   6. Per client: ./onboard-client.sh <slug> <port> <domain>
 EOF

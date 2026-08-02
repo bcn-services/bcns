@@ -43,7 +43,21 @@ install -m 440 "$tmp" "/etc/sudoers.d/bcns-$slug"
 rm -f "$tmp"
 
 # nginx vhost: Cloudflare -> origin TLS -> this client's app port.
+#
+# The www block is not optional. 00-default is a `return 444` catch-all, so any
+# hostname without an explicit server_name gets its connection dropped -- and a
+# client's existing site almost always answers on both apex and www. Without
+# this, the DNS cutover silently breaks every www visitor while the apex looks
+# fine. Redirect rather than a second server_name so one host stays canonical.
 cat > "/etc/nginx/sites-available/$slug" <<EOF
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name www.$domain;
+    ssl_certificate     /etc/ssl/cloudflare/origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    return 301 https://$domain\$request_uri;
+}
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
