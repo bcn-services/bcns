@@ -69,6 +69,16 @@ server {
         proxy_set_header Host \$host;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+        # nginx defaults (4k/8k) are too small for a Supabase auth response.
+        # @supabase/ssr rotates the session on every request and chunks the JWT
+        # across sb-<ref>-auth-token.0/.1/..., so the combined Set-Cookie headers
+        # overflow the buffer and nginx answers 502 "upstream sent too big
+        # header". Anonymous traffic is unaffected, which is what makes this
+        # nasty: the site looks fine, and only SIGNED-IN users -- the operator --
+        # get 502s.
+        proxy_buffer_size        16k;
+        proxy_buffers         8  16k;
+        proxy_busy_buffers_size  32k;
     }
 }
 EOF
