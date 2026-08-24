@@ -64,21 +64,46 @@ server {
     server_name $domain;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    # Proxy defaults sit at server level so BOTH location blocks inherit them.
+    # Duplicating them per-location is how the two copies drift apart.
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    # CVE-2025-29927. Next uses x-middleware-subrequest to stop middleware from
+    # recursing, and (<14.2.25) trusts the value the CLIENT sends. A forged one
+    # skips middleware.ts outright -- including the /admin auth gate. Overwrite
+    # it unconditionally so a client-supplied value can never reach the app.
+    proxy_set_header x-middleware-subrequest "";
+    # nginx defaults (4k/8k) are too small for a Supabase auth response.
+    # @supabase/ssr rotates the session on every request and chunks the JWT
+    # across sb-<ref>-auth-token.0/.1/..., so the combined Set-Cookie headers
+    # overflow the buffer and nginx answers 502 "upstream sent too big
+    # header". Anonymous traffic is unaffected, which is what makes this
+    # nasty: the site looks fine, and only SIGNED-IN users -- the operator --
+    # get 502s.
+    proxy_buffer_size        16k;
+    proxy_buffers         8  16k;
+    proxy_busy_buffers_size  32k;
+
+    # A bcns marketing home page is server components only -- no form, no server
+    # action, no client fetch -- so POST / is never legitimate traffic. It is
+    # the React2Shell (CVE-2025-66478) RCE probe, which POSTs a crafted RSC
+    # payload to the PAGE url. Dropping it at the edge keeps the payload out of
+    # Node, and stops the unhandled rejection it raises inside Next's own error
+    # handler from filling Sentry. 444 closes the connection with no response,
+    # so the scanner gets nothing back to fingerprint.
+    #
+    # IF YOU EVER ADD A SERVER ACTION TO `/`, DELETE THIS BLOCK. Server actions
+    # POST to the page url, so this would 444 the action and the form would fail
+    # with no error anywhere. Actions on any OTHER route are unaffected.
+    location = / {
+        if (\$request_method = POST) {
+            return 444;
+        }
+        proxy_pass http://127.0.0.1:$port;
+    }
     location / {
         proxy_pass http://127.0.0.1:$port;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        # nginx defaults (4k/8k) are too small for a Supabase auth response.
-        # @supabase/ssr rotates the session on every request and chunks the JWT
-        # across sb-<ref>-auth-token.0/.1/..., so the combined Set-Cookie headers
-        # overflow the buffer and nginx answers 502 "upstream sent too big
-        # header". Anonymous traffic is unaffected, which is what makes this
-        # nasty: the site looks fine, and only SIGNED-IN users -- the operator --
-        # get 502s.
-        proxy_buffer_size        16k;
-        proxy_buffers         8  16k;
-        proxy_busy_buffers_size  32k;
     }
 }
 EOF

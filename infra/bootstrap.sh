@@ -81,6 +81,43 @@ ln -sf /etc/nginx/sites-available/00-default /etc/nginx/sites-enabled/00-default
 nginx -t
 systemctl reload nginx
 
+# fail2ban: ban the scanners nginx already refuses.
+#
+# The stock install only jails sshd, so HTTP probing ran unlimited: one scanner
+# hit l2details.com for three days straight, unbanned, before anyone noticed.
+#
+# `444` is the signal, and it is a precise one -- nginx only ever returns it
+# where WE wrote `return 444`: the 00-default catch-all (request carried an
+# unknown/absent Host header) and the `POST /` block in each client vhost.
+# Neither is reachable by a real visitor, so a 444 is by definition a machine
+# poking at the origin and there are no false positives to tune around.
+#
+# backend=auto is REQUIRED and not the default here: jail.d/defaults-debian.conf
+# sets `backend = systemd` globally, which reads the journal. nginx logs to a
+# FILE, so a systemd-backend jail silently matches nothing -- it starts clean,
+# reports 0 failures forever, and looks like it is working.
+cat > /etc/fail2ban/filter.d/nginx-refused.conf <<'EOF'
+[Definition]
+# combined log format; 444 = connection closed by us, no response sent
+failregex = ^<HOST> - \S+ \[[^\]]*\] "[A-Z]+ [^"]*" 444 
+ignoreregex =
+datepattern = %%d/%%b/%%Y:%%H:%%M:%%S %%z
+EOF
+
+cat > /etc/fail2ban/jail.d/nginx-refused.conf <<'EOF'
+[nginx-refused]
+enabled  = true
+port     = http,https
+filter   = nginx-refused
+logpath  = /var/log/nginx/access.log
+backend  = auto
+maxretry = 3
+findtime = 600
+bantime  = 86400
+EOF
+
+fail2ban-client reload
+
 # App unit template + nightly backups
 install -m 644 "$(dirname "$0")/bcns-app@.service" /etc/systemd/system/
 systemctl daemon-reload
