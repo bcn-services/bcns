@@ -27,7 +27,7 @@ export function NavCards() {
           >
             <Link
               href={card.href}
-              className="group mx-auto grid w-full max-w-[90rem] items-baseline gap-2 px-6 py-8 transition-colors duration-200 hover:bg-primary/[0.06] focus-visible:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[1.25rem_minmax(9rem,1fr)_2.2fr_auto] sm:gap-8 sm:py-9 lg:px-12"
+              className="group mx-auto grid w-full max-w-[90rem] items-baseline gap-2 px-6 py-8 transition-colors duration-200 hover:bg-primary/[0.06] focus-visible:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[1.25rem_14rem_minmax(0,42rem)_1fr] sm:gap-10 sm:py-9 lg:px-12"
             >
               <span
                 aria-hidden
@@ -41,7 +41,7 @@ export function NavCards() {
                 {card.description}
               </p>
               <ArrowRight
-                className="hidden size-5 self-center text-muted-foreground/50 transition-[transform,color] duration-200 group-hover:translate-x-1.5 group-hover:text-primary sm:block"
+                className="hidden size-5 self-center justify-self-end text-muted-foreground/50 transition-[transform,color] duration-200 group-hover:translate-x-1.5 group-hover:text-primary sm:block"
                 aria-hidden
               />
             </Link>

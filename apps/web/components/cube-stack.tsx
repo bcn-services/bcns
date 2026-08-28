@@ -23,12 +23,22 @@ import { FACE_FILLS } from "@/components/cube";
 
 const [FACE_TOP, FACE_FRONT, FACE_RIGHT] = FACE_FILLS;
 
-// Spread offsets when the stack opens, as a fraction of cube edge, per cube
-// in logo-triangle order (top, bottom-left, bottom-right).
+// Offsets as a fraction of cube edge, per cube in logo-triangle order
+// (top, bottom-left, bottom-right).
+//
+// The open cube pulls toward the triangle's centre rather than away from it:
+// it is the one that grows, so it needs the room, and a cube that stayed put
+// while scaling would run off the right edge of a phone screen.
+const RECENTRE = [
+  { x: 0, y: 0.16 },
+  { x: 0.26, y: -0.12 },
+  { x: -0.26, y: -0.12 },
+];
+// The other two step outward to clear it.
 const SPREAD = [
-  { x: 0, y: -0.2 },
-  { x: -0.29, y: 0.16 },
-  { x: 0.29, y: 0.16 },
+  { x: 0, y: -0.34 },
+  { x: -0.42, y: 0.24 },
+  { x: 0.42, y: 0.24 },
 ];
 
 const REST = { rotateX: -26, rotateY: 45 };
@@ -51,7 +61,7 @@ function Cube({
 }) {
   const isActive = active === index;
   const dimmed = active !== null && !isActive;
-  const spread = active !== null ? SPREAD[index]! : { x: 0, y: 0 };
+  const offset = isActive ? RECENTRE[index]! : dimmed ? SPREAD[index]! : { x: 0, y: 0 };
 
   // Scale lives on a CSS-transitioned wrapper, not on the motion element: the
   // open scale is a responsive CSS var, which framer-motion cannot animate.
@@ -67,10 +77,10 @@ function Cube({
       className="[width:var(--cube)] [height:var(--cube)] [perspective:1400px]"
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{
-        opacity: dimmed ? 0.5 : 1,
-        scale: dimmed ? 0.92 : 1,
-        x: `${spread.x * 100}%`,
-        y: `${spread.y * 100}%`,
+        opacity: dimmed ? 0.6 : 1,
+        scale: dimmed ? 0.94 : 1,
+        x: `${offset.x * 100}%`,
+        y: `${offset.y * 100}%`,
       }}
       transition={{
         opacity: { duration: 0.3 },
@@ -176,7 +186,7 @@ export function CubeStack() {
 
   return (
     <div
-      className="flex flex-col items-center [--cube-open-scale:1.5] [--cube:clamp(9.5rem,30vw,15rem)] sm:[--cube-open-scale:1.25] lg:[--cube-open-scale:1.18]"
+      className="flex flex-col items-center [--cube-open-scale:1.85] [--cube:clamp(6.75rem,20vw,10rem)] sm:[--cube-open-scale:1.4] lg:[--cube-open-scale:1.3]"
       onMouseLeave={() => setActive(null)}
     >
       <div className="flex flex-col items-center py-[8%]">
@@ -188,7 +198,9 @@ export function CubeStack() {
       </div>
       <p
         aria-hidden
-        className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/60"
+        className={`mt-6 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/60 transition-opacity duration-300 ${
+          active !== null ? "opacity-0" : "opacity-100"
+        }`}
       >
         <span className="hidden sm:inline">hover a block</span>
         <span className="sm:hidden">tap a block</span>
