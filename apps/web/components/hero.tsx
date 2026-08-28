@@ -31,7 +31,7 @@ export function Hero() {
           <motion.p
             {...rise}
             transition={{ duration: 0.5 }}
-            className="font-mono text-xs uppercase tracking-[0.22em] text-primary"
+            className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary sm:text-xs sm:tracking-[0.22em]"
           >
             {hero.badge}
           </motion.p>
@@ -52,15 +52,15 @@ export function Hero() {
           <motion.div
             {...rise}
             transition={{ duration: 0.6, delay: 0.24 }}
-            className="mt-9 flex flex-wrap gap-3"
+            className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap"
           >
-            <Link href="/#contact" className={`${buttonVariants({ size: "lg" })} hover-glow`}>
+            <Link href="/#contact" className={`${buttonVariants({ size: "lg" })} hover-glow w-full sm:w-auto`}>
               {hero.ctaPrimary}
               <ArrowRight aria-hidden />
             </Link>
             <Link
               href="/services#examples"
-              className={buttonVariants({ variant: "outline", size: "lg" })}
+              className={`${buttonVariants({ variant: "outline", size: "lg" })} w-full sm:w-auto`}
             >
               {hero.ctaSecondary}
             </Link>

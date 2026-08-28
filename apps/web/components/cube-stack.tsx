@@ -15,8 +15,8 @@
  * static list — no spread, no spin, all three descriptions visible at once.
  */
 
-import { useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 import { siteContent } from "@/lib/content";
 import type { StepItem } from "@/lib/content";
 import { FACE_FILLS } from "@/components/cube";
@@ -42,9 +42,10 @@ const SPREAD = [
 ];
 
 const REST = { rotateX: -26, rotateY: 45 };
-// Near-face-on, not flat: keeping a few degrees means the lit top edge is
-// still visible, so the revealed face reads as a cube face, not a flat card.
-const OPEN = { rotateX: -7, rotateY: 172 };
+// Near-face-on, not flat: a few degrees keep the lit top edge visible so the
+// revealed face still reads as a cube face. Any more tilt and the cube's own
+// right face swings across the copy.
+const OPEN = { rotateX: -5, rotateY: 177 };
 
 const faceStyle = "absolute inset-0 border-2 border-foreground/80";
 
@@ -74,11 +75,11 @@ function Cube({
       }}
     >
     <motion.div
-      className="[width:var(--cube)] [height:var(--cube)] [perspective:1400px]"
+      className="relative [width:var(--cube)] [height:var(--cube)] [perspective:1400px]"
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{
-        opacity: dimmed ? 0.6 : 1,
-        scale: dimmed ? 0.94 : 1,
+        opacity: dimmed ? 0.38 : 1,
+        scale: dimmed ? 0.9 : 1,
         x: `${offset.x * 100}%`,
         y: `${offset.y * 100}%`,
       }}
@@ -110,7 +111,10 @@ function Cube({
             className={faceStyle}
             style={{ background: FACE_FRONT, transform: "translateZ(calc(var(--cube) / 2))" }}
           >
-            <span className="absolute bottom-[8%] left-[8%] font-mono text-[length:calc(var(--cube)/13)] font-medium text-foreground/70">
+            <span
+              className="absolute top-[8%] left-[8%] font-mono text-[length:calc(var(--cube)/13)] font-medium"
+              style={{ color: "hsl(214 62% 28%)" }}
+            >
               {item.step}
             </span>
           </span>
@@ -138,7 +142,12 @@ function Cube({
           {/* Back face — the reveal. Sized in cube-relative units so the copy
               keeps the same optical size at every breakpoint. */}
           <span
-            className={`${faceStyle} flex flex-col bg-card p-[6.5%] text-left`}
+            // The shadow is painted in this face's own 3D plane, so it would
+            // leak out over the cube's top face at rest — only cast it while
+            // the face is the one being read.
+            className={`${faceStyle} flex flex-col bg-card p-[6.5%] text-left transition-shadow duration-300 ${
+              isActive ? "shadow-[0_20px_50px_-18px_hsl(214_62%_35%/0.55)]" : "shadow-none"
+            }`}
             style={{ transform: "rotateY(180deg) translateZ(calc(var(--cube) / 2))" }}
           >
             <span className="font-mono text-[length:calc(var(--cube)/19)] font-medium tracking-widest text-primary">
@@ -162,8 +171,18 @@ export function CubeStack() {
   const { items } = siteContent.howItWorks;
   const [active, setActive] = useState<number | null>(null);
   const reduceMotion = useReducedMotion();
+  // useReducedMotion reads matchMedia during render, so it disagrees with the
+  // server on the first pass. Gate the swap on mount to keep hydration clean.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  if (reduceMotion) {
+  // Ambient parallax: the stack drifts a few pixels toward the cursor so it
+  // reads as an object sitting in the page rather than an image pasted on it.
+  const frame = useRef<HTMLDivElement>(null);
+  const px = useSpring(useMotionValue(0), { stiffness: 90, damping: 20 });
+  const py = useSpring(useMotionValue(0), { stiffness: 90, damping: 20 });
+
+  if (mounted && reduceMotion) {
     return (
       <ul role="list" className="flex flex-col gap-5">
         {items.map((item, i) => (
@@ -187,18 +206,29 @@ export function CubeStack() {
   return (
     <div
       className="flex flex-col items-center [--cube-open-scale:1.85] [--cube:clamp(6.75rem,20vw,10rem)] sm:[--cube-open-scale:1.4] lg:[--cube-open-scale:1.3]"
-      onMouseLeave={() => setActive(null)}
+      ref={frame}
+      onMouseMove={(e) => {
+        const r = frame.current?.getBoundingClientRect();
+        if (!r) return;
+        px.set(((e.clientX - r.left) / r.width - 0.5) * 18);
+        py.set(((e.clientY - r.top) / r.height - 0.5) * 14);
+      }}
+      onMouseLeave={() => {
+        setActive(null);
+        px.set(0);
+        py.set(0);
+      }}
     >
-      <div className="flex flex-col items-center py-[8%]">
+      <motion.div style={{ x: px, y: py }} className="flex flex-col items-center py-[8%]">
         <Cube item={items[0]} index={0} active={active} setActive={setActive} />
         <div className="mt-[calc(var(--cube)*-0.22)] flex gap-[calc(var(--cube)*0.04)]">
           <Cube item={items[1]} index={1} active={active} setActive={setActive} />
           <Cube item={items[2]} index={2} active={active} setActive={setActive} />
         </div>
-      </div>
+      </motion.div>
       <p
         aria-hidden
-        className={`mt-6 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/60 transition-opacity duration-300 ${
+        className={`mt-6 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/80 transition-opacity duration-300 ${
           active !== null ? "opacity-0" : "opacity-100"
         }`}
       >
