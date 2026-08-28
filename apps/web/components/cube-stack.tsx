@@ -42,10 +42,11 @@ const SPREAD = [
 ];
 
 const REST = { rotateX: -26, rotateY: 45 };
-// Near-face-on, not flat: a few degrees keep the lit top edge visible so the
-// revealed face still reads as a cube face. Any more tilt and the cube's own
-// right face swings across the copy.
-const OPEN = { rotateX: -5, rotateY: 177 };
+// Near-face-on, not flat. The tilt is kept in rotateX only: any yaw off 180
+// leaves the side faces slightly open, which pokes stray slivers of blue out
+// past the card. Pitch alone still shows the lit top edge, so the reveal
+// reads as a cube face rather than a flat card.
+const OPEN = { rotateX: -4, rotateY: 180 };
 
 const faceStyle = "absolute inset-0 border-2 border-foreground/80";
 
@@ -156,7 +157,7 @@ function Cube({
             <span className="mt-[2%] font-display text-[length:calc(var(--cube)/13)] font-semibold leading-tight tracking-tight text-card-foreground">
               {item.title}
             </span>
-            <span className="mt-[4%] text-[length:calc(var(--cube)/19)] leading-[1.45] text-muted-foreground">
+            <span className="mt-[4%] text-[length:calc(var(--cube)/19)] leading-[1.45] text-card-foreground/75">
               {item.description}
             </span>
           </span>
@@ -205,7 +206,7 @@ export function CubeStack() {
 
   return (
     <div
-      className="flex flex-col items-center [--cube-open-scale:1.85] [--cube:clamp(6.75rem,20vw,10rem)] sm:[--cube-open-scale:1.4] lg:[--cube-open-scale:1.3]"
+      className="flex flex-col items-center [--cube-open-scale:1.85] [--cube:clamp(6.75rem,20vw,10rem)] sm:[--cube-open-scale:1.5] lg:[--cube-open-scale:1.5]"
       ref={frame}
       onMouseMove={(e) => {
         const r = frame.current?.getBoundingClientRect();
