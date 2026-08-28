@@ -1,57 +1,53 @@
-import Link from "next/link";
-import { ArrowRight, Wrench, FolderOpen, Tag, Users } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { Card, Container } from "@nseluga/ui";
-import { siteContent } from "@/lib/content";
-import { Reveal } from "@/components/reveal";
+"use client";
 
-const NAV_CARD_ICONS: Record<string, LucideIcon> = {
-  "/services": Wrench,
-  "/work": FolderOpen,
-  "/pricing": Tag,
-  "/about": Users,
-};
+/**
+ * Site navigation as full-width editorial rows — one per destination, each
+ * spanning the viewport, keyed by a cube-face swatch. Replaces the old card
+ * grid: fewer boxes, more room for the description to actually be read.
+ */
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { siteContent } from "@/lib/content";
+import { FACE_FILLS } from "@/components/cube";
 
 export function NavCards() {
-  const { items } = siteContent.navCards;
-
+  const { navCards } = siteContent;
   return (
-    <section aria-label="Site navigation" className="pt-2 pb-16">
-      <Container>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" role="list">
-          {items.map((card, i) => {
-            const Icon = NAV_CARD_ICONS[card.href] ?? Wrench;
-            return (
-              <Reveal as="li" key={card.href} variant="pop" delay={i * 110}>
-                <Link href={card.href} className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
-                  <Card className="flex h-full flex-col overflow-hidden border-t-2 border-t-border transition-[transform,box-shadow,border-color] duration-300 ease-out group-hover:border-t-primary group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/20 group-hover:-translate-y-1.5 group-hover:scale-[1.02]">
-                    <div className="relative flex shrink-0 items-center justify-center h-20 overflow-hidden bg-gradient-to-b from-primary/10 to-transparent">
-                      {/* accent sweep on hover */}
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-x-0 top-0 h-px -translate-x-full bg-gradient-to-r from-transparent via-primary to-transparent transition-transform duration-500 ease-out group-hover:translate-x-full"
-                      />
-                      <Icon className="size-8 text-primary/60 transition-[transform,color] duration-300 ease-out group-hover:scale-110 group-hover:text-primary" aria-hidden />
-                    </div>
-                    <div className="flex flex-1 flex-col gap-3 p-6 pt-4">
-                      <span className="font-display text-lg font-semibold tracking-tight">
-                        {card.title}
-                      </span>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {card.description}
-                      </p>
-                      <div className="mt-auto flex items-center gap-1.5 text-sm font-medium text-primary/70 transition-all duration-300 group-hover:text-primary group-hover:gap-2.5">
-                        <span>Explore</span>
-                        <ArrowRight className="size-4 link-slide" aria-hidden />
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              </Reveal>
-            );
-          })}
-        </ul>
-      </Container>
-    </section>
+    <nav aria-label="Sections" className="border-b border-border/60">
+      <ul role="list" className="divide-y divide-border/60">
+        {navCards.items.map((card, i) => (
+          <motion.li
+            key={card.href}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.45, delay: i * 0.05 }}
+          >
+            <Link
+              href={card.href}
+              className="group mx-auto grid w-full max-w-[90rem] items-baseline gap-2 px-6 py-8 transition-colors duration-200 hover:bg-primary/[0.06] focus-visible:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[1.25rem_minmax(9rem,1fr)_2.2fr_auto] sm:gap-8 sm:py-9 lg:px-12"
+            >
+              <span
+                aria-hidden
+                className="hidden size-3.5 rotate-45 self-center border-2 border-foreground/70 transition-transform duration-300 group-hover:rotate-[135deg] sm:block"
+                style={{ background: FACE_FILLS[i % 3] }}
+              />
+              <span className="font-display text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
+                {card.title}
+              </span>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:mt-0 sm:text-base">
+                {card.description}
+              </p>
+              <ArrowRight
+                className="hidden size-5 self-center text-muted-foreground/50 transition-[transform,color] duration-200 group-hover:translate-x-1.5 group-hover:text-primary sm:block"
+                aria-hidden
+              />
+            </Link>
+          </motion.li>
+        ))}
+      </ul>
+    </nav>
   );
 }

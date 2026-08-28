@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Boxes } from "lucide-react";
-import { Container } from "@nseluga/ui";
+import { LogoMark } from "@/components/cube";
 import { siteConfig } from "@/lib/site";
 
 const legalLinks = [
@@ -11,13 +10,14 @@ const legalLinks = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border/60 py-12">
-      <Container className="flex flex-col items-center justify-between gap-6 sm:flex-row">
-        <div className="flex flex-col items-center gap-2 sm:items-start">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Boxes className="size-4" aria-hidden />
-            </span>
+    <footer className="border-t border-border/60">
+      <div className="mx-auto flex w-full max-w-[90rem] flex-col items-center justify-between gap-6 px-6 py-12 sm:flex-row lg:px-12">
+        <div className="flex flex-col items-center gap-2.5 sm:items-start">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-sm font-display font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+          >
+            <LogoMark className="h-5 w-[1.53rem]" />
             {siteConfig.name}
           </Link>
           <p className="text-sm text-muted-foreground">
@@ -25,18 +25,18 @@ export function SiteFooter() {
           </p>
         </div>
 
-        <nav aria-label="Footer" className="flex items-center gap-6">
+        <nav aria-label="Footer" className="flex items-center gap-7">
           {legalLinks.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {link.label}
             </Link>
           ))}
         </nav>
-      </Container>
+      </div>
     </footer>
   );
 }
