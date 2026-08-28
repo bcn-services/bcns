@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Menu } from "lucide-react";
 import { buttonVariants } from "@nseluga/ui";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoMark } from "@/components/cube";
@@ -30,6 +31,36 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          {/* Native disclosure: the nav is four links, so a JS drawer would buy
+              nothing and would cost this header its server-component status. */}
+          <details className="group relative md:hidden [&_summary::-webkit-details-marker]:hidden">
+            <summary
+              aria-label="Menu"
+              className="flex size-9 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Menu aria-hidden className="size-5" />
+            </summary>
+            <nav
+              aria-label="Primary"
+              className="absolute right-0 top-11 w-52 rounded-xl border border-border bg-card p-2 shadow-lg"
+            >
+              {siteConfig.nav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-primary/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <Link
+                href="/#contact"
+                className={buttonVariants({ size: "sm", className: "mt-1 w-full" })}
+              >
+                Book a free consult
+              </Link>
+            </nav>
+          </details>
           <Link
             href="/#contact"
             className={buttonVariants({ size: "sm", className: "hidden sm:inline-flex" })}
