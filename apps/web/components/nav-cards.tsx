@@ -1,57 +1,44 @@
 import Link from "next/link";
-import { ArrowRight, Wrench, FolderOpen, Tag, Users } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { Card, Container } from "@nseluga/ui";
 import { siteContent } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
+import { GUTTER } from "@/components/kit";
 
-const NAV_CARD_ICONS: Record<string, LucideIcon> = {
-  "/services": Wrench,
-  "/work": FolderOpen,
-  "/pricing": Tag,
-  "/about": Users,
-};
-
+/**
+ * Site navigation as an editorial index: one full-width hairline row per
+ * destination, flooding blue on hover. Replaces the old card grid — fewer
+ * boxes, and the description gets room to actually be read.
+ */
 export function NavCards() {
-  const { items } = siteContent.navCards;
+  const { navCards } = siteContent;
 
   return (
-    <section aria-label="Site navigation" className="pt-2 pb-16">
-      <Container>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" role="list">
-          {items.map((card, i) => {
-            const Icon = NAV_CARD_ICONS[card.href] ?? Wrench;
-            return (
-              <Reveal as="li" key={card.href} variant="pop" delay={i * 110}>
-                <Link href={card.href} className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
-                  <Card className="flex h-full flex-col overflow-hidden border-t-2 border-t-border transition-[transform,box-shadow,border-color] duration-300 ease-out group-hover:border-t-primary group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/20 group-hover:-translate-y-1.5 group-hover:scale-[1.02]">
-                    <div className="relative flex shrink-0 items-center justify-center h-20 overflow-hidden bg-gradient-to-b from-primary/10 to-transparent">
-                      {/* accent sweep on hover */}
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-x-0 top-0 h-px -translate-x-full bg-gradient-to-r from-transparent via-primary to-transparent transition-transform duration-500 ease-out group-hover:translate-x-full"
-                      />
-                      <Icon className="size-8 text-primary/60 transition-[transform,color] duration-300 ease-out group-hover:scale-110 group-hover:text-primary" aria-hidden />
-                    </div>
-                    <div className="flex flex-1 flex-col gap-3 p-6 pt-4">
-                      <span className="font-display text-lg font-semibold tracking-tight">
-                        {card.title}
-                      </span>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {card.description}
-                      </p>
-                      <div className="mt-auto flex items-center gap-1.5 text-sm font-medium text-primary/70 transition-all duration-300 group-hover:text-primary group-hover:gap-2.5">
-                        <span>Explore</span>
-                        <ArrowRight className="size-4 link-slide" aria-hidden />
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              </Reveal>
-            );
-          })}
-        </ul>
-      </Container>
-    </section>
+    <nav aria-label="Sections" className="border-b border-border">
+      <ul role="list">
+        {navCards.items.map((card, i) => (
+          <Reveal as="li" key={card.href} delay={i * 70}>
+            <Link
+              href={card.href}
+              className={`group flood-row block focus-visible:outline-none ${
+                i < navCards.items.length - 1 ? "border-b border-border" : ""
+              }`}
+            >
+              <div
+                className={`${GUTTER} grid items-center gap-3 py-8 sm:grid-cols-[23.75rem_1fr_3.75rem] sm:gap-12 sm:py-[2.375rem]`}
+              >
+                <span className="font-display text-[1.75rem] font-medium tracking-tight sm:text-[2.125rem]">
+                  {card.title}
+                </span>
+                <span className="max-w-[38.75rem] text-[0.90625rem] leading-[1.6] text-muted-foreground transition-colors duration-[350ms] group-hover:text-accent-foreground group-focus-visible:text-accent-foreground">
+                  {card.description}
+                </span>
+                <span aria-hidden className="flood-arrow hidden text-[1.5rem] sm:block sm:justify-self-end">
+                  &rarr;
+                </span>
+              </div>
+            </Link>
+          </Reveal>
+        ))}
+      </ul>
+    </nav>
   );
 }

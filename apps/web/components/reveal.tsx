@@ -3,13 +3,23 @@
 import * as React from "react";
 
 /** Entrance animation variants — map to keyframes in the Tailwind preset. */
-type RevealVariant = "fade-up" | "pop" | "fade-right" | "fade-left";
+type RevealVariant = "fade-up" | "pop" | "fade-right" | "fade-left" | "draw-rule";
 
 const VARIANT_CLASS: Record<RevealVariant, string> = {
   "fade-up": "animate-fade-up",
   pop: "animate-pop",
   "fade-right": "animate-fade-right",
   "fade-left": "animate-fade-left",
+  "draw-rule": "animate-draw-rule",
+};
+
+/** Pre-reveal resting state. A rule collapses along its own axis, not to zero opacity. */
+const HIDDEN_CLASS: Record<RevealVariant, string> = {
+  "fade-up": "opacity-0",
+  pop: "opacity-0",
+  "fade-right": "opacity-0",
+  "fade-left": "opacity-0",
+  "draw-rule": "scale-x-0",
 };
 
 type RevealProps<T extends React.ElementType> = {
@@ -19,7 +29,7 @@ type RevealProps<T extends React.ElementType> = {
   delay?: number;
   /** Entrance animation. Defaults to `fade-up`; `pop` for springy focal reveals. */
   variant?: RevealVariant;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
 };
 
@@ -64,7 +74,11 @@ export function Reveal<T extends React.ElementType = "div">({
           }
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" }
+      // threshold 0, not a fraction: an element taller than the viewport can
+      // never show 15% of itself, so a fractional threshold leaves the tallest
+      // sections (pricing tiers, case-study bodies, the consult steps on a
+      // phone) stuck at opacity-0 forever. Any pixel entering is enough.
+      { threshold: 0, rootMargin: "0px 0px -8% 0px" }
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -73,9 +87,12 @@ export function Reveal<T extends React.ElementType = "div">({
   return (
     <Tag
       ref={ref}
+      // Marks the element for the no-JS override in app/layout.tsx: without JS
+      // the observer never runs, so the hidden state would be permanent.
+      data-reveal=""
       // Pre-reveal: invisible and nudged down; on reveal, fade-up animation runs
       // and lands the element at its natural position.
-      className={`${shown ? VARIANT_CLASS[variant] : "opacity-0"} ${className}`.trim()}
+      className={`${shown ? VARIANT_CLASS[variant] : HIDDEN_CLASS[variant]} ${className}`.trim()}
       style={delay ? { animationDelay: `${delay}ms` } : undefined}
       {...rest}
     >

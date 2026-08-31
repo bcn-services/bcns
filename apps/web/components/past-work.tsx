@@ -1,62 +1,47 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock } from "lucide-react";
-import { Badge, Card, Container, SectionHeading } from "@nseluga/ui";
-import { SectionAtmosphere } from "@/components/section-atmosphere";
-import { Reveal } from "@/components/reveal";
-import { SignatureMotif } from "@/components/signature-motif";
 import { siteContent } from "@/lib/content";
+import { Reveal } from "@/components/reveal";
+import { Eyebrow, GUTTER, CubeTexture } from "@/components/kit";
 import { caseStudyImage } from "@/lib/case-study-images";
 
+/**
+ * Past work. The structure here is deliberately unchanged from production —
+ * heading, then a two-column grid of screenshot-led case-study cards, with the
+ * holding state as the empty case. Only the styling was brought over to the
+ * shared design language: hairlines, light display type, the lift-card gesture.
+ */
 export function PastWork() {
   const { eyebrow, title, description, items, holdingState } = siteContent.pastWork;
 
   return (
-    <section id="past-work" className="relative overflow-hidden border-t border-border/60 pt-16 pb-16 sm:pt-20 sm:pb-20">
-      <SectionAtmosphere variant="work" />
-      <Container>
-        <SectionHeading
-          eyebrow={eyebrow}
-          title={title}
-          description={description}
-        />
+    <section id="past-work" className="relative border-b border-border">
+      <CubeTexture count={2} />
+      <div className={`${GUTTER} pb-16 pt-16 sm:pt-[4.75rem]`}>
+        <Reveal>
+          <Eyebrow>{eyebrow}</Eyebrow>
+        </Reveal>
+        <Reveal
+          as="h1"
+          delay={80}
+          className="mt-5 text-balance text-[clamp(2.25rem,5vw,3.625rem)] font-light leading-[1.06] tracking-[-0.025em]"
+        >
+          {title}
+        </Reveal>
+        <Reveal as="p" delay={160} className="mt-5 max-w-xl text-[1.125rem] leading-relaxed text-muted-foreground">
+          {description}
+        </Reveal>
 
         {items.length === 0 ? (
-          <Reveal className="mx-auto mt-14 max-w-3xl">
-            <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-secondary/40">
-              {/* ambient glow from icon center */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_30%,hsl(var(--primary)/0.12),transparent_70%)]"
-              />
-              {/* branded motif, drifting low-opacity behind content — signals a live studio */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute -right-10 -top-10 opacity-[0.14] animate-drift"
-              >
-                <div className="scale-150">
-                  <SignatureMotif />
-                </div>
-              </div>
-              {/* subtle shimmer sweep across the panel — "live, awaiting first client" */}
-              <div
-                aria-hidden
-                className="shimmer-surface animate-shimmer pointer-events-none absolute inset-0 opacity-60"
-              />
-              <div className="relative flex flex-col items-center gap-6 px-8 py-16 text-center sm:px-16 sm:py-20">
-                <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_32px_hsl(var(--primary)/0.15)]">
-                  <Clock className="size-8" aria-hidden />
-                </div>
-                <p className="text-xl font-semibold">{holdingState.title}</p>
-                <p className="max-w-md text-base text-muted-foreground">{holdingState.body}</p>
-                <Link
-                  href={holdingState.ctaHref}
-                  className="hover-glow animate-glow-pulse inline-flex items-center rounded-md bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground"
-                >
-                  {holdingState.ctaLabel}
-                </Link>
-              </div>
-            </div>
+          <Reveal className="mt-14 rounded-2xl border border-border bg-secondary px-8 py-16 text-center sm:px-16 sm:py-20">
+            <p className="text-xl font-semibold">{holdingState.title}</p>
+            <p className="mx-auto mt-4 max-w-md text-muted-foreground">{holdingState.body}</p>
+            <Link
+              href={holdingState.ctaHref}
+              className="lift-button mt-8 inline-block rounded-lg bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground"
+            >
+              {holdingState.ctaLabel}
+            </Link>
           </Reveal>
         ) : (
           /* Two columns, not three: with exactly two items a 3-col grid leaves an
@@ -74,48 +59,44 @@ export function PastWork() {
                 >
                   <Link
                     href={`/work/${item.slug}`}
-                    className="group block flex-1 rounded-xl ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="group lift-card flex h-full flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
-                    <Card className="flex h-full flex-col overflow-hidden border-t-2 border-t-border transition-[transform,box-shadow,border-color] duration-300 ease-out group-hover:-translate-y-1.5 group-hover:scale-[1.02] group-hover:border-primary/40 group-hover:border-t-primary group-hover:shadow-xl group-hover:shadow-primary/20">
-                      {shot && (
-                        /* The two client screenshots have opposite themes (DeLuca's is
-                           light, L2's is dark). The inset hairline gives both the same
-                           edge so the pair doesn't read as two different sites. */
-                        <div className="relative aspect-[16/8] w-full shrink-0 overflow-hidden bg-secondary/40 ring-1 ring-inset ring-border/60">
-                          <Image
-                            src={caseStudyImage(shot.src)}
-                            alt=""
-                            fill
-                            sizes="(min-width: 640px) 50vw, 100vw"
-                            className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
-                          />
-                          <div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-x-0 top-0 h-px -translate-x-full bg-gradient-to-r from-transparent via-primary to-transparent transition-transform duration-500 ease-out group-hover:translate-x-full"
-                          />
-                        </div>
-                      )}
-                      <div className="flex flex-1 flex-col gap-3 p-6">
-                        <Badge className="w-fit">{item.tag}</Badge>
-                        <span className="font-display text-lg font-semibold tracking-tight">
-                          {item.title}
-                        </span>
-                        <p className="text-sm leading-relaxed text-muted-foreground">
-                          {item.outcome}
-                        </p>
-                        <div className="mt-auto flex items-center gap-1.5 pt-2 text-sm font-medium text-primary/70 transition-all duration-300 group-hover:gap-2.5 group-hover:text-primary">
-                          <span>Read the case study</span>
-                          <ArrowRight className="size-4 link-slide" aria-hidden />
-                        </div>
+                    {shot && (
+                      /* The two client screenshots have opposite themes (DeLuca's is
+                         light, L2's is dark). The inset hairline gives both the same
+                         edge so the pair doesn't read as two different sites. */
+                      <div className="relative aspect-[16/8] w-full shrink-0 overflow-hidden bg-secondary ring-1 ring-inset ring-border">
+                        <Image
+                          src={caseStudyImage(shot.src)}
+                          alt=""
+                          fill
+                          sizes="(min-width: 640px) 50vw, 100vw"
+                          className="object-cover object-top"
+                        />
                       </div>
-                    </Card>
+                    )}
+                    <div className="flex flex-1 flex-col gap-3 p-7">
+                      <span className="w-fit rounded-full border border-accent px-3.5 py-1.5 font-display text-xs font-medium uppercase tracking-[0.1em] text-primary">
+                        {item.tag}
+                      </span>
+                      <span className="text-[1.375rem] font-semibold">{item.title}</span>
+                      <p className="text-[0.90625rem] leading-[1.7] text-muted-foreground">
+                        {item.outcome}
+                      </p>
+                      <span className="mt-auto flex items-center gap-2 pt-2 font-display text-sm font-medium text-primary">
+                        Read the case study
+                        <span aria-hidden className="transition-transform duration-300 ease-out group-hover:translate-x-1.5">
+                          &rarr;
+                        </span>
+                      </span>
+                    </div>
                   </Link>
                   {item.link && (
                     <a
                       href={item.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-3 inline-block rounded-md text-sm text-muted-foreground underline underline-offset-4 ring-offset-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="mt-3 inline-block rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {item.link}
                     </a>
@@ -125,7 +106,7 @@ export function PastWork() {
             })}
           </div>
         )}
-      </Container>
+      </div>
     </section>
   );
 }

@@ -3,119 +3,113 @@
 @tailwind utilities;
 
 @layer base {
-  /* nate-personal light fallback */
+  /*
+   * Light mode is the approved artboard palette, converted to HSL:
+   *   ground #FBFCFE · ink #14161a · secondary text #55575c · hairline #DDE4EE
+   *   accents #4a86d7 / #7EB3F7 · tint panel #F1F6FD · card #FFFFFF
+   *
+   * Dark mode is derived in the same spirit rather than inverted: a near-black
+   * ground, the SAME two blues (the brighter #7EB3F7 becomes primary so it
+   * carries contrast on black), and hairlines that flip from a dark line on
+   * light to a low-contrast light line on dark.
+   */
   :root {
-    --background: 240 20% 97%;
-    --foreground: 250 30% 11%;
+    --background: 220 60% 99%; /* #FBFCFE ground */
+    --foreground: 220 13% 9%; /* #14161a ink */
 
-    --card: 0 0% 100%;
-    --card-foreground: 250 30% 11%;
+    --card: 0 0% 100%; /* #FFFFFF raised surface */
+    --card-foreground: 220 13% 9%;
 
-    --primary: 214 72% 44%;
+    --primary: 214 64% 57%; /* #4a86d7 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 250 20% 92%;
-    --secondary-foreground: 250 30% 11%;
+    /* Tint panel #F1F6FD — the quiet blue-grey fill behind calm blocks. */
+    --secondary: 215 75% 97%;
+    --secondary-foreground: 220 13% 9%;
 
-    --muted: 250 20% 92%;
-    --muted-foreground: 250 16% 42%;
+    --muted: 215 75% 97%;
+    --muted-foreground: 223 4% 35%; /* #55575c */
 
-    --accent: 262 45% 88%;
-    --accent-foreground: 262 60% 36%;
+    /* #7EB3F7 — the flood blue: index-row hover, full-bleed plates, borders. */
+    --accent: 214 88% 73%;
+    --accent-foreground: 216 64% 22%; /* #14315c reads on the flood */
 
     --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 250 20% 88%;
-    --input: 250 20% 88%;
-    --ring: 214 72% 44%;
+    --border: 215 33% 90%; /* #DDE4EE hairline */
+    --input: 217 25% 82%; /* #C6CFDD — field edges sit a step darker */
+    --ring: 214 64% 57%;
 
-    --radius: 0.875rem;
+    --radius: 1rem;
   }
 
-  /* nate-personal dark (default) — charcoal-purple field, pastel blue/purple accents */
   .dark {
-    --background: 250 22% 10%;        /* #15131F field */
-    --foreground: 250 28% 94%;        /* #ECEAF5 ink */
+    --background: 220 14% 7%; /* #0F1114 near-black ground */
+    --foreground: 214 20% 94%; /* #EDF0F4 */
 
-    --card: 250 22% 15%;              /* #201D30 surface */
-    --card-foreground: 250 28% 94%;
+    --card: 220 13% 10%; /* #16181C */
+    --card-foreground: 214 20% 94%;
 
-    --primary: 214 100% 74%;          /* #7CB3FF pastel blue — primary CTA */
-    --primary-foreground: 250 22% 10%;
+    --primary: 214 88% 73%; /* #7EB3F7 — the lighter blue leads on black */
+    --primary-foreground: 220 14% 7%;
 
-    --secondary: 250 22% 18%;         /* #262238 elevated surface */
-    --secondary-foreground: 250 28% 94%;
+    --secondary: 218 16% 13%; /* dark equivalent of the tint panel */
+    --secondary-foreground: 214 20% 94%;
 
-    --muted: 250 22% 18%;
-    --muted-foreground: 250 16% 65%;  /* #9A97B4 muted ink */
+    --muted: 218 16% 13%;
+    --muted-foreground: 218 8% 65%;
 
-    --accent: 262 30% 22%;            /* purple-tinted chip bg */
-    --accent-foreground: 214 100% 74%; /* pastel blue icon/text on chip */
+    --accent: 214 64% 57%; /* #4a86d7 floods on dark; the deeper blue holds text */
+    --accent-foreground: 214 92% 95%;
 
     --destructive: 0 63% 50%;
-    --destructive-foreground: 250 28% 94%;
+    --destructive-foreground: 214 20% 94%;
 
-    --border: 250 18% 23%;            /* #332F45 hairline */
-    --input: 250 18% 25%;
-    --ring: 214 100% 74%;
+    --border: 217 14% 20%; /* low-contrast light hairline */
+    --input: 217 14% 26%;
+    --ring: 214 88% 73%;
 
-    --radius: 0.875rem;
+    --radius: 1rem;
   }
 }
 
 @layer components {
   /*
-   * Shared interaction utilities — applied consistently instead of re-authored
-   * per component. Motion is subtle/purposeful and inherits the global
-   * reduce-motion no-op.
+   * The four interaction gestures from the artboards, authored once. Everything
+   * on the site reuses these rather than re-deriving a hover per component.
    */
 
-  /* Card hover: pronounced lift + scale + accent glow. Put on the card root. */
-  .hover-lift {
-    @apply transition-[transform,box-shadow,border-color] duration-300 ease-out;
+  /* Cards / tiers / founder panels: lift 6px, blue-tinted shadow, border → #7EB3F7. */
+  .lift-card {
+    @apply transition-[transform,box-shadow,border-color] duration-[350ms] ease-[cubic-bezier(0.16,1,0.3,1)];
   }
-  .hover-lift:hover {
-    @apply -translate-y-1.5 scale-[1.02] border-primary/40 shadow-xl shadow-primary/20;
-  }
-
-  /* Arrow/link slide: put on an inline arrow inside a `.group` parent. */
-  .link-slide {
-    @apply transition-transform duration-200 ease-out;
-  }
-  .group:hover .link-slide {
-    @apply translate-x-1.5;
+  .lift-card:hover {
+    @apply -translate-y-1.5 border-accent shadow-[0_18px_44px_hsl(var(--primary)/0.14)];
   }
 
-  /* Icon-tile brighten + pop: put on an icon tile inside a `.group` parent. */
-  .icon-brighten {
-    @apply transition-[transform,background-color,color] duration-300 ease-out;
+  /* Buttons: lift 2px onto a soft blue shadow. */
+  .lift-button {
+    @apply transition-[transform,box-shadow,background-color] duration-[250ms] ease-out;
   }
-  .group:hover .icon-brighten {
-    @apply -translate-y-0.5 scale-110 bg-primary/20 text-primary;
-  }
-
-  /* CTA / focal glow on hover — accent halo that intensifies. */
-  .hover-glow {
-    @apply transition-shadow duration-300 ease-out;
-  }
-  .hover-glow:hover {
-    box-shadow:
-      0 0 0 1px hsl(var(--primary) / 0.5),
-      0 0 32px 2px hsl(var(--primary) / 0.35);
+  .lift-button:hover {
+    @apply -translate-y-0.5 shadow-[0_10px_24px_hsl(var(--primary)/0.28)];
   }
 
-  /* Placeholder shimmer surface — pair with `animate-shimmer`. */
-  .shimmer-surface {
-    background-image: linear-gradient(
-      100deg,
-      transparent 20%,
-      hsl(var(--primary) / 0.08) 45%,
-      hsl(var(--primary) / 0.14) 50%,
-      hsl(var(--primary) / 0.08) 55%,
-      transparent 80%
-    );
-    background-size: 200% 100%;
+  /* Index / nav rows: the whole row floods #7EB3F7 and the arrow slides. */
+  .flood-row {
+    @apply transition-colors duration-[350ms] ease-out;
+  }
+  .flood-row:hover,
+  .flood-row:focus-visible {
+    @apply bg-accent text-accent-foreground;
+  }
+  .flood-arrow {
+    @apply transition-transform duration-[350ms] ease-out;
+  }
+  .flood-row:hover .flood-arrow,
+  .flood-row:focus-visible .flood-arrow {
+    @apply translate-x-2;
   }
 }
 

@@ -48,6 +48,20 @@ export interface UseCasesContent {
   items: [UseCaseItem, UseCaseItem, UseCaseItem, UseCaseItem];
 }
 
+export interface AiConsultStep {
+  step: string;
+  title: string;
+  description: string;
+}
+
+export interface AiConsultContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  rate: string;
+  steps: [AiConsultStep, AiConsultStep, AiConsultStep];
+}
+
 export interface ContactHighlightItem {
   title: string;
   description: string;
@@ -189,6 +203,7 @@ export interface SiteContent {
   hero: HeroContent;
   howItWorks: HowItWorksContent;
   useCases: UseCasesContent;
+  aiConsult: AiConsultContent;
   contactSection: ContactSectionContent;
   pastWork: PastWorkContent;
   reviews: ReviewsContent;
@@ -273,6 +288,33 @@ export const siteContent: SiteContent = {
         title: "Something Else",
         description:
           "Your options aren't limited to what we've done before. If you have a pain point, we can build a tool to alleviate it.",
+      },
+    ],
+  },
+
+  aiConsult: {
+    eyebrow: "AI consulting",
+    title: "How an AI consult works",
+    description: "One day, spent on your business.",
+    rate: "$500 / day",
+    steps: [
+      {
+        step: "01",
+        title: "We look at the work you already do",
+        description:
+          "We go through your week with you and find the parts that are repetitive, slow, or typed in twice. Most of a business does not need AI. We tell you which parts of yours do.",
+      },
+      {
+        step: "02",
+        title: "We build one of them with you watching",
+        description:
+          "We take the task costing you the most hours and build the workflow for it while you watch, so you see how it was put together and not just the finished thing.",
+      },
+      {
+        step: "03",
+        title: "Your team uses it on real work",
+        description:
+          "The rest of the day is your people running it on their own jobs, with us there when something breaks.",
       },
     ],
   },
@@ -485,7 +527,7 @@ export const siteContent: SiteContent = {
       },
     ],
     whyBcns:
-      "Every business we have worked in runs on some process that could be faster, and the software meant to fix it usually solves a general version of the problem instead of the specific one. We started bcns to close that gap.",
+      "Every business we have worked in runs on at least one process that could be faster. The software sold to fix it is built for the general version of the problem, not the one that business actually has. We started bcns to build the specific one.",
   },
 
   navCards: {
