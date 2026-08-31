@@ -46,7 +46,7 @@ interface and the component.
 | Page | URL | Content keys used |
 |------|-----|-------------------|
 | Home | `/` | `hero`, `howItWorks`, `useCases`, `contactSection`, `navCards`, `pageMeta.home` |
-| Services | `/services` | `howItWorks`, `useCases`, `contactSection`, `pageMeta.services` |
+| Services | `/services` | `howItWorks`, `useCases`, `aiConsult`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
@@ -268,6 +268,60 @@ Shows concrete verticals or problem types served. Four items, fixed tuple.
 - **Length:** 1-2 sentences, ≤130 chars
 
 > `items` is a fixed tuple of exactly 4.
+
+---
+
+## AI Consult (`siteContent.aiConsult`) — /services
+
+Explains what a day of AI consulting actually consists of. Three steps, fixed
+tuple, read as one day in sequence.
+
+### eyebrow
+- **Field:** `aiConsult.eyebrow`
+- **Purpose:** Section label
+- **Tone:** Neutral
+- **Length:** 1-3 words, ≤30 chars
+
+### title
+- **Field:** `aiConsult.title`
+- **Purpose:** Section headline
+- **Tone:** Plain, no hype
+- **Length:** ≤60 chars
+
+### description
+- **Field:** `aiConsult.description`
+- **Purpose:** 1 line framing the engagement as a single day
+- **Tone:** Plain
+- **Length:** 1 sentence, ≤80 chars
+
+### rate
+- **Field:** `aiConsult.rate`
+- **Purpose:** The day rate, shown as the section's numeric anchor
+- **Tone:** Bare figure
+- **Length:** ≤20 chars
+- **Note:** Must stay in sync with the AI consulting tier in `pricing.tiers`.
+
+### steps[n] — step 1-3 (fixed)
+
+#### steps[n].step
+- **Field:** `aiConsult.steps[n].step`
+- **Purpose:** Ordinal marker ("01")
+- **Tone:** Numeric
+- **Length:** 2 chars
+
+#### steps[n].title
+- **Field:** `aiConsult.steps[n].title`
+- **Purpose:** What happens in this part of the day, as a sentence
+- **Tone:** Second person, concrete
+- **Length:** ≤55 chars
+
+#### steps[n].description
+- **Field:** `aiConsult.steps[n].description`
+- **Purpose:** 1-3 sentences on what that actually involves
+- **Tone:** Plain, evidence over claims
+- **Length:** ≤240 chars
+
+> `steps` is a fixed tuple of exactly 3.
 
 ---
 

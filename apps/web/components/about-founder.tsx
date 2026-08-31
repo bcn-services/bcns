@@ -1,112 +1,148 @@
-import Image, { type StaticImageData } from "next/image";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Container,
-  SectionHeading,
-} from "@nseluga/ui";
-import { SectionAtmosphere } from "@/components/section-atmosphere";
-import { Reveal } from "@/components/reveal";
+import Image from "next/image";
 import { siteContent } from "@/lib/content";
-import nateSeluga from "@/public/founders/nate-seluga.jpg";
+import { Reveal } from "@/components/reveal";
+import { GUTTER } from "@/components/kit";
+import { Cube } from "@/components/cube";
 
 /**
- * `founders[].photo` in the registry is a path string; next/image needs a static
- * import to get intrinsic dimensions and to turn a deleted file into a build
- * error. Same mechanism and reasoning as lib/case-study-images.ts, kept local
- * because `founders` is a fixed tuple of two. A founder with no `photo` — or a
- * `photo` with no entry here — falls back to initials rather than a broken image.
+ * The two founders as hairline cards, then the "why bcns" statement on the
+ * full-bleed blue plate — this page's one bold moment.
+ *
+ * The section heading lives in the page's `PageHead`.
  */
-const FOUNDER_PHOTOS: Record<string, StaticImageData> = {
-  "/founders/nate-seluga.jpg": nateSeluga,
-};
+
+/**
+ * Splits the statement into the beats it is already written in: the opening
+ * observation, the middle it complicates, and the closing line. Rendering the
+ * three at one size makes a slab of text; giving each its own weight lets the
+ * statement land the way it is written, without touching the string.
+ *
+ * Same render-time split `emphasize` uses on the headlines — `content.ts` stays
+ * the single frozen source. A statement of any other shape falls back to the
+ * plain paragraph rather than losing a sentence.
+ */
+function beats(statement: string) {
+  const parts = statement.match(/[^.]+\./g)?.map((part) => part.trim());
+  if (!parts || parts.length < 2) return { lead: statement, middle: "", close: "" };
+  return {
+    lead: parts[0] ?? statement,
+    middle: parts.slice(1, -1).join(" "),
+    close: parts[parts.length - 1] ?? "",
+  };
+}
+
+/** Initials fallback for a founder with no photo yet. */
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
 
 export function AboutFounder() {
-  const { eyebrow, title, description, founders, whyBcns } = siteContent.about;
+  const { founders, whyBcns } = siteContent.about;
+  const { lead, middle, close } = beats(whyBcns);
 
   return (
-    <section id="about" className="relative overflow-hidden border-t border-border/60 pt-16 pb-24 sm:pt-20 sm:pb-28">
-      <SectionAtmosphere variant="about" />
-      <Container>
-        <SectionHeading
-          eyebrow={eyebrow}
-          title={title}
-          accent="people"
-          description={description}
-        />
+    <>
+      <section id="founders" className={`${GUTTER} grid gap-7 py-16 lg:grid-cols-2`}>
+        {founders.map((founder, i) => (
+          <Reveal
+            key={founder.name}
+            delay={i * 110}
+            className="lift-card flex h-full flex-col rounded-[1.25rem] border border-border bg-card p-8 sm:p-10 sm:px-10 sm:py-11"
+          >
+            <div className="flex items-center gap-5">
+              {founder.photo ? (
+                <Image
+                  src={founder.photo}
+                  alt=""
+                  width={72}
+                  height={72}
+                  className="size-[4.5rem] shrink-0 rounded-full border border-accent object-cover"
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="flex size-[4.5rem] shrink-0 items-center justify-center rounded-full border border-accent bg-secondary font-display text-[1.375rem] font-bold text-primary"
+                >
+                  {initials(founder.name)}
+                </span>
+              )}
+              <div>
+                <h2 className="text-[1.375rem] font-semibold sm:text-[1.625rem]">{founder.name}</h2>
+                <p className="mt-1 font-display text-[0.8125rem] font-medium uppercase tracking-[0.1em] text-primary">
+                  {founder.roleLine}
+                </p>
+              </div>
+            </div>
 
-        <div className="mt-14 grid gap-8 lg:grid-cols-2">
-          {founders.map((founder, index) => {
-            const initials = founder.name.split(" ").map((w: string) => w[0]).join("");
-            const photo = founder.photo ? FOUNDER_PHOTOS[founder.photo] : undefined;
-            return (
-            <Reveal as="div" key={founder.name} variant="pop" delay={index * 140} className="h-full">
-            <Card className="group hover-lift relative h-full overflow-hidden">
-              <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-primary/40 transition-colors duration-300 group-hover:bg-primary" aria-hidden />
-              <CardHeader className="pl-8">
-                <div className="flex items-center gap-4 mb-2">
-                  {photo ? (
-                    /* Decorative: the name is already adjacent in CardTitle, so
-                       alt text would only repeat it to a screen reader. */
-                    <Image
-                      src={photo}
-                      alt=""
-                      sizes="56px"
-                      className="size-14 shrink-0 rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div
-                      aria-hidden
-                      className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/25 to-accent/60 text-foreground font-bold text-lg select-none"
-                    >
-                      {initials}
-                    </div>
-                  )}
-                  <div>
-                    <CardTitle className="text-2xl font-bold">{founder.name}</CardTitle>
-                    <p className="text-sm font-semibold uppercase tracking-wider text-primary/70">{founder.roleLine}</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 pl-8">
-                <CardDescription className="text-base leading-relaxed">
-                  {founder.bio}
-                </CardDescription>
-                <ul className="space-y-1.5 border-t border-border/60 pt-4">
-                  {founder.credentials.map((credential, credIndex) => (
-                    <li key={credIndex} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/50" aria-hidden />
-                      {credential}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            </Reveal>
-            );
-          })}
+            <p className="mt-[1.625rem] text-[0.90625rem] leading-[1.75] text-muted-foreground">
+              {founder.bio}
+            </p>
+
+            <div aria-hidden className="mb-[1.125rem] mt-6 h-px bg-border" />
+            <ul className="mt-auto font-display text-[0.8125rem] text-muted-foreground">
+              {founder.credentials.map((credential) => (
+                <li key={credential}>{credential}</li>
+              ))}
+            </ul>
+          </Reveal>
+        ))}
+      </section>
+
+      {/* The bold moment: the statement on a full-bleed plate. */}
+      <section className="relative overflow-hidden bg-accent text-accent-foreground">
+        {/* The mark at poster scale, bleeding off the corner. Outline only and
+            barely there: it anchors the plate without competing with the type. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-20 -top-16 hidden w-[30rem] text-accent-foreground/20 lg:block"
+        >
+          <Cube filled={false} strokeWidth={0.5} className="w-full" />
         </div>
 
-        {whyBcns && (
-          <Reveal className="mx-auto mt-16 max-w-3xl">
-            <blockquote className="relative rounded-2xl border-l-2 border-primary bg-secondary/40 px-10 py-8 pt-10 text-center">
-              {/* Large opening mark — serif accent, low opacity, behind the text. */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute left-5 top-1 select-none font-serif-accent text-7xl italic leading-none text-primary/25"
-              >
-                &ldquo;
-              </span>
-              <p className="relative text-pretty text-xl font-medium leading-relaxed text-foreground/90 sm:text-2xl">
-                {whyBcns}
-              </p>
-            </blockquote>
-          </Reveal>
-        )}
-      </Container>
-    </section>
+        <div className={`relative ${GUTTER} py-16 sm:py-[5.5rem]`}>
+          <Reveal
+            variant="draw-rule"
+            aria-hidden
+            className="h-px w-16 origin-left bg-current opacity-40"
+          />
+
+          <div className="mt-9 grid gap-x-16 gap-y-9 lg:grid-cols-[1.1fr_1fr]">
+            <Reveal
+              as="p"
+              className="text-balance text-[clamp(1.625rem,3vw,2.375rem)] font-light leading-[1.26] tracking-[-0.015em]"
+            >
+              {lead}
+            </Reveal>
+
+            <div className="lg:pt-2.5">
+              {middle && (
+                <Reveal
+                  as="p"
+                  delay={110}
+                  className="max-w-[46ch] text-[1.0625rem] leading-[1.75] text-accent-foreground/80"
+                >
+                  {middle}
+                </Reveal>
+              )}
+              {close && (
+                <Reveal
+                  as="p"
+                  delay={200}
+                  className={`border-l-2 border-accent-foreground/40 pl-5 text-[1.1875rem] font-semibold leading-snug ${
+                    middle ? "mt-7" : ""
+                  }`}
+                >
+                  {close}
+                </Reveal>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

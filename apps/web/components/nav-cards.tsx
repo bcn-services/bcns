@@ -1,51 +1,42 @@
-"use client";
+import Link from "next/link";
+import { siteContent } from "@/lib/content";
+import { Reveal } from "@/components/reveal";
+import { GUTTER } from "@/components/kit";
 
 /**
- * Site navigation as full-width editorial rows — one per destination, each
- * spanning the viewport, keyed by a cube-face swatch. Replaces the old card
- * grid: fewer boxes, more room for the description to actually be read.
+ * Site navigation as an editorial index: one full-width hairline row per
+ * destination, flooding blue on hover. Replaces the old card grid — fewer
+ * boxes, and the description gets room to actually be read.
  */
-
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
-import { siteContent } from "@/lib/content";
-import { FACE_FILLS } from "@/components/cube";
-
 export function NavCards() {
   const { navCards } = siteContent;
+
   return (
-    <nav aria-label="Sections" className="border-b border-border/60">
-      <ul role="list" className="divide-y divide-border/60">
+    <nav aria-label="Sections" className="border-b border-border">
+      <ul role="list">
         {navCards.items.map((card, i) => (
-          <motion.li
-            key={card.href}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.45, delay: i * 0.05 }}
-          >
+          <Reveal as="li" key={card.href} delay={i * 70}>
             <Link
               href={card.href}
-              className="group mx-auto grid w-full max-w-[90rem] items-baseline gap-2 px-6 py-8 transition-colors duration-200 hover:bg-primary/[0.06] focus-visible:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[1.25rem_14rem_minmax(0,42rem)_1fr] sm:gap-10 sm:py-9 lg:px-12"
+              className={`group flood-row block focus-visible:outline-none ${
+                i < navCards.items.length - 1 ? "border-b border-border" : ""
+              }`}
             >
-              <span
-                aria-hidden
-                className="hidden size-3.5 rotate-45 self-center border-2 border-foreground/70 transition-transform duration-300 group-hover:rotate-[135deg] sm:block"
-                style={{ background: FACE_FILLS[i % 3] }}
-              />
-              <span className="font-display text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
-                {card.title}
-              </span>
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:mt-0 sm:text-base">
-                {card.description}
-              </p>
-              <ArrowRight
-                className="hidden size-5 self-center justify-self-end text-muted-foreground/50 transition-[transform,color] duration-200 group-hover:translate-x-1.5 group-hover:text-primary sm:block"
-                aria-hidden
-              />
+              <div
+                className={`${GUTTER} grid items-center gap-3 py-8 sm:grid-cols-[23.75rem_1fr_3.75rem] sm:gap-12 sm:py-[2.375rem]`}
+              >
+                <span className="font-display text-[1.75rem] font-medium tracking-tight sm:text-[2.125rem]">
+                  {card.title}
+                </span>
+                <span className="max-w-[38.75rem] text-[0.90625rem] leading-[1.6] text-muted-foreground transition-colors duration-[350ms] group-hover:text-accent-foreground group-focus-visible:text-accent-foreground">
+                  {card.description}
+                </span>
+                <span aria-hidden className="flood-arrow hidden text-[1.5rem] sm:block sm:justify-self-end">
+                  &rarr;
+                </span>
+              </div>
             </Link>
-          </motion.li>
+          </Reveal>
         ))}
       </ul>
     </nav>

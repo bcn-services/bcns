@@ -1,66 +1,60 @@
-"use client";
-
-/**
- * Contact band — full-bleed to match the nav rows above it. Highlights are
- * keyed by the same cube-face swatches as the rest of the page instead of
- * lucide icon tiles, so the whole homepage speaks one visual language.
- */
-
-import { motion } from "framer-motion";
 import { ContactForm } from "@/components/contact-form";
 import { siteContent } from "@/lib/content";
-import { FACE_FILLS } from "@/components/cube";
+import { Reveal } from "@/components/reveal";
+import { Eyebrow, GUTTER } from "@/components/kit";
 
-const rise = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-60px" },
-};
-
+/**
+ * Closing contact band: copy and a hairline highlight table on the left, the
+ * form card on the right. The highlights are a two-column rule-separated table
+ * rather than icon tiles — same rule system as the rest of the page.
+ */
 export function ContactSection() {
   const { eyebrow, title, description, highlights } = siteContent.contactSection;
 
   return (
-    <section id="contact" className="relative">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_50%_55%,hsl(214_88%_73%/0.12),transparent_75%)]"
-      />
-      <div className="mx-auto grid w-full max-w-[90rem] gap-12 px-6 py-20 lg:grid-cols-[1fr_1fr] lg:gap-20 lg:px-12 lg:py-24">
-        <motion.div {...rise} transition={{ duration: 0.55 }}>
-          <p className="font-mono text-xs uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
-          <h2 className="mt-5 max-w-[14ch] text-balance font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.02em]">
+    <section id="contact">
+      <div className={`${GUTTER} grid gap-14 py-16 sm:py-[5.25rem] lg:grid-cols-[1.1fr_1fr] lg:gap-[4.5rem]`}>
+        <div>
+          <Reveal>
+            <Eyebrow>{eyebrow}</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
+            delay={80}
+            className="mt-5 max-w-[16ch] text-balance text-[clamp(2.25rem,4.6vw,3.125rem)] font-light leading-[1.1] tracking-[-0.02em]"
+          >
             {title}
-          </h2>
-          <p className="mt-5 max-w-md text-pretty leading-relaxed text-muted-foreground">
+          </Reveal>
+          <Reveal
+            as="p"
+            delay={160}
+            className="mt-[1.375rem] max-w-[32.5rem] text-[1rem] leading-[1.7] text-muted-foreground"
+          >
             {description}
-          </p>
-          <ul role="list" className="mt-10 flex flex-col gap-7 border-t border-border/60 pt-8">
-            {highlights.map((h, i) => (
-              <li key={h.title} className="flex gap-4">
-                <span
-                  aria-hidden
-                  className="mt-1.5 size-3.5 shrink-0 rotate-45 border-2 border-foreground/70"
-                  style={{ background: FACE_FILLS[i % 3] }}
-                />
-                <div>
-                  <p className="font-display font-semibold tracking-tight">{h.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {h.description}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </motion.div>
+          </Reveal>
 
-        <motion.div
-          {...rise}
-          transition={{ duration: 0.55, delay: 0.08 }}
-          className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
+          <dl className="mt-9 border-t border-border">
+            {highlights.map((h, i) => (
+              <Reveal
+                key={h.title}
+                delay={220 + i * 70}
+                className={`grid gap-2 py-[1.125rem] text-sm sm:grid-cols-[9.375rem_1fr] sm:gap-6 ${
+                  i < highlights.length - 1 ? "border-b border-border" : ""
+                }`}
+              >
+                <dt className="font-semibold">{h.title}</dt>
+                <dd className="leading-relaxed text-muted-foreground">{h.description}</dd>
+              </Reveal>
+            ))}
+          </dl>
+        </div>
+
+        <Reveal
+          delay={120}
+          className="self-start rounded-[1.125rem] border border-border bg-card p-6 shadow-[0_12px_44px_hsl(220_13%_9%/0.05)] sm:p-9"
         >
           <ContactForm />
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );

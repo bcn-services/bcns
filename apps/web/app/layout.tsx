@@ -5,41 +5,27 @@ import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
 // Fonts are SELF-HOSTED (next/font/local), not fetched from Google at build time.
-// `next/font/google` downloads font CSS + binaries during compilation: 16 network
-// round-trips for these three families, with no timeout on a production build. If
-// fonts.googleapis.com is unreachable it retries 3x and then throws, failing
-// `next build` — a CI/deploy dependency on Google's CDN for a site that needs no
-// runtime network. The files in ./fonts are the exact latin-subset binaries Google
-// was serving (byte-identical, sha256 recorded in ./fonts/README.md).
+// `next/font/google` downloads font CSS + binaries during compilation and, in a
+// production build, has no timeout — if fonts.googleapis.com is unreachable it
+// retries 3x and then throws, failing `next build`. The files in ./fonts are the
+// latin-subset binaries Google serves (sha256 recorded in ./fonts/README.md).
 //
-// All three are variable fonts, so ONE file covers the whole weight axis and the
+// Both are variable fonts, so ONE file covers the whole weight axis and the
 // `weight` values below are ranges, not discrete faces. Only the latin subset is
-// shipped: it covers every character in the site's copy (verified — the only
-// non-latin glyph anywhere, "→", appears solely in code comments, and no Google
-// subset carries it regardless).
-const inter = localFont({
-  src: "./fonts/inter-latin-var.woff2",
+// shipped: it covers every character in the site's rendered copy.
+const manrope = localFont({
+  src: "./fonts/manrope-latin-var.woff2",
   variable: "--font-sans",
   display: "swap",
-  weight: "100 900",
+  weight: "300 600",
 });
 
-const bricolage = localFont({
-  src: "./fonts/bricolage-grotesque-latin-var.woff2",
+// Space Grotesk carries every heading, eyebrow, number and label.
+const spaceGrotesk = localFont({
+  src: "./fonts/space-grotesk-latin-var.woff2",
   variable: "--font-display",
   display: "swap",
-  weight: "200 800",
-});
-
-// Serif accent face — used for exactly ONE italic accent word per headline
-// (never for body). Exposed as `font-serif-accent` in the Tailwind preset.
-// Italic-only: the upright cut is never used, so it is not shipped.
-const fraunces = localFont({
-  src: "./fonts/fraunces-italic-latin-var.woff2",
-  variable: "--font-serif-accent",
-  display: "swap",
-  weight: "100 900",
-  style: "italic",
+  weight: "400 700",
 });
 
 export const metadata: Metadata = {
@@ -79,16 +65,21 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F4F5FA" },
-    { media: "(prefers-color-scheme: dark)", color: "#15131F" },
+    { media: "(prefers-color-scheme: light)", color: "#FBFCFE" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F1114" },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${bricolage.variable} ${fraunces.variable} font-sans`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+      <body className={`${manrope.variable} ${spaceGrotesk.variable} font-sans`}>
+        {/* Reveal starts hidden and is un-hidden by an IntersectionObserver.
+            With JS off that observer never runs, so show everything up front. */}
+        <noscript>
+          <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
+        </noscript>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
       </body>
