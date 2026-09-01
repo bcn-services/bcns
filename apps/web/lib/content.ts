@@ -296,7 +296,7 @@ export const siteContent: SiteContent = {
     eyebrow: "AI consulting",
     title: "How an AI consult works",
     description: "One day, spent on your business.",
-    rate: "$500 / day",
+    rate: "$1,000 / day",
     steps: [
       {
         step: "01",
@@ -427,9 +427,9 @@ export const siteContent: SiteContent = {
     tiers: [
       {
         name: "Standard build",
-        price: "$1,000 setup",
-        setup: "$1,000 setup",
-        monthly: "$149/mo",
+        price: "$3,000 setup",
+        setup: "$3,000 setup",
+        monthly: "$250/mo",
         seats: "Includes up to 15 users, then $20/user per month.",
         description:
           "A single-purpose tool to streamline one of your current pain points.",
@@ -442,9 +442,9 @@ export const siteContent: SiteContent = {
       },
       {
         name: "Advanced build",
-        price: "$3,000 setup",
-        setup: "$3,000 setup",
-        monthly: "$349/mo",
+        price: "$6,000 setup",
+        setup: "$6,000 setup",
+        monthly: "$500/mo",
         seats: "Includes up to 15 users, then $20/user per month.",
         description:
           "A highly technical tool or fully integrated system to manage your whole business.",
@@ -457,7 +457,7 @@ export const siteContent: SiteContent = {
       },
       {
         name: "AI consulting",
-        price: "$500 / day",
+        price: "$1,000 / day",
         description:
           "Want to learn how to integrate AI into your business? We can teach you modern best practices and practical applications.",
         features: [
@@ -578,7 +578,7 @@ export const siteContent: SiteContent = {
     pricing: {
       title: "Pricing | bcns",
       description:
-        "Standard builds are $1,000 setup and $149/mo. Advanced builds are $3,000 setup and $349/mo. Both include up to 15 users, then $20/user per month. AI consulting at $800 per day. Fixed quotes, no hourly surprises.",
+        "Standard builds are $3,000 setup and $250/mo. Advanced builds are $6,000 setup and $500/mo. Both include up to 15 users, then $20/user per month. AI consulting at $1,000 per day. Fixed quotes, no hourly surprises.",
     },
     about: {
       title: "About bcns | Two Founders, Custom Software",

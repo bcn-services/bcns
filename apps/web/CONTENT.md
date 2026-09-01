@@ -694,20 +694,20 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[0].price
 - **Field:** `pricing.tiers[0].price`
-- **Purpose:** Headline price string shown on the card. Currently `$1,000 setup`.
+- **Purpose:** Headline price string shown on the card. Currently `$3,000 setup`.
 - **Tone:** N/A (formatted value)
 - **Length:** ≤20 chars
 
 #### tiers[0].setup _(optional)_
 - **Field:** `pricing.tiers[0].setup`
-- **Purpose:** One-time setup fee, spelled out. Currently `$1,000 one-time setup`.
+- **Purpose:** One-time setup fee, spelled out. Currently `$3,000 one-time setup`.
 - **Tone:** N/A (formatted value)
 - **Note:** Optional field on build tiers; the AI consulting tier (tiers[2]) omits it.
 - **Length:** ≤30 chars
 
 #### tiers[0].monthly _(optional)_
 - **Field:** `pricing.tiers[0].monthly`
-- **Purpose:** Flat monthly hosting/support fee. Currently `$149/mo`.
+- **Purpose:** Flat monthly hosting/support fee. Currently `$250/mo`.
 - **Tone:** N/A (formatted value)
 - **Note:** Optional; consulting tier omits it.
 - **Length:** ≤20 chars
@@ -745,18 +745,18 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[1].price
 - **Field:** `pricing.tiers[1].price`
-- **Purpose:** Headline price string shown on the card. Currently `$3,000 setup`.
+- **Purpose:** Headline price string shown on the card. Currently `$6,000 setup`.
 - **Length:** ≤20 chars
 
 #### tiers[1].setup _(optional)_
 - **Field:** `pricing.tiers[1].setup`
-- **Purpose:** One-time setup fee, spelled out. Currently `$3,000 one-time setup`.
+- **Purpose:** One-time setup fee, spelled out. Currently `$6,000 one-time setup`.
 - **Note:** Optional; consulting tier omits it.
 - **Length:** ≤30 chars
 
 #### tiers[1].monthly _(optional)_
 - **Field:** `pricing.tiers[1].monthly`
-- **Purpose:** Flat monthly hosting/support fee. Currently `$349/mo`.
+- **Purpose:** Flat monthly hosting/support fee. Currently `$500/mo`.
 - **Note:** Optional; consulting tier omits it.
 - **Length:** ≤20 chars
 
@@ -787,7 +787,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 
 #### tiers[2].price
 - **Field:** `pricing.tiers[2].price`
-- **Purpose:** Price string. Currently `$800 / day`.
+- **Purpose:** Price string. Currently `$1,000 / day`.
 - **Note:** AI consulting is a day-rate engagement, so it omits the optional `setup`, `monthly`, and `seats` fields the two build tiers carry.
 - **Length:** ≤20 chars
 
@@ -846,7 +846,7 @@ Addresses objections and reduces friction before the visitor contacts you.
 
 The seven pre-seeded entries, in order, are:
 
-0. **How much will my project cost?** — Setup + monthly framing: Standard is $1,000 setup and $149/mo, Advanced is $3,000 setup and $349/mo, both include up to 15 users then $20/user per month. Exact numbers come in the fixed quote after the free consult.
+0. **How much will my project cost?** — Setup + monthly framing: Standard is $3,000 setup and $250/mo, Advanced is $6,000 setup and $500/mo, both include up to 15 users then $20/user per month. Exact numbers come in the fixed quote after the free consult.
 1. **How long does a build take?** — About a week for single tools, two to three weeks for connected systems; delivery date lands with the quote.
 2. **What happens if something breaks after delivery?** — 30 days of no-questions fixes, then a year of free bug fixes on what was built; new features quoted separately.
 3. **Do I need to be technical to work with you?** — No; questions are about the business, and everything ships with a plain-English walkthrough.
