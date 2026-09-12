@@ -27,6 +27,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title: string | null
           updated_at: string | null
@@ -60,6 +61,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           spend_minor: number | null
           updated_at: string | null
@@ -95,6 +97,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status: "active" | "paused" | "churned" | null
           timezone: string | null
@@ -137,6 +140,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status: "ok" | "stale" | "auth_failed" | "error" | "never_ran" | null
           status_since: string | null
@@ -156,6 +160,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status?: "ok" | "stale" | "auth_failed" | "error" | "never_ran" | null
           status_since?: string | null
@@ -175,6 +180,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status?: "ok" | "stale" | "auth_failed" | "error" | "never_ran" | null
           status_since?: string | null
@@ -225,6 +231,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           spend_minor: number | null
           storage_path: string | null
@@ -268,6 +275,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at: string | null
           total_spent_minor: number | null
@@ -292,6 +300,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at?: string | null
           total_spent_minor?: number | null
@@ -316,6 +325,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at?: string | null
           total_spent_minor?: number | null
@@ -354,6 +364,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at: string | null
           value: number | null
@@ -373,6 +384,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at?: string | null
           value?: number | null
@@ -392,6 +404,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at?: string | null
           value?: number | null
@@ -441,6 +454,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at: string | null
         }
@@ -461,6 +475,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at: string | null
         }
@@ -486,6 +501,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at: string | null
           status: string | null
@@ -512,6 +528,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -538,6 +555,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -576,6 +594,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at: string | null
         }
@@ -650,6 +669,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at: string | null
         }
@@ -713,6 +733,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           storage_path: string | null
           tags: string[] | null
@@ -742,6 +763,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           storage_path?: string | null
           tags?: string[] | null
@@ -771,6 +793,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           storage_path?: string | null
           tags?: string[] | null
@@ -811,6 +834,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           updated_at: string | null
           user_id: string | null
@@ -868,6 +892,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title: string | null
           updated_at: string | null
@@ -890,6 +915,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title?: string | null
           updated_at?: string | null
@@ -912,6 +938,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title?: string | null
           updated_at?: string | null
@@ -956,6 +983,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at: string | null
           status: string | null
@@ -983,6 +1011,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -1010,6 +1039,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -1053,6 +1083,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status: string | null
           title: string | null
@@ -1080,6 +1111,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status?: string | null
           title?: string | null
@@ -1107,6 +1139,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           status?: string | null
           title?: string | null
@@ -1149,6 +1182,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title: string | null
           updated_at: string | null
@@ -1169,6 +1203,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title?: string | null
           updated_at?: string | null
@@ -1189,6 +1224,7 @@ export type Database = {
             | "upload"
             | "dashboard"
             | "platform"
+            | "drive"
             | null
           title?: string | null
           updated_at?: string | null
