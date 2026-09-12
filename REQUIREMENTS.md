@@ -273,3 +273,8 @@ Only what was explicitly deferred.
 - Third role / per-panel permissions. Trigger: a client asks.
 - Zero-row `stale` heuristic tuning after the first false alarm.
 - Promotion of the briefing into the shared package. Trigger: second client wants one.
+- Shopify OAuth app (Partner app `bcns-data`: hosted OAuth callback, the three mandatory GDPR
+  webhooks, dev-store test, app review). Until then each store connects with a custom-app Admin
+  API token pasted into `onboard`. Trigger: more than a few Shopify clients, or the connect page.
+- Self-serve connect page (client clicks Connect per source instead of Nate running `onboard`).
+  Trigger: enough clients that hand onboarding is the bottleneck.

@@ -41,6 +41,7 @@ One line per decision or finding resolved. Design calls D1–D20 live in DESIGN.
 - N1: "—" in W2; GA4 connector post-launch if Declan has GA4, else checkout-conversion tile from abandoned checkouts. Conversion = orders ÷ visits; Shopify API exposes no visit count.
 - N2: accept, America/New_York. N3: Meet provisional, yes. N4: add-user script, yes.
 - N5 (2026-09-12): Drive content library stays in Drive; fifth connector `drive` indexes it into `data.media` with `storage_path` null and a copied thumbnail; complete listing every run so tombstones are safe. Needs Nate #7 now applies to it. DESIGN §4.6.
+- N6 (2026-09-13): Shopify OAuth app (callback + GDPR webhooks + review) and the self-serve connect page are future builds that come with more clients; recorded in REQUIREMENTS "Still open". SB connects now with the custom-app token via `onboard --sources shopify,monday`.
 - Design approved; W2 build may start from commit below.
 
 ## W2 build log (2026-09-12, Fable 5.1 orchestrating)
