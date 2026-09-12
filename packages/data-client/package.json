@@ -23,10 +23,5 @@
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bcn-services/bcns-data.git",
-    "directory": "packages/data-client"
   }
 }
