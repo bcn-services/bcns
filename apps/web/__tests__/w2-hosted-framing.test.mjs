@@ -30,11 +30,14 @@ test("hero proofPoints no longer say 'Use it forever, free'", () => {
   );
 });
 
-test("hero proofPoints communicate bcns hosts/runs it", () => {
-  const joined = siteContent.hero.proofPoints.join(" ").toLowerCase();
+// bcns Connect pass: the hero now sells Connect, so the "bcns hosts it" claim
+// lives on the Connect pricing card (the baseline every client is on).
+test("the bcns Connect tier communicates bcns hosts/runs it", () => {
+  const connect = siteContent.pricing.tiers.find((t) => t.id === "connect");
+  const joined = connect.features.join(" ").toLowerCase();
   assert.ok(
-    /\bhost\b|\bhosts\b|\bhost it\b|running/.test(joined),
-    `expected a hosting/running proof point, got: ${JSON.stringify(siteContent.hero.proofPoints)}`
+    /\bhost\b|\bhosts\b|\bhosting\b|running/.test(joined),
+    `expected a hosting/running feature on Connect, got: ${JSON.stringify(connect.features)}`
   );
 });
 
@@ -65,11 +68,11 @@ test("no claim that software runs without bcns or client owns the code", () => {
 });
 
 // --- 4. Contact highlight: data is the client's and exportable ---
-test("a contact highlight states data is the client's and exportable", () => {
+test("a contact highlight states data is the client's and handed over on request", () => {
   const match = siteContent.contactSection.highlights.find((h) => {
     const text = `${h.title} ${h.description}`.toLowerCase();
     const ownership = /your data|data is (always )?yours|data.*yours/.test(text);
-    const exportable = /export/.test(text);
+    const exportable = /export|hand (it |them )?over/.test(text);
     return ownership && exportable;
   });
   assert.ok(

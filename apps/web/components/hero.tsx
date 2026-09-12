@@ -34,7 +34,7 @@ export function Hero() {
             transition={{ duration: 0.6, ease: EASE, delay: 0.08 }}
             className="mt-6 max-w-[13ch] text-balance text-[clamp(2.5rem,6.2vw,4.25rem)] font-light leading-[1.06] tracking-[-0.025em]"
           >
-            {emphasize(hero.headline, "already works")}
+            {emphasize(hero.headline, "ready for the future")}
           </motion.h1>
 
           <motion.p
@@ -57,7 +57,7 @@ export function Hero() {
               {hero.ctaPrimary}
             </Link>
             <Link
-              href="/services#examples"
+              href="/services#connect"
               className="rounded-lg border border-input px-[1.875rem] py-4 text-center text-[0.9375rem] font-medium transition-colors duration-200 hover:border-accent hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {hero.ctaSecondary}

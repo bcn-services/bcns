@@ -45,6 +45,10 @@ export interface UseCasesContent {
   eyebrow: string;
   title: string;
   description: string;
+  /** Heading rendered above the grid itself; eyebrow/title/description above feed the page head. */
+  blockEyebrow: string;
+  blockTitle: string;
+  blockDescription: string;
   items: [UseCaseItem, UseCaseItem, UseCaseItem, UseCaseItem];
 }
 
@@ -201,7 +205,9 @@ export interface PageMetaRegistry {
 
 export interface SiteContent {
   hero: HeroContent;
+  buildingBlocks: HowItWorksContent;
   howItWorks: HowItWorksContent;
+  connect: AiConsultContent;
   useCases: UseCasesContent;
   aiConsult: AiConsultContent;
   contactSection: ContactSectionContent;
@@ -220,23 +226,50 @@ export interface SiteContent {
 
 export const siteContent: SiteContent = {
   hero: {
-    badge: "Software custom built for your business",
-    headline: "We build tools around how your business already works",
+    badge: "bcns Connect: your whole business in one place",
+    headline: "Get your business ready for the future",
     subheadline:
-      "For businesses that only want to pay for what they actually need",
+      "bcns Connect brings the tools you already use into one place, so AI and software can finally work from your real business",
     ctaPrimary: "Book a free consult",
-    ctaSecondary: "See what we build",
+    ctaSecondary: "See how it works",
     proofPoints: [
-      "We work with you to create a plan",
-      "You test it, we refine it",
-      "Fixed price, agreed before we start",
+      "Keep the tools you already use",
+      "$200 a month, no setup fee",
+      "Build on top whenever you're ready",
+    ],
+  },
+
+  buildingBlocks: {
+    eyebrow: "What we offer",
+    title: "Three building blocks for a business that's ready for AI.",
+    description:
+      "Everyone starts with bcns Connect. Add a custom build or a day of AI consulting whenever you're ready.",
+    items: [
+      {
+        step: "01",
+        title: "bcns Connect",
+        description:
+          "Every tool your business runs on, connected in one organized place. Ready for your team, the AI tools you choose, or anything you build next.",
+      },
+      {
+        step: "02",
+        title: "Deluxe builds",
+        description:
+          "An AI agent, an app, a dashboard, anything really. Custom built on top of Connect around how your business already works.",
+      },
+      {
+        step: "03",
+        title: "AI consulting",
+        description:
+          "One day spent on your business. We find where AI actually helps, build it with you, and get your team using it.",
+      },
     ],
   },
 
   howItWorks: {
     eyebrow: "Our process",
     title: "From first call to your personalized product. We're here to assist at every step.",
-    description: "You communicate your needs, we build you a tool that accomodates them.",
+    description: "You communicate your needs, we build you a tool that accommodates them.",
     items: [
       {
         step: "01",
@@ -254,34 +287,65 @@ export const siteContent: SiteContent = {
         step: "03",
         title: "The build",
         description:
-          "We build it, let you test it and refine it until it's right for you. Once launched, we host it, maintain it and support your needs so you can focus on your business.",
+          "We connect your tools and build anything you asked for on top, then let you test it and refine it until it's right. Once launched, we host it, maintain it and support your needs so you can focus on your business.",
+      },
+    ],
+  },
+
+  connect: {
+    eyebrow: "bcns Connect",
+    title: "How bcns Connect works",
+    description: "One connection for your whole business.",
+    rate: "$200 / month",
+    steps: [
+      {
+        step: "01",
+        title: "We connect the tools you already use",
+        description:
+          "Your online store, ad accounts, project boards, calendar, email and files. We plug into each one, and nothing about how you use them changes.",
+      },
+      {
+        step: "02",
+        title: "Everything lands in one organized place",
+        description:
+          "Customers, orders, money, messages and files, sorted the same way no matter where they came from and kept current on their own. For the first time, all of it can be searched and compared together.",
+      },
+      {
+        step: "03",
+        title: "You put it to work",
+        description:
+          "Your team sees the whole business at once. The AI tools you already use can work from your real data instead of guesses. And anything we build for you with Deluxe starts from here.",
       },
     ],
   },
 
   useCases: {
     eyebrow: "Our services",
-    title: "Tools are meant to serve you, not complicate things further",
+    title: "The building blocks of a business ready for what's next",
     description:
-      "Four solutions to common business challenges. If you need something else, we're happy to accomodate you.",
+      "bcns Connect is the foundation every business starts on. Deluxe builds and AI consulting add to it when you're ready.",
+    blockEyebrow: "Deluxe builds",
+    blockTitle: "Anything you need, custom built on top of Connect.",
+    blockDescription:
+      "Starting at $5,000 setup and $300/month on top of Connect. If you have a pain point, we can build a tool to alleviate it.",
     items: [
       {
-        tag: "Bookings",
-        title: "Scheduling & Booking Systems",
+        tag: "Agents",
+        title: "AI Agents",
         description:
-          "Automate deposits, reminders, cancellations and scheduling using the same workflows already in place.",
+          "An assistant that already knows your business. It answers questions about your customers, orders and money, drafts replies, and flags what needs you, working from your real data.",
       },
       {
-        tag: "Operations",
-        title: "Inventory & Back-Office Automation",
+        tag: "Apps",
+        title: "Custom Apps",
         description:
-          "Enhance your spreadsheets. Whether you want to replace or integrate them, we can help you optimize your data management.",
+          "Booking systems, back-office tools, customer portals. Built around how you already work, and reading from the same data as everything else.",
       },
       {
         tag: "Insight",
         title: "Dashboards & Reporting",
         description:
-          "One place to hold all your business analytics. We can consolidate your data and enable you to easily generate insights that are useful to you.",
+          "One place to hold all your business analytics. Your data is already connected, so we build the views that are useful to you.",
       },
       {
         tag: "Other",
@@ -323,7 +387,7 @@ export const siteContent: SiteContent = {
     eyebrow: "Get in touch",
     title: "Tell us what's slowing you down",
     description:
-      "Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to create your custom solution.",
+      "Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to get you connected.",
     highlights: [
       {
         title: "Free consult",
@@ -335,9 +399,9 @@ export const siteContent: SiteContent = {
         description: "You approve the exact product and its price before any work starts.",
       },
       {
-        title: "Your product",
+        title: "Your data",
         description:
-          "We host and maintain the app for you. Your data is always yours and we'll hand it over at any time.",
+          "We host and maintain everything for you. Your data is always yours and we'll hand it over at any time.",
       },
     ],
   },
@@ -423,39 +487,39 @@ export const siteContent: SiteContent = {
     eyebrow: "Pricing",
     title: "We charge you for what you actually need and no more.",
     description:
-      "Each build has a one-time setup fee and a flat monthly rate for hosting and maintenance.",
+      "Every business starts on bcns Connect for a flat monthly rate with no setup fee. Deluxe builds and AI consulting are added on top when you need them.",
     tiers: [
       {
-        name: "Standard build",
-        price: "$3,000 setup",
-        setup: "$3,000 setup",
-        monthly: "$250/mo",
-        seats: "Includes up to 15 users, then $20/user per month.",
+        id: "connect",
+        name: "bcns Connect",
+        price: "$200 per month",
+        seats: "No setup fee.",
         description:
-          "A single-purpose tool to streamline one of your current pain points.",
+          "The foundation for everything else. Every tool your business runs on, connected and organized in one place.",
         features: [
-          "One core workflow, built end to end",
-          "Delivered in one week",
+          "Connects the tools you already use",
+          "Your data organized and kept current automatically",
+          "Ready for your team and the AI tools you choose",
+          "Hosting, backups and support included",
+        ],
+      },
+      {
+        id: "deluxe",
+        name: "Deluxe build",
+        price: "$5,000+ setup",
+        setup: "$5,000+ setup",
+        monthly: "+ from $300/mo on top of Connect",
+        description:
+          "Anything custom built on top of your Connect data: an agent, an app, a dashboard.",
+        features: [
+          "Scoped and quoted after our consult",
+          "Built around how you already work",
           "30 days of fixes and tweaks included",
           "One year of bug fixes, free",
         ],
       },
       {
-        name: "Advanced build",
-        price: "$6,000 setup",
-        setup: "$6,000 setup",
-        monthly: "$500/mo",
-        seats: "Includes up to 15 users, then $20/user per month.",
-        description:
-          "A highly technical tool or fully integrated system to manage your whole business.",
-        features: [
-          "A full workflow management system",
-          "Delivered in two to three weeks",
-          "30 days of fixes and tweaks included",
-          "One year of bug fixes, free",
-        ],
-      },
-      {
+        id: "consulting",
         name: "AI consulting",
         price: "$1,000 / day",
         description:
@@ -487,17 +551,42 @@ export const siteContent: SiteContent = {
       {
         question: "What does the monthly fee cover?",
         answer:
-          "The monthly fee keeps your tool running and cared for. It covers hosting, uptime, daily backups, security patches and bug fixes. We host it so you and your team can focus on using it.",
+          "Your bcns Connect fee keeps your tools connected and your data current. It covers hosting, backups, security patches, bug fixes and support. A Deluxe build adds its own monthly fee to cover the same care for what we built you.",
       },
       {
         question: "Does my tool use AI?",
         answer:
-          "AI isn't magic. Some of our builds use AI but only when it is actually the right tool for the job. If you want AI integrated into your product, we can help you implement it.",
+          "bcns Connect gets your business ready for AI. Whether to use it is up to you. Some of our Deluxe builds use AI, but only when it is actually the right tool for the job.",
       },
       {
         question: "What happens if I want to cancel?",
         answer:
-          "You are free to cancel any time. You will retain access for the time payed for and receive all your data once the service ends.",
+          "You are free to cancel any time. You will retain access for the time paid for and receive all your data once the service ends.",
+      },
+      {
+        question: "What is bcns Connect?",
+        answer:
+          "It connects the software your business already runs on and keeps everything organized in one place, so your team, AI tools and anything we build for you all work from the same information.",
+      },
+      {
+        question: "Do I have to stop using my current software?",
+        answer:
+          "No. Connect works alongside your tools. You keep using them exactly as you do today.",
+      },
+      {
+        question: "Can I use my data with other tools?",
+        answer:
+          "Yes. Your data is yours. Once it's organized in Connect, you can plug in the AI assistants and apps you already like.",
+      },
+      {
+        question: "What does a Deluxe build add?",
+        answer:
+          "Something custom built for you on top of Connect: an AI agent, an app, a dashboard, anything really. We scope it with you and give you a fixed quote before any work starts.",
+      },
+      {
+        question: "Is my data private?",
+        answer:
+          "Yes. Only you and your team can see your data, and we'll hand over a full copy any time, free.",
       },
     ],
   },
@@ -511,7 +600,7 @@ export const siteContent: SiteContent = {
         name: "Nate Seluga",
         roleLine: "Engineering",
         photo: "/founders/nate-seluga.jpg",
-        bio: "Nate builds the tools. He is drawn to efficiency, and to software optimizes your workflow exactly how you want it to. Time spent inside day-to-day operations showed him how much of a workday goes to operations that could be automated but weren't, due to the inconvenience of change and hesitation to pay for outside solutions that aren't tailored to the existing process. He has extensive experience creating tools to reduce friction in his own work. bcns exists because that toolbox should not stop with the person who built it.",
+        bio: "Nate builds the tools. He is drawn to efficiency, and to software that optimizes your workflow exactly how you want it to. Time spent inside day-to-day operations showed him how much of a workday goes to operations that could be automated but weren't, due to the inconvenience of change and hesitation to pay for outside solutions that aren't tailored to the existing process. He has extensive experience creating tools to reduce friction in his own work. bcns exists because that toolbox should not stop with the person who built it.",
         credentials: [
           "Computer science, Harvey Mudd College",
         ],
@@ -535,7 +624,7 @@ export const siteContent: SiteContent = {
       {
         title: "Our Service",
         description:
-          "Business management systems, analytics dashboards and workflow automations. The problems we solve and how.",
+          "bcns Connect, custom Deluxe builds and AI consulting. The three building blocks and how they fit together.",
         href: "/services",
       },
       {
@@ -561,14 +650,14 @@ export const siteContent: SiteContent = {
 
   pageMeta: {
     home: {
-      title: "bcns: Custom Software for Local Businesses",
+      title: "bcns: Get Your Small Business Ready for AI",
       description:
-        "bcns builds custom software for local businesses. Fixed quotes, fast turnaround, and tools built around how you already work. Book a free 30-minute consult.",
+        "bcns Connect brings the tools your small business already uses into one organized place, ready for AI and custom software. $200/month, no setup fee. Book a free 30-minute consult.",
     },
     services: {
-      title: "What We Build | bcns",
+      title: "What We Offer | bcns",
       description:
-        "Booking systems, inventory tools, dashboards, and AI consulting for local businesses. Four problem types, one studio that builds to fit your workflow.",
+        "bcns Connect, custom Deluxe builds and AI consulting for small businesses. Three building blocks for a business that's ready for AI.",
     },
     work: {
       title: "Past Work | bcns",
@@ -578,12 +667,12 @@ export const siteContent: SiteContent = {
     pricing: {
       title: "Pricing | bcns",
       description:
-        "Standard builds are $3,000 setup and $250/mo. Advanced builds are $6,000 setup and $500/mo. Both include up to 15 users, then $20/user per month. AI consulting at $1,000 per day. Fixed quotes, no hourly surprises.",
+        "bcns Connect is $200/month with no setup fee. Deluxe builds start at $5,000 setup plus $300/month on top of Connect. AI consulting at $1,000 per day. Fixed quotes, no hourly surprises.",
     },
     about: {
       title: "About bcns | Two Founders, Custom Software",
       description:
-        "Nate builds. Brandon makes sure it's worth building. Two founders who left generic tools behind to build custom software that fits local businesses.",
+        "Nate builds. Brandon makes sure it's worth building. Two founders who left generic tools behind to build custom software that fits small businesses.",
     },
   },
 };

@@ -3,9 +3,10 @@ import { Reveal } from "@/components/reveal";
 import { GUTTER } from "@/components/kit";
 
 /**
- * The three tiers as hairline cards. Advanced carries the accent border and a
- * soft blue shadow so it reads as the recommended one; AI consulting sits on
- * the tint panel because it is a different kind of engagement, not a bigger one.
+ * The three tiers as hairline cards. bcns Connect carries the accent border and
+ * a soft blue shadow because it is the baseline every client starts on; AI
+ * consulting sits on the tint panel because it is a different kind of
+ * engagement, not a bigger one.
  *
  * The section heading lives in the page's `PageHead` — on the artboard the
  * pricing heading is the page head.
@@ -28,9 +29,9 @@ export function Pricing() {
     <section id="pricing" className="border-b border-border">
       <div className={`${GUTTER} grid items-start gap-6 py-16 sm:py-16 lg:grid-cols-3`}>
         {tiers.map((tier, i) => {
-          // Branch on data shape, not index: build tiers carry setup/monthly,
-          // the consulting tier carries a single day rate.
-          const isConsulting = !tier.setup;
+          // Branch on id, not shape: Connect has no setup fee either, but it is
+          // a product card, not the consulting panel.
+          const isConsulting = tier.id === "consulting";
           const [amount, unit] = splitPrice(tier.setup ?? tier.price);
           return (
             <Reveal
@@ -40,14 +41,14 @@ export function Pricing() {
               className={`lift-card h-full rounded-[1.125rem] border p-[2.125rem] ${
                 isConsulting
                   ? "border-border bg-secondary"
-                  : i === 1
+                  : i === 0
                     ? "border-accent bg-card shadow-[0_12px_36px_hsl(var(--primary)/0.1)]"
                     : "border-border bg-card"
               }`}
             >
               <h3
                 className={`font-display text-sm font-medium uppercase tracking-[0.08em] ${
-                  i === 1 && !isConsulting ? "text-primary" : "text-muted-foreground"
+                  i === 0 && !isConsulting ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 {tier.name}

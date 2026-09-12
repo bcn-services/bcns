@@ -45,8 +45,8 @@ interface and the component.
 
 | Page | URL | Content keys used |
 |------|-----|-------------------|
-| Home | `/` | `hero`, `howItWorks`, `useCases`, `contactSection`, `navCards`, `pageMeta.home` |
-| Services | `/services` | `howItWorks`, `useCases`, `aiConsult`, `contactSection`, `pageMeta.services` |
+| Home | `/` | `hero`, `buildingBlocks`, `navCards`, `contactSection`, `pageMeta.home` |
+| Services | `/services` | `useCases` (page head + Deluxe grid), `connect`, `aiConsult`, `howItWorks`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
@@ -87,13 +87,14 @@ be ruthless about length.
 
 ### ctaSecondary
 - **Field:** `hero.ctaSecondary`
-- **Purpose:** Text for the secondary CTA button (links to past work or about)
+- **Purpose:** Text for the secondary CTA button (links to `/services#connect`, the How bcns Connect works section)
 - **Tone:** Softer than primary; invites exploration rather than conversion
 - **Length:** 2-5 words, ≤30 chars
 
 ### proofPoints[0]
 - **Field:** `hero.proofPoints[0]`
 - **Purpose:** First social-proof stat or trust signal displayed below the CTAs
+- **Note:** The three currently cover what Connect changes (nothing about your tools), what it costs, and what comes next. Keep the Connect price in sync with `pricing.tiers[0]` and `connect.rate`.
 - **Tone:** Factual, specific; a number or short claim works best
 - **Length:** ≤35 chars (e.g. "12 clients served", "48-hour turnaround")
 
@@ -113,9 +114,54 @@ be ruthless about length.
 
 ---
 
-## How It Works (`siteContent.howItWorks`) — Home, /services
+## Building Blocks (`siteContent.buildingBlocks`) — Home
 
-Demystifies the engagement process. Steps are a fixed tuple of 3; the `step`
+The three products as the three building blocks of a business ready for AI:
+bcns Connect, Deluxe builds, AI consulting, in that order. Same shape as
+`howItWorks` (`HowItWorksContent`) and rendered by the same component in its
+cards variant, so the field rules below mirror that section. Describe the
+end vision of each product, not what is built today.
+
+### eyebrow
+- **Field:** `buildingBlocks.eyebrow`
+- **Purpose:** Section label above the title
+- **Tone:** Neutral (e.g. "What we offer")
+- **Length:** 1-4 words, ≤30 chars
+
+### title
+- **Field:** `buildingBlocks.title`
+- **Purpose:** Frames the three products as one system, not a menu
+- **Tone:** Confident, forward-looking; "building blocks" is the anchor phrase
+- **Length:** ≤80 chars, 1 sentence
+
+### description
+- **Field:** `buildingBlocks.description`
+- **Purpose:** States the order: everyone starts on Connect, the other two are added on top
+- **Tone:** Plain, brief
+- **Length:** 1-2 sentences, ≤120 chars
+
+### items[0..2] — one per product (fixed tuple)
+
+#### items[n].title
+- **Field:** `buildingBlocks.items[n].title`
+- **Purpose:** Product name. Keep in the fixed order Connect, Deluxe builds, AI consulting, and match the names in `pricing.tiers`.
+- **Length:** 1-3 words, ≤25 chars
+
+#### items[n].description
+- **Field:** `buildingBlocks.items[n].description`
+- **Purpose:** What the product does for the business, benefit first
+- **Tone:** Plain words, no technical terms; the owner should picture it in their own business
+- **Length:** 1-2 sentences, ≤160 chars
+
+> `items` is a fixed tuple of exactly 3. The `step` field ("01"/"02"/"03") is
+> structural — do not change it. No prices here; prices live on /pricing.
+
+---
+
+## How It Works (`siteContent.howItWorks`) — /services
+
+Demystifies the engagement process. Rendered as the process rows at the
+bottom of /services. Steps are a fixed tuple of 3; the `step`
 field ("01", "02", "03") is structural and is not user-facing copy.
 
 ### eyebrow
@@ -183,33 +229,56 @@ field ("01", "02", "03") is structural and is not user-facing copy.
 
 ---
 
-## Use Cases (`siteContent.useCases`) — Home, /services
+## Use Cases (`siteContent.useCases`) — /services
 
-Shows concrete verticals or problem types served. Four items, fixed tuple.
+Two jobs. `eyebrow`/`title`/`description` are the /services page head (the
+`PageHead` emphasis phrase is set in `app/services/page.tsx` and must stay a
+substring of `title`). `blockEyebrow`/`blockTitle`/`blockDescription` head the
+Deluxe grid, and `items` are four example Deluxe builds. Four items, fixed
+tuple.
 
 ### eyebrow
 - **Field:** `useCases.eyebrow`
-- **Purpose:** Section label
+- **Purpose:** Page-head label for /services
 - **Tone:** Neutral
 - **Length:** 1-4 words, ≤30 chars
 
 ### title
 - **Field:** `useCases.title`
-- **Purpose:** Section headline framing the variety of problems solved
+- **Purpose:** /services headline framing the three products as building blocks
 - **Tone:** Direct
 - **Length:** ≤80 chars
 
 ### description
 - **Field:** `useCases.description`
-- **Purpose:** 1 sentence contextualising the examples below
+- **Purpose:** 1-2 sentences: Connect is the foundation, the others add to it
 - **Tone:** Plain
-- **Length:** 1 sentence, ≤120 chars
+- **Length:** 1-2 sentences, ≤140 chars
+
+### blockEyebrow
+- **Field:** `useCases.blockEyebrow`
+- **Purpose:** Label above the Deluxe grid
+- **Tone:** Neutral; the product name ("Deluxe builds")
+- **Length:** 1-3 words, ≤30 chars
+
+### blockTitle
+- **Field:** `useCases.blockTitle`
+- **Purpose:** One-line headline for the Deluxe grid: anything custom, built on Connect
+- **Tone:** Direct
+- **Length:** ≤70 chars, 1 sentence
+
+### blockDescription
+- **Field:** `useCases.blockDescription`
+- **Purpose:** Starting price plus an invitation to bring a pain point
+- **Tone:** Plain
+- **Note:** The price must match `pricing.tiers[1]` (setup and monthly).
+- **Length:** 1-2 sentences, ≤130 chars
 
 ### items[0] — use case 1 (fixed)
 
 #### items[0].tag
 - **Field:** `useCases.items[0].tag`
-- **Purpose:** Chip/badge label categorising the use case (e.g. "Analytics", "Automation")
+- **Purpose:** Chip/badge label categorising the Deluxe build (e.g. "Agents", "Apps"). Also the React key, so keep tags unique.
 - **Tone:** 1-2 word noun; category label not a sentence
 - **Length:** 1-3 words, ≤25 chars
 
@@ -268,6 +337,61 @@ Shows concrete verticals or problem types served. Four items, fixed tuple.
 - **Length:** 1-2 sentences, ≤130 chars
 
 > `items` is a fixed tuple of exactly 4.
+
+---
+
+## Connect (`siteContent.connect`) — /services
+
+How bcns Connect works, as three steps with the monthly rate as the numeric
+anchor. Same shape as `aiConsult` (`AiConsultContent`) and rendered by the
+same component with `id="connect"` (the hero's secondary CTA links here).
+Describe the finished product, the end vision, in the owner's words: tools
+they recognise, never how the connection works underneath.
+
+### eyebrow
+- **Field:** `connect.eyebrow`
+- **Purpose:** Section label; the product name
+- **Length:** 1-3 words, ≤30 chars
+
+### title
+- **Field:** `connect.title`
+- **Purpose:** Section headline
+- **Tone:** Plain, no hype
+- **Length:** ≤60 chars
+
+### description
+- **Field:** `connect.description`
+- **Purpose:** 1 line on what Connect is
+- **Tone:** Plain
+- **Length:** 1 sentence, ≤80 chars
+
+### rate
+- **Field:** `connect.rate`
+- **Purpose:** The monthly rate, shown as the section's numeric anchor
+- **Tone:** Bare figure
+- **Length:** ≤20 chars
+- **Note:** Must stay in sync with `pricing.tiers[0]` and `hero.proofPoints`.
+
+### steps[n] — step 1-3 (fixed)
+
+#### steps[n].step
+- **Field:** `connect.steps[n].step`
+- **Purpose:** Ordinal marker ("01")
+- **Length:** 2 chars
+
+#### steps[n].title
+- **Field:** `connect.steps[n].title`
+- **Purpose:** One stage of the product, as a sentence: connect, organize, put to work
+- **Tone:** Second person, concrete
+- **Length:** ≤55 chars
+
+#### steps[n].description
+- **Field:** `connect.steps[n].description`
+- **Purpose:** 1-3 sentences on what that stage means for the business
+- **Tone:** Plain; name tools and data the owner recognises (store, calendar, orders), no technical terms
+- **Length:** ≤240 chars
+
+> `steps` is a fixed tuple of exactly 3.
 
 ---
 
@@ -679,107 +803,78 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 - **Tone:** Honest; don't over-promise
 - **Length:** 1-2 sentences, ≤150 chars
 
-### tiers[0] — Standard build
+Tier order is fixed and meaningful: `pricing.tsx` gives `tiers[0]` (bcns
+Connect, the baseline every client starts on) the accent border, and puts the
+tier with `id: "consulting"` on the tint panel. Deluxe and consulting are add-ons
+on top of Connect; the copy should never present them as bigger versions of it.
 
-#### tiers[0].id _(optional)_
-- **Field:** `pricing.tiers[0].id`
-- **Purpose:** Internal identifier for the tier; used by components for scroll anchors or comparison logic. Not displayed.
-- **Note:** Leave undefined unless a component explicitly needs it.
+### tiers[n].id _(optional)_
+- **Field:** `pricing.tiers[n].id`
+- **Purpose:** Internal identifier; not displayed. Current values: `connect`, `deluxe`, `consulting`.
+- **Note:** `pricing.tsx` branches on `id === "consulting"` for the tint panel, so do not rename that one.
+
+### tiers[0] — bcns Connect
 
 #### tiers[0].name
 - **Field:** `pricing.tiers[0].name`
-- **Purpose:** Display name for the first pricing tier. Currently `Standard build`.
-- **Tone:** Descriptive noun; signals the scope of the tier
+- **Purpose:** Display name. Currently `bcns Connect`; must match `buildingBlocks.items[0].title`.
 - **Length:** 1-3 words, ≤25 chars
 
 #### tiers[0].price
 - **Field:** `pricing.tiers[0].price`
-- **Purpose:** Headline price string shown on the card. Currently `$3,000 setup`.
-- **Tone:** N/A (formatted value)
-- **Length:** ≤20 chars
-
-#### tiers[0].setup _(optional)_
-- **Field:** `pricing.tiers[0].setup`
-- **Purpose:** One-time setup fee, spelled out. Currently `$3,000 one-time setup`.
-- **Tone:** N/A (formatted value)
-- **Note:** Optional field on build tiers; the AI consulting tier (tiers[2]) omits it.
-- **Length:** ≤30 chars
-
-#### tiers[0].monthly _(optional)_
-- **Field:** `pricing.tiers[0].monthly`
-- **Purpose:** Flat monthly hosting/support fee. Currently `$250/mo`.
-- **Tone:** N/A (formatted value)
-- **Note:** Optional; consulting tier omits it.
+- **Purpose:** Headline monthly price shown on the card (Connect has no setup fee, so the monthly rate is the headline). Currently `$200 per month`.
+- **Note:** Must match `connect.rate` and `hero.proofPoints`.
 - **Length:** ≤20 chars
 
 #### tiers[0].seats _(optional)_
 - **Field:** `pricing.tiers[0].seats`
-- **Purpose:** Included-user allowance and per-seat overage. Currently `Includes up to 15 users, then $20/user per month.`
-- **Tone:** Plain, factual
-- **Note:** Optional; consulting tier omits it.
+- **Purpose:** Small line under the price. Currently `No setup fee.` Seat-based pricing is no longer on the site.
 - **Length:** 1 sentence, ≤60 chars
 
 #### tiers[0].description
 - **Field:** `pricing.tiers[0].description`
-- **Purpose:** 1 sentence describing who this tier is for
-- **Tone:** Direct; "a single-purpose tool…"
-- **Length:** 1 sentence, ≤100 chars
+- **Purpose:** 1 sentence: Connect is the foundation for everything else
+- **Length:** 1 sentence, ≤110 chars
 
 #### tiers[0].features[n] (open-ended array)
 - **Field:** `pricing.tiers[0].features`
-- **Purpose:** Bullet list of deliverables/inclusions for tier 0
-- **Note:** features[1] = `Delivered in about a week`; features[2] = `30 days of fixes and tweaks included`; features[3] = `One year of bug fixes, free`
-- **Tone:** Concrete noun phrase
+- **Purpose:** What Connect includes, in the owner's words (keeps your tools, data organized, AI-ready, hosting and support)
 - **Length:** ≤60 chars per item
 
-### tiers[1] — Advanced build
-
-#### tiers[1].id _(optional)_
-- **Field:** `pricing.tiers[1].id`
-- **Purpose:** Same as tiers[0].id
+### tiers[1] — Deluxe build
 
 #### tiers[1].name
 - **Field:** `pricing.tiers[1].name`
-- **Purpose:** Currently `Advanced build`.
+- **Purpose:** Currently `Deluxe build`. Any custom build is a Deluxe build.
 - **Length:** 1-3 words, ≤25 chars
 
 #### tiers[1].price
 - **Field:** `pricing.tiers[1].price`
-- **Purpose:** Headline price string shown on the card. Currently `$6,000 setup`.
+- **Purpose:** Headline starting price. Currently `$5,000+ setup` (the `+` marks it as a starting price).
 - **Length:** ≤20 chars
 
 #### tiers[1].setup _(optional)_
 - **Field:** `pricing.tiers[1].setup`
-- **Purpose:** One-time setup fee, spelled out. Currently `$6,000 one-time setup`.
-- **Note:** Optional; consulting tier omits it.
+- **Purpose:** Starting setup fee; the card renders this over `price` when present. Currently `$5,000+ setup` (the `+` marks it as a starting price).
 - **Length:** ≤30 chars
 
 #### tiers[1].monthly _(optional)_
 - **Field:** `pricing.tiers[1].monthly`
-- **Purpose:** Flat monthly hosting/support fee. Currently `$500/mo`.
-- **Note:** Optional; consulting tier omits it.
-- **Length:** ≤20 chars
-
-#### tiers[1].seats _(optional)_
-- **Field:** `pricing.tiers[1].seats`
-- **Purpose:** Included-user allowance and per-seat overage. Currently `Includes up to 15 users, then $20/user per month.`
-- **Note:** Optional; consulting tier omits it.
-- **Length:** 1 sentence, ≤60 chars
+- **Purpose:** Monthly add-on on top of Connect. Currently `+ from $300/mo on top of Connect`.
+- **Note:** Must match `useCases.blockDescription`. Real quotes vary per build; the site shows the starting figure.
+- **Length:** ≤30 chars
 
 #### tiers[1].description
 - **Field:** `pricing.tiers[1].description`
+- **Purpose:** 1 sentence: anything custom, built on the client's Connect data
 - **Length:** 1 sentence, ≤100 chars
 
 #### tiers[1].features[n] (open-ended array)
 - **Field:** `pricing.tiers[1].features`
-- **Note:** features[1] = `Delivered in two to three weeks`; features[2] = `30 days of fixes and tweaks included`; features[3] = `One year of bug fixes, free`
+- **Purpose:** Scoping, fit, and the post-launch fix windows. No delivery times; each build is scoped after the consult.
 - **Length:** ≤60 chars per item
 
 ### tiers[2] — AI consulting
-
-#### tiers[2].id _(optional)_
-- **Field:** `pricing.tiers[2].id`
-- **Purpose:** Same as tiers[0].id
 
 #### tiers[2].name
 - **Field:** `pricing.tiers[2].name`
@@ -788,12 +883,12 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 #### tiers[2].price
 - **Field:** `pricing.tiers[2].price`
 - **Purpose:** Price string. Currently `$1,000 / day`.
-- **Note:** AI consulting is a day-rate engagement, so it omits the optional `setup`, `monthly`, and `seats` fields the two build tiers carry.
+- **Note:** AI consulting is a day-rate engagement, so it omits `setup`, `monthly`, and `seats`. Must match `aiConsult.rate`.
 - **Length:** ≤20 chars
 
 #### tiers[2].description
 - **Field:** `pricing.tiers[2].description`
-- **Length:** 1 sentence, ≤100 chars
+- **Length:** 1 sentence, ≤130 chars
 
 #### tiers[2].features[n] (open-ended array)
 - **Field:** `pricing.tiers[2].features`
@@ -807,7 +902,7 @@ Communicates value and sets expectations. `tiers` is an open-ended array
 ## FAQ (`siteContent.faq`) — /pricing
 
 Addresses objections and reduces friction before the visitor contacts you.
-`items` is an open-ended array (7 pre-seeded).
+`items` is an open-ended array (10 pre-seeded).
 
 ### eyebrow
 - **Field:** `faq.eyebrow`
@@ -833,7 +928,6 @@ Addresses objections and reduces friction before the visitor contacts you.
 - **Field:** `faq.items[n].question`
 - **Purpose:** A question visitors have
 - **Tone:** Written as the visitor would phrase it — use "you/your" not "clients"
-- **Note:** Several answers contain `[INPUT: …]` placeholders for pricing/turnaround/support details
 - **Length:** 1 sentence, ≤100 chars
 
 #### items[n].answer
@@ -844,15 +938,20 @@ Addresses objections and reduces friction before the visitor contacts you.
 
 #### Seeded questions (current `faq.items` order)
 
-The seven pre-seeded entries, in order, are:
+The ten pre-seeded entries, in order, are:
 
-0. **How much will my project cost?** — Setup + monthly framing: Standard is $3,000 setup and $250/mo, Advanced is $6,000 setup and $500/mo, both include up to 15 users then $20/user per month. Exact numbers come in the fixed quote after the free consult.
-1. **How long does a build take?** — About a week for single tools, two to three weeks for connected systems; delivery date lands with the quote.
-2. **What happens if something breaks after delivery?** — 30 days of no-questions fixes, then a year of free bug fixes on what was built; new features quoted separately.
-3. **Do I need to be technical to work with you?** — No; questions are about the business, and everything ships with a plain-English walkthrough.
-4. **What does the monthly fee cover?** — Hosting, uptime, daily backups, security patches, bug fixes, and small tweaks, run on bcns servers so the team reaches it from any device with a login.
-5. **Does my tool use AI, and how does that get billed?** — AI is optional; if used, the client brings their own Anthropic key and Anthropic bills them directly, so they control that cost and can leave AI out entirely.
-6. **What happens if I stop paying the monthly fee?** — Hosting stops and the live tool goes offline, but the data is always the client's; bcns exports it and hands it over before shutting anything down. No lock-in.
+0. **Do you use AI?** — Yes, as a tool that lets bcns build faster and better; not magic.
+1. **Do I need to be technical to work with you?** — No; questions are about the business, and communication stays plain.
+2. **What does the monthly fee cover?** — The Connect fee covers connection, current data, hosting, backups, security patches, bug fixes and support; a Deluxe build adds its own monthly fee for the same care.
+3. **Does my tool use AI?** — Connect makes the business ready for AI and the owner decides whether to use it; Deluxe builds use AI only where it is the right tool.
+4. **What happens if I want to cancel?** — Cancel any time, keep access for the time paid for, and get all the data when service ends.
+5. **What is bcns Connect?** — Plain-words definition: one organized place that the team, AI tools and custom builds all work from.
+6. **Do I have to stop using my current software?** — No; Connect works alongside it.
+7. **Can I use my data with other tools?** — Yes; the data is the client's, and they can plug in the third-party AI tools and apps they like.
+8. **What does a Deluxe build add?** — Something custom on top of Connect, scoped and quoted as a fixed price before work starts.
+9. **Is my data private?** — Only the client's team sees it, and a full export is handed over any time, free.
+
+New entries are appended, never inserted, so existing indexes stay stable.
 
 > **Adding more FAQs:** append `{ question, answer }` objects to `faq.items`.
 > No interface or component change needed.
@@ -1027,6 +1126,12 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `hero.ctaPrimary` | Hero — ctaPrimary |
 | `hero.ctaSecondary` | Hero — ctaSecondary |
 | `hero.proofPoints[0..2]` | Hero — proofPoints |
+| `buildingBlocks.eyebrow` | Building Blocks — eyebrow |
+| `buildingBlocks.title` | Building Blocks — title |
+| `buildingBlocks.description` | Building Blocks — description |
+| `buildingBlocks.items[0..2].title` | Building Blocks — items title |
+| `buildingBlocks.items[0..2].description` | Building Blocks — items description |
+| `buildingBlocks.items[0..2].step` | Structural (not user-facing) — noted |
 | `howItWorks.eyebrow` | How It Works — eyebrow |
 | `howItWorks.title` | How It Works — title |
 | `howItWorks.description` | How It Works — description |
@@ -1036,9 +1141,19 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `useCases.eyebrow` | Use Cases — eyebrow |
 | `useCases.title` | Use Cases — title |
 | `useCases.description` | Use Cases — description |
+| `useCases.blockEyebrow` | Use Cases — blockEyebrow |
+| `useCases.blockTitle` | Use Cases — blockTitle |
+| `useCases.blockDescription` | Use Cases — blockDescription |
 | `useCases.items[0..3].tag` | Use Cases — items tags |
 | `useCases.items[0..3].title` | Use Cases — items titles |
 | `useCases.items[0..3].description` | Use Cases — items descriptions |
+| `connect.eyebrow` | Connect — eyebrow |
+| `connect.title` | Connect — title |
+| `connect.description` | Connect — description |
+| `connect.rate` | Connect — rate |
+| `connect.steps[0..2].step` | Connect — steps step |
+| `connect.steps[0..2].title` | Connect — steps title |
+| `connect.steps[0..2].description` | Connect — steps description |
 | `contactSection.eyebrow` | Contact Section — eyebrow |
 | `contactSection.title` | Contact Section — title |
 | `contactSection.description` | Contact Section — description |
@@ -1082,9 +1197,9 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pricing.tiers[0..2].id` | Pricing — tiers id |
 | `pricing.tiers[0..2].name` | Pricing — tiers name |
 | `pricing.tiers[0..2].price` | Pricing — tiers price |
-| `pricing.tiers[0..1].setup` _(optional)_ | Pricing — tiers setup |
-| `pricing.tiers[0..1].monthly` _(optional)_ | Pricing — tiers monthly |
-| `pricing.tiers[0..1].seats` _(optional)_ | Pricing — tiers seats |
+| `pricing.tiers[1].setup` _(optional)_ | Pricing — tiers setup |
+| `pricing.tiers[1].monthly` _(optional)_ | Pricing — tiers monthly |
+| `pricing.tiers[0].seats` _(optional)_ | Pricing — tiers seats |
 | `pricing.tiers[0..2].description` | Pricing — tiers description |
 | `pricing.tiers[0..2].features[n]` | Pricing — tiers features |
 | `faq.eyebrow` | FAQ — eyebrow |
@@ -1115,9 +1230,9 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 93 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. Unchanged by this pass: `screenshots`/`screenshots[m].src`/`.alt`/`.caption` were already rows before the three case-study screenshots were captured — this pass filled in values (populating `delucas`/`l2detailz`'s `screenshots` arrays), it did not add new field paths. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 109 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. The bcns Connect pass added 16 rows: `buildingBlocks` (6), `connect` (7) and `useCases.block*` (3); the pricing `setup`/`monthly`/`seats` rows were narrowed to the tiers that carry them. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
-The three hosting FAQ entries added in this pass (monthly-fee coverage, bring-your-own-Anthropic-key, stop-paying handoff) live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
+The FAQ entries appended in the bcns Connect pass live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
 ---
 
@@ -1160,4 +1275,4 @@ captured from each app's local demo fixture (see the Past Work section).
 
 ---
 
-_Last updated: 2026-07-28 (Captured the three case-study screenshots — `delucas-dashboard.png`, `l2detailz-frontend.png`, `l2detailz-calendar.png` — from each app's local demo fixture and populated `pastWork.items[0].screenshots` / `pastWork.items[1].screenshots` with real `src`/`alt` values; `caption` stays `[INPUT: …]` pending client permission). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-09-12 (bcns Connect pass: added the `buildingBlocks` and `connect` sections and the `useCases.block*` fields, rewrote the pricing tiers as bcns Connect / Deluxe build / AI consulting, and re-listed the ten seeded FAQ entries). Source of truth: `apps/web/lib/content.ts`._
