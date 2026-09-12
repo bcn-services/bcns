@@ -68,7 +68,7 @@ export async function checklist(source: Source, tz: string, c: Creds, fetch: Fet
     if (!tok.access_token) throw new Error(`G1: refresh failed (${tok.error_description ?? tok.error ?? 'no access_token'})`)
     const info: any = await (await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${tok.access_token}`)).json()
     if (info.aud && info.aud !== clientId) throw new Error(`G1: token audience ${info.aud} ≠ oauth_client_id`)
-    const q = encodeURIComponent(`'${c.config.folder_id}' in parents and trashed=false` + (source === 'meet' ? ` and mimeType='application/vnd.google-apps.document'` : ''))
+    const q = encodeURIComponent(`'${c.config.folder_id}' in parents and trashed=false` + (source === 'meet' ? ` and mimeType='application/vnd.google-apps.document'` : ` and mimeType != 'application/vnd.google-apps.folder'`))
     const files: any = await (await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=1&fields=files(id)`,
       { headers: { Authorization: `Bearer ${tok.access_token}` } })).json()
     if (!files.files?.length) throw new Error(source === 'meet' ? 'G2: no readable Gemini notes doc in the folder' : 'G2: no readable file in the Drive folder')

@@ -11,7 +11,7 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const FIELDS = 'nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))'
 
 const configSchema = z.object({
-  folder_id: z.string(),
+  folder_id: z.string().regex(/^[\w-]+$/, 'the id segment of the folder URL, not the URL'),
   oauth_client_id: z.string().optional(),
 }).passthrough()
 
@@ -55,7 +55,7 @@ async function* pull(ctx: RunContext): AsyncGenerator<Page> {
     const known = await ctx.knownMedia(files.map(f => String(f.id)))
     const raw: RawRow[] = []
     for (const f of files) {
-      // ponytail: thumbnail fetched once per new file id; a file edited in place keeps its old thumb.
+      // ponytail: thumbnail fetched until one lands (known = row with a thumb); a file edited in place keeps its old thumb.
       // Upgrade: knownMedia returns source_updated_at, refetch when modifiedTime is newer.
       const thumb_path = known.has(String(f.id)) ? null : await thumb(ctx, f)
       raw.push({ entity: 'file', externalId: String(f.id), sourceUpdatedAt: new Date(f.modifiedTime), payload: { ...f, thumb_path } })

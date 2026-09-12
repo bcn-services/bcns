@@ -63,7 +63,7 @@ Types:
 ```sql
 create schema data;  create schema api;
 create extension if not exists btree_gin;
-create type data.source        as enum ('shopify','meta','monday','meet','drive','upload','dashboard','platform');
+create type data.source        as enum ('shopify','meta','monday','meet','upload','dashboard','platform','drive');
 create type data.client_status as enum ('active','paused','churned');
 create type data.member_role   as enum ('member','owner');
 create type data.token_kind    as enum ('shopify_admin','monday_personal','meta_system_user','google_oauth_refresh');
@@ -938,10 +938,10 @@ dashboard — the next complete run un-deletes anything still in the folder.
 |---|---|
 | Auth | Same app and scopes as §4.5 (`google_oauth_refresh`, Internal app, `drive.readonly`). Mint a separate refresh token for this source (a second consent on the same app) so the `meet` and `drive` token rows never share one. |
 | refreshToken | Same as §4.5. |
-| config | `{ folder_id: "<Drive folder of the content library>", oauth_client_id: "…" }` |
+| config | `{ folder_id: "<Drive folder of the content library>", oauth_client_id: "…" }` — `folder_id` is the id segment of the folder URL (`[A-Za-z0-9_-]+`; the schema rejects a pasted URL). |
 | defaults | `interval = '1 hour'`, `backfillDepth = '0'`, `rateLimit = { concurrency: 2, minDelayMs: 200 }`, `fullList = [{ entity: 'file', table: 'media' }]`. |
-| Pull `file` | Every run lists the whole folder — no `modifiedTime` filter, because a changed-only page would tombstone every unchanged file: `GET drive/v3/files?q='<folder_id>' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))&pageSize=100`. Flat folder only. For ids not already in `media` the connector fetches `thumbnailLink` (`=s512`) and writes it to `<client_id>/thumb/<file_id>.jpg`; a missing or failed thumbnail is logged (`drive_thumb_skip`) and the row still lands. |
-| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule. |
+| Pull `file` | Every run lists the whole folder — no `modifiedTime` filter, because a changed-only page would tombstone every unchanged file: `GET drive/v3/files?q='<folder_id>' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))&pageSize=100`. Flat folder only. For rows that have no thumbnail yet (`knownMedia` = a row whose bytes or thumbnail landed) the connector fetches `thumbnailLink` (`=s512`) and writes it to `<client_id>/thumb/<file_id>.jpg`; a missing or failed thumbnail is logged (`drive_thumb_skip`) and the row still lands. |
+| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule and, like a dashboard delete, purged (row and thumbnail) 30 days later unless they return first. |
 
 ## 5. Worker and jobs
 
@@ -1033,7 +1033,7 @@ Per claimed row:
 2. Load token + config; build `RunContext`.
 3. Iterate `backfill(from, cursor)` or `incremental(since)`. Per page, in one transaction:
    insert raw (`on conflict do nothing`), `normalize`, upsert canonical, apply tombstone if
-   present, `update connector_schedule set backfill_cursor|incremental_cursor = page.cursor`,
+   present (a `media` tombstone also sets `purge_after = now() + 30 days`, cleared if the id returns), `update connector_schedule set backfill_cursor|incremental_cursor = page.cursor`,
    bump `connector_runs.pages/rows_*`. Stop when `page.done` or `RUN_BUDGET_MS` elapsed.
 4. Finish: `status='ok'`, `finished_at`. Schedule: if backfill finished → `backfill_cursor = null`,
    `next_run_at = now()` (first incremental follows immediately), notification
@@ -1086,7 +1086,7 @@ upsert `connector_health` **only where the result is distinct** from the stored 
 | `auth_failed` | `source_tokens.status = 'auth_failed'` or last finished run `status = 'auth_failed'` |
 | `never_ran` | no run with `finished_at` |
 | `error` | last finished run `status = 'error'` and `consecutive_failures >= 1` and not stale |
-| `stale` | `last_success_at < now() − 3 * interval` (missed ≥ 3 runs), **or** — only for sources whose connector declares a `fullList` entity (Monday, Meta) — the last finished `ok` run fetched 0 rows for that entity while the previous 10 `ok` runs each fetched > 0. Never applied to `updated_at`-filtered incrementals (Shopify, Meet): an idle store legitimately returns 0 rows at night. |
+| `stale` | `last_success_at < now() − 3 * interval` (missed ≥ 3 runs), **or** — only for sources whose connector declares a `fullList` entity (Monday, Meta, Drive) — the last finished `ok` run fetched 0 rows for that entity while the previous 10 `ok` runs each fetched > 0. Never applied to `updated_at`-filtered incrementals (Shopify, Meet): an idle store legitimately returns 0 rows at night. |
 | `ok` | otherwise |
 
 ```sql
