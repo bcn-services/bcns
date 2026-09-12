@@ -41,3 +41,17 @@ One line per decision or finding resolved. Design calls D1–D20 live in DESIGN.
 - N1: "—" in W2; GA4 connector post-launch if Declan has GA4, else checkout-conversion tile from abandoned checkouts. Conversion = orders ÷ visits; Shopify API exposes no visit count.
 - N2: accept, America/New_York. N3: Meet provisional, yes. N4: add-user script, yes.
 - Design approved; W2 build may start from commit below.
+
+## W2 build log (2026-09-12, Fable 5.1 orchestrating)
+
+Defaults taken where DESIGN.md left something open; each one line, no new decisions.
+
+- Auth hook lives in `public.custom_access_token_hook` (Supabase's hook registration only resolves `public`); §7 names it `data.` — test calls the `public` one.
+- `owner_bypassrls`: local stack also has `service_role` and `supabase_read_only_user` with `rolbypassrls`; both are Supabase-managed, allow-listed with `supabase_admin`.
+- `anon_key_zero` / `no_claim_zero_rows`: anon holds no grant on `api`, so PostgREST answers 42501 (permission denied) rather than 0 rows / BCNS0 — tests accept either; still zero data.
+- `register_upload` on a foreign-tenant path raises BCNS3 (prefix regex) before the BCNS4 lookup; `rpc_every_write_scoped` expects BCNS3 for it.
+- Seed writes `storage.objects` metadata rows for the 3 media/client (no bytes) — sign/ticket tests only need catalog rows; `storage_prefix_isolation` uploads a real 1×1 PNG.
+- Local stack is Postgres 15 (`config.toml` `major_version = 15`); production project version should match before `db push`.
+- Local `supabase start` excludes studio/realtime/edge-runtime/logflare/vector/imgproxy/inbucket/mailpit/supavisor; CI uses the same list. Worker tests use the direct 54322 URL (no local pooler).
+- Fixtures: `fixtures/` is gitignored (real samples), so connector tests ship synthetic pages under `test/fixtures/`.
+- `deploy-worker.yml` written but never run (guardrail: no GCP deploys); needs the WIF secrets/vars listed in its header.
