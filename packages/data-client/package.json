@@ -10,11 +10,22 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "tsc"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.58.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bcn-services/bcns-data.git",
+    "directory": "packages/data-client"
   }
 }
