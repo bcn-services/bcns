@@ -2,6 +2,7 @@
 import { execSync } from 'node:child_process'
 import pg from 'pg'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+export type Api = SupabaseClient<any, 'api', any>
 import { SignJWT } from 'jose'
 
 export const DB_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
@@ -42,20 +43,20 @@ export const mediaId = (client: keyof typeof CLIENTS, n: 1 | 2 | 3) =>
 export const origPath = (client: keyof typeof CLIENTS, n: 1 | 2 | 3) => `${CLIENTS[client]}/orig/${mediaId(client, n)}.png`
 export const thumbPath = (client: keyof typeof CLIENTS, n: 1 | 2 | 3) => `${CLIENTS[client]}/thumb/${mediaId(client, n)}.jpg`
 
-const opts = { db: { schema: 'api' }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+const opts = { db: { schema: 'api' as const }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
 
-export function anonClient(): SupabaseClient {
+export function anonClient(): Api {
   return createClient(SUPABASE_URL, localKeys().anon, opts)
 }
-export function serviceClient(): SupabaseClient {
+export function serviceClient(): Api {
   return createClient(SUPABASE_URL, localKeys().service, opts)
 }
-export function clientWithToken(token: string): SupabaseClient {
+export function clientWithToken(token: string): Api {
   return createClient(SUPABASE_URL, localKeys().anon, { ...opts, global: { headers: { Authorization: `Bearer ${token}` } } })
 }
 
 /** Sign in through GoTrue (exercises the custom access token hook). */
-export async function signIn(user: SeedUser): Promise<{ client: SupabaseClient; token: string; claims: Record<string, any> }> {
+export async function signIn(user: SeedUser): Promise<{ client: Api; token: string; claims: Record<string, any> }> {
   const c = anonClient()
   const { data, error } = await c.auth.signInWithPassword({ email: user.email, password: user.password })
   if (error || !data.session) throw new Error(`signIn ${user.email}: ${error?.message}`)
