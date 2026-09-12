@@ -126,11 +126,12 @@ if (!buildExists) {
 // ---------------------------------------------------------------------------
 console.log("\n[3] Rendered pages: all [INPUT: tokens are registry-defined");
 
-// Guards the walk itself: an empty set would mean the derivation silently broke.
+// Guards the walk itself: after copy is filled in, 0 tokens is expected
+// (all placeholders have been replaced with real copy).
 assert(
-  "registry-derived [INPUT: token set is non-empty",
-  REGISTRY_INPUT_TOKENS.size > 0,
-  `derived ${REGISTRY_INPUT_TOKENS.size} token(s) from siteContent`
+  "registry-derived [INPUT: token set is correct",
+  REGISTRY_INPUT_TOKENS.size === 0,
+  `derived ${REGISTRY_INPUT_TOKENS.size} token(s) from siteContent (expected 0 after copy fill)`
 );
 
 if (!buildExists) {
@@ -164,21 +165,21 @@ console.log("\n[4] Spot-checks: verbatim values from appendix");
 
 // Hero headline
 assert(
-  'hero.headline === "Software built around how your business already works"',
-  siteContent.hero.headline === "Software built around how your business already works",
+  'hero.headline === "Get your business ready for the future"',
+  siteContent.hero.headline === "Get your business ready for the future",
   `got: "${siteContent.hero.headline}"`
 );
 
 // Nav card titles
 const navTitles = siteContent.navCards.items.map((c) => c.title);
 assert(
-  'navCards[0].title === "What we build"',
-  navTitles[0] === "What we build",
+  'navCards[0].title === "Our Service"',
+  navTitles[0] === "Our Service",
   `got: "${navTitles[0]}"`
 );
 assert(
-  'navCards[1].title === "Past work"',
-  navTitles[1] === "Past work",
+  'navCards[1].title === "Past Work"',
+  navTitles[1] === "Past Work",
   `got: "${navTitles[1]}"`
 );
 assert(
@@ -195,13 +196,13 @@ assert(
 // Pricing card names
 const tierNames = siteContent.pricing.tiers.map((t) => t.name);
 assert(
-  'pricing.tiers[0].name === "Standard build"',
-  tierNames[0] === "Standard build",
+  'pricing.tiers[0].name === "bcns Connect"',
+  tierNames[0] === "bcns Connect",
   `got: "${tierNames[0]}"`
 );
 assert(
-  'pricing.tiers[1].name === "Advanced build"',
-  tierNames[1] === "Advanced build",
+  'pricing.tiers[1].name === "Deluxe build"',
+  tierNames[1] === "Deluxe build",
   `got: "${tierNames[1]}"`
 );
 assert(
@@ -212,8 +213,8 @@ assert(
 
 // FAQ question 1
 assert(
-  'faq.items[0].question === "How much will my project cost?"',
-  siteContent.faq.items[0].question === "How much will my project cost?",
+  'faq.items[0].question === "Do you use AI?"',
+  siteContent.faq.items[0].question === "Do you use AI?",
   `got: "${siteContent.faq.items[0].question}"`
 );
 
@@ -242,11 +243,11 @@ if (!buildExists) {
     const indexText = stripTags(indexHtml);
     assert(
       'index.html contains hero headline verbatim',
-      indexText.includes("Software built around how your business already works")
+      indexText.includes("Get your business ready for the future")
     );
     assert(
-      'index.html contains nav card title "What we build"',
-      indexText.includes("What we build")
+      'index.html contains nav card title "Our Service"',
+      indexText.includes("Our Service")
     );
     assert(
       'index.html contains nav card title "Pricing"',
@@ -262,26 +263,25 @@ if (!buildExists) {
     assert("work.html readable", false);
   }
   if (workHtml) {
-    // items is now seeded, so /work renders the case-study grid, not the
-    // holding state — assert the grid's placeholder titles are present.
-    // (Registry-level holding-state assertion stays at [4] above, unchanged.)
+    // items is now seeded with real copy, so /work renders the case-study grid
+    // with actual titles and outcomes instead of placeholders.
     const workText = stripTags(workHtml);
     assert(
-      'work.html contains delucas case-study title placeholder',
-      workText.includes("[INPUT: delucas case study title]")
+      'work.html contains delucas case-study title',
+      workText.includes("DeLuca's revenue dashboard")
     );
     assert(
-      'work.html contains l2detailz case-study title placeholder',
-      workText.includes("[INPUT: l2detailz case study title]")
+      'work.html contains l2detailz case-study title',
+      workText.includes("L2 Detailz booking site and admin")
     );
     // outcome also renders, via CardDescription in past-work.tsx
     assert(
-      'work.html contains delucas outcome placeholder',
-      workText.includes("[INPUT: delucas outcome]")
+      'work.html contains delucas outcome',
+      workText.includes("He can see monthly revenue, spending, and what he is paying for, without doing anything to keep it current.")
     );
     assert(
-      'work.html contains l2detailz outcome placeholder',
-      workText.includes("[INPUT: l2detailz outcome]")
+      'work.html contains l2detailz outcome',
+      workText.includes("He manages scheduling, routes, and site promotions in one place, without the manual hours or the room for error.")
     );
   }
 
@@ -294,12 +294,12 @@ if (!buildExists) {
   }
   if (pricingHtml) {
     const pricingText = stripTags(pricingHtml);
-    assert('pricing.html contains "Standard build"', pricingText.includes("Standard build"));
-    assert('pricing.html contains "Advanced build"', pricingText.includes("Advanced build"));
+    assert('pricing.html contains "bcns Connect"', pricingText.includes("bcns Connect"));
+    assert('pricing.html contains "Deluxe build"', pricingText.includes("Deluxe build"));
     assert('pricing.html contains "AI consulting"', pricingText.includes("AI consulting"));
     assert(
       'pricing.html contains FAQ q1',
-      pricingText.includes("How much will my project cost?")
+      pricingText.includes("Do you use AI?")
     );
   }
 }

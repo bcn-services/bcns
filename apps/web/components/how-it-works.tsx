@@ -1,4 +1,4 @@
-import { siteContent } from "@/lib/content";
+import { siteContent, type HowItWorksContent } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { Eyebrow, GUTTER } from "@/components/kit";
 
@@ -7,15 +7,26 @@ import { Eyebrow, GUTTER } from "@/components/kit";
  * `cards` (home — three hairline cards under a split heading) and `rows`
  * (services — compact step-lines under a single-column heading).
  *
+ * `content` swaps in any three-item set of the same shape — home passes the
+ * building blocks through the `cards` shape.
+ *
  * Server component: the entrance work is all `Reveal`, which owns its own
  * client boundary.
  */
-export function HowItWorks({ variant = "cards" }: { variant?: "cards" | "rows" }) {
-  const { eyebrow, title, description, items } = siteContent.howItWorks;
+export function HowItWorks({
+  variant = "cards",
+  content = siteContent.howItWorks,
+  id = "how-it-works",
+}: {
+  variant?: "cards" | "rows";
+  content?: HowItWorksContent;
+  id?: string;
+}) {
+  const { eyebrow, title, description, items } = content;
 
   if (variant === "rows") {
     return (
-      <section id="how-it-works" className="border-b border-border">
+      <section id={id} className="border-b border-border">
         <div className={`${GUTTER} pb-7 pt-16 sm:pt-[4.25rem]`}>
           <Reveal>
             <Eyebrow>{eyebrow}</Eyebrow>
@@ -49,7 +60,7 @@ export function HowItWorks({ variant = "cards" }: { variant?: "cards" | "rows" }
   }
 
   return (
-    <section id="how-it-works" className="border-b border-border">
+    <section id={id} className="border-b border-border">
       <div className={`${GUTTER} grid gap-8 pb-10 pt-16 sm:pt-[4.75rem] lg:grid-cols-[1fr_1.4fr] lg:gap-16`}>
         <div>
           <Reveal>

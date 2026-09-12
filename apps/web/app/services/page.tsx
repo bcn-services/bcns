@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default function ServicesPage() {
-  const { useCases, contactSection } = siteContent;
+  const { useCases, connect, contactSection } = siteContent;
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
@@ -21,9 +21,10 @@ export default function ServicesPage() {
         <PageHead
           eyebrow={useCases.eyebrow}
           title={useCases.title}
-          emphasis="serve you"
+          emphasis="what's next"
           description={useCases.description}
         />
+        <AiConsult content={connect} id="connect" />
         <UseCases />
         <AiConsult />
         <HowItWorks variant="rows" />

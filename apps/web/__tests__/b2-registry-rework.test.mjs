@@ -275,8 +275,13 @@ console.log("\n[5] NavCards reads from siteContent.navCards.items (not inline ca
 
 const navCardsSrc = readFileSync(resolve(root, "components/nav-cards.tsx"), "utf8");
 assert(
-  "nav-cards.tsx reads siteContent.navCards",
-  navCardsSrc.includes("siteContent.navCards")
+  "nav-cards.tsx reads from siteContent",
+  navCardsSrc.includes("siteContent")
+);
+assert(
+  "nav-cards.tsx extracts navCards from siteContent",
+  navCardsSrc.includes("navCards") &&
+  (navCardsSrc.includes("{ navCards }") || navCardsSrc.includes("siteContent.navCards"))
 );
 assert(
   "nav-cards.tsx does NOT have inline cards array literal",

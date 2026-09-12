@@ -12,18 +12,19 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const contentMd = readFileSync(resolve(__dirname, "..", "CONTENT.md"), "utf8");
 
-// --- New pricing fields (setup / monthly / seats) on the two build tiers ---
+// --- Pricing fields (setup / monthly / seats) on the tiers that carry them ---
 // Values come straight from the registry so the test tracks content.ts drift.
 const buildTiers = siteContent.pricing.tiers.filter(
   (t) => t.setup || t.monthly || t.seats,
 );
 
-test("two build tiers carry the new setup/monthly/seats fields", () => {
-  assert.equal(buildTiers.length, 2, "expected setup/monthly/seats on 2 tiers");
+test("Connect and Deluxe carry setup/monthly/seats fields", () => {
+  assert.deepEqual(buildTiers.map((t) => t.id), ["connect", "deluxe"]);
 });
 
 for (const tier of buildTiers) {
-  for (const key of ["setup", "monthly", "seats"]) {
+  // Connect has no setup fee and Deluxe no seats line, so only check keys the tier defines.
+  for (const key of ["setup", "monthly", "seats"].filter((k) => k in tier)) {
     const value = tier[key];
     test(`CONTENT.md documents pricing value: ${tier.name}.${key} = "${value}"`, () => {
       assert.ok(
@@ -38,36 +39,35 @@ for (const tier of buildTiers) {
   }
 }
 
-// Spot-check the concrete headline numbers are present (defends against a
-// CONTENT.md that documents field names but not the migrated $1,000/$3,000 etc).
-for (const literal of ["$1,000", "$149/mo", "$3,000", "$349/mo", "15 users", "$20/user"]) {
+// Spot-check the new pricing literals are present (bcns Connect + Deluxe + Consulting).
+for (const literal of ["$200", "$5,000", "$300", "$1,000"]) {
   test(`CONTENT.md contains pricing literal: ${literal}`, () => {
     assert.ok(contentMd.includes(literal), `CONTENT.md missing "${literal}"`);
   });
 }
 
-// --- The 3 new W3 FAQ questions (monthly-fee coverage, BYO Anthropic key, stop-paying) ---
-const newFaqQuestions = [
+// --- Key FAQ questions relevant to pricing/hosting explanation ---
+const keyFaqQuestions = [
   "What does the monthly fee cover?",
-  "Does my tool use AI, and how does that get billed?",
-  "What happens if I stop paying the monthly fee?",
+  "Does my tool use AI?",
+  "What happens if I want to cancel?",
 ];
 
-test("all 3 new FAQ questions exist in the registry", () => {
+test("key FAQ questions exist in the registry", () => {
   const registryQuestions = siteContent.faq.items.map((i) => i.question);
-  for (const q of newFaqQuestions) {
+  for (const q of keyFaqQuestions) {
     assert.ok(registryQuestions.includes(q), `registry faq missing question: ${q}`);
   }
 });
 
-for (const q of newFaqQuestions) {
-  test(`CONTENT.md documents new FAQ question: "${q}"`, () => {
+for (const q of keyFaqQuestions) {
+  test(`CONTENT.md documents FAQ question: "${q}"`, () => {
     assert.ok(contentMd.includes(q), `CONTENT.md missing FAQ question "${q}"`);
   });
 }
 
-// The hosting / BYOK / stop-paying concepts should be reflected in CONTENT.md prose.
-for (const concept of ["hosting", "Anthropic key", "export"]) {
+// The hosting / data-export concepts should be reflected in CONTENT.md prose.
+for (const concept of ["hosting", "export"]) {
   test(`CONTENT.md reflects FAQ concept: ${concept}`, () => {
     assert.ok(
       contentMd.toLowerCase().includes(concept.toLowerCase()),

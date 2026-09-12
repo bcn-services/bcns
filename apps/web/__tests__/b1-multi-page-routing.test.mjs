@@ -50,7 +50,7 @@ assert("home imports NavCards", homeSrc.includes("NavCards"));
 assert("home imports ContactSection", homeSrc.includes("ContactSection"));
 assert("home does NOT import ProblemSolution", !homeSrc.includes("ProblemSolution"));
 assert("home does NOT import DeliveryModels", !homeSrc.includes("DeliveryModels"));
-assert("home does NOT import HowItWorks", !homeSrc.includes("HowItWorks"));
+assert("home DOES import HowItWorks", homeSrc.includes("HowItWorks"));
 assert("home does NOT import Pricing", !homeSrc.includes("Pricing"));
 assert("home does NOT import Faq", !homeSrc.includes("Faq"));
 assert("home does NOT import AboutFounder", !homeSrc.includes("AboutFounder"));

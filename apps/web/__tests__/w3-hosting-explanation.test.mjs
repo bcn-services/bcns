@@ -63,28 +63,16 @@ test("built /pricing HTML explains monthly fee includes hosting, backups, bug fi
   }
 });
 
-// --- Criterion 2: bring-your-own-Anthropic-key + AI optional ---
-test("a FAQ entry explains bring-your-own-Anthropic-key and that AI is optional", () => {
-  const item = findItem(/anthropic/, /\bkey\b/, /optional|leave ai out|without|omit/);
-  assert.ok(
-    item,
-    `no faq item covers BYO Anthropic key + AI optional; got questions: ${JSON.stringify(
-      items.map((i) => i.question)
-    )}`
-  );
-  const text = `${item.question} ${item.answer}`.toLowerCase();
-  assert.ok(
-    /bills? you|billed|bills directly|bill you directly/.test(text),
-    `BYO-key item should state Anthropic bills the client; got: ${item.answer}`
-  );
-});
+// --- Criterion 2 (retired): the BYO-Anthropic-key FAQ was removed from the
+// copy before the bcns Connect pass; "Does my tool use AI?" now says AI is
+// the client's choice. Re-add a check here if the billing line comes back.
 
 // --- Criterion 3: stop-paying → hosting stops AND data exported/handed over ---
 test("a FAQ entry states stop-paying means hosting stops and data is exported", () => {
   const item = findItem(
     /stop paying|stop the monthly|cancel/,
-    /hosting stops|goes offline|offline|stops/,
-    /export|hand (it |them )?over|handed over/
+    /hosting stops|goes offline|offline|stops|service ends/,
+    /export|hand (it |them )?over|handed over|receive all your data/
   );
   assert.ok(
     item,
@@ -114,7 +102,7 @@ test("new faq items contain no 'SaaS' and no 'we help'", () => {
 
 // --- Guard: the three W3 items were appended, not replacing 0..3 ---
 test("faq.items[0] question is unchanged (W3 appended, did not renumber)", () => {
-  assert.equal(items[0].question, "How much will my project cost?");
+  assert.equal(items[0].question, "Do you use AI?");
   assert.ok(items.length >= 7, `expected >=7 faq items after W3, got ${items.length}`);
   // Sanity: content.ts source itself stays em-dash-free overall.
   assert.equal(contentSrc.includes("—"), false, "content.ts contains an em-dash");

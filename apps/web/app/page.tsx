@@ -18,7 +18,7 @@ export default function HomePage() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <HowItWorks />
+        <HowItWorks content={siteContent.buildingBlocks} id="building-blocks" />
         <NavCards />
         <ContactSection />
       </main>

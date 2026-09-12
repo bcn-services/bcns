@@ -15,9 +15,9 @@ export const siteConfig = {
   name: "bcns",
   domain: "bcn-services.com",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  tagline: "Custom software for local businesses — built to fit how you already work.",
+  tagline: "Your small business, connected and ready for AI.",
   description:
-    "bcns designs and builds custom software for local small businesses — the tools that don't exist off the shelf, cost too much from enterprise vendors, or never quite fit your workflow. You own what we build.",
+    "bcns connects the tools small businesses already use into one organized place, then builds anything on top of it: AI agents, apps, dashboards. Your data is always yours.",
   email: "nseluga@bcn-services.com",
   nav: [
     { label: "Services", href: "/services" },

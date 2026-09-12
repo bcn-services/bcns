@@ -1,20 +1,27 @@
-import { siteContent } from "@/lib/content";
+import { siteContent, type AiConsultContent } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { Eyebrow, GUTTER, CubeBullet } from "@/components/kit";
 
 /**
- * What a day of AI consulting actually consists of.
+ * What a day of AI consulting actually consists of — and, through `content`,
+ * how bcns Connect works, which shares the shape.
  *
- * Deliberately not the three-card row the home page uses for process: the
- * heading and the day rate hold a sticky left column, and the three steps run
- * down the right as hairline rows on a single spine. It reads as one day going
- * forward in time rather than three interchangeable tiles.
+ * Deliberately not the three-card row the home page uses: the heading and the
+ * rate hold a sticky left column, and the three steps run down the right as
+ * hairline rows on a single spine. It reads as one thing going forward in time
+ * rather than three interchangeable tiles.
  */
-export function AiConsult() {
-  const { eyebrow, title, description, rate, steps } = siteContent.aiConsult;
+export function AiConsult({
+  content = siteContent.aiConsult,
+  id = "ai-consult",
+}: {
+  content?: AiConsultContent;
+  id?: string;
+}) {
+  const { eyebrow, title, description, rate, steps } = content;
 
   return (
-    <section id="ai-consult" className="border-b border-border">
+    <section id={id} className="border-b border-border">
       <div className={`${GUTTER} grid gap-12 py-16 sm:py-[4.5rem] lg:grid-cols-[22rem_1fr] lg:gap-20`}>
         <div className="lg:sticky lg:top-28 lg:self-start">
           <Reveal>
