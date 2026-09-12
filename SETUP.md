@@ -1,8 +1,8 @@
 # bcns — Platform & Client Repo Setup
 
-All repos live under **github.com/nseluga** (personal account, no org). **Private by default.**
+All repos live under **github.com/bcn-services** (the `bcn-services` org). **Private by default.**
 
-> **Status (2026-07-20):** Live. `bcns` (platform) on `main`; `@nseluga/*@0.1.0`
+> **Status (2026-07-20):** Live. `bcns` (platform) on `main`; `@bcn-services/*@0.1.0`
 > published to GitHub Packages; `bcns-app-template` is a Template Repository;
 > `bcns-client-delucas` extracted and running. Fresh installs verified with a
 > classic PAT. Next: scope + build Coventry Hills.
@@ -24,26 +24,17 @@ All repos live under **github.com/nseluga** (personal account, no org). **Privat
 - Client apps: `bcns-client-<slug>`, where `<slug>` is the kebab-case business name.
   - Coventry Hills → `bcns-client-coventry-hills`
   - DeLuca's → `bcns-client-delucas`
-- Rationale: with everything on a personal account (no org namespace), the `bcns-`
-  prefix clusters and sorts the studio's repos together on the profile.
+- Rationale: the `bcns-` prefix clusters and sorts the studio's repos together
+  under the `bcn-services` org.
 
-## Shared packages (@nseluga/*)
+## Shared packages (@bcn-services/*)
 
-`@nseluga/app-core`, `@nseluga/ui`, `@nseluga/config` live here and publish **privately** to
-GitHub Packages (`npm.pkg.github.com`) under `nseluga`. Clients never receive them —
+`@bcn-services/app-core`, `@bcn-services/ui`, `@bcn-services/config` live here and publish **privately** to
+GitHub Packages (`npm.pkg.github.com`) under the `bcn-services` org. Clients never receive them —
 apps are hosted on our VPS, so only machines we control ever install them.
 
-> **⚠️ TEMPORARY SCOPE — migrate to a `bcns` org later.** GitHub Packages requires the
-> npm scope to match the owning account, so on a personal account the packages must be
-> `@nseluga/*`. The name `bcns` is available as a GitHub org. Once the business admin is
-> set up and it's no longer just Nate, create the free **`bcns` org** and rename
-> `@nseluga/*` → `@bcns/*` (global find/replace across this repo + the template + every
-> client repo, then republish). The `@bcns` brand already lives in all repo names
-> (`bcns`, `bcns-app-template`, `bcns-client-*`); only the npm scope is on the temporary
-> `@nseluga` name, and it's invisible to clients.
-
 **Propagation:** improve a package → `pnpm publish` a new version → bump the range /
-`npm update @nseluga/app-core` in each client repo. No copy-paste.
+`npm update @bcn-services/app-core` in each client repo. No copy-paste.
 
 **Publishing (from this repo, on a machine we control):**
 
@@ -55,7 +46,7 @@ apps are hosted on our VPS, so only machines we control ever install them.
 consuming repo's `.npmrc`:
 
 ```
-@nseluga:registry=https://npm.pkg.github.com
+@bcn-services:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
@@ -68,7 +59,7 @@ returns **403 on downloads** from GitHub Packages — installs require a classic
 
 ```js
 // next.config.mjs
-transpilePackages: ['@nseluga/app-core', '@nseluga/ui', '@nseluga/config']
+transpilePackages: ['@bcn-services/app-core', '@bcn-services/ui', '@bcn-services/config']
 ```
 
 ## Spinning up a new client (e.g. Coventry Hills)
@@ -97,10 +88,10 @@ legacy **desktop (Electron) app**, not a hosted web app. So it:
 - is **not** generated from `bcns-app-template` (no Next.js/hosted-web scaffold),
 - is **not** deployed to our Coolify/Hetzner VPS and carries no monthly-hosting line
   (self-hosted / client-run, "build once"),
-- still gets its own repo (`bcns-client-delucas`) and consumes `@nseluga/*` by version.
+- still gets its own repo (`bcns-client-delucas`) and consumes `@bcn-services/*` by version.
 
 **Status: extracted (2026-07-20).** `apps/delucas` was moved out to
 [`bcns-client-delucas`](https://github.com/nseluga/bcns-client-delucas) with full
-history (`git subtree split`); `@nseluga/*` deps repointed from `workspace:*` to
+history (`git subtree split`); `@bcn-services/*` deps repointed from `workspace:*` to
 published versions; Vite/electron-vite aliases repointed at the installed package.
 Verified standalone: typecheck + unit tests + `electron-vite build` all pass.

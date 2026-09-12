@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Container } from "@nseluga/ui";
+import { Container } from "@bcn-services/ui";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {

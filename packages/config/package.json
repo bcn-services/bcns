@@ -1,9 +1,14 @@
 {
-  "name": "@nseluga/config",
+  "name": "@bcn-services/config",
   "version": "0.1.0",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bcn-services/bcns.git",
+    "directory": "packages/config"
   },
   "files": [
     "eslint",

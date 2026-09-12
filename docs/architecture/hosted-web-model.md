@@ -21,11 +21,11 @@ consequences.
 
 The concrete implementation of the code-sharing decision is:
 
-- [`@nseluga/app-core`](../../packages/app-core/) — the shared application-core
+- [`@bcn-services/app-core`](../../packages/app-core/) — the shared application-core
   package (auth wiring, DB access, AI client, billing helpers) consumed by each
   client repo.
 
-A second artifact, `templates/hosted-web/` (`@nseluga/hosted-web-template`), was
+A second artifact, `templates/hosted-web/` (`@bcn-services/hosted-web-template`), was
 built and then **removed** once its logic was absorbed into `app-core@0.2.0`.
 [`templates/`](../../templates/) is now a placeholder for future starters.
 
@@ -100,7 +100,7 @@ Revisit the single-droplet choice once steady spend passes **~$150–200/mo**.
 | --- | --- |
 | **Single-droplet blast radius** — one box hosting many clients is a single point of failure. | Off-box Supabase Postgres plus nightly `pg_dump` to DO Spaces (data survives the box); per-Unix-user isolation so one app cannot read another's secrets; documented rebuild-from-scratch drill in `infra/README.md`. |
 | **DDoS / abusive traffic** | Cloudflare WAF and DDoS protection sit in front of every app; UFW only allows 80/443 from Cloudflare ranges, so the origin is unreachable directly. |
-| **Managed-service lock-in** — Supabase, Stripe, Cloudflare, DigitalOcean are all third parties. | Keep integration behind the `@nseluga/app-core` seam so a provider can be swapped without touching each client app; Postgres and Stripe are portable by design. |
+| **Managed-service lock-in** — Supabase, Stripe, Cloudflare, DigitalOcean are all third parties. | Keep integration behind the `@bcn-services/app-core` seam so a provider can be swapped without touching each client app; Postgres and Stripe are portable by design. |
 | **Secret management** — API keys (incl. client Anthropic keys) must never leak. | Secrets live in a per-client env file on the droplet (mode 600, owned by that client's Unix user) or the Supabase vault, never in a repo; client AI keys stored encrypted per the BYOK-AI decision. |
 
 ### Repo model: one repo per client business
@@ -128,12 +128,12 @@ outside it — including DeLuca's, which was extracted to its own repo
 
 Shared code is **not** copied between client repos. Instead:
 
-- Shared code lives in **versioned packages**: `@nseluga/ui`, `@nseluga/config`, and
-  [`@nseluga/app-core`](../../packages/app-core/), each consumed by every client
+- Shared code lives in **versioned packages**: `@bcn-services/ui`, `@bcn-services/config`, and
+  [`@bcn-services/app-core`](../../packages/app-core/), each consumed by every client
   repo as a normal dependency.
 - A **starter** spins up a new client repo **pre-wired** to the hosting stack and
   the shared packages. The original `templates/hosted-web/` copy was **removed**
-  once its logic was absorbed into `@nseluga/app-core@0.2.0`; the replacement
+  once its logic was absorbed into `@bcn-services/app-core@0.2.0`; the replacement
   will be a standalone GitHub Template Repository. Until it exists, new client
   repos are wired by hand against the shared packages. See
   [`templates/README.md`](../../templates/README.md).
@@ -163,6 +163,6 @@ Shared code is **not** copied between client repos. Instead:
   (mitigated by off-box Supabase data and nightly backups to DO Spaces).
 - Heavier reliance on managed third parties (Supabase, Stripe, Cloudflare,
   DigitalOcean), accepted for the operational leverage and kept behind the
-  `@nseluga/app-core` seam.
+  `@bcn-services/app-core` seam.
 - bcns now owns ongoing hosting and maintenance obligations that the old
   one-time model did not carry.
