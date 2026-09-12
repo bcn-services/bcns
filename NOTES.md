@@ -55,3 +55,10 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - Local `supabase start` excludes studio/realtime/edge-runtime/logflare/vector/imgproxy/inbucket/mailpit/supavisor; CI uses the same list. Worker tests use the direct 54322 URL (no local pooler).
 - Fixtures: `fixtures/` is gitignored (real samples), so connector tests ship synthetic pages under `test/fixtures/`.
 - `deploy-worker.yml` written but never run (guardrail: no GCP deploys); needs the WIF secrets/vars listed in its header.
+- Connector modules live in `worker/src/connectors/` (§4.1 says `worker/connectors/`) so the worker is one tsconfig root; `pnpm tick` = `tsx worker/src/index.ts`.
+- `onboard`: smoke/temp passwords print once (no password-manager API); `rotate-smoke` likewise skips the `gh secret set` hop (dashboard repo unknown at platform level). `add-member` falls back to createUser+printed password when invite mail is unavailable (local stack has no mailer).
+- `onboard` G1 "bcns-org client id fails" is checked against `BCNS_OAUTH_CLIENT_ID` env (the bcns app's id) plus the tokeninfo audience; Workspace "Internal" user type has no API surface.
+- `hard-delete` archives to Spaces via `SPACES_ENDPOINT/KEY/SECRET`, or to `EXPORT_ARCHIVE_DIR` when set (tests/CI); `backfillDepth = 'unbounded'` → `backfill_from = 1970-01-01`.
+- Canonical tables reference `clients` without `on delete cascade` (§1.4 is silent); `hard-delete` deletes them explicitly, in dependency order.
+- `@nseluga/data-client`: `createDataClient` takes an optional `accessToken` (the template's own auth session) since §8 says the returned object exposes nothing else; `thumbUrls` signs for 300 s and returns a path→url map; `health()` returns the `client_v1` row.
+- `pnpm db:types` uses `--db-url` against 54322 (the CLI's `--local` type-gen container cannot reach the db here).
