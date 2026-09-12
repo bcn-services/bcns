@@ -62,7 +62,7 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - `onboard` G1 "bcns-org client id fails" is checked against `BCNS_OAUTH_CLIENT_ID` env (the bcns app's id) plus the tokeninfo audience; Workspace "Internal" user type has no API surface.
 - `hard-delete` archives to Spaces via `SPACES_ENDPOINT/KEY/SECRET`, or to `EXPORT_ARCHIVE_DIR` when set (tests/CI); `backfillDepth = 'unbounded'` → `backfill_from = 1970-01-01`.
 - Canonical tables reference `clients` without `on delete cascade` (§1.4 is silent); `hard-delete` deletes them explicitly, in dependency order.
-- `@nseluga/data-client`: `createDataClient` takes an optional `accessToken` (the template's own auth session) since §8 says the returned object exposes nothing else; `thumbUrls` signs for 300 s and returns a path→url map; `health()` returns the `client_v1` row.
+- `@bcn-services/data-client`: `createDataClient` takes an optional `accessToken` (the template's own auth session) since §8 says the returned object exposes nothing else; `thumbUrls` signs for 300 s and returns a path→url map; `health()` returns the `client_v1` row.
 - `pnpm db:types` uses `--db-url` against 54322 (the CLI's `--local` type-gen container cannot reach the db here).
 - Worker sharding: `hashtext()` is signed, so the predicate is `((hashtext(client_id::text) % n) + n) % n`; plain `%` would starve half the shards.
 - §5.5 "zero rows from a full-list source" is judged at run level (`connector_runs.rows_fetched`) for monday/meta only; there is no per-entity row count column.

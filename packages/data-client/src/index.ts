@@ -1,4 +1,4 @@
-// @nseluga/data-client — thin typed wrappers over supabase-js for the shared-platform dashboard
+// @bcn-services/data-client — thin typed wrappers over supabase-js for the shared-platform dashboard
 // contract (DESIGN.md §8). Nothing beyond what §8 lists: views, rpc, media, health.
 import { createClient, PostgrestError, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './database.types.js'

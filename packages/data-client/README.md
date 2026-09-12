@@ -1,4 +1,4 @@
-# @nseluga/data-client
+# @bcn-services/data-client
 
 Thin typed wrapper over `@supabase/supabase-js` for the bcns-data shared platform (DESIGN.md §8).
 Talks to schema `api` only — nothing else.
@@ -10,7 +10,7 @@ Workspace-internal package (`pnpm-workspace.yaml`). Peer dependency: `@supabase/
 ## Usage
 
 ```ts
-import { createDataClient } from '@nseluga/data-client'
+import { createDataClient } from '@bcn-services/data-client'
 
 const dc = createDataClient({
   supabaseUrl: 'https://<project>.supabase.co',

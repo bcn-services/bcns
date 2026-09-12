@@ -1271,7 +1271,7 @@ is 404; greps the build output for the service-role key prefix. (R5, R39)
 
 Design of the contract only; the template and package are separate repos.
 
-- **Package `@nseluga/data-client`** (new, shared): `createDataClient({ supabaseUrl, anonKey })`
+- **Package `@bcn-services/data-client`** (new, shared): `createDataClient({ supabaseUrl, anonKey })`
   returns a typed Supabase client whose `Database` type is generated from schema `api` only
   (`supabase gen types --schema api`). Exposes `views.<name>_v1()` builders, `rpc.<name>()`
   wrappers that map SQLSTATEs to a `DataClientError { code: 'no_tenant' | 'budget_reached' | … }`,

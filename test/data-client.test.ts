@@ -7,7 +7,7 @@ async function dataClientAs(user: (typeof USERS)[keyof typeof USERS]) {
   return createDataClient({ supabaseUrl: SUPABASE_URL, anonKey: localKeys().anon, accessToken: token })
 }
 
-describe('@nseluga/data-client', () => {
+describe('@bcn-services/data-client', () => {
   it('a view read returns only the caller tenant\'s rows', async () => {
     const dc = await dataClientAs(USERS.acmeMember)
     const { data, error } = await dc.views.money_v1()

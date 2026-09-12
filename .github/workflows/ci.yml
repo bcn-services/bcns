@@ -21,7 +21,7 @@ jobs:
         run: supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,supavisor
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm --filter @nseluga/data-client build
+      - run: pnpm --filter @bcn-services/data-client build
       - name: worker image builds
         run: docker build -f worker/Dockerfile -t bcns-data-worker:ci .
       - if: always()
