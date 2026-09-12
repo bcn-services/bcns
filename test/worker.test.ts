@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { CLIENTS, localKeys, pool, sql, SUPABASE_URL } from './helpers.js'
 import { closePool, type Tick } from '../worker/src/db.js'
-import { claim } from '../worker/src/run.js'
+import { claim, runOne, type ScheduleRow } from '../worker/src/run.js'
 import { tick, type TickResult } from '../worker/src/tick.js'
 import { refreshTokens } from '../worker/src/tokens.js'
 import { alerts, computeHealth } from '../worker/src/health.js'
@@ -151,12 +151,23 @@ describe('worker', () => {
   it('stale_no_false_alarm', async () => {
     const c = await mkClient([{ source: 'shopify' }, { source: 'monday' }])
     for (const source of ['shopify', 'monday'] as const) {
-      for (let i = 0; i < 11; i++) {
-        await sql(`insert into data.connector_runs (client_id, source, mode, status, started_at, finished_at, rows_fetched)
-                   values ($1, $2, 'incremental', 'ok', now() - make_interval(mins => $3), now() - make_interval(mins => $3), $4)`,
-          [c, source, 60 - i * 5, i === 10 ? 0 : 100])
+      for (let i = 0; i < 10; i++) {
+        await sql(`insert into data.connector_runs (client_id, source, mode, status, started_at, finished_at, rows_fetched, entity_rows)
+                   values ($1, $2, 'incremental', 'ok', now() - make_interval(mins => $3), now() - make_interval(mins => $3), 100, $4::jsonb)`,
+          [c, source, 60 - i * 5, JSON.stringify(source === 'monday' ? { board: 1, item: 100 } : { order: 100 })])
       }
     }
+    // Shopify: a fabricated idle run. Monday: a REAL run against an empty board, so the `board` meta row is
+    // counted exactly as in production (rows_fetched = 1, item = 0) and the rule must still fire.
+    await sql(`insert into data.connector_runs (client_id, source, mode, status, started_at, finished_at, rows_fetched)
+               values ($1, 'shopify', 'incremental', 'ok', now(), now(), 0)`, [c])
+    const t = mkTick()
+    await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1 and source = 'monday'`, [c, t.owner])
+    const row = (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1 and source = 'monday'`, [c])).rows[0]
+    await runOne(t, row)
+    const real = (await sql<{ status: string; rows_fetched: number; entity_rows: Record<string, number> }>(
+      `select status, rows_fetched, entity_rows from data.connector_runs where client_id = $1 and source = 'monday' order by started_at desc limit 1`, [c])).rows[0]
+    expect(real).toMatchObject({ status: 'ok', rows_fetched: 1, entity_rows: { board: 1, item: 0 } })
     await sql(`update data.connector_schedule set last_run_at = now(), last_success_at = now() where client_id = $1`, [c])
     await computeHealth(mkTick())
     const h = await sql<{ source: string; status: string }>(
@@ -214,6 +225,27 @@ describe('worker', () => {
     const a = owned(t0.owner), b = owned(t1.owner)
     expect(a.size + b.size).toBe(10)
     expect([...a].filter(x => b.has(x))).toEqual([])
+
+    // D11: two overlapping ticks in the SAME shard — `skip locked` + the lease, not sharding, must prevent a double run.
+    await sql(`update data.connector_schedule set next_run_at = now(), lease_until = null, lease_owner = null where client_id = any($1::uuid[])`, [ids])
+    const same = { ...opts, taskCount: 1, taskIndex: 0 }
+    await Promise.all([tick(same), tick(same)])
+    const total = await sql<{ n: number }>(`select count(*)::int as n from data.connector_runs where client_id = any($1::uuid[])`, [ids])
+    expect(total.rows[0].n).toBe(20)
+  })
+
+  it('lease_lost_write_ignored', async () => {
+    // A lease reaped and re-claimed by another worker: the original worker finishes its run but writes nothing to the schedule row.
+    const c = await mkClient([{ source: 'monday' }])
+    const a = mkTick()
+    await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1`, [c, a.owner])
+    const row = (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1`, [c])).rows[0]
+    await sql(`update data.connector_schedule set lease_owner = 'other-worker', lease_until = now() + interval '8 minutes' where client_id = $1`, [c])
+    await runOne(a, row)
+    const s = (await sql<{ lease_owner: string; last_success_at: Date | null; status: string }>(
+      `select s.lease_owner, s.last_success_at, r.status from data.connector_schedule s
+       join data.connector_runs r on r.client_id = s.client_id and r.source = s.source where s.client_id = $1`, [c])).rows[0]
+    expect(s).toMatchObject({ lease_owner: 'other-worker', last_success_at: null, status: 'ok' })
   })
 
   it('housekeeping_single_holder', async () => {

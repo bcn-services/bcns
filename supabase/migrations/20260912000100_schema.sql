@@ -147,6 +147,7 @@ create table data.connector_runs (
   pages         int not null default 0,
   rows_fetched  int not null default 0,
   rows_upserted int not null default 0,
+  entity_rows   jsonb not null default '{}',  -- per-entity fetched counts; §5.5 zero-row rule is per entity
   error         text,
   lease_owner   text
 );

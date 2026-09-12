@@ -164,3 +164,7 @@ export const connectors: Record<Source, Connector> = { shopify, meta, monday, me
 export const fullListSources: Source[] = (Object.keys(connectors) as Source[]).filter(
   s => (connectors[s].defaults.fullList?.length ?? 0) > 0,
 )
+
+/** source -> its fullList entity names; §5.5's zero-row rule is judged per entity. */
+export const fullListEntities: Partial<Record<Source, string[]>> = Object.fromEntries(
+  fullListSources.map(s => [s, connectors[s].defaults.fullList!.map(f => f.entity)]))

@@ -1,7 +1,7 @@
 // §5.5 health, §5.6 alerts + Resend delivery, §5.6 pooled-egress watch.
 import { envNum, envStr, sql } from './db.js'
 import type { Tick } from './db.js'
-import { fullListSources } from './connectors/index.js'
+import { fullListEntities } from './connectors/index.js'
 
 /** One statement; `is distinct from` keeps status_since stable across ticks (§5.5). */
 export async function computeHealth(_t: Tick): Promise<number> {
@@ -13,30 +13,38 @@ export async function computeHealth(_t: Tick): Promise<number> {
        join data.clients c on c.id = s.client_id and c.status = 'active'
        left join data.source_tokens tk on (tk.client_id, tk.source) = (s.client_id, s.source)
      ), last_run as (
-       select distinct on (client_id, source) client_id, source, status, rows_fetched
+       select distinct on (client_id, source) client_id, source, status, entity_rows
        from data.connector_runs where finished_at is not null and mode <> 'renormalize'
        order by client_id, source, finished_at desc
      ), prev_ok as (
-       select client_id, source, count(*) as n, min(rows_fetched) as min_rows from (
-         select client_id, source, rows_fetched,
+       select client_id, source, entity_rows from (
+         select client_id, source, entity_rows,
                 row_number() over (partition by client_id, source order by finished_at desc) as rn
          from data.connector_runs where finished_at is not null and status = 'ok' and mode <> 'renormalize'
-       ) x where rn between 2 and 11 group by client_id, source
+       ) x where rn between 2 and 11
+     ), zero_now as (
+       -- §5.5: a full-list entity fetched 0 rows in the last ok run, after 10 ok runs that each fetched > 0
+       select distinct lr.client_id, lr.source
+       from last_run lr
+       cross join jsonb_array_elements_text(coalesce($1::jsonb -> lr.source::text, '[]'::jsonb)) as e(entity)
+       where lr.status = 'ok' and coalesce((lr.entity_rows ->> e.entity)::int, 0) = 0
+         and (select count(*) from prev_ok p
+              where (p.client_id, p.source) = (lr.client_id, lr.source)
+                and coalesce((p.entity_rows ->> e.entity)::int, 0) > 0) = 10
      ), computed as (
        select s.client_id, s.source,
          (case
             when s.token_status = 'auth_failed' or lr.status = 'auth_failed' then 'auth_failed'
             when lr.client_id is null then 'never_ran'
             when s.last_success_at < now() - 3 * s.interval then 'stale'
-            when s.source = any($1::data.source[]) and lr.status = 'ok' and lr.rows_fetched = 0
-                 and p.n = 10 and p.min_rows > 0 then 'stale'
+            when z.client_id is not null then 'stale'
             when lr.status = 'error' and s.consecutive_failures >= 1 then 'error'
             else 'ok'
           end)::data.health_status as status,
          s.last_run_at, s.last_success_at, s.last_error
        from sched s
        left join last_run lr on (lr.client_id, lr.source) = (s.client_id, s.source)
-       left join prev_ok p on (p.client_id, p.source) = (s.client_id, s.source)
+       left join zero_now z on (z.client_id, z.source) = (s.client_id, s.source)
      )
      insert into data.connector_health as h (client_id, source, status, status_since, last_run_at, last_success_at, last_error)
      select client_id, source, status, now(), last_run_at, last_success_at,
@@ -49,7 +57,7 @@ export async function computeHealth(_t: Tick): Promise<number> {
        last_error = excluded.last_error, computed_at = now()
      where (h.status, h.last_error, h.last_success_at, h.last_run_at)
            is distinct from (excluded.status, excluded.last_error, excluded.last_success_at, excluded.last_run_at)`,
-    [fullListSources])
+    [JSON.stringify(fullListEntities)])
   return r.rowCount ?? 0
 }
 

@@ -52,7 +52,7 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - `register_upload` on a foreign-tenant path raises BCNS3 (prefix regex) before the BCNS4 lookup; `rpc_every_write_scoped` expects BCNS3 for it.
 - Seed writes `storage.objects` metadata rows for the 3 media/client (no bytes) — sign/ticket tests only need catalog rows; `storage_prefix_isolation` uploads a real 1×1 PNG.
 - Local stack is Postgres 15 (`config.toml` `major_version = 15`); production project version should match before `db push`.
-- Local `supabase start` excludes studio/realtime/edge-runtime/logflare/vector/imgproxy/inbucket/mailpit/supavisor; CI uses the same list. Worker tests use the direct 54322 URL (no local pooler).
+- Local `supabase start` excludes studio/realtime/edge-runtime/logflare/vector/imgproxy/mailpit/supavisor; CI uses the same list. Worker tests use the direct 54322 URL (no local pooler).
 - Fixtures: `fixtures/` is gitignored (real samples), so connector tests ship synthetic pages under `test/fixtures/`.
 - `deploy-worker.yml` written but never run (guardrail: no GCP deploys); needs the WIF secrets/vars listed in its header.
 - Connector modules live in `worker/src/connectors/` (§4.1 says `worker/connectors/`) so the worker is one tsconfig root; `pnpm tick` = `tsx worker/src/index.ts`.
@@ -75,6 +75,8 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - `health_one_row` asserts per `status = 'active'` client (§5.5 skips paused/churned) plus a global no-duplicate check.
 - Meta config key is `act_id` with the `act_` prefix in the value (§4.3 example `act_123`); seed and checklist corrected from `ad_account_id` / `act_${id}`.
 - Meet `parseNotes` beyond the "Notes by Gemini" suffix strip is `it.todo` (§4.5 N3, no real sample).
+- Review (opus, fresh context, 2026-09-12) — fixed: (a) `connector_runs.entity_rows jsonb` (internal, service-role-only) accumulates per-entity fetched counts per page so §5.5's per-entity zero-row rule is computable; `rows_fetched` still counts every raw row (Monday's `board` row included), which is why the run-level rule was dead. `stale_no_false_alarm` now drives a real empty-board Monday run. (b) Every `connector_schedule` write inside a run is guarded by `lease_owner = <this tick>`; a run whose lease was reaped and re-claimed logs `run_lost_lease` and touches nothing (`lease_lost_write_ignored`; `worker_claim_no_double_process` now also overlaps two ticks in the same shard). (c) Connector `fetch` gets `AbortSignal.timeout(60 s)` unless the caller passed a signal — DESIGN sets no per-request timeout and the 8-minute lease was the only bound. (d) CI `supabase start -x` dropped `inbucket` (not a CLI 2.114 service name; mailpit is the mail service).
+- Review — noted, not changed: §5.4 holds the `source_tokens` row lock and its pooled connection (pool max 4) across the refresh HTTP call by design; the 60 s timeout bounds it. `data.require_w()` is vacuous today (`tenant_or_raise` already proves membership; roles are only member/owner) and stays as the §3 hook for a future read-only role. Cross-tenant forged-claim, storage prefix/ticket, same-shard claim, catalog grants, export/hard-delete scoping, and purge orphan sweep all held under attack.
 
 ## Needs Nate
 
@@ -84,3 +86,4 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 4. `onboard` / `rotate-smoke`: which password manager and which dashboard repo receive the smoke credentials; today they print once.
 5. Meet §4.5 N3: one real "Notes by Gemini" doc to finish `parseNotes` participants/title.
 6. Hosted project: `RESEND_API_KEY`, `BCNS_ALERT_EMAIL`, and enabling the custom access token hook on the hosted project (config.toml only wires it locally).
+7. A complete full-list run that returns zero items tombstones every row of that table for the client (§4.1 as written; `tombstone_only_on_done` covers the budget-stop case only). Confirm Monday/Meta never answer an empty-but-successful list during degradation, or say whether an empty complete list should be a no-op.
