@@ -63,7 +63,7 @@ Types:
 ```sql
 create schema data;  create schema api;
 create extension if not exists btree_gin;
-create type data.source        as enum ('shopify','meta','monday','meet','upload','dashboard','platform');
+create type data.source        as enum ('shopify','meta','monday','meet','drive','upload','dashboard','platform');
 create type data.client_status as enum ('active','paused','churned');
 create type data.member_role   as enum ('member','owner');
 create type data.token_kind    as enum ('shopify_admin','monday_personal','meta_system_user','google_oauth_refresh');
@@ -747,10 +747,10 @@ One TypeScript module per source in `worker/connectors/<source>.ts`:
 
 ```ts
 export interface Connector {
-  source: Source;                                       // 'shopify' | 'meta' | 'monday' | 'meet'
+  source: Source;                                       // 'shopify' | 'meta' | 'monday' | 'meet' | 'drive'
   defaults: { interval: string; backfillDepth: string;  // Postgres interval literals
               rateLimit: { concurrency: number; minDelayMs: number };   // per (source, client_id) — never global
-              fullList?: { entity: string; table: 'jobs' | 'records' }[] }; // entities whose complete pull authorises tombstones
+              fullList?: { entity: string; table: 'jobs' | 'records' | 'media' }[] }; // entities whose complete pull authorises tombstones
   configSchema: ZodSchema;                              // shape of connector_schedule.config
   tokenKind: TokenKind;
   backfill(ctx: RunContext, from: Date, cursor: Json|null): AsyncIterable<Page>;
@@ -925,6 +925,23 @@ documented API behaviour) and leaves `parseNotes()` behind a fixture-driven test
 | Normalize → `messages` | `kind='meeting_note'`, `external_id = file.id`, `title = name` with a trailing "– Notes by Gemini" (pattern **provisional**) stripped, `body = exported text`, `occurred_at = createdTime`, `participants = []` (**provisional**: Gemini notes list attendees in a header block; parse once a sample exists), `url = webViewLink`, `attributes = { modified_time, owners }`. |
 
 Fallback when a client opts out: the owner drops the doc into the Content Library; nothing to design.
+
+### 4.6 Google Drive content library
+
+Added 2026-09-12 (N5). The client keeps marketing files in a Drive folder; the pain is finding and
+viewing them, not storage. The connector indexes the folder into `media`; the bytes never leave
+Drive (`storage_path` null, so `download_url` refuses a ticket and the dashboard opens
+`attributes.web_view_link`). Drive is the source of truth: delete a file in Drive, not in the
+dashboard — the next complete run un-deletes anything still in the folder.
+
+| | |
+|---|---|
+| Auth | Same app and scopes as §4.5 (`google_oauth_refresh`, Internal app, `drive.readonly`). Mint a separate refresh token for this source (a second consent on the same app) so the `meet` and `drive` token rows never share one. |
+| refreshToken | Same as §4.5. |
+| config | `{ folder_id: "<Drive folder of the content library>", oauth_client_id: "…" }` |
+| defaults | `interval = '1 hour'`, `backfillDepth = '0'`, `rateLimit = { concurrency: 2, minDelayMs: 200 }`, `fullList = [{ entity: 'file', table: 'media' }]`. |
+| Pull `file` | Every run lists the whole folder — no `modifiedTime` filter, because a changed-only page would tombstone every unchanged file: `GET drive/v3/files?q='<folder_id>' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))&pageSize=100`. Flat folder only. For ids not already in `media` the connector fetches `thumbnailLink` (`=s512`) and writes it to `<client_id>/thumb/<file_id>.jpg`; a missing or failed thumbnail is logged (`drive_thumb_skip`) and the row still lands. |
+| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule. |
 
 ## 5. Worker and jobs
 
@@ -1147,7 +1164,7 @@ null`. Only that client's rows are touched.
 
 | script | does |
 |---|---|
-| `onboard --slug --name --timezone [--sources shopify,meta,monday,meet]` | Inserts `clients`; creates the smoke user (`smoke+<slug>@bcn-services.com`, random password stored in the bcns password manager) + membership `is_smoke`; prompts for each source's credential (per the §9 checklist, refusing a Meta user token or non-Internal Google app by inspecting the token's `/debug_token` type and the OAuth client's audience), writes `source_tokens`; copies connector defaults into `connector_schedule` (`backfill_from = today − backfillDepth`, `backfill_cursor = {}`, `next_run_at = now()`); for Monday, auto-fills `config.columns`; for Meta, fills `account_timezone/currency` and warns on mismatch. |
+| `onboard --slug --name --timezone [--sources shopify,meta,monday,meet,drive]` | Inserts `clients`; creates the smoke user (`smoke+<slug>@bcn-services.com`, random password stored in the bcns password manager) + membership `is_smoke`; prompts for each source's credential (per the §9 checklist, refusing a Meta user token or non-Internal Google app by inspecting the token's `/debug_token` type and the OAuth client's audience), writes `source_tokens`; copies connector defaults into `connector_schedule` (`backfill_from = today − backfillDepth`, `backfill_cursor = {}`, `next_run_at = now()`); for Monday, auto-fills `config.columns`; for Meta, fills `account_timezone/currency` and warns on mismatch. |
 | `add-member --slug --email [--owner]` | Creates the auth user (invite email via Auth admin API) + membership. |
 | `import-media --slug --dir <folder> [--set <name>] [--tags a,b]` | Walks a folder, uploads each file to `orig`, registers it through `data.register_media(client_id, path, …)` — the same validation the RPC uses (§3.3) — optionally adds to a set. Idempotent on filename+size. |
 | `churn --slug` | `clients.status = churned`. Everything else follows from the hook and the claim query (R34). |

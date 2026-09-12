@@ -40,6 +40,7 @@ One line per decision or finding resolved. Design calls D1–D20 live in DESIGN.
 
 - N1: "—" in W2; GA4 connector post-launch if Declan has GA4, else checkout-conversion tile from abandoned checkouts. Conversion = orders ÷ visits; Shopify API exposes no visit count.
 - N2: accept, America/New_York. N3: Meet provisional, yes. N4: add-user script, yes.
+- N5 (2026-09-12): Drive content library stays in Drive; fifth connector `drive` indexes it into `data.media` with `storage_path` null and a copied thumbnail; complete listing every run so tombstones are safe. Needs Nate #7 now applies to it. DESIGN §4.6.
 - Design approved; W2 build may start from commit below.
 
 ## W2 build log (2026-09-12, Fable 5.1 orchestrating)
@@ -77,6 +78,7 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - Meet `parseNotes` beyond the "Notes by Gemini" suffix strip is `it.todo` (§4.5 N3, no real sample).
 - Review (opus, fresh context, 2026-09-12) — fixed: (a) `connector_runs.entity_rows jsonb` (internal, service-role-only) accumulates per-entity fetched counts per page so §5.5's per-entity zero-row rule is computable; `rows_fetched` still counts every raw row (Monday's `board` row included), which is why the run-level rule was dead. `stale_no_false_alarm` now drives a real empty-board Monday run. (b) Every `connector_schedule` write inside a run is guarded by `lease_owner = <this tick>`; a run whose lease was reaped and re-claimed logs `run_lost_lease` and touches nothing (`lease_lost_write_ignored`; `worker_claim_no_double_process` now also overlaps two ticks in the same shard). (c) Connector `fetch` gets `AbortSignal.timeout(60 s)` unless the caller passed a signal — DESIGN sets no per-request timeout and the 8-minute lease was the only bound. (d) CI `supabase start -x` dropped `inbucket` (not a CLI 2.114 service name; mailpit is the mail service).
 - Review — noted, not changed: §5.4 holds the `source_tokens` row lock and its pooled connection (pool max 4) across the refresh HTTP call by design; the 60 s timeout bounds it. `data.require_w()` is vacuous today (`tenant_or_raise` already proves membership; roles are only member/owner) and stays as the §3 hook for a future read-only role. Cross-tenant forged-claim, storage prefix/ticket, same-shard claim, catalog grants, export/hard-delete scoping, and purge orphan sweep all held under attack.
+- Drive (2026-09-12): `purge()` now requires `deleted_at is not null` (the partial index already assumed it); without it a dashboard-deleted Drive file that the next run un-deleted would still be hard-deleted a month later. `CanonTable` gains `media` so `fullList` can tombstone Drive rows. `thumb_path` is upserted with the same coalesce guard as `storage_path`.
 
 ## Needs Nate
 
