@@ -1,4 +1,4 @@
-// onboard --slug --name --timezone [--sources shopify,meta,monday,meet]  (DESIGN.md §5.10, §9)
+// onboard --slug --name --timezone [--sources shopify,meta,monday,meet,drive]  (DESIGN.md §5.10, §9)
 // Inserts the client + smoke user, then per source: prompts for credentials, runs the §9 checklist
 // (a failed item stops the script), writes source_tokens and connector_schedule from the connector's
 // own defaults. Smoke password is printed once (no password-manager integration in this build).
@@ -9,12 +9,13 @@ import { connectors, type Source } from '../worker/src/connectors/index.js'
 import { checklist, type Creds } from './checklist.js'
 import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
 
-// What the operator is asked for, per source (§4.2–§4.5 config + token shapes).
+// What the operator is asked for, per source (§4.2–§4.6 config + token shapes).
 const PROMPTS: Record<Source, { config: string[]; secret: string; refresh?: string; attribute?: string }> = {
   shopify: { config: ['shop', 'admin_url'], secret: 'Admin API token (shpat_…)' },
   meta: { config: ['act_id', 'ads_manager_url'], secret: 'system user token' },
   monday: { config: ['board_id', 'board_url'], secret: 'personal token' },
   meet: { config: ['folder_id', 'oauth_client_id', 'notes_url'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
+  drive: { config: ['folder_id', 'oauth_client_id'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
 }
 
 export function backfillFrom(depth: string): string {
@@ -26,7 +27,7 @@ export async function main(argv: string[], ask?: (q: string) => Promise<string>)
   const { values } = parseArgs({ args: argv, options: {
     slug: { type: 'string' }, name: { type: 'string' }, timezone: { type: 'string' }, sources: { type: 'string' } } })
   const { slug, name, timezone } = values
-  if (!slug || !name || !timezone) die('usage: onboard --slug <slug> --name <name> --timezone <tz> [--sources shopify,meta,monday,meet]')
+  if (!slug || !name || !timezone) die('usage: onboard --slug <slug> --name <name> --timezone <tz> [--sources shopify,meta,monday,meet,drive]')
   const sources = (values.sources ?? '').split(',').map((s) => s.trim()).filter(Boolean) as Source[]
   for (const s of sources) if (!(s in connectors)) die(`unknown source: ${s}`)
 

@@ -8,10 +8,10 @@ import { applyWrites, runOne, writeRaw, type ScheduleRow } from '../worker/src/r
 import { connectors, type RawRow, type RunContext, type Source } from '../worker/src/connectors/index.js'
 
 const fx = (name: string) => JSON.parse(readFileSync(`test/fixtures/${name}-sample.json`, 'utf8'))
-const SHOPIFY = fx('shopify'), META = fx('meta'), MONDAY = fx('monday'), MEET = fx('meet')
+const SHOPIFY = fx('shopify'), META = fx('meta'), MONDAY = fx('monday'), MEET = fx('meet'), DRIVE = fx('drive')
 
 const KIND: Record<Source, string> = {
-  shopify: 'shopify_admin', meta: 'meta_system_user', monday: 'monday_personal', meet: 'google_oauth_refresh',
+  shopify: 'shopify_admin', meta: 'meta_system_user', monday: 'monday_personal', meet: 'google_oauth_refresh', drive: 'google_oauth_refresh',
 }
 const CANON = ['customers', 'jobs', 'messages', 'money', 'media', 'products', 'daily_metrics', 'records']
 const made: string[] = []
@@ -88,6 +88,12 @@ const meetRaw = (): RawRow[] => MEET.files.files.map((f: any) => ({
   entity: 'doc', externalId: f.id, sourceUpdatedAt: new Date(f.modifiedTime), payload: { ...f, text: MEET.exports[f.id] },
 }))
 
+// shaped as the connector stores it: the thumbnail copy already happened, so normalize stays pure.
+const driveRaw = (): RawRow[] => DRIVE.files.files.map((f: any) => ({
+  entity: 'file', externalId: f.id, sourceUpdatedAt: new Date(f.modifiedTime),
+  payload: { ...f, thumb_path: f.thumbnailLink ? `thumb/${f.id}.jpg` : null },
+}))
+
 const ctxFor = (clientId: string, source: Source, config: unknown): RunContext =>
   ({ clientId, source, config, timezone: 'America/New_York', token: { secret: 'test-token' } }) as unknown as RunContext
 
@@ -146,18 +152,69 @@ describe('connectors', () => {
     expect(await tombstoned()).toBe(0)
   })
 
+  it('drive_thumb_once', async () => {
+    async function run(known: Set<string>) {
+      const clientId = randomUUID()
+      const fetchedUrls: string[] = []
+      const fetch = (async (url: string) => {
+        const u = String(url)
+        fetchedUrls.push(u)
+        if (u.includes('/drive/v3/files')) return json({ files: DRIVE.files.files })
+        if (u.includes('img1')) return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } })
+        if (u.includes('deck1')) return new Response('boom', { status: 500 })
+        return json({})
+      }) as unknown as typeof globalThis.fetch
+      const putCalls: [string, string][] = []
+      const logCalls: [string, unknown][] = []
+      const ctx = ({
+        clientId, source: 'drive' as Source, config: { folder_id: 'f1' }, timezone: 'America/New_York',
+        token: { secret: 'test-token' },
+        fetch,
+        log: (event: string, data?: unknown) => logCalls.push([event, data]),
+        putObject: async (path: string, _bytes: Uint8Array, mime: string) => { putCalls.push([path, mime]) },
+        knownMedia: async () => known,
+      }) as unknown as RunContext
+      const pages = []
+      for await (const page of connectors.drive.backfill(ctx, new Date(0), null)) pages.push(page)
+      return { pages, putCalls, logCalls, fetchedUrls, clientId }
+    }
+
+    const { pages, putCalls, logCalls, fetchedUrls, clientId } = await run(new Set(['pdf1']))
+    expect(pages.length).toBe(1)
+    const [page] = pages
+    expect(page.done).toBe(true)
+    expect(page.entityDone).toBe(true)
+    expect(typeof page.cursor.pulled_at).toBe('string')
+    expect(page.raw.length).toBe(3)
+    expect(page.raw.every(r => r.entity === 'file')).toBe(true)
+
+    expect(putCalls).toEqual([[`${clientId}/thumb/img1.jpg`, 'image/png']])
+    const byId = Object.fromEntries(page.raw.map(r => [r.externalId, r.payload]))
+    expect(byId.img1.thumb_path).toBe(`${clientId}/thumb/img1.jpg`)
+    expect(byId.pdf1.thumb_path).toBeNull()
+    expect(byId.deck1.thumb_path).toBeNull()
+    expect(logCalls.filter(([e]) => e === 'drive_thumb_skip')).toEqual([['drive_thumb_skip', { id: 'deck1', error: expect.any(String) }]])
+    const thumbUrl = fetchedUrls.find(u => u.includes('img1'))
+    expect(thumbUrl).toMatch(/=s512$/)
+
+    const known = await run(new Set(['img1']))
+    expect(known.putCalls.find(([path]) => path.includes('img1.jpg'))).toBeUndefined()
+  })
+
   it('normalize_idempotent', async () => {
     const c = await mkClient([
       { source: 'shopify', config: { shop: 'fixture.myshopify.com', currency: 'USD' } },
       { source: 'meta', config: { act_id: 'act_1001', currency: 'USD' } },
       { source: 'monday', config: { board_id: board.id, columns: { status: 'status', priority: 'priority', owner: 'person', due: 'date4', link: 'link' } } },
       { source: 'meet', config: { folder_id: 'f1' } },
+      { source: 'drive', config: { folder_id: 'f1' } },
     ])
     const cases: [Source, RawRow[], unknown][] = [
       ['shopify', shopifyRaw(), { shop: 'fixture.myshopify.com', currency: 'USD' }],
       ['meta', metaRaw(), { act_id: 'act_1001', currency: 'USD' }],
       ['monday', mondayRaw(board.items_page.items), { board_id: board.id, columns: { status: 'status', priority: 'priority', owner: 'person', due: 'date4', link: 'link' }, done_statuses: ['Done'] }],
       ['meet', meetRaw(), { folder_id: 'f1' }],
+      ['drive', driveRaw(), { folder_id: 'f1' }],
     ]
     for (const [source, raw, config] of cases) {
       const writes = connectors[source].normalize(ctxFor(c, source, config), raw)

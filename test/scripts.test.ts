@@ -162,6 +162,8 @@ describe('scripts', () => {
     process.env.BCNS_OAUTH_CLIENT_ID = 'bcns-app'
     await expect(checklist('meet', 'UTC', { secret: '', refresh_secret: 'r', config: { oauth_client_id: 'bcns-app', folder_id: 'f' } }, json({})))
       .rejects.toThrow(/G1/)
+    await expect(checklist('drive', 'UTC', { secret: '', refresh_secret: 'r', config: { oauth_client_id: 'bcns-app', folder_id: 'f' } }, json({})))
+      .rejects.toThrow(/G1/)
     await expect(checklist('shopify', 'UTC', { secret: 'nope', config: { shop: 's' } }, json({}))).rejects.toThrow(/S1/)
     await expect(checklist('monday', 'UTC', { secret: 't', config: { board_id: '1' } }, json({ data: { boards: [{ columns: [{ id: 'c', title: 'Name', type: 'name' }] }] } })))
       .rejects.toThrow(/D1/)

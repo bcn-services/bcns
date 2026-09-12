@@ -36,7 +36,7 @@ export async function thumbnails(t: Tick): Promise<number> {
 
 export async function purge(t: Tick): Promise<number> {
   const doomed = await sql<{ id: string; storage_path: string | null; thumb_path: string | null }>(
-    `select id, storage_path, thumb_path from data.media where purge_after < now() limit 200`)
+    `select id, storage_path, thumb_path from data.media where deleted_at is not null and purge_after < now() limit 200`)
   if (doomed.rows.length) {
     const paths = doomed.rows.flatMap(m => [m.storage_path, m.thumb_path].filter((p): p is string => !!p))
     if (paths.length) await storage().remove(paths)

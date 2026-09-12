@@ -23,6 +23,9 @@ export async function refreshTokens(t: Tick): Promise<number> {
 }
 
 /** One cheap authenticated call per source; §5.4. */
+const google = (ctx: RunContext) => ctx.fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+  headers: { Authorization: `Bearer ${ctx.token.secret}` },
+})
 const PROBES: Record<Source, (ctx: RunContext) => Promise<Response>> = {
   shopify: ctx => ctx.fetch(`https://${ctx.config.shop}/admin/api/2026-07/graphql.json`, {
     method: 'POST',
@@ -35,9 +38,8 @@ const PROBES: Record<Source, (ctx: RunContext) => Promise<Response>> = {
     headers: { 'content-type': 'application/json', Authorization: ctx.token.secret },
     body: JSON.stringify({ query: '{ me { id } }' }),
   }),
-  meet: ctx => ctx.fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
-    headers: { Authorization: `Bearer ${ctx.token.secret}` },
-  }),
+  meet: google,
+  drive: google,
 }
 
 /** A token mis-classified during an outage recovers within an hour; a failure bumps updated_at so the probe stays hourly. */
