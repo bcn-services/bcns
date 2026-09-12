@@ -1,0 +1,7 @@
+.env*
+!.env.example
+fixtures/
+node_modules/
+.next/
+.vercel/
+.DS_Store
