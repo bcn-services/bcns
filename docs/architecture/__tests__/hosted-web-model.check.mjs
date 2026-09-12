@@ -14,7 +14,7 @@ const t = readFileSync(adr, "utf8");
 const required = [
   "$1,000", "$149", "$3,000", "$349", "$20", "15", "Part II",
   "DigitalOcean", "Cloudflare", "Supabase", "Stripe",
-  "@nseluga/app-core",
+  "@bcn-services/app-core",
 ];
 
 // Retired stack choices must not reappear as if current. The revision note is

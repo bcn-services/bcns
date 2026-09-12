@@ -1,3 +1,3 @@
-import { base } from "@nseluga/config/eslint/base";
+import { base } from "@bcn-services/config/eslint/base";
 
 export default base;

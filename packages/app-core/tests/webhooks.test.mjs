@@ -1,6 +1,6 @@
 /**
  * Tests for the generic webhook hygiene helpers (lib/webhooks.ts).
- * Run with: corepack pnpm --filter @nseluga/app-core test
+ * Run with: corepack pnpm --filter @bcn-services/app-core test
  *
  * Covers the two platform rules:
  *  - signature verification gates everything (fail-closed default rejects all)

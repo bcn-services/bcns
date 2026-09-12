@@ -6,9 +6,9 @@ Project-level guidance for Claude Code agents working in this repo.
 
 bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the droplet provisioning scripts. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
 - `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
-- `packages/ui/` — shared React component library (`@nseluga/ui`)
-- `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@nseluga/config`)
-- `packages/app-core/` — shared application core (`@nseluga/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
+- `packages/ui/` — shared React component library (`@bcn-services/ui`)
+- `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@bcn-services/config`)
+- `packages/app-core/` — shared application core (`@bcn-services/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
 - `infra/` — provisioning-as-code for the shared DigitalOcean droplet that hosts **client** apps (bootstrap, per-client onboarding, systemd unit, nightly backups). Nothing here touches `apps/web`.
 - `docs/architecture/` — ADRs. `hosted-web-model.md` is the hosted-web business/delivery decision.
 - `templates/` — placeholder for future app starters; **empty today**. The former `templates/hosted-web/` starter was deleted once its logic moved into `app-core@0.2.0`.
@@ -25,7 +25,7 @@ pnpm test             # test suites across all packages
 
 # Opt-in static export -> apps/web/out/ (plain files, nginx-servable, no Node).
 # Not the default: the default build is what Vercel runs.
-pnpm --filter @nseluga/web export
+pnpm --filter @bcn-services/web export
 pnpm format           # Prettier write
 pnpm format:check     # Prettier check (CI-safe)
 ```
@@ -45,7 +45,7 @@ All commands run from the repo root via Turborepo. There is no need to `cd` into
 - `ui/` — primitive shadcn-style components (input, label, textarea)
 - `theme-provider.tsx`, `theme-toggle.tsx` — dark mode via next-themes
 
-**Shared UI (`packages/ui/`):** Shared React primitives used by `apps/web` and any future client apps. Import as `@nseluga/ui`. Add to this package when a component will be reused across apps.
+**Shared UI (`packages/ui/`):** Shared React primitives used by `apps/web` and any future client apps. Import as `@bcn-services/ui`. Add to this package when a component will be reused across apps.
 
 **Shared config (`packages/config/`):** All ESLint, tsconfig base, Tailwind preset, Prettier config. `apps/web` extends these — do not duplicate config in app-level files.
 
@@ -73,7 +73,7 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 Client apps are **not** added to this monorepo. Each new client business gets **its own repo**. See `docs/architecture/hosted-web-model.md` for the decision and rationale.
 
 1. Create the new repo and wire it against the shared packages by hand. **There is no starter template today** — `templates/hosted-web/` was deleted once its logic moved into `app-core@0.2.0`, and its replacement (a standalone GitHub Template Repository) does not exist yet.
-2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
+2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@bcn-services/ui`, `@bcn-services/config`, and `@bcn-services/app-core`.
 3. Propagate shared improvements by publishing a new package version and bumping it in each client repo — no copy-paste, no hand-editing per app.
 
 `apps/` in this monorepo holds only the platform repo's own app — the marketing site (`apps/web`). DeLuca's was extracted to its own repo (`bcns-client-delucas`).

@@ -1,4 +1,4 @@
-// Static export is OPT-IN via BUILD_STATIC_EXPORT=1 (`pnpm --filter @nseluga/web export`).
+// Static export is OPT-IN via BUILD_STATIC_EXPORT=1 (`pnpm --filter @bcn-services/web export`).
 // It is not the default because the default build is what Vercel runs, and
 // `output: "export"` forces `images.unoptimized`, which would ship the
 // case-study screenshots at full size on the live site for no benefit.
@@ -12,7 +12,7 @@ const staticExport = process.env.BUILD_STATIC_EXPORT === "1";
 const nextConfig = {
   reactStrictMode: true,
   // Compile the shared workspace UI package from source.
-  transpilePackages: ["@nseluga/ui"],
+  transpilePackages: ["@bcn-services/ui"],
   ...(staticExport ? { output: "export", images: { unoptimized: true } } : {}),
 };
 

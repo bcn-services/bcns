@@ -4,10 +4,10 @@ Project-specific efficiency, reliability, and resilience conventions observed in
 
 ## Platform Repo & Shared Packages
 
-- **Shared packages publish to GitHub Packages.** `@nseluga/app-core`, `@nseluga/ui`, `@nseluga/config` are published (private) to `npm.pkg.github.com`; each carries a `publishConfig.registry` and a `files` list that ships its source. Bump the version and `pnpm -r publish --no-git-checks` to propagate; client repos consume by semver range, never `workspace:*`.
-- **Packages ship raw TypeScript, no build step.** Consumers must transpile them — Next apps via `transpilePackages`, Vite/Electron apps by aliasing `@nseluga/ui` to the installed `src` entry. Do not add a compile step without also updating every consumer.
+- **Shared packages publish to GitHub Packages.** `@bcn-services/app-core`, `@bcn-services/ui`, `@bcn-services/config` are published (private) to `npm.pkg.github.com`; each carries a `publishConfig.registry` and a `files` list that ships its source. Bump the version and `pnpm -r publish --no-git-checks` to propagate; client repos consume by semver range, never `workspace:*`.
+- **Packages ship raw TypeScript, no build step.** Consumers must transpile them — Next apps via `transpilePackages`, Vite/Electron apps by aliasing `@bcn-services/ui` to the installed `src` entry. Do not add a compile step without also updating every consumer.
 - **Installs require a classic PAT** with `read:packages` — the `gh` CLI OAuth token can publish but 403s on downloads. Auth lives in the machine's `~/.npmrc` (or `GITHUB_TOKEN` env), never committed.
-- **Scope = account owner (temporary).** The `@nseluga` scope exists only because GitHub Packages ties npm scope to the owning account; migrating to a `bcns` org (rename `@nseluga/*` → `@bcns/*`) is deferred. The `@bcns` brand lives in repo names, not the package scope.
+- **Scope = account owner.** The `@bcn-services` scope matches the `bcn-services` GitHub org that owns this repo, which is what GitHub Packages requires.
 
 ## Electron Security
 

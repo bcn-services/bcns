@@ -1,5 +1,5 @@
 {
-  "extends": "@nseluga/config/tsconfig/react-library.json",
+  "extends": "@bcn-services/config/tsconfig/react-library.json",
   "compilerOptions": {
     "baseUrl": "."
   },

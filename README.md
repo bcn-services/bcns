@@ -18,9 +18,9 @@ bcns/
 ├─ apps/              # Platform-owned apps only (not client apps)
 │  └─ web/            # The landing website (Next.js App Router + TS + Tailwind)
 ├─ packages/
-│  ├─ ui/             # Shared React component library (@nseluga/ui)
-│  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@nseluga/config)
-│  └─ app-core/       # @nseluga/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client + AI opt-in gate, health probe, webhook hygiene, storage interface
+│  ├─ ui/             # Shared React component library (@bcn-services/ui)
+│  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@bcn-services/config)
+│  └─ app-core/       # @bcn-services/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client + AI opt-in gate, health probe, webhook hygiene, storage interface
 ├─ package.json       # Root scripts + workspace dev dependencies
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
@@ -33,8 +33,8 @@ bcns/
 - **[Next.js](https://nextjs.org/) 14 (App Router) + TypeScript (strict)** — the site.
 - **[Tailwind CSS](https://tailwindcss.com/)** with dark-mode-ready HSL theme tokens.
 - **shadcn/ui-style components** + **[Lucide](https://lucide.dev/) icons**, with
-  shared primitives living in `@nseluga/ui`.
-- **ESLint (flat config) + Prettier**, shared from `@nseluga/config` and
+  shared primitives living in `@bcn-services/ui`.
+- **ESLint (flat config) + Prettier**, shared from `@bcn-services/config` and
   runnable from the repo root via Turbo.
 
 ---
@@ -114,7 +114,7 @@ This is a pnpm monorepo, so the deploy hinges on one project setting:
 Leave everything else on auto-detect. Vercel reads the Next.js preset from
 `apps/web`, and because "Include files outside the Root Directory" is on by
 default, it still installs from the workspace root (`pnpm-lock.yaml`,
-`pnpm-workspace.yaml`) so `@nseluga/ui` and `@nseluga/config` resolve.
+`pnpm-workspace.yaml`) so `@bcn-services/ui` and `@bcn-services/config` resolve.
 
 There is deliberately **no `vercel.json`**. A root-level one is ignored once the
 Root Directory is a subdirectory, and overriding `outputDirectory` to
@@ -149,7 +149,7 @@ for the full delivery model and rationale.
 1. Generate a new repo from `bcns-app-template` — pre-wired to the hosting
    stack and shared packages.
 2. Consume the shared packages **by version** (normal dependencies, not
-   `workspace:*`): `@nseluga/ui`, `@nseluga/config`, and `@nseluga/app-core`.
+   `workspace:*`): `@bcn-services/ui`, `@bcn-services/config`, and `@bcn-services/app-core`.
 3. Propagate shared improvements by publishing a new package version and bumping
    it in each client repo — no copy-paste per app.
 

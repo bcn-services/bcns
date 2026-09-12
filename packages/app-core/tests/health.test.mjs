@@ -1,6 +1,6 @@
 /**
  * Tests for the pure health evaluation (lib/health.ts).
- * Run with: corepack pnpm --filter @nseluga/app-core test
+ * Run with: corepack pnpm --filter @bcn-services/app-core test
  *
  * Covers the template contract for /api/health:
  *  - no Supabase env → ok:true, db:"unconfigured" (keyless runs never look down)
