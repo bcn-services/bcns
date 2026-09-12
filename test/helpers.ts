@@ -42,7 +42,7 @@ export const mediaId = (client: keyof typeof CLIENTS, n: 1 | 2 | 3) =>
 export const origPath = (client: keyof typeof CLIENTS, n: 1 | 2 | 3) => `${CLIENTS[client]}/orig/${mediaId(client, n)}.png`
 export const thumbPath = (client: keyof typeof CLIENTS, n: 1 | 2 | 3) => `${CLIENTS[client]}/thumb/${mediaId(client, n)}.jpg`
 
-const opts = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+const opts = { db: { schema: 'api' }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
 
 export function anonClient(): SupabaseClient {
   return createClient(SUPABASE_URL, localKeys().anon, opts)
@@ -97,3 +97,50 @@ export async function apiViews(): Promise<string[]> {
 /** 1x1 PNG bytes for upload tests. */
 export const PNG_1x1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+
+/**
+ * One argument builder per api RPC, every id pointing at seeded `beta` rows. Used by the
+ * cross-tenant and no-claim tests; a new RPC without an entry fails `rpc_every_write_scoped`.
+ * `expect`: 'BCNS3'/'BCNS4' — single-id RPC must raise that code; 'ignored' — array RPC must return 0 / touch nothing;
+ * 'none' — RPC has no id argument, beta rows must simply stay unchanged.
+ */
+export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: 'BCNS3' | 'BCNS4' | 'ignored' | 'none' }> = {
+  save_record: { args: { kind: 'note', attributes: {}, external_id: 'rec-0', title: 'x' }, expect: 'none' },
+  delete_record: { args: { record_id: null }, expect: 'BCNS4' }, // record_id filled at runtime
+  register_upload: { args: { path: origPath('beta', 1) }, expect: 'BCNS3' }, // foreign prefix fails path validation before lookup
+  update_media: { args: { media_id: mediaId('beta', 1), title: 'x' }, expect: 'BCNS4' },
+  bulk_tag: { args: { media_ids: [mediaId('beta', 1), mediaId('beta', 2)], add: ['x'] }, expect: 'ignored' },
+  delete_media: { args: { media_ids: [mediaId('beta', 1), mediaId('beta', 2)] }, expect: 'ignored' },
+  restore_media: { args: { media_ids: [mediaId('beta', 1), mediaId('beta', 2)] }, expect: 'ignored' },
+  create_media_set: { args: { name: 'rpc-scoped-test' }, expect: 'none' },
+  update_media_set: { args: { set_id: null, name: 'x' }, expect: 'BCNS4' }, // set_id filled at runtime
+  delete_media_set: { args: { set_id: null }, expect: 'BCNS4' },
+  set_media_set_items: { args: { set_id: null, media_ids: [mediaId('beta', 1)], action: 'remove' }, expect: 'BCNS4' },
+  download_url: { args: { media_id: mediaId('beta', 1) }, expect: 'BCNS4' },
+  report_dashboard_version: { args: { app_version: '0', api_version: 'v1' }, expect: 'none' },
+  remove_member: { args: { target_user_id: USERS.betaMember.id }, expect: 'BCNS4' },
+}
+
+/** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
+export async function betaRpcArgs() {
+  const rec = await sql(`select id from data.records where client_id = $1 and source = 'dashboard' limit 1`, [CLIENTS.beta])
+  const set = await sql(`select id from data.media_sets where client_id = $1 order by name limit 1`, [CLIENTS.beta])
+  const out = structuredClone(RPC_ARGS)
+  out.delete_record.args.record_id = rec.rows[0].id
+  for (const k of ['update_media_set', 'delete_media_set', 'set_media_set_items']) out[k].args.set_id = set.rows[0].id
+  return out
+}
+
+/** Snapshot of beta's mutable rows for "unchanged" assertions. */
+export async function betaSnapshot() {
+  const r = await sql(`select
+    (select count(*)||'/'||coalesce(max(updated_at)::text,'') from data.records where client_id = $1) records,
+    (select count(*)||'/'||coalesce(max(updated_at)::text,'') from data.media where client_id = $1) media,
+    (select count(*)||'/'||coalesce(max(updated_at)::text,'') from data.media_sets where client_id = $1) media_sets,
+    (select count(*) from data.media_set_items where client_id = $1) media_set_items,
+    (select count(*) from data.memberships where client_id = $1) memberships,
+    (select count(*) from data.dashboard_versions where client_id = $1) dashboard_versions,
+    (select count(*)||'/'||coalesce(sum(bytes),0) from data.egress_ledger where client_id = $1) egress,
+    (select count(*) from data.download_tickets where client_id = $1) tickets`, [CLIENTS.beta])
+  return r.rows[0]
+}
