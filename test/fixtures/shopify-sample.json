@@ -1,0 +1,482 @@
+{
+  "shop": {
+    "data": {
+      "shop": {
+        "currencyCode": "USD",
+        "ianaTimezone": "America/New_York"
+      }
+    },
+    "extensions": {
+      "cost": {
+        "requestedQueryCost": 10,
+        "throttleStatus": {
+          "maximumAvailable": 2000,
+          "currentlyAvailable": 1990,
+          "restoreRate": 100
+        }
+      }
+    }
+  },
+  "orders": {
+    "data": {
+      "orders": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "order-cursor-1"
+        },
+        "nodes": [
+          {
+            "id": "gid://shopify/Order/500001",
+            "name": "#1001",
+            "createdAt": "2026-09-02T10:00:00Z",
+            "updatedAt": "2026-09-02T11:00:00Z",
+            "processedAt": "2026-09-02T10:05:00Z",
+            "cancelledAt": null,
+            "displayFinancialStatus": "PAID",
+            "displayFulfillmentStatus": "FULFILLED",
+            "currencyCode": "USD",
+            "totalPriceSet": {
+              "shopMoney": {
+                "amount": "101.00",
+                "currencyCode": "USD"
+              }
+            },
+            "currentTotalPriceSet": {
+              "shopMoney": {
+                "amount": "101.00",
+                "currencyCode": "USD"
+              }
+            },
+            "customer": {
+              "id": "gid://shopify/Customer/700001",
+              "email": "buyer1@example.test",
+              "displayName": "Buyer 1"
+            },
+            "lineItems": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/LineItem/900001",
+                  "title": "Product 1",
+                  "sku": "SKU-001",
+                  "quantity": 2,
+                  "discountedTotalSet": {
+                    "shopMoney": {
+                      "amount": "101.00"
+                    }
+                  }
+                }
+              ]
+            },
+            "refunds": []
+          },
+          {
+            "id": "gid://shopify/Order/500002",
+            "name": "#1002",
+            "createdAt": "2026-09-03T10:00:00Z",
+            "updatedAt": "2026-09-03T11:00:00Z",
+            "processedAt": "2026-09-03T10:05:00Z",
+            "cancelledAt": null,
+            "displayFinancialStatus": "PAID",
+            "displayFulfillmentStatus": "FULFILLED",
+            "currencyCode": "USD",
+            "totalPriceSet": {
+              "shopMoney": {
+                "amount": "102.00",
+                "currencyCode": "USD"
+              }
+            },
+            "currentTotalPriceSet": {
+              "shopMoney": {
+                "amount": "102.00",
+                "currencyCode": "USD"
+              }
+            },
+            "customer": {
+              "id": "gid://shopify/Customer/700002",
+              "email": "buyer2@example.test",
+              "displayName": "Buyer 2"
+            },
+            "lineItems": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/LineItem/900002",
+                  "title": "Product 2",
+                  "sku": "SKU-002",
+                  "quantity": 3,
+                  "discountedTotalSet": {
+                    "shopMoney": {
+                      "amount": "102.00"
+                    }
+                  }
+                }
+              ]
+            },
+            "refunds": []
+          },
+          {
+            "id": "gid://shopify/Order/500003",
+            "name": "#1003",
+            "createdAt": "2026-09-04T10:00:00Z",
+            "updatedAt": "2026-09-04T11:00:00Z",
+            "processedAt": "2026-09-04T10:05:00Z",
+            "cancelledAt": null,
+            "displayFinancialStatus": "PAID",
+            "displayFulfillmentStatus": "FULFILLED",
+            "currencyCode": "USD",
+            "totalPriceSet": {
+              "shopMoney": {
+                "amount": "103.00",
+                "currencyCode": "USD"
+              }
+            },
+            "currentTotalPriceSet": {
+              "shopMoney": {
+                "amount": "103.00",
+                "currencyCode": "USD"
+              }
+            },
+            "customer": {
+              "id": "gid://shopify/Customer/700003",
+              "email": "buyer3@example.test",
+              "displayName": "Buyer 3"
+            },
+            "lineItems": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/LineItem/900003",
+                  "title": "Product 3",
+                  "sku": "SKU-003",
+                  "quantity": 1,
+                  "discountedTotalSet": {
+                    "shopMoney": {
+                      "amount": "103.00"
+                    }
+                  }
+                }
+              ]
+            },
+            "refunds": []
+          },
+          {
+            "id": "gid://shopify/Order/500004",
+            "name": "#1004",
+            "createdAt": "2026-09-05T10:00:00Z",
+            "updatedAt": "2026-09-05T11:00:00Z",
+            "processedAt": "2026-09-05T10:05:00Z",
+            "cancelledAt": null,
+            "displayFinancialStatus": "PAID",
+            "displayFulfillmentStatus": "FULFILLED",
+            "currencyCode": "USD",
+            "totalPriceSet": {
+              "shopMoney": {
+                "amount": "104.00",
+                "currencyCode": "USD"
+              }
+            },
+            "currentTotalPriceSet": {
+              "shopMoney": {
+                "amount": "104.00",
+                "currencyCode": "USD"
+              }
+            },
+            "customer": {
+              "id": "gid://shopify/Customer/700004",
+              "email": "buyer4@example.test",
+              "displayName": "Buyer 4"
+            },
+            "lineItems": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/LineItem/900004",
+                  "title": "Product 4",
+                  "sku": "SKU-004",
+                  "quantity": 2,
+                  "discountedTotalSet": {
+                    "shopMoney": {
+                      "amount": "104.00"
+                    }
+                  }
+                }
+              ]
+            },
+            "refunds": []
+          },
+          {
+            "id": "gid://shopify/Order/500005",
+            "name": "#1005",
+            "createdAt": "2026-09-06T10:00:00Z",
+            "updatedAt": "2026-09-06T11:00:00Z",
+            "processedAt": "2026-09-06T10:05:00Z",
+            "cancelledAt": null,
+            "displayFinancialStatus": "PAID",
+            "displayFulfillmentStatus": "FULFILLED",
+            "currencyCode": "USD",
+            "totalPriceSet": {
+              "shopMoney": {
+                "amount": "105.00",
+                "currencyCode": "USD"
+              }
+            },
+            "currentTotalPriceSet": {
+              "shopMoney": {
+                "amount": "105.00",
+                "currencyCode": "USD"
+              }
+            },
+            "customer": {
+              "id": "gid://shopify/Customer/700005",
+              "email": "buyer5@example.test",
+              "displayName": "Buyer 5"
+            },
+            "lineItems": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/LineItem/900005",
+                  "title": "Product 5",
+                  "sku": "SKU-005",
+                  "quantity": 3,
+                  "discountedTotalSet": {
+                    "shopMoney": {
+                      "amount": "105.00"
+                    }
+                  }
+                }
+              ]
+            },
+            "refunds": [
+              {
+                "id": "gid://shopify/Refund/800005",
+                "createdAt": "2026-09-06T12:00:00Z",
+                "totalRefundedSet": {
+                  "shopMoney": {
+                    "amount": "10.00",
+                    "currencyCode": "USD"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "extensions": {
+      "cost": {
+        "requestedQueryCost": 10,
+        "throttleStatus": {
+          "maximumAvailable": 2000,
+          "currentlyAvailable": 1990,
+          "restoreRate": 100
+        }
+      }
+    }
+  },
+  "products": {
+    "data": {
+      "products": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "product-cursor-1"
+        },
+        "nodes": [
+          {
+            "id": "gid://shopify/Product/300001",
+            "title": "Product 1",
+            "handle": "product-1",
+            "status": "ACTIVE",
+            "vendor": "Vendor 1",
+            "productType": "Widget",
+            "updatedAt": "2026-09-02T08:00:00Z",
+            "featuredMedia": {
+              "preview": {
+                "image": {
+                  "url": "https://cdn.example.test/product-1.jpg"
+                }
+              }
+            },
+            "variants": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/ProductVariant/400001",
+                  "sku": "SKU-001",
+                  "title": "Default",
+                  "price": "20.99",
+                  "inventoryQuantity": 11
+                }
+              ]
+            }
+          },
+          {
+            "id": "gid://shopify/Product/300002",
+            "title": "Product 2",
+            "handle": "product-2",
+            "status": "ACTIVE",
+            "vendor": "Vendor 1",
+            "productType": "Widget",
+            "updatedAt": "2026-09-03T08:00:00Z",
+            "featuredMedia": {
+              "preview": {
+                "image": {
+                  "url": "https://cdn.example.test/product-2.jpg"
+                }
+              }
+            },
+            "variants": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/ProductVariant/400002",
+                  "sku": "SKU-002",
+                  "title": "Default",
+                  "price": "21.99",
+                  "inventoryQuantity": 12
+                }
+              ]
+            }
+          },
+          {
+            "id": "gid://shopify/Product/300003",
+            "title": "Product 3",
+            "handle": "product-3",
+            "status": "ACTIVE",
+            "vendor": "Vendor 1",
+            "productType": "Widget",
+            "updatedAt": "2026-09-04T08:00:00Z",
+            "featuredMedia": {
+              "preview": {
+                "image": {
+                  "url": "https://cdn.example.test/product-3.jpg"
+                }
+              }
+            },
+            "variants": {
+              "nodes": [
+                {
+                  "id": "gid://shopify/ProductVariant/400003",
+                  "sku": "SKU-003",
+                  "title": "Default",
+                  "price": "22.99",
+                  "inventoryQuantity": 13
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "extensions": {
+      "cost": {
+        "requestedQueryCost": 10,
+        "throttleStatus": {
+          "maximumAvailable": 2000,
+          "currentlyAvailable": 1990,
+          "restoreRate": 100
+        }
+      }
+    }
+  },
+  "payouts": {
+    "data": {
+      "shopifyPaymentsAccount": {
+        "payouts": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "payout-cursor-1"
+          },
+          "nodes": [
+            {
+              "id": "gid://shopify/ShopifyPaymentsPayout/600001",
+              "issuedAt": "2026-09-01T00:00:00Z",
+              "status": "PAID",
+              "transactionType": "DEPOSIT",
+              "net": {
+                "amount": "501.00",
+                "currencyCode": "USD"
+              },
+              "summary": {
+                "chargesGross": {
+                  "amount": "551.00"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/ShopifyPaymentsPayout/600002",
+              "issuedAt": "2026-09-02T00:00:00Z",
+              "status": "PAID",
+              "transactionType": "DEPOSIT",
+              "net": {
+                "amount": "502.00",
+                "currencyCode": "USD"
+              },
+              "summary": {
+                "chargesGross": {
+                  "amount": "552.00"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "extensions": {
+      "cost": {
+        "requestedQueryCost": 10,
+        "throttleStatus": {
+          "maximumAvailable": 2000,
+          "currentlyAvailable": 1990,
+          "restoreRate": 100
+        }
+      }
+    }
+  },
+  "inventory": {
+    "data": {
+      "products": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "id": "gid://shopify/Product/300001",
+            "variants": {
+              "nodes": [
+                {
+                  "inventoryQuantity": 11
+                }
+              ]
+            }
+          },
+          {
+            "id": "gid://shopify/Product/300002",
+            "variants": {
+              "nodes": [
+                {
+                  "inventoryQuantity": 12
+                }
+              ]
+            }
+          },
+          {
+            "id": "gid://shopify/Product/300003",
+            "variants": {
+              "nodes": [
+                {
+                  "inventoryQuantity": 13
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "extensions": {
+      "cost": {
+        "requestedQueryCost": 10,
+        "throttleStatus": {
+          "maximumAvailable": 2000,
+          "currentlyAvailable": 1990,
+          "restoreRate": 100
+        }
+      }
+    }
+  }
+}

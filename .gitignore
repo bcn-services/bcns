@@ -1,6 +1,7 @@
 .env*
 !.env.example
-fixtures/
+# real client samples; repo root only, test/fixtures is synthetic and committed
+/fixtures/
 node_modules/
 dist/
 .next/
