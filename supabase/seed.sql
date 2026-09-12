@@ -39,7 +39,7 @@ insert into data.memberships (user_id, client_id, role, is_smoke) values
 -- connectors: schedule + placeholder tokens + never_ran health
 insert into data.connector_schedule (client_id, source, interval, backfill_from, config) values
   ('a0000000-0000-4000-8000-000000000001', 'shopify', '15 minutes', current_date - 90, '{"shop":"acme-test.myshopify.com"}'),
-  ('a0000000-0000-4000-8000-000000000001', 'meta',    '1 hour',     current_date - 90, '{"ad_account_id":"act_1"}'),
+  ('a0000000-0000-4000-8000-000000000001', 'meta',    '1 hour',     current_date - 90, '{"act_id":"act_1"}'),
   ('a0000000-0000-4000-8000-000000000001', 'monday',  '15 minutes', current_date - 90, '{"board_id":"1001"}'),
   ('a0000000-0000-4000-8000-000000000001', 'meet',    '1 hour',     current_date - 90, '{"folder_id":"f1"}'),
   ('b0000000-0000-4000-8000-000000000001', 'shopify', '15 minutes', current_date - 90, '{"shop":"beta-test.myshopify.com"}'),

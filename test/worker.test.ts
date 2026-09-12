@@ -265,8 +265,6 @@ describe('worker', () => {
   })
 
   it('worker_isolation', async () => {
-    await sql(`update data.connector_schedule set config = '{"act_id":"act_1"}'::jsonb
-               where client_id = $1 and source = 'meta'`, [CLIENTS.acme])
     await due(CLIENTS.acme, 'shopify'); await due(CLIENTS.acme, 'meta'); await due(CLIENTS.beta, 'shopify')
 
     const fetch = stub((url, body) =>

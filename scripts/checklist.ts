@@ -40,8 +40,8 @@ export async function checklist(source: Source, tz: string, c: Creds, fetch: Fet
     const g = 'https://graph.facebook.com/v21.0'
     const dbg: any = await (await fetch(`${g}/debug_token?input_token=${c.secret}&access_token=${c.secret}`)).json()
     if (dbg.data?.type !== 'SYSTEM_USER') throw new Error(`M1: token type ${dbg.data?.type ?? 'unknown'}, need SYSTEM_USER`)
-    const acct: any = await (await fetch(`${g}/act_${c.config.act_id}?fields=timezone_name,currency&access_token=${c.secret}`)).json()
-    if (acct.error || !acct.timezone_name) throw new Error(`M2: act_${c.config.act_id} not readable (${acct.error?.message ?? 'no ads_read'})`)
+    const acct: any = await (await fetch(`${g}/${c.config.act_id}?fields=timezone_name,currency&access_token=${c.secret}`)).json()
+    if (acct.error || !acct.timezone_name) throw new Error(`M2: ${c.config.act_id} not readable (${acct.error?.message ?? 'no ads_read'})`)
     config.account_timezone = acct.timezone_name; config.currency = acct.currency
     warnTz('M3', acct.timezone_name)
   }

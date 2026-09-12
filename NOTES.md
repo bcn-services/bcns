@@ -62,3 +62,25 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - Canonical tables reference `clients` without `on delete cascade` (§1.4 is silent); `hard-delete` deletes them explicitly, in dependency order.
 - `@nseluga/data-client`: `createDataClient` takes an optional `accessToken` (the template's own auth session) since §8 says the returned object exposes nothing else; `thumbUrls` signs for 300 s and returns a path→url map; `health()` returns the `client_v1` row.
 - `pnpm db:types` uses `--db-url` against 54322 (the CLI's `--local` type-gen container cannot reach the db here).
+- Worker sharding: `hashtext()` is signed, so the predicate is `((hashtext(client_id::text) % n) + n) % n`; plain `%` would starve half the shards.
+- §5.5 "zero rows from a full-list source" is judged at run level (`connector_runs.rows_fetched`) for monday/meta only; there is no per-entity row count column.
+- Meta maps `campaign` and `ad` into `records`, so the table's tombstones fire only once every contributing entity reported `entityDone`.
+- DESIGN never releases the housekeeping lease; `tick()` expires it at the end (owner kept) so the next tick in the same minute can take it.
+- `RunContext` gets read-only lookups (`hasMetricToday`, `knownMedia`, `mergeConfig`) as injected closures, not a pool handle, per §4.1.
+- Per-source `minDelayMs` is skipped when a transport is injected (tests), so suites don't sleep per Meta page.
+- Optional env `BCNS_ALERT_FROM` (defaults to `BCNS_ALERT_EMAIL`).
+- `.gitignore` `fixtures/` → `/fixtures/`: real client samples at repo root stay ignored, synthetic `test/fixtures/` commits (CI imports it).
+- `worker/Dockerfile` pins `pnpm@10` via npm; corepack resolves pnpm 11, whose `minimumReleaseAge` rejects the lockfile in a clean container. Matches CI's `pnpm/action-setup {version: 10}`.
+- Seeded `connector_schedule.next_run_at` defaults to `now()`; worker/connector suites push seeded rows a day out in `beforeAll` and restore in `afterAll`.
+- `health_one_row` asserts per `status = 'active'` client (§5.5 skips paused/churned) plus a global no-duplicate check.
+- Meta config key is `act_id` with the `act_` prefix in the value (§4.3 example `act_123`); seed and checklist corrected from `ad_account_id` / `act_${id}`.
+- Meet `parseNotes` beyond the "Notes by Gemini" suffix strip is `it.todo` (§4.5 N3, no real sample).
+
+## Needs Nate
+
+1. Spaces: create bucket `bcns-exports` and provide `SPACES_ENDPOINT/REGION/KEY/SECRET` for `hard-delete` archives (CI/tests use `EXPORT_ARCHIVE_DIR`).
+2. `BCNS_OAUTH_CLIENT_ID`: the bcns Google OAuth client id, so onboarding's G1 check can refuse it.
+3. `deploy-worker.yml`: WIF provider + service-account secrets, `GCP_PROJECT`/`GCP_REGION`/`TASK_COUNT` vars, Artifact Registry repo `bcns`, and a pre-created Cloud Run job `bcns-data-worker` (the workflow runs `jobs update`, not `create`). Never run here.
+4. `onboard` / `rotate-smoke`: which password manager and which dashboard repo receive the smoke credentials; today they print once.
+5. Meet §4.5 N3: one real "Notes by Gemini" doc to finish `parseNotes` participants/title.
+6. Hosted project: `RESEND_API_KEY`, `BCNS_ALERT_EMAIL`, and enabling the custom access token hook on the hosted project (config.toml only wires it locally).

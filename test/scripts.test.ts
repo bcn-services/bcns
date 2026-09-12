@@ -148,7 +148,7 @@ describe('scripts', () => {
 
   it('§9 checklist refuses a Meta USER token and a bcns Google client, accepts a system user', async () => {
     const json = (body: unknown) => async () => new Response(JSON.stringify(body), { status: 200 })
-    await expect(checklist('meta', 'America/New_York', { secret: 't', config: { act_id: '1' } }, json({ data: { type: 'USER' } })))
+    await expect(checklist('meta', 'America/New_York', { secret: 't', config: { act_id: 'act_1' } }, json({ data: { type: 'USER' } })))
       .rejects.toThrow(/M1/)
     const calls: string[] = []
     const metaOk = async (url: string | URL | Request) => {
@@ -156,7 +156,7 @@ describe('scripts', () => {
       return new Response(JSON.stringify(String(url).includes('debug_token')
         ? { data: { type: 'SYSTEM_USER' } } : { timezone_name: 'America/Los_Angeles', currency: 'USD' }))
     }
-    const v = await checklist('meta', 'America/New_York', { secret: 't', config: { act_id: '1' } }, metaOk as typeof fetch)
+    const v = await checklist('meta', 'America/New_York', { secret: 't', config: { act_id: 'act_1' } }, metaOk as typeof fetch)
     expect(v.config).toEqual({ account_timezone: 'America/Los_Angeles', currency: 'USD' })
     expect(v.warnings[0]).toMatch(/^M3/)
     process.env.BCNS_OAUTH_CLIENT_ID = 'bcns-app'
