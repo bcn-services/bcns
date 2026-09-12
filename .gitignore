@@ -2,6 +2,7 @@
 !.env.example
 fixtures/
 node_modules/
+dist/
 .next/
 .vercel/
 .DS_Store
