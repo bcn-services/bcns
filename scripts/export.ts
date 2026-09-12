@@ -41,14 +41,14 @@ export async function exportClient(db: pg.Pool, clientId: string, out: string): 
       await conn.query(`declare raw_cur no scroll cursor for select * from data.${part} where client_id = $1 order by fetched_at`, [clientId])
       for (;;) {
         const page = await conn.query('fetch 1000 from raw_cur')
-        for (const row of page.rows) if (!jsonl.write(JSON.stringify(row) + '\n')) await new Promise((res) => jsonl.once('drain', res))
+        for (const row of page.rows) if (!jsonl.write(JSON.stringify(row) + '\n')) await new Promise<void>((res) => jsonl.once('drain', () => res()))
         if (page.rows.length < 1000) break
       }
       await conn.query('commit')
     }
   } finally {
     conn.release()
-    await new Promise((res) => jsonl.end(res))
+    await new Promise<void>((res) => jsonl.end(() => res()))
   }
 
   // files/: every original this client still has in Storage.
