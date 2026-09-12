@@ -53,7 +53,7 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - `anon_key_zero` / `no_claim_zero_rows`: anon holds no grant on `api`, so PostgREST answers 42501 (permission denied) rather than 0 rows / BCNS0 — tests accept either; still zero data.
 - `register_upload` on a foreign-tenant path raises BCNS3 (prefix regex) before the BCNS4 lookup; `rpc_every_write_scoped` expects BCNS3 for it.
 - Seed writes `storage.objects` metadata rows for the 3 media/client (no bytes) — sign/ticket tests only need catalog rows; `storage_prefix_isolation` uploads a real 1×1 PNG.
-- Local stack is Postgres 15 (`config.toml` `major_version = 15`); production project version should match before `db push`.
+- Local stack and CI are Postgres 17 (`config.toml` `major_version = 17`), matching the hosted project (`cnsxbglhredokjbvudfd`, PG17).
 - Local `supabase start` excludes studio/realtime/edge-runtime/logflare/vector/imgproxy/mailpit/supavisor; CI uses the same list. Worker tests use the direct 54322 URL (no local pooler).
 - Fixtures: `fixtures/` is gitignored (real samples), so connector tests ship synthetic pages under `test/fixtures/`.
 - `deploy-worker.yml` written but never run (guardrail: no GCP deploys); needs the WIF secrets/vars listed in its header.

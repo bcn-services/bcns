@@ -4,7 +4,7 @@ Implements `REQUIREMENTS.md` (R1–R39). Every table, policy, view, RPC, connect
 specified here so the build session makes no design calls. Section 10 maps each requirement to its
 section. Section 11 ("Needs Nate") lists what this document could not decide.
 
-Conventions: Postgres 15 on the shared Supabase Pro project. Base tables live in schema **`data`**;
+Conventions: Postgres 17 on the shared Supabase Pro project. Base tables live in schema **`data`**;
 the dashboard-facing contract lives in schema **`api`**; PostgREST exposes **`api` only**. All
 timestamps are `timestamptz`; day buckets are `date` in the client's timezone; money is
 `amount_minor bigint` + `currency char(3)`. `client_id` is the first column of every primary key,
