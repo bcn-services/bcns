@@ -23,15 +23,18 @@ process.env.EXPORT_ARCHIVE_DIR = archiveDir
 afterAll(async () => {
   // Best-effort: remove the throwaway client even if an earlier assertion failed mid-suite.
   try {
-    await sql(`update data.clients set status = 'churned', churned_at = now() - interval '91 days' where slug = $1`, [SLUG])
+    // Two statements: the churn trigger stamps churned_at = now() whenever status flips, so back-dating must come after.
+    await sql(`update data.clients set status = 'churned' where slug = $1`, [SLUG])
+    await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG])
     await hardDelete(['--slug', SLUG, '--confirm', SLUG])
-  } catch {
-    /* already gone or never created */
+  } catch (e) {
+    console.error('cleanup', SLUG, String(e)) // already gone or never created
   }
   try {
-    await sql(`update data.clients set status = 'churned', churned_at = now() - interval '91 days' where slug = $1`, [SLUG2])
+    await sql(`update data.clients set status = 'churned' where slug = $1`, [SLUG2])
+    await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG2])
     await hardDelete(['--slug', SLUG2, '--confirm', SLUG2])
-  } catch { /* same */ }
+  } catch (e) { console.error('cleanup', SLUG2, String(e)) }
   rmSync(archiveDir, { recursive: true, force: true })
 })
 
