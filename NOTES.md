@@ -35,3 +35,9 @@ One line per decision or finding resolved. Design calls D1–D20 live in DESIGN.
 - Renormalize keyset-paginates `raw_latest` under its own lease (F34).
 - New CI tests: `owner_bypassrls`, `function_privileges`, `hook_mints_claims`, `rpc_every_write_scoped`, `member_cannot_remove`, `owner_cross_tenant_remove`, `anon_key_zero`, `internal_tables_unreachable`, `thumb_prefix_cross_tenant`, `download_ticket_required`, `raw_dedupe`, `tombstone_only_on_done`, `stale_no_false_alarm`, `alert_retry`, `housekeeping_single_holder`, `lease_reap`, `token_refresh_once`; third seeded client `gamma` (paused).
 - Needs Nate unchanged: N1–N4, each with the design's default stated (—, accept+warn, provisional, script).
+
+## Nate's decisions (2026-09-13)
+
+- N1: "—" in W2; GA4 connector post-launch if Declan has GA4, else checkout-conversion tile from abandoned checkouts. Conversion = orders ÷ visits; Shopify API exposes no visit count.
+- N2: accept, America/New_York. N3: Meet provisional, yes. N4: add-user script, yes.
+- Design approved; W2 build may start from commit below.

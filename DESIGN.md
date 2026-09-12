@@ -1307,9 +1307,18 @@ Recorded by `scripts/onboard`; a failed item stops the script.
 | R12 | §1.4 `daily_metrics` entity columns | R25 | §1.2, §5.3 | R38 | §8 |
 | R13 | D1, D4, §2.3, §7 `internal_tables_unreachable` | R26 | §5.3, §7 `worker_isolation` | R39 | §7 dashboard CI |
 
-## 11. Needs Nate
+## 11. Needs Nate — resolved 2026-09-13
 
-Decisions this design could not make. Each blocks only the item named, not the build.
+Nate's answers. The build follows these; the original options stay below for the record.
+
+| item | decision |
+|---|---|
+| N1 | Ship "—" with tooltip in W2. Ask Declan whether GA4 is connected: yes → GA4 sessions connector post-launch (true conversion); no → "checkout conversion" tile = orders ÷ (orders + abandoned checkouts) from the Admin API, labeled as such. Neither is in W2. |
+| N2 | Accept. SB is `America/New_York`; M3 still verifies the ad account's own timezone. |
+| N3 | Yes — build the Meet connector provisional against the documented Drive shape; parsing lands when a sample exists. |
+| N4 | Yes — owner "add user" stays a bcns script. |
+
+Original items:
 
 - **N1 — Conversion rate source.** The Shopify Admin API exposes no sessions or conversion
   metric on any plan; `shopifyqlQuery FROM sessions` is undocumented and is probed at onboarding
@@ -1328,7 +1337,8 @@ Decisions this design could not make. Each blocks only the item named, not the b
   bcns script (D16). If SB expects self-serve invites, that is one edge function + RPC, not in
   this design. Default: script.
 
-No reviewer finding was left open; every one is resolved in the section named in §12.
+No reviewer finding was left open; every one is resolved in the section named in §12. Any new
+open question raised during the build takes the design's stated default.
 
 ## 12. Review log
 
