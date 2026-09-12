@@ -1,95 +1,80 @@
 // onboard --slug --name --timezone [--sources shopify,meta,monday,meet]  (DESIGN.md §5.10, §9)
-//
-// NOTES (design silent / no live network in this environment):
-// - Connector defaults (interval, backfill_depth) aren't in code yet (no worker/src/connectors/*
-//   exists). Uses the values seed.sql already assumes: shopify/monday 15m, meta/meet 1h, 90d backfill.
-// - §9's live checklist (Shopify shop probe, Meta /debug_token, Google Internal-app check, Monday
-//   column autodetect) needs real per-source network access this local script can't make. --sources
-//   prompts for and stores the secret + writes connector_schedule defaults; it does not verify them.
-//   Needs Nate: decide whether/when to add the live verification calls.
-// - Smoke password has no password-manager integration here; printed once to stdout instead.
+// Inserts the client + smoke user, then per source: prompts for credentials, runs the §9 checklist
+// (a failed item stops the script), writes source_tokens and connector_schedule from the connector's
+// own defaults. Smoke password is printed once (no password-manager integration in this build).
 import { parseArgs } from 'node:util'
 import { randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline/promises'
+import { connectors, type Source } from '../worker/src/connectors/index.js'
+import { checklist, type Creds } from './checklist.js'
 import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
 
-const SOURCES = ['shopify', 'meta', 'monday', 'meet'] as const
-type Source = (typeof SOURCES)[number]
-const TOKEN_KIND: Record<Source, string> = {
-  shopify: 'shopify_admin',
-  meta: 'meta_system_user',
-  monday: 'monday_personal',
-  meet: 'google_oauth_refresh',
+// What the operator is asked for, per source (§4.2–§4.5 config + token shapes).
+const PROMPTS: Record<Source, { config: string[]; secret: string; refresh?: string; attribute?: string }> = {
+  shopify: { config: ['shop', 'admin_url'], secret: 'Admin API token (shpat_…)' },
+  meta: { config: ['act_id', 'ads_manager_url'], secret: 'system user token' },
+  monday: { config: ['board_id', 'board_url'], secret: 'personal token' },
+  meet: { config: ['folder_id', 'oauth_client_id', 'notes_url'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
 }
-// seed.sql's own intervals/backfill window, pending real connector-code defaults (see NOTES above).
-const DEFAULT_INTERVAL: Record<Source, string> = {
-  shopify: '15 minutes',
-  monday: '15 minutes',
-  meta: '1 hour',
-  meet: '1 hour',
-}
-const DEFAULT_BACKFILL_DAYS = 90
 
-export async function main(argv: string[]): Promise<void> {
-  const { values } = parseArgs({
-    args: argv,
-    options: {
-      slug: { type: 'string' },
-      name: { type: 'string' },
-      timezone: { type: 'string' },
-      sources: { type: 'string' },
-    },
-  })
+export function backfillFrom(depth: string): string {
+  if (depth === 'unbounded') return `'1970-01-01'::date`
+  return `(current_date - interval '${depth === '0' ? '0 days' : depth}')::date`
+}
+
+export async function main(argv: string[], ask?: (q: string) => Promise<string>): Promise<void> {
+  const { values } = parseArgs({ args: argv, options: {
+    slug: { type: 'string' }, name: { type: 'string' }, timezone: { type: 'string' }, sources: { type: 'string' } } })
   const { slug, name, timezone } = values
   if (!slug || !name || !timezone) die('usage: onboard --slug <slug> --name <name> --timezone <tz> [--sources shopify,meta,monday,meet]')
   const sources = (values.sources ?? '').split(',').map((s) => s.trim()).filter(Boolean) as Source[]
-  for (const s of sources) if (!SOURCES.includes(s)) die(`unknown source: ${s}`)
+  for (const s of sources) if (!(s in connectors)) die(`unknown source: ${s}`)
 
   const db = pgClient()
+  const rl = ask ? null : createInterface({ input: process.stdin, output: process.stdout })
+  const question = ask ?? ((q: string) => rl!.question(q))
   try {
-    const client = await db.query<{ id: string }>(
-      'insert into data.clients (slug, name, timezone) values ($1, $2, $3) returning id',
-      [slug, name, timezone],
-    )
+    const client = await db.query<{ id: string }>('insert into data.clients (slug, name, timezone) values ($1, $2, $3) returning id', [slug, name, timezone])
     const clientId = client.rows[0].id
 
+    // U1
     const email = `smoke+${slug}@bcn-services.com`
     const password = randomBytes(18).toString('base64url')
     const admin = serviceClient()
     const { data: user, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
     if (error || !user.user) die(`create smoke user: ${error?.message}`)
-    await db.query('insert into data.memberships (user_id, client_id, role, is_smoke) values ($1, $2, $3, true)', [
-      user.user.id,
-      clientId,
-      'member',
-    ])
+    await db.query('insert into data.memberships (user_id, client_id, role, is_smoke) values ($1, $2, $3, true)', [user.user.id, clientId, 'member'])
 
-    if (sources.length) {
-      const rl = createInterface({ input: process.stdin, output: process.stdout })
-      try {
-        for (const source of sources) {
-          const secret = await rl.question(`${source} credential (${TOKEN_KIND[source]}): `)
-          await db.query(
-            `insert into data.source_tokens (client_id, source, kind, secret) values ($1, $2, $3, $4)
-             on conflict (client_id, source) do update set secret = excluded.secret, kind = excluded.kind`,
-            [clientId, source, TOKEN_KIND[source], secret],
-          )
-          await db.query(
-            `insert into data.connector_schedule (client_id, source, interval, backfill_from, backfill_cursor, next_run_at)
-             values ($1, $2, $3::interval, current_date - $4::int, '{}'::jsonb, now())
-             on conflict (client_id, source) do nothing`,
-            [clientId, source, DEFAULT_INTERVAL[source], DEFAULT_BACKFILL_DAYS],
-          )
-        }
-      } finally {
-        rl.close()
-      }
+    for (const source of sources) {
+      const p = PROMPTS[source]
+      const creds: Creds = { secret: '', config: {} }
+      for (const k of p.config) creds.config[k] = await question(`${source} ${k}: `)
+      creds.secret = await question(`${source} ${p.secret}: `)
+      if (p.refresh) creds.refresh_secret = await question(`${source} ${p.refresh}: `)
+      if (p.attribute) creds.attributes = { [p.attribute]: await question(`${source} ${p.attribute}: `) }
+      const { config, warnings } = await checklist(source, timezone, creds)
+      for (const w of warnings) console.warn(`warning ${w}`)
+      const { access_token, expires_in, ...cfg } = config
+      const conn = connectors[source]
+      await db.query(
+        `insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, expires_at, attributes)
+         values ($1, $2, $3, $4, $5, $6, $7)
+         on conflict (client_id, source) do update set kind = excluded.kind, secret = excluded.secret, refresh_secret = excluded.refresh_secret,
+           expires_at = excluded.expires_at, attributes = excluded.attributes, status = 'active', status_detail = null`,
+        [clientId, source, conn.tokenKind, (access_token as string) || creds.secret, creds.refresh_secret ?? null,
+         access_token ? new Date(Date.now() + Number(expires_in) * 1000) : null, creds.attributes ?? {}])
+      await db.query(
+        `insert into data.connector_schedule (client_id, source, interval, backfill_from, backfill_cursor, config, next_run_at)
+         values ($1, $2, $3::interval, ${backfillFrom(conn.defaults.backfillDepth)}, '{}'::jsonb, $4, now())
+         on conflict (client_id, source) do update set config = excluded.config`,
+        [clientId, source, conn.defaults.interval, { ...creds.config, ...cfg }])
     }
 
     console.log(`onboarded ${slug} (${clientId})`)
     console.log(`smoke user: ${email}`)
     console.log(`smoke password (save now, shown once): ${password}`)
   } finally {
+    rl?.close()
     await db.end()
   }
 }

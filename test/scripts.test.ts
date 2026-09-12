@@ -1,6 +1,6 @@
 // Exercises the bcns-run operator scripts (DESIGN.md §5.10) end to end against the local stack.
 // Uses a throwaway client (never acme/beta/gamma) created by onboard and removed by hard-delete.
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,8 +11,10 @@ import { main as importMedia } from '../scripts/import-media.js'
 import { main as churn } from '../scripts/churn.js'
 import { main as hardDelete } from '../scripts/hard-delete.js'
 import { main as exportClient } from '../scripts/export.js'
+import { checklist } from '../scripts/checklist.js'
 
 const SLUG = 'zz-script-test'
+const SLUG2 = 'zz-script-test2'
 let clientId: string
 
 const archiveDir = mkdtempSync(join(tmpdir(), 'bcns-archive-'))
@@ -26,6 +28,10 @@ afterAll(async () => {
   } catch {
     /* already gone or never created */
   }
+  try {
+    await sql(`update data.clients set status = 'churned', churned_at = now() - interval '91 days' where slug = $1`, [SLUG2])
+    await hardDelete(['--slug', SLUG2, '--confirm', SLUG2])
+  } catch { /* same */ }
   rmSync(archiveDir, { recursive: true, force: true })
 })
 
@@ -46,6 +52,25 @@ describe('scripts', () => {
 
     const user = await sql('select id from auth.users where email = $1', [`smoke+${SLUG}@bcn-services.com`])
     expect(user.rowCount).toBe(1)
+  })
+
+  it('onboard --sources writes source_tokens + connector_schedule from the connector defaults', async () => {
+    const real = globalThis.fetch
+    vi.stubGlobal('fetch', (url: RequestInfo | URL, init?: RequestInit) => String(url).includes('api.monday.com')
+      ? Promise.resolve(new Response(JSON.stringify({ data: { boards: [{ columns: [{ id: 'status', title: 'Status', type: 'status' }, { id: 'date4', title: 'Due', type: 'date' }] }] } })))
+      : real(url, init))
+    try {
+      await onboard(['--slug', SLUG2, '--name', 'ZZ2', '--timezone', 'UTC', '--sources', 'monday'],
+        async (q) => (q.includes('board_id') ? '123' : q.includes('board_url') ? 'https://m.example' : 'tok'))
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    const sched = await sql<any>(`select interval::text, backfill_from::text, config from data.connector_schedule s join data.clients c on c.id = s.client_id where c.slug = $1`, [SLUG2])
+    expect(sched.rows[0].interval).toBe('01:00:00')
+    expect(sched.rows[0].backfill_from).toBe(new Date().toISOString().slice(0, 10))
+    expect(sched.rows[0].config).toEqual({ board_id: '123', board_url: 'https://m.example', columns: { status: 'status', due: 'date4' } })
+    const tok = await sql<any>(`select kind, secret from data.source_tokens t join data.clients c on c.id = t.client_id where c.slug = $1`, [SLUG2])
+    expect(tok.rows[0]).toEqual({ kind: 'monday_personal', secret: 'tok' })
   })
 
   it('set-quota updates egress_quota_bytes', async () => {
@@ -119,5 +144,26 @@ describe('scripts', () => {
 
     const objects = await sql('select 1 from storage.objects where name like $1', [`${clientId}/%`])
     expect(objects.rowCount).toBe(0)
+  })
+
+  it('§9 checklist refuses a Meta USER token and a bcns Google client, accepts a system user', async () => {
+    const json = (body: unknown) => async () => new Response(JSON.stringify(body), { status: 200 })
+    await expect(checklist('meta', 'America/New_York', { secret: 't', config: { act_id: '1' } }, json({ data: { type: 'USER' } })))
+      .rejects.toThrow(/M1/)
+    const calls: string[] = []
+    const metaOk = async (url: string | URL | Request) => {
+      calls.push(String(url))
+      return new Response(JSON.stringify(String(url).includes('debug_token')
+        ? { data: { type: 'SYSTEM_USER' } } : { timezone_name: 'America/Los_Angeles', currency: 'USD' }))
+    }
+    const v = await checklist('meta', 'America/New_York', { secret: 't', config: { act_id: '1' } }, metaOk as typeof fetch)
+    expect(v.config).toEqual({ account_timezone: 'America/Los_Angeles', currency: 'USD' })
+    expect(v.warnings[0]).toMatch(/^M3/)
+    process.env.BCNS_OAUTH_CLIENT_ID = 'bcns-app'
+    await expect(checklist('meet', 'UTC', { secret: '', refresh_secret: 'r', config: { oauth_client_id: 'bcns-app', folder_id: 'f' } }, json({})))
+      .rejects.toThrow(/G1/)
+    await expect(checklist('shopify', 'UTC', { secret: 'nope', config: { shop: 's' } }, json({}))).rejects.toThrow(/S1/)
+    await expect(checklist('monday', 'UTC', { secret: 't', config: { board_id: '1' } }, json({ data: { boards: [{ columns: [{ id: 'c', title: 'Name', type: 'name' }] }] } })))
+      .rejects.toThrow(/D1/)
   })
 })
