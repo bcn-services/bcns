@@ -1,7 +1,7 @@
 // Exercises the bcns-run operator scripts (DESIGN.md §5.10) end to end against the local stack.
 // Uses a throwaway client (never acme/beta/gamma) created by onboard and removed by hard-delete.
 import { afterAll, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sql, PNG_1x1 } from './helpers.js'
@@ -10,17 +10,23 @@ import { main as setQuota } from '../scripts/set-quota.js'
 import { main as importMedia } from '../scripts/import-media.js'
 import { main as churn } from '../scripts/churn.js'
 import { main as hardDelete } from '../scripts/hard-delete.js'
+import { main as exportClient } from '../scripts/export.js'
 
 const SLUG = 'zz-script-test'
 let clientId: string
 
+const archiveDir = mkdtempSync(join(tmpdir(), 'bcns-archive-'))
+process.env.EXPORT_ARCHIVE_DIR = archiveDir
+
 afterAll(async () => {
   // Best-effort: remove the throwaway client even if an earlier assertion failed mid-suite.
   try {
-    await hardDelete(['--slug', SLUG, '--confirm', SLUG, '--force'])
+    await sql(`update data.clients set status = 'churned', churned_at = now() - interval '91 days' where slug = $1`, [SLUG])
+    await hardDelete(['--slug', SLUG, '--confirm', SLUG])
   } catch {
     /* already gone or never created */
   }
+  rmSync(archiveDir, { recursive: true, force: true })
 })
 
 describe('scripts', () => {
@@ -77,8 +83,33 @@ describe('scripts', () => {
     expect(r.rows[0].churned_at).not.toBeNull()
   })
 
-  it('hard-delete removes the client, its rows, and its storage objects', async () => {
+  it('export writes CSV per canonical table, raw.jsonl and files/', async () => {
+    await sql(`insert into data.raw (client_id, source, entity, external_id, payload_hash, payload) values ($1, 'shopify', 'order', 'x1', 'h', '{"a":1}')`, [clientId])
+    const out = mkdtempSync(join(tmpdir(), 'bcns-export-'))
+    try {
+      await exportClient(['--slug', SLUG, '--out', out])
+      const names = readdirSync(out)
+      for (const t of ['customers', 'money', 'media', 'records']) expect(names).toContain(`${t}.csv`)
+      expect(readFileSync(join(out, 'media.csv'), 'utf8').split('\n')[0]).toContain('storage_path')
+      expect(readFileSync(join(out, 'raw.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+      expect(readdirSync(join(out, 'files'))).toHaveLength(1)
+    } finally {
+      rmSync(out, { recursive: true, force: true })
+    }
+  })
+
+  it('hard-delete refuses within 90 days of churn', async () => {
+    await expect(hardDelete(['--slug', SLUG, '--confirm', SLUG])).rejects.toThrow(/90 days/)
+    expect((await sql('select 1 from data.clients where slug = $1', [SLUG])).rowCount).toBe(1)
+  })
+
+  it('hard-delete archives the export, then removes the client, its rows, and its storage objects', async () => {
+    await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG])
     await hardDelete(['--slug', SLUG, '--confirm', SLUG])
+    expect(existsSync(join(archiveDir, SLUG))).toBe(true)
+    expect(readdirSync(join(archiveDir, SLUG))[0]).toMatch(/\.tar\.gz$/)
+    expect((await sql('select 1 from data.raw where client_id = $1', [clientId])).rowCount).toBe(0)
+    expect((await sql('select 1 from auth.users where email = $1', [`smoke+${SLUG}@bcn-services.com`])).rowCount).toBe(0)
 
     const client = await sql('select 1 from data.clients where slug = $1', [SLUG])
     expect(client.rowCount).toBe(0)
