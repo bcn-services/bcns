@@ -46,30 +46,7 @@ export async function main(argv: string[], ask?: (q: string) => Promise<string>)
     if (error || !user.user) die(`create smoke user: ${error?.message}`)
     await db.query('insert into data.memberships (user_id, client_id, role, is_smoke) values ($1, $2, $3, true)', [user.user.id, clientId, 'member'])
 
-    for (const source of sources) {
-      const p = PROMPTS[source]
-      const creds: Creds = { secret: '', config: {} }
-      for (const k of p.config) creds.config[k] = await question(`${source} ${k}: `)
-      creds.secret = await question(`${source} ${p.secret}: `)
-      if (p.refresh) creds.refresh_secret = await question(`${source} ${p.refresh}: `)
-      if (p.attribute) creds.attributes = { [p.attribute]: await question(`${source} ${p.attribute}: `) }
-      const { config, warnings } = await checklist(source, timezone, creds)
-      for (const w of warnings) console.warn(`warning ${w}`)
-      const { access_token, expires_in, ...cfg } = config
-      const conn = connectors[source]
-      await db.query(
-        `insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, expires_at, attributes)
-         values ($1, $2, $3, $4, $5, $6, $7)
-         on conflict (client_id, source) do update set kind = excluded.kind, secret = excluded.secret, refresh_secret = excluded.refresh_secret,
-           expires_at = excluded.expires_at, attributes = excluded.attributes, status = 'active', status_detail = null`,
-        [clientId, source, conn.tokenKind, (access_token as string) || creds.secret, creds.refresh_secret ?? null,
-         access_token ? new Date(Date.now() + Number(expires_in) * 1000) : null, creds.attributes ?? {}])
-      await db.query(
-        `insert into data.connector_schedule (client_id, source, interval, backfill_from, backfill_cursor, config, next_run_at)
-         values ($1, $2, $3::interval, ${backfillFrom(conn.defaults.backfillDepth)}, '{}'::jsonb, $4, now())
-         on conflict (client_id, source) do update set config = excluded.config`,
-        [clientId, source, conn.defaults.interval, { ...creds.config, ...cfg }])
-    }
+    for (const source of sources) await attachSource(db, clientId, timezone, source, question)
 
     console.log(`onboarded ${slug} (${clientId})`)
     console.log(`smoke user: ${email}`)
@@ -78,6 +55,34 @@ export async function main(argv: string[], ask?: (q: string) => Promise<string>)
     rl?.close()
     await db.end()
   }
+}
+
+// One source: prompt, run the §9 checklist (throws before any write), upsert source_tokens + connector_schedule.
+// Shared with add-source. Re-running rotates the token and resets its status; the schedule keeps its cursor.
+export async function attachSource(db: ReturnType<typeof pgClient>, clientId: string, timezone: string, source: Source,
+  question: (q: string) => Promise<string>): Promise<void> {
+  const p = PROMPTS[source]
+  const creds: Creds = { secret: '', config: {} }
+  for (const k of p.config) creds.config[k] = await question(`${source} ${k}: `)
+  creds.secret = await question(`${source} ${p.secret}: `)
+  if (p.refresh) creds.refresh_secret = await question(`${source} ${p.refresh}: `)
+  if (p.attribute) creds.attributes = { [p.attribute]: await question(`${source} ${p.attribute}: `) }
+  const { config, warnings } = await checklist(source, timezone, creds)
+  for (const w of warnings) console.warn(`warning ${w}`)
+  const { access_token, expires_in, ...cfg } = config
+  const conn = connectors[source]
+  await db.query(
+    `insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, expires_at, attributes)
+         values ($1, $2, $3, $4, $5, $6, $7)
+         on conflict (client_id, source) do update set kind = excluded.kind, secret = excluded.secret, refresh_secret = excluded.refresh_secret,
+           expires_at = excluded.expires_at, attributes = excluded.attributes, status = 'active', status_detail = null`,
+    [clientId, source, conn.tokenKind, (access_token as string) || creds.secret, creds.refresh_secret ?? null,
+     access_token ? new Date(Date.now() + Number(expires_in) * 1000) : null, creds.attributes ?? {}])
+  await db.query(
+    `insert into data.connector_schedule (client_id, source, interval, backfill_from, backfill_cursor, config, next_run_at)
+         values ($1, $2, $3::interval, ${backfillFrom(conn.defaults.backfillDepth)}, '{}'::jsonb, $4, now())
+         on conflict (client_id, source) do update set config = excluded.config`,
+    [clientId, source, conn.defaults.interval, { ...creds.config, ...cfg }])
 }
 
 if (isMain(import.meta.url)) runMain(main)
