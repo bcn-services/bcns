@@ -4,14 +4,16 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sql, PNG_1x1 } from './helpers.js'
+import { localKeys, sql, pool, SUPABASE_URL, PNG_1x1 } from './helpers.js'
 import { main as onboard } from '../scripts/onboard.js'
 import { main as setQuota } from '../scripts/set-quota.js'
 import { main as importMedia } from '../scripts/import-media.js'
+import { main as addMember, upsertMembership } from '../scripts/add-member.js'
 import { main as churn } from '../scripts/churn.js'
 import { main as hardDelete } from '../scripts/hard-delete.js'
 import { main as exportClient } from '../scripts/export.js'
 import { checklist } from '../scripts/checklist.js'
+import { signIn } from '../packages/data-client/src/index.js'
 
 const SLUG = 'zz-script-test'
 const SLUG2 = 'zz-script-test2'
@@ -99,6 +101,101 @@ describe('scripts', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('add-member --agent creates a non-smoke member whose password signs in with the client_id claim, and re-run rotates it', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await addMember(['--slug', SLUG, '--agent'])
+
+      const email = `agent+${SLUG}@bcn-services.com`
+      const membership = await sql<{ role: string; is_smoke: boolean }>(
+        `select mem.role, mem.is_smoke from data.memberships mem join auth.users u on u.id = mem.user_id
+         where u.email = $1 and mem.client_id = $2`,
+        [email, clientId],
+      )
+      expect(membership.rowCount).toBe(1)
+      expect(membership.rows[0]).toEqual({ role: 'member', is_smoke: false })
+
+      const printed = log.mock.calls.map((c) => c.join(' ')).join('\n')
+      expect(printed).toContain(`agent user: ${email}`)
+      const passwordLine = log.mock.calls.map((c) => c.join(' ')).find((l) => l.startsWith('agent password'))!
+      const password1 = passwordLine.split(': ').slice(1).join(': ')
+
+      const dc1 = await signIn({ supabaseUrl: SUPABASE_URL, anonKey: localKeys().anon, email, password: password1 })
+      const claims = JSON.parse(Buffer.from((await dc1.accessToken()).split('.')[1], 'base64url').toString())
+      expect(claims.client_id).toBe(clientId)
+
+      log.mockClear()
+      await addMember(['--slug', SLUG, '--agent'])
+      const passwordLine2 = log.mock.calls.map((c) => c.join(' ')).find((l) => l.startsWith('agent password'))!
+      const password2 = passwordLine2.split(': ').slice(1).join(': ')
+      expect(password2).not.toBe(password1)
+
+      await expect(
+        signIn({ supabaseUrl: SUPABASE_URL, anonKey: localKeys().anon, email, password: password1 }),
+      ).rejects.toThrow(/sign-in failed/)
+      const dc2 = await signIn({ supabaseUrl: SUPABASE_URL, anonKey: localKeys().anon, email, password: password2 })
+      expect(await dc2.accessToken()).toBeTruthy()
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  it('add-member --agent rejects --email or --owner', async () => {
+    await expect(addMember(['--slug', SLUG, '--agent', '--email', 'x@example.com'])).rejects.toThrow(/usage/)
+    await expect(addMember(['--slug', SLUG, '--agent', '--owner'])).rejects.toThrow(/usage/)
+  })
+
+  it('add-member --agent refuses to rotate a user that already owns the agent+ address but was not minted by --agent', async () => {
+    const email = `agent+${SLUG2}@bcn-services.com`
+    await addMember(['--slug', SLUG2, '--email', email, '--owner'])
+
+    const before = await sql<{ encrypted_password: string }>(
+      'select encrypted_password from auth.users where email = $1',
+      [email],
+    )
+    expect(before.rowCount).toBe(1)
+
+    await expect(addMember(['--slug', SLUG2, '--agent'])).rejects.toThrow(/refusing to rotate/)
+
+    const after = await sql<{ encrypted_password: string }>(
+      'select encrypted_password from auth.users where email = $1',
+      [email],
+    )
+    expect(after.rows[0].encrypted_password).toBe(before.rows[0].encrypted_password)
+
+    const membership = await sql<{ role: string }>(
+      `select mem.role from data.memberships mem join auth.users u on u.id = mem.user_id where u.email = $1`,
+      [email],
+    )
+    expect(membership.rows[0].role).toBe('owner')
+  })
+
+  it('upsertMembership leaves is_smoke unchanged on the plain (non-agent) path, only forces it false for --agent', async () => {
+    const smokeEmail = `smoke+${SLUG}@bcn-services.com`
+    const user = await sql<{ id: string }>('select id from auth.users where email = $1', [smokeEmail])
+    const userId = user.rows[0].id
+    await sql('update data.memberships set is_smoke = true where user_id = $1', [userId])
+
+    // Plain path re-add (role change), same user_id -> hits the ON CONFLICT branch.
+    await upsertMembership(pool, userId, clientId, 'owner', { agent: false })
+    const afterPlain = await sql<{ is_smoke: boolean; role: string }>(
+      'select is_smoke, role from data.memberships where user_id = $1',
+      [userId],
+    )
+    expect(afterPlain.rows[0]).toEqual({ is_smoke: true, role: 'owner' })
+
+    // --agent path always forces is_smoke back to false.
+    await upsertMembership(pool, userId, clientId, 'member', { agent: true })
+    const afterAgent = await sql<{ is_smoke: boolean; role: string }>(
+      'select is_smoke, role from data.memberships where user_id = $1',
+      [userId],
+    )
+    expect(afterAgent.rows[0]).toEqual({ is_smoke: false, role: 'member' })
+
+    // restore, so the smoke-user invariant holds for later assertions/cleanup
+    await sql('update data.memberships set is_smoke = true, role = $2 where user_id = $1', [userId, 'owner'])
   })
 
   it('churn sets status = churned and stamps churned_at', async () => {
