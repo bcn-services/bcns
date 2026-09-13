@@ -2,7 +2,7 @@
 
 **Display name:** SB (store: SaunaBoy) · **Contact:** Declan, Founder
 **Project:** Command Center · **Quote:** `~/os/clients/sb/quote/2026-08-26-sb.md`
-($750 setup / $100 mo, **unsigned** as of 2026-09-12)
+($750 setup / $100 mo, **signed** per Nate 2026-09-12; the os copy isn't updated)
 
 ## Brief
 
@@ -24,6 +24,32 @@ layer; it never writes back to those systems.
 - **Daily Briefing:** an AI summary each morning of the previous day across
   every source, plus an on-demand button. This is the only AI in v1; there's no
   chat assistant.
+
+## Layout and visual (decided 2026-09-12, not built yet)
+
+- **No sidebar or tab bar.** The home view (Overview) is the one page. Remove
+  `.app-nav` from `app/layout.tsx`.
+- **Service buttons link out.** "View Shopify Dashboard", "View Ads Manager",
+  "Open Monday.com", "Join Meeting" and the like open that service's own site.
+  The dashboard doesn't rebuild those services' pages.
+- **Only these live in the dashboard:** the combined data on the home view, the
+  Content Library (with the Creative Folder), and the Financial Information
+  page. You reach each one by clicking its panel on home, not through a nav.
+- **No agent.** The reference's "Ask the Command Center anything" strip and its
+  quick actions are out; the AI Agent is scoped as a separate product. The
+  Daily Briefing stays (it's in the signed quote).
+- **Financial Information** combines the financial figures from every connected
+  app: Shopify revenue, orders and AOV, and Meta ad spend. Its page may also
+  let SB enter figures those apps don't track, stored as dashboard records
+  through `save_record` (no new migration). That goes beyond the quote, which
+  scopes the report to Shopify only.
+- **Settings and Integrations** are icon buttons in the header, each opening a
+  popup. Integrations shows each connection's status. This replaces the
+  `/integrations` page.
+- **Visual target:** match `~/os/clients/sb/SB_Reference.PNG` exactly (layout,
+  colors, type, cards, pink accent), minus its sidebar. Nate may send a design
+  file with exact values; prefer it over the PNG when it exists. Style each new
+  page to this target as it's built, not in a pass at the end.
 
 ## Config decisions
 
