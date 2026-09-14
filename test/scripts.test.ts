@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { localKeys, sql, pool, SUPABASE_URL, PNG_1x1 } from './helpers.js'
 import { main as onboard } from '../scripts/onboard.js'
+import { main as addSource } from '../scripts/add-source.js'
+import { ScriptError } from '../scripts/_lib.js'
 import { main as setQuota } from '../scripts/set-quota.js'
 import { main as importMedia } from '../scripts/import-media.js'
 import { main as addMember, upsertMembership } from '../scripts/add-member.js'
@@ -17,6 +19,7 @@ import { signIn } from '../packages/data-client/src/index.js'
 
 const SLUG = 'zz-script-test'
 const SLUG2 = 'zz-script-test2'
+const SLUG3 = 'zz-script-test3'
 let clientId: string
 
 const archiveDir = mkdtempSync(join(tmpdir(), 'bcns-archive-'))
@@ -37,6 +40,11 @@ afterAll(async () => {
     await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG2])
     await hardDelete(['--slug', SLUG2, '--confirm', SLUG2])
   } catch (e) { console.error('cleanup', SLUG2, String(e)) }
+  try {
+    await sql(`update data.clients set status = 'churned' where slug = $1`, [SLUG3])
+    await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG3])
+    await hardDelete(['--slug', SLUG3, '--confirm', SLUG3])
+  } catch (e) { console.error('cleanup', SLUG3, String(e)) }
   rmSync(archiveDir, { recursive: true, force: true })
 })
 
@@ -267,5 +275,91 @@ describe('scripts', () => {
     await expect(checklist('shopify', 'UTC', { secret: 'nope', config: { shop: 's' } }, json({}))).rejects.toThrow(/S1/)
     await expect(checklist('monday', 'UTC', { secret: 't', config: { board_id: '1' } }, json({ data: { boards: [{ columns: [{ id: 'c', title: 'Name', type: 'name' }] }] } })))
       .rejects.toThrow(/D1/)
+  })
+
+  describe('add-source', () => {
+    const MONDAY_COLS = { data: { boards: [{ columns: [{ id: 'status', title: 'Status', type: 'status' }, { id: 'date4', title: 'Due', type: 'date' }] }] } }
+    const SHOPIFY_OK = {
+      data: { currentAppInstallation: { accessScopes: ['read_orders', 'read_all_orders', 'read_products', 'read_inventory',
+        'read_shopify_payments_payouts', 'read_reports', 'read_customers'].map((handle) => ({ handle })) },
+      shop: { ianaTimezone: 'UTC', currencyCode: 'USD' } },
+    }
+    // Stubs the vendor APIs the §9 checklist calls; everything else (local Supabase) goes to the real fetch.
+    async function run(argv: string[], answers: string[]) { // answers in prompt order: config fields, then the secret
+      const real = globalThis.fetch
+      vi.stubGlobal('fetch', (url: RequestInfo | URL, init?: RequestInit) => {
+        const u = String(url)
+        if (u.includes('api.monday.com')) return Promise.resolve(new Response(JSON.stringify(MONDAY_COLS)))
+        if (u.includes('myshopify.com')) return Promise.resolve(new Response(JSON.stringify(
+          String(init?.body).includes('shopifyqlQuery') ? { data: { shopifyqlQuery: { __typename: 'TableResponse' } } } : SHOPIFY_OK)))
+        return real(url, init)
+      })
+      const out: string[] = []
+      const spies = (['log', 'warn', 'error'] as const).map((m) => vi.spyOn(console, m).mockImplementation((...a) => { out.push(a.join(' ')) }))
+      try {
+        await addSource(argv, async () => answers.shift() ?? '')
+      } finally {
+        vi.unstubAllGlobals()
+        spies.forEach((s) => s.mockRestore())
+      }
+      return out.join('\n')
+    }
+    const tokens = (source: string) => sql<any>(`select t.kind, t.secret, t.status, t.status_detail from data.source_tokens t
+      join data.clients c on c.id = t.client_id where c.slug = $1 and t.source = $2`, [SLUG3, source])
+    const schedule = (source: string) => sql<any>(`select backfill_cursor, incremental_cursor, next_run_at, config from data.connector_schedule s
+      join data.clients c on c.id = s.client_id where c.slug = $1 and s.source = $2`, [SLUG3, source])
+
+    it('attaches monday to an existing client exactly as onboard does', async () => {
+      await onboard(['--slug', SLUG3, '--name', 'ZZ3', '--timezone', 'UTC'], async () => '')
+      const out = await run(['--slug', SLUG3, '--source', 'monday'], ['123', 'https://m.example', 'tok'])
+      expect(out).toMatch(/attached monday to zz-script-test3/)
+      expect((await tokens('monday')).rows).toEqual([{ kind: 'monday_personal', secret: 'tok', status: 'active', status_detail: null }])
+      expect((await schedule('monday')).rows[0].config).toEqual({ board_id: '123', board_url: 'https://m.example', columns: { status: 'status', due: 'date4' } })
+    })
+
+    it('re-run rotates the token, clears auth_failed, and keeps the backfill cursor', async () => {
+      await sql(`update data.source_tokens t set status = 'auth_failed', status_detail = 'HTTP 401' from data.clients c
+        where c.id = t.client_id and c.slug = $1 and t.source = 'monday'`, [SLUG3])
+      await sql(`update data.connector_schedule s set backfill_cursor = '{"page": 7}', incremental_cursor = '{"since": "x"}',
+        next_run_at = now() + interval '3 hours' from data.clients c where c.id = s.client_id and c.slug = $1 and s.source = 'monday'`, [SLUG3])
+      const before = (await schedule('monday')).rows[0]
+      const out = await run(['--slug', SLUG3, '--source', 'monday'], ['123', 'https://m.example', 'tok2'])
+      expect(out).not.toContain('tok2')
+      expect(out).toContain(`next pull ${before.next_run_at.toISOString()}`)
+      expect((await tokens('monday')).rows).toEqual([{ kind: 'monday_personal', secret: 'tok2', status: 'active', status_detail: null }])
+      const s = await schedule('monday')
+      expect(s.rowCount).toBe(1)
+      expect(s.rows[0]).toMatchObject({ backfill_cursor: { page: 7 }, incremental_cursor: { since: 'x' }, next_run_at: before.next_run_at })
+    })
+
+    it('refuses while a run holds the lease, and refuses a changed board unless --reset-cursors', async () => {
+      const lease = (v: string) => sql(`update data.connector_schedule s set lease_until = ${v} from data.clients c
+        where c.id = s.client_id and c.slug = $1 and s.source = 'monday'`, [SLUG3])
+      await lease(`now() + interval '5 minutes'`)
+      await expect(run(['--slug', SLUG3, '--source', 'monday'], ['123', 'https://m.example', 'tok3'])).rejects.toThrow(/in flight/)
+      await lease('null')
+      await expect(run(['--slug', SLUG3, '--source', 'monday'], ['456', 'https://m.example', 'tok3'])).rejects.toThrow(/--reset-cursors/)
+      expect((await tokens('monday')).rows[0].secret).toBe('tok2') // refused before anything was written
+      expect((await schedule('monday')).rows[0].config.board_id).toBe('123')
+      await run(['--slug', SLUG3, '--source', 'monday', '--reset-cursors'], ['456', 'https://m.example', 'tok3'])
+      expect((await schedule('monday')).rows[0]).toMatchObject({ backfill_cursor: {}, incremental_cursor: {}, config: { board_id: '456' } })
+    })
+
+    it('attaches shopify with the S3–S5 config from the checklist', async () => {
+      const out = await run(['--slug', SLUG3, '--source', 'shopify'], ['zz-test', 'https://admin.example', 'shpat_test'])
+      expect(out).not.toContain('shpat_test')
+      expect((await tokens('shopify')).rows[0]).toMatchObject({ kind: 'shopify_admin', secret: 'shpat_test', status: 'active' })
+      expect((await schedule('shopify')).rows[0].config).toEqual({
+        shop: 'zz-test', admin_url: 'https://admin.example', store_timezone: 'UTC', currency: 'USD', sessions_mode: 'shopifyql' })
+    })
+
+    it('refuses an unknown slug, an unknown source, a failed checklist, and a churned client', async () => {
+      await expect(addSource(['--slug', 'zz-nope', '--source', 'monday'], async () => 'x')).rejects.toThrow(ScriptError)
+      await expect(addSource(['--slug', SLUG3, '--source', 'upload'], async () => 'x')).rejects.toThrow(/unknown source/)
+      await expect(run(['--slug', SLUG3, '--source', 'shopify'], ['zz-test', 'https://admin.example', 'not-shpat'])).rejects.toThrow(/S1/)
+      expect((await tokens('shopify')).rows[0].secret).toBe('shpat_test') // failed checklist wrote nothing
+      await sql(`update data.clients set status = 'churned' where slug = $1`, [SLUG3])
+      await expect(addSource(['--slug', SLUG3, '--source', 'meta'], async () => 'x')).rejects.toThrow(/churned/)
+    })
   })
 })
