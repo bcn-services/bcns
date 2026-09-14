@@ -1,33 +1,58 @@
 # Engineer Report
-**Task:** Item D — Monday.com + Google Meet home panels for the SB Command Center rebuild
-**Branch:** feat/monday-meet-panels (worktree `.claude/worktrees/monday-meet-panels`, stacked on feat/shell-home @ 6653b70)
+
+**Task:** Item B — Financial Information page (`/financials`) + home Financial panel, per DESIGN.md
+**Branch:** `feat/financials` (worktree `.claude/worktrees/financials`, off `feat/shell-home` @ 6653b70)
 **Date:** 2026-09-13
 
 ## Design Decisions
-- Item A already built full panel chrome, all three states, and every shaping helper (`sortPriorityTasks`, `taskBadge`, `sortRecentNotes`, `noteExcerpt` in `lib/panels.ts`) — this item is pure wiring: two reads + props, no new logic.
-- DB query narrows to `kind='task'` / `kind='meeting_note'`, ordered, `limit(50)` (well above the panels' top-5/top-3); final sort/tone/nulls-last stays entirely in `lib/panels.ts`, called inside `MeetPanel`/`MondayPanel` — DB order is only a coarse pre-cap, not the display order.
-- `mondayState`/`meetState` now derive from real row presence (`taskRows.length > 0` / `noteRows.length > 0`) instead of the hardcoded `false` item A left as the seam marker.
-- A failed `jobs_v1`/`messages_v1` read degrades to `[]` (not-connected/empty rendering) via the same `unwrap`/`Promise.allSettled` pattern as every other home read — it cannot blank the page.
-- No CSS changes: item A's panel chrome already renders all three states correctly for Meet/Monday, confirmed live.
+
+- All pure logic lives in `lib/financials.ts` (validation, totals, tiles, daily merge, home rows) so `tests/financials.test.mjs` covers it without a DB; the page and the server action are thin.
+- Validation is server-side in `parseEntryInput`; HTML `required`/`step`/`maxlength` are convenience only. A rejected submit never reaches `save_record`.
+- No client JS: the form is a plain `<form action={serverAction}>`. Errors come back as `redirect('/financials?error=<code>&f_*=…')` — a fixed code set mapped to messages server-side (`entryErrorMessage` returns `null` for anything unknown), so a crafted query string cannot render arbitrary text. `f_*` params re-fill the form.
+- Entries are filtered on `attributes->>date` (the `YYYY-MM-DD` string written in `client_v1.timezone`), not on `occurred_at` (timestamptz), so range membership matches what the user typed rather than a UTC-shifted day.
+- `deleteFinancialEntry` re-reads `records_v1` for the posted id constrained to `kind='financial_entry'` + `source='dashboard'` before calling `delete_record` — the id arrives from a form, so a Shopify/Meta row id can't be deleted through it.
+- Null vs `$0`: `sumPresent` returns `null` only when every input is absent, so an unconnected source renders `—` and a genuine zero renders `$0`. Manual figures are `null` only when the period has no entries at all.
+- Money is integer cents end to end; `parseAmountToCents` parses the decimal string with a regex (no float math), caps at 1,000,000,000 major units and rejects non-positive values.
+- Panels size to content (`.fin-grid { align-items: start }`) — the equal-height default left the Daily Breakdown panel with ~500px of empty space in the screenshots.
 
 ## Files Changed
-- `app/page.tsx` — added `jobs_v1` (`kind='task'`, ordered `due_on` asc nullsFirst:false, limit 50) and `messages_v1` (`kind='meeting_note'`, ordered `occurred_at` desc, limit 50) to the home `Promise.allSettled`; unwrapped alongside the existing six reads; `mondayState`/`meetState` computed from row presence; `MeetPanel`/`MondayPanel` now receive real `notes`/`tasks` rows instead of `[]`.
-- `tests/panels.test.mjs` — added two tests: `sortPriorityTasks` defaults to a 5-row cap and `sortRecentNotes` defaults to a 3-row cap, each from a synthetic 50-row batch (matching the new server-side cap). Sort order, nulls-last, tone rule, and excerpt trimming were already covered by item A's tests and needed no changes.
 
-## Verification
-- `corepack pnpm typecheck` → `$ tsc --noEmit` (no output, exit 0)
-- `corepack pnpm lint` → `$ eslint .` (no output, exit 0)
-- `corepack pnpm test` → `# tests 78 / # pass 77 / # fail 0 / # skipped 1`
-- `corepack pnpm build` → `✓ Compiled successfully`, `✓ Generating static pages (7/7)`, routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health`
-- Signed-in smoke via `shot.mjs` on `:3104` as smoke+sb: home renders the full grid; Meet and Monday both show their not-connected state ("Not connected yet. Connect Google Meet" / "Not connected yet. Connect Monday.com") — correct, since `connector_health_v1` has no rows for `monday`/`meet` on this SB account (matches every other panel). Integrations popup, Settings popup, and the range pill all opened correctly; `/financials` and `/library` reached. Dev log (`dev-3104.log`) has no errors from the two new reads (or anywhere else) across all navigations.
-
-## Deferred / Out of Scope
-- Live "data" state for Meet/Monday is unverified end-to-end against real rows (no `jobs_v1`/`messages_v1` rows exist in this SB account yet) — the shaping logic itself (sort, tone, excerpt, caps) is unit-tested in `tests/panels.test.mjs` by item A and this item, and the query/prop wiring is now live; QA can seed rows via the data client to exercise the data state if desired.
-- Everything else (Financial Information, Content Library, header, shell) is out of scope per DESIGN.md — items B/C.
-
-## Flags for Reviewer
-- `jobs_v1`/`messages_v1` reads have no date-range filter (Monday/Meet panels are not range-bound per DESIGN.md — "Priority Tasks" and "Recent Meeting Notes" are point-in-time, not range metrics), only a `limit(50)` cap; a board/inbox with heavy task/note churn could still see a stale top-5/3 if the 50-row window rolls past the true priority set. Upgrade: a `kind`+`is_done`/`occurred_at`-aware server-side pre-sort if this becomes visible in practice.
-- Same PostgREST-default-limit caveat item A flagged for `campaign_daily_v1`/`creative_daily_v1` applies here in spirit, but at a much smaller, deliberately-chosen cap (50 vs the display need of 5/3), so the risk surface is small.
+- `lib/financials.ts` — rewritten as the pure core: entry validation/shaping, `sumEntries`, `computeProfit`, `computeFinancialTotals`, `computeFinancialTiles` (the 7 DESIGN.md tiles), `computeDailyRows`, `financialRecordsQuery`, and the corrected home `computeFinancialRows`.
+- `lib/overview.ts` — exported the existing `isValidYmd` so the entry parser and the action reuse it instead of a second date regex.
+- `app/financials/actions.ts` — new: `createFinancialEntry` (`save_record('financial_entry', …, external_id=uuid, title=category, occurred_at=date)`) and `deleteFinancialEntry` (ownership-checked `delete_record`), both revalidating `/financials` and `/`.
+- `app/financials/page.tsx` — rewritten from the item A stub: 7 metric tiles with previous-period deltas, Daily Breakdown table (days with nothing omitted, empty state otherwise), Manual Entries panel (error banner, form, newest-first list with delete, "No entries yet.").
+- `app/page.tsx` — additive: `records_v1` joins the existing `Promise.allSettled`, manual income/expense totals feed `computeFinancialRows` for both periods, and the panel shows `data` whenever entries exist even with no connector.
+- `app/globals.css` — appended `/* === item B: financials === */` only: `.metric-row--7`, `.fin-grid`, `.fin-table`, `.entry-form`, `.entry-list`, `.form-error`, `.btn-link-danger`, all on existing tokens.
+- `tests/financials.test.mjs` — 7 tests → 24, covering amount parsing (incl. no float drift and the `<script>` error-code case), per-field rejection, entry shaping/range/order, profit identity, tile order/labels/origins, daily merge, and Expenses = manual only.
 
 ## Conflicts with DESIGN.md
-None found — item A's seam (props, states, chrome) matched the spec exactly; this item only needed to supply real data.
+
+- Item A's `computeFinancialRows` computed `Expenses = ad spend + manual expenses` and `Profit = revenue − expenses`. DESIGN.md says the home rows are Revenue / Ad Spend / **Expenses (manual)** / Profit, and `Profit = revenue + manual income − ad spend − manual expenses`. DESIGN.md wins: both are now as specified, and the double-count of ad spend in Expenses is gone. No other conflict found; no bcns-data change is needed (`records_v1.source` exists with `dashboard` in the enum).
+
+## Verification
+
+- `corepack pnpm typecheck` → `$ tsc --noEmit`, no output, exit 0
+- `corepack pnpm lint` → `$ eslint .`, no output, exit 0
+- `corepack pnpm test` → `# tests 101 / # pass 100 / # fail 0 / # skipped 1`
+- `corepack pnpm build` → `✓ Compiled successfully`, `✓ Generating static pages (7/7)`, routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health` (run before the dev server started; the only change since is CSS)
+- Signed-in smoke as `smoke+sb@bcn-services.com` via `shot.mjs` on `http://localhost:3102`, screenshots in `~/.claude/jobs/8d474d1e/tmp/b-engineer/shots`:
+  - valid save (`smoke-test` / expense / 12.34) → row appears, tiles show Manual Expenses `$12`, Profit `-$12`, daily table shows Sep 13 with per-cell `—` for the unconnected sources
+  - `12.345`, `-3`, empty category, 501-char note, empty date → each redirects with its `error=` code, renders the matching `[role=alert]` message, creates nothing, and preserves the typed values
+  - home panel text `Revenue — / Ad Spend — / Expenses $12 / Profit -$12` — confirms Expenses is manual-only
+  - delete → list empty, all 7 tiles `—`, "Not connected yet." empty state
+- Hosted writes: 2 `financial_entry` rows created as smoke+sb with category `smoke-test`, both deleted through the UI's Delete. Net zero.
+- Dev server left running for QA on port 3102 — pid 36512, log `~/.claude/jobs/8d474d1e/tmp/dev-3102.log`.
+
+## Deferred / Out of Scope
+
+- Editing an existing entry (DESIGN.md specifies create + delete only).
+- Pagination of manual entries: capped at `ENTRY_ROW_LIMIT = 500` per range, which no realistic range reaches.
+- Currency is taken from whichever source row supplies one (`pickCurrency`), defaulting to USD; there is no per-entry currency in the spec.
+
+## Flags for Reviewer
+
+- `app/financials/actions.ts` — the trust boundary. Both actions take raw `FormData`; `deleteFinancialEntry` relies on the kind+source re-read for authorization on top of RLS.
+- `financialRecordsQuery` filters on a JSON path (`attributes->>date`), which cannot use a plain b-tree index; fine at this row count, worth an expression index if `records_v1` grows large.
+- `campaign_daily_v1` is read with `limit(1000)` and summed in the app — marked with a `ponytail:` comment; a range longer than ~3 years of campaigns would truncate.
+- `save_record` uses a fresh `crypto.randomUUID()` as `external_id`, so a retried submit creates a second row rather than being idempotent.
+- Three sources are read in one `Promise.allSettled`; a failing source logs and degrades to `—` rather than failing the page.

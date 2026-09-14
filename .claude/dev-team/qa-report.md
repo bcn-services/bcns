@@ -1,34 +1,31 @@
+---
 # QA Report
-**Task:** Item D — Monday.com + Google Meet home panels for the SB Command Center rebuild
-**Branch:** feat/monday-meet-panels
+**Task:** Item B — Financial Information page (`/financials`) + home Financial panel, per DESIGN.md
+**Branch:** `feat/financials`
 **Date:** 2026-09-13
 **Gate mode:** tests+behavioral
 
 ## VERDICT: PASS
 
 ## Criteria Checked
-- Home reads `jobs_v1`(`kind='task'`)/`messages_v1`(`kind='meeting_note'`) inside `Promise.allSettled`, degrades via `unwrap` — `tests/qa-monday-meet.test.mjs` inspects `app/page.tsx` for the allSettled block, the `unwrap` function body, and the `taskRows`/`noteRows` `[] `fallback on `.error` — PASS
-- Monday: ≤5 rows, not-done first then `due_on` asc nulls-last, badge tone rules — `tests/panels.test.mjs` (existing) + `tests/qa-monday-meet.test.mjs` new cases: duplicate `due_on` tiebreak by title, all-done batch, mixed-case "In PROGRESS"/"WORKING on it", >5 tasks capped keeping priority order — PASS
-- Meet: ≤3 notes newest-first, title/date/excerpt, link only when `url` present w/ external-link props — `tests/panels.test.mjs` (existing, >3 batch cap) + `tests/qa-monday-meet.test.mjs`: multi-line/whitespace body excerpt, occurred_at ties; missing-`url` → no link covered by `tests/overview.test.mjs`'s `isSafeHttpsUrl` (gates `MeetPanel`'s `<a>` render) — PASS
-- Three states, connection = health-row presence not data-row presence — `tests/qa-monday-meet.test.mjs`: `panelState([], [...], true)` → `not_connected` (rows w/o health row), `panelState(health, [...], false)` → `empty` (health w/o rows); confirmed live at 3104 (no monday/meet health rows → both panels render "Not connected yet") — PASS
-- typecheck/lint/test green — see Gate outputs below — PASS
-
-## Behavioral Evidence
-- Live smoke on `:3104` signed in as `smoke+sb@bcn-services.com` via `shot.mjs`:
-  - `home`: 7 panels rendered incl. "Google Meet / Note AI" and "Monday.com"; both show `"Not connected yet. Connect …"`; `alertCount: 0`; connect hrefs `?from=2026-09-07&to=2026-09-13&popup=integrations`.
-  - Clicked Meet's "Connect Google Meet" link (`state-note__link`) → URL gained `popup=integrations`, and the Integrations `<details>` (`popup-panel__title === "Integrations"`) `open === true`, listing Monday.com/Google Meet rows as "Not connected".
-  - Screenshots read (Read tool): `/Users/nateseluga/.claude/jobs/8d474d1e/tmp/qa-d/shots/home.png` (grid renders correctly, both panels' not-connected chrome matches DESIGN.md) and `home-meet-connect-result.png` (Integrations popup open, correct rows).
-  - `grep -iE "error|warn" dev-3104.log` → only the pre-existing `.npmrc` pnpm registry warning, no app errors from the two new reads or navigation.
-- Data-state (live rows in `jobs_v1`/`messages_v1`) not exercised live — no such rows exist in this SB account (engineer report flagged this too); covered instead by the unit fixtures above, which is the interpretation tested.
-
-## Gate Outputs
-- `corepack pnpm typecheck` → `$ tsc --noEmit`, no output, exit 0
-- `corepack pnpm lint` → `$ eslint .`, no output, exit 0
-- `corepack pnpm test` → `# tests 88 / # pass 87 / # fail 0 / # skipped 1` (10 new assertions added in `tests/qa-monday-meet.test.mjs`, all passing; 1 pre-existing skip unrelated to this item)
+- `/financials` header active button, 7 tiles, daily table, Manual entries panel, `?from&to`, `—` for unconnected sources — behavioral: loaded `/financials` on 3102 (nothing connected live), read_page/screenshot showed the "Financial Information" header button with `page-btn is-active`, 7 metric tiles (Revenue/Orders/AOV/Ad Spend/Manual Income/Manual Expenses/Profit) all `—`, Daily Breakdown showing "Not connected yet. Connect Shopify and Meta", Manual Entries panel with "No entries yet." — PASS
+- Server-side validation (`app/financials/actions.ts` + `lib/financials.ts`): date/type/category/amount/note rules, adversarial money cases, invalid → visible message + no RPC + values preserved, valid → exact `save_record` args — unit: `tests/financials.test.mjs` (parseAmountToCents/parseEntryInput, 24 cases incl. `1e3`,`1,000`,`12.`,`.5`,`Infinity`,`NaN`,`12.345`,cap+0.01) + `tests/qa-financials.test.mjs` (unicode digits, `-0`, embedded whitespace, leading/trailing whitespace, 0.1+0.2-style summation). Behavioral: submitted `12.345` (bypassing the `step` HTML5 gate with `form.noValidate=true` to reach the server path — see Interpretations), `-3`, `1000000000.01`, and a 65-char category with the RPC bypass off for category (maxLength doesn't block programmatic `.value`, so this one already exercised the server path); each redirected to `?error=<code>` with the matching `[role=alert]` message, created no row (entry list stayed at 1 `smoke-test` row throughout), and the amount/category cases echoed the typed value back (`f_amount=12.345` visible in the URL and reflected in the field) — PASS
+- List/delete from `records_v1` (`kind='financial_entry'`), newest first, delete = own rows only, empty state — unit: `shapeEntries` tests (financials.test.mjs) + `qa-financials.test.mjs`'s static check that `deleteFinancialEntry` re-reads `records_v1` filtered by `kind`+`source` before `delete_record` (RPC not injectable — see Interpretations). Behavioral: added `smoke-test`, it appeared newest-first; deleted it via the UI's Delete button, list returned to "No entries yet." — PASS
+- Profit identity, home panel rows (Revenue/Ad Spend/Expenses-manual/Profit), deltas, daily table days-with-nothing omitted + empty state — unit: `computeProfit`/`computeFinancialRows`/`computeDailyRows` tests (financials.test.mjs) + `qa-financials.test.mjs` (income+expense same day, range-boundary inclusion/exclusion, zero/empty previous-period delta). Behavioral: with one manual expense entry the Daily Breakdown table showed exactly one row (`Sep 13, 2026 | — | — | — | $9.99 | — | $9.99` for an income entry) and reverted to the not-connected state note once deleted; home `/` Financial panel showed `Revenue — / Ad Spend — / Expenses $12 / Profit -$12` while the entry existed (manual-only Expenses, matching the engineer's DESIGN.md-corrected identity) and reverted to the not-connected state after delete — PASS
+- typecheck/lint/test green — `corepack pnpm typecheck` → `$ tsc --noEmit`, no output, exit 0. `corepack pnpm lint` → `$ eslint .`, no output, exit 0. `corepack pnpm test` → `# tests 110 / # pass 109 / # fail 0 / # skipped 1` (includes the 9 new `qa-financials.test.mjs` tests, all passing) — PASS
 
 ## Tests Added
-- `tests/qa-monday-meet.test.mjs` — mixed-case progress detection, all-done tone, duplicate-`due_on` tiebreak, >5-task cap with priority order, multi-line/whitespace excerpt collapsing, `occurred_at` ties + >3 cap, `panelState` connection-vs-data-presence distinction, and static assertions on `app/page.tsx`'s allSettled/unwrap/state-derivation wiring. No new test infra — reuses the existing `tsx --test` harness.
-- `package.json` — registered `tests/qa-monday-meet.test.mjs` in the `test` script.
+- `tests/qa-financials.test.mjs` — 9 tests: adversarial `parseAmountToCents` gaps (unicode digits, `-0`, embedded whitespace, whitespace-wrapped valid amounts, exact-cent summation), `computeDailyRows` income+expense same day and range-boundary inclusion, `computeFinancialTiles` delta-vs-empty/zero previous period, `financialRecordsQuery`'s query shape via a minimal chainable fake client (kind/source filters, range, order, limit), and a static assertion that `deleteFinancialEntry` filters by kind+source before calling `delete_record`.
+- No new test infra: reused the existing `tsx --test` convention and registered the file in `package.json`'s `test` script alongside the existing suites.
+
+## Interpretations
+- `app/financials/actions.ts`'s `createFinancialEntry`/`deleteFinancialEntry` call `getDataClient()`/`save_record`/`delete_record` directly with no injection seam, so they are not unit-mockable. Interpreted the "server-side validation is the gate" criterion as: unit-test the validator (`parseEntryInput`/`parseAmountToCents`) that gates the RPC call, and confirm behaviorally (bypassing the client-side HTML5 `step`/`max` constraints with `form.noValidate = true`, since those constraints otherwise block the browser from ever sending an out-of-range `amount` to the server) that the server still rejects the value, shows the matching message, and creates no row. The delete-ownership check (kind+source re-read before `delete_record`) was verified statically by asserting the read happens before the delete call in `actions.ts`, since there is no second client account available to attempt a cross-client delete live.
+- Money cap boundary retested for float-safety: `parseAmountToCents("0.10") + parseAmountToCents("0.20") === 30` (exact), confirming the digit-wise cents parse avoids the classic float-drift class the brief names.
 
 ## Not Verifiable
-none
+none — every `done when:` criterion above was covered by a real test run or a real browser action with an observed result.
+
+## Live behavioral evidence
+- Screenshots: `/Users/nateseluga/.claude/jobs/8d474d1e/tmp/qa-b/shots/` — `financials-initial.png`, `after-valid-save.png`, `after-bad-category.png`, `t-init.png` (not-connected daily table + empty manual panel), `t-check.png` (daily row with a manual entry, tile values, entry list), `after-delete.png`, `home-with-entry.png`, `home-after-delete.png`.
+- Hosted writes: 2 `financial_entry` rows created as `smoke+sb@bcn-services.com` (category `smoke-test`, once expense $12.34, once income $9.99), both deleted through the UI's Delete button in the same session. Final check (`final.json` run) confirmed `rows: []`, "No entries yet." — net zero.
+- Dev server left running on 3102 (pid 36512) per the QA brief; not restarted or stopped by this session.
