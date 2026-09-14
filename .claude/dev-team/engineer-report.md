@@ -1,58 +1,78 @@
 # Engineer Report
-
-**Task:** Item B — Financial Information page (`/financials`) + home Financial panel, per DESIGN.md
-**Branch:** `feat/financials` (worktree `.claude/worktrees/financials`, off `feat/shell-home` @ 6653b70)
+**Task:** Item C — Content Library + Creative Folder page (`/library`)
+**Branch:** `feat/library` (worktree `.claude/worktrees/library`, off `feat/shell-home` @ 6653b70)
 **Date:** 2026-09-13
 
 ## Design Decisions
-
-- All pure logic lives in `lib/financials.ts` (validation, totals, tiles, daily merge, home rows) so `tests/financials.test.mjs` covers it without a DB; the page and the server action are thin.
-- Validation is server-side in `parseEntryInput`; HTML `required`/`step`/`maxlength` are convenience only. A rejected submit never reaches `save_record`.
-- No client JS: the form is a plain `<form action={serverAction}>`. Errors come back as `redirect('/financials?error=<code>&f_*=…')` — a fixed code set mapped to messages server-side (`entryErrorMessage` returns `null` for anything unknown), so a crafted query string cannot render arbitrary text. `f_*` params re-fill the form.
-- Entries are filtered on `attributes->>date` (the `YYYY-MM-DD` string written in `client_v1.timezone`), not on `occurred_at` (timestamptz), so range membership matches what the user typed rather than a UTC-shifted day.
-- `deleteFinancialEntry` re-reads `records_v1` for the posted id constrained to `kind='financial_entry'` + `source='dashboard'` before calling `delete_record` — the id arrives from a form, so a Shopify/Meta row id can't be deleted through it.
-- Null vs `$0`: `sumPresent` returns `null` only when every input is absent, so an unconnected source renders `—` and a genuine zero renders `$0`. Manual figures are `null` only when the period has no entries at all.
-- Money is integer cents end to end; `parseAmountToCents` parses the decimal string with a regex (no float math), caps at 1,000,000,000 major units and rejects non-positive values.
-- Panels size to content (`.fin-grid { align-items: start }`) — the equal-height default left the Daily Breakdown panel with ~500px of empty space in the screenshots.
+- **Upload path: browser-side storage PUT + a `register_upload` server action.** `app/library/UploadForm.tsx` (the page's only client component) builds a `createBrowserClient` on the same cookie session and PUTs each file to `media/<client_id>/orig/<uuid>.<ext>`, then posts *only that path* to `registerUpload`; bytes never enter a server action body and `serverActions.bodySizeLimit` is untouched.
+- **`client.media.upload()` cannot be used in the browser** — it decodes the JWT with `Buffer.from(token, "base64url")`, and Next 14 aliases the client bundle's `Buffer` to `next/dist/compiled/buffer`, which throws `Unknown encoding: base64url` (verified empirically; the `buffer` npm package is not installed, and adding it would be a new dependency). The two halves the form performs are byte-for-byte the calls data-client would have made.
+- **Public URL + anon key reach the browser as props**, read through `lib/env.ts` `getConfig()` at request time in the server component — no `NEXT_PUBLIC_*` inlining, so the app still builds with no environment set.
+- **`client_id` comes free from `egress_status_v1.client_id`** (already read for the egress line), so the upload path needs no extra query.
+- **Zero client JS for selection.** The grid is one `<form>` of checkboxes whose submit buttons carry `name="op"`; the bulk bar reveals itself with CSS `.media-form:has(.media-check:checked)`. One server action (`bulkAction`) dispatches to `bulk_tag` / `set_media_set_items` / `delete_media`.
+- **Bulk download renders a tray of per-file mint-on-click buttons** (`?dl=<ids>`), not auto-triggered downloads. Minting is what spends egress, so it must happen on a POST: minting on render would re-charge the client on every refresh or back-button.
+- **Egress is enforced twice.** The page server-renders every download control `disabled` when `egress_status_v1.exceeded`, and `downloadMedia` re-reads the view and refuses before calling `download_url` (which also raises `budget_reached` on its own). `egressLine()` fails open when the row is unreadable.
+- **Actions redirect instead of returning errors** (a server component can't read a return value): they `redirect("/library<back>&error=<code>")` and the page renders `.lib-alert`. `back` is validated against `/^\?[A-Za-z0-9=&%,.:_+-]*$/` before being used as a redirect target.
+- **Thumbnails sign `thumb_path` only** — see Conflicts; the original is deliberately not a fallback.
+- All pure logic lives in `lib/library.ts`; the page and actions hold every I/O call. Styling is one appended `/* === item C: library === */` block.
 
 ## Files Changed
-
-- `lib/financials.ts` — rewritten as the pure core: entry validation/shaping, `sumEntries`, `computeProfit`, `computeFinancialTotals`, `computeFinancialTiles` (the 7 DESIGN.md tiles), `computeDailyRows`, `financialRecordsQuery`, and the corrected home `computeFinancialRows`.
-- `lib/overview.ts` — exported the existing `isValidYmd` so the entry parser and the action reuse it instead of a second date regex.
-- `app/financials/actions.ts` — new: `createFinancialEntry` (`save_record('financial_entry', …, external_id=uuid, title=category, occurred_at=date)`) and `deleteFinancialEntry` (ownership-checked `delete_record`), both revalidating `/financials` and `/`.
-- `app/financials/page.tsx` — rewritten from the item A stub: 7 metric tiles with previous-period deltas, Daily Breakdown table (days with nothing omitted, empty state otherwise), Manual Entries panel (error banner, form, newest-first list with delete, "No entries yet.").
-- `app/page.tsx` — additive: `records_v1` joins the existing `Promise.allSettled`, manual income/expense totals feed `computeFinancialRows` for both periods, and the panel shows `data` whenever entries exist even with no connector.
-- `app/globals.css` — appended `/* === item B: financials === */` only: `.metric-row--7`, `.fin-grid`, `.fin-table`, `.entry-form`, `.entry-list`, `.form-error`, `.btn-link-danger`, all on existing tokens.
-- `tests/financials.test.mjs` — 7 tests → 24, covering amount parsing (incl. no float drift and the `<script>` error-code case), per-field rejection, entry shaping/range/order, profit identity, tile order/labels/origins, daily merge, and Expenses = manual only.
-
-## Conflicts with DESIGN.md
-
-- Item A's `computeFinancialRows` computed `Expenses = ad spend + manual expenses` and `Profit = revenue − expenses`. DESIGN.md says the home rows are Revenue / Ad Spend / **Expenses (manual)** / Profit, and `Profit = revenue + manual income − ad spend − manual expenses`. DESIGN.md wins: both are now as specified, and the double-count of ad spend in Expenses is gone. No other conflict found; no bcns-data change is needed (`records_v1.source` exists with `dashboard` in the enum).
+- `lib/library.ts` — new. Tag parsing to the platform's own rules, search/tag filtering, byte formatting, bulk-id validation, egress gate, storage path, set grouping/cover, labels.
+- `app/library/actions.ts` — new. `bulkAction`, `saveMedia`, `downloadMedia`, `setAction`, `registerUpload`; every write a named RPC through `lib/data.ts` as the signed-in user.
+- `app/library/UploadForm.tsx` — new. The only client component: multi-file browser-side upload + `registerUpload`, then `router.refresh()`.
+- `app/library/page.tsx` — replaced the stub with the real page: toolbar (search, tag filter, Upload, New set), media grid + bulk bar, item view, download tray, Creative Folder sidebar, egress line, empty state.
+- `app/globals.css` — appended the item C block (toolbar, grid/tile, bulk bar, set list, item view, `.sr-only`, inline/danger button variants, responsive fallbacks). Nothing above it touched.
+- `app/page.tsx` — one-line additive change: home's library tiles now derive their thumb through `mediaThumbPath()` so the two pages agree on what is signable.
+- `tests/library.test.mjs` — new. 18 unit tests over `lib/library.ts`.
+- `package.json` — appended `tests/library.test.mjs` to the `test` script.
 
 ## Verification
+All four gates run in order in the worktree (build run with the dev server stopped).
 
-- `corepack pnpm typecheck` → `$ tsc --noEmit`, no output, exit 0
-- `corepack pnpm lint` → `$ eslint .`, no output, exit 0
-- `corepack pnpm test` → `# tests 101 / # pass 100 / # fail 0 / # skipped 1`
-- `corepack pnpm build` → `✓ Compiled successfully`, `✓ Generating static pages (7/7)`, routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health` (run before the dev server started; the only change since is CSS)
-- Signed-in smoke as `smoke+sb@bcn-services.com` via `shot.mjs` on `http://localhost:3102`, screenshots in `~/.claude/jobs/8d474d1e/tmp/b-engineer/shots`:
-  - valid save (`smoke-test` / expense / 12.34) → row appears, tiles show Manual Expenses `$12`, Profit `-$12`, daily table shows Sep 13 with per-cell `—` for the unconnected sources
-  - `12.345`, `-3`, empty category, 501-char note, empty date → each redirects with its `error=` code, renders the matching `[role=alert]` message, creates nothing, and preserves the typed values
-  - home panel text `Revenue — / Ad Spend — / Expenses $12 / Profit -$12` — confirms Expenses is manual-only
-  - delete → list empty, all 7 tiles `—`, "Not connected yet." empty state
-- Hosted writes: 2 `financial_entry` rows created as smoke+sb with category `smoke-test`, both deleted through the UI's Delete. Net zero.
-- Dev server left running for QA on port 3102 — pid 36512, log `~/.claude/jobs/8d474d1e/tmp/dev-3102.log`.
+- `corepack pnpm typecheck` → `$ tsc --noEmit` (no output, exit 0)
+- `corepack pnpm lint` → `$ eslint .` (no output, exit 0)
+- `corepack pnpm test` → `# tests 93 / # pass 92 / # fail 0 / # skipped 1` (the 1 skip is the pre-existing hosted RLS scaffold)
+- `corepack pnpm build` → `✓ Compiled successfully`, `ƒ /library  71.6 kB  166 kB First Load JS`
+
+Signed-in smoke, 15 steps through `shot.mjs` against `http://localhost:3103` as `smoke+sb@bcn-services.com` (values are the driver's own JSON):
+
+```
+01-empty        {"tiles":0,"sets":0,"note":"No files yet. Upload your first creative."}
+02-uploaded     Uploaded 1 file. | tiles=1
+03-grid         {"tiles":1,"names":["smoke-test hero"],"tags":["smoke","test"]}
+04-item         /library?...&item=d75c2d41-7731-4d77-b082-a1dd9458827f
+05-tags-saved   saved
+06-download     {"status":200,"bytes":74,"host":"cnsxbglhredokjbvudfd.supabase.co","signed":true}
+07-set-created  /library?...&set=6f3ddd2c-db0b-4df6-8f81-a532c95f142e
+08-bulk-tag     tagged
+09-added-to-set added
+11-set-members  {"tiles":1,"sets":1,"tags":["bulk","edited","smoke","test"],"counts":["1 File"]}
+12-search       {"tiles":0,"note":"No files match this search."}
+13-deleted-file deleted
+14-deleted-set  set deleted
+15-final        {"tiles":0,"sets":0,"note":"No files yet. Upload your first creative."}
+```
+
+Screenshots read and checked: `01-empty`, `04-item`, `11-set-members` in `/Users/nateseluga/.claude/jobs/8d474d1e/tmp/c-engineer/shots/`. Dev server left running on **3103**, pid from `lsof -nP -iTCP:3103 -sTCP:LISTEN -t`, log `/Users/nateseluga/.claude/jobs/8d474d1e/tmp/dev-3103.log`.
+
+Hosted objects: one ≤10 KB `smoke-test hero` PNG (74 B) and one `smoke-test set` per run, all deleted through the UI. Confirmed clean afterwards — `data.media where deleted_at is null = 0`, `data.media_sets = 0`, `data.media_set_items = 0`.
+
+## Conflicts with DESIGN.md
+1. **Reorder inside a set is not implementable.** `data.media_set_items` has only `client_id, set_id, media_id, added_at` — no position column — and `api.set_media_set_items` accepts `action in ('add','remove')` only. DESIGN.md line 218 asks for "remove / reorder". Built everything else; reorder needs a bcns-data change (a `position` column plus a `reorder`/`set` action).
+2. **Thumbnails can never render today.** `data.media.thumb_path` is null for every row (nothing derives one), and the storage policy `media_read_orig` only signs `<client>/orig/...` while a download ticket for that object exists (`data.has_download_ticket`), so the original is not a usable thumbnail source — an orig fallback showed an image for five minutes after a download and a placeholder the rest of the time. The grid and set covers therefore render the placeholder tile DESIGN.md specifies "on failure", for every file. Needs a bcns-data change (thumbnail generation, or a thumb-free signing policy).
+3. **Egress meters bytes, not download counts.** `egress_status_v1` exposes `bytes_used` / `quota_bytes` / `exceeded`, so "Downloads this period: X of Y" renders byte sizes ("Downloads this period: 364 B of 20 GB").
+4. **Bulk download is a tray of per-file links**, as the spec permits, rather than auto-triggered downloads — and deliberately so, since minting on render would double-charge egress on a refresh.
 
 ## Deferred / Out of Scope
-
-- Editing an existing entry (DESIGN.md specifies create + delete only).
-- Pagination of manual entries: capped at `ENTRY_ROW_LIMIT = 500` per range, which no realistic range reaches.
-- Currency is taken from whichever source row supplies one (`pickCurrency`), defaulting to USD; there is no per-entry currency in the spec.
+- Reorder (blocked, above).
+- Server-side search/paging: the page reads ≤500 media rows, ≤200 sets and ≤5000 set-item rows and filters in memory (`ponytail:` note in `page.tsx`). Fine at SB's scale, needs `ilike`/`contains` + paging past ~500 files.
+- `restore_media` (undelete) — DESIGN.md doesn't ask for it.
+- Per-file upload progress: the form reports "Uploading <name> (n of m)" but no byte progress; supabase-js's upload has no progress callback.
 
 ## Flags for Reviewer
-
-- `app/financials/actions.ts` — the trust boundary. Both actions take raw `FormData`; `deleteFinancialEntry` relies on the kind+source re-read for authorization on top of RLS.
-- `financialRecordsQuery` filters on a JSON path (`attributes->>date`), which cannot use a plain b-tree index; fine at this row count, worth an expression index if `records_v1` grows large.
-- `campaign_daily_v1` is read with `limit(1000)` and summed in the app — marked with a `ponytail:` comment; a range longer than ~3 years of campaigns would truncate.
-- `save_record` uses a fresh `crypto.randomUUID()` as `external_id`, so a retried submit creates a second row rather than being idempotent.
-- Three sources are read in one `Promise.allSettled`; a failing source logs and degrades to `—` rather than failing the page.
+- **`registerUpload` is the one action that returns instead of redirecting** — it's called imperatively from the client component. It validates `path` and `bytes` but trusts the caller for the path shape; the platform's own `data.register_media` regex is the real gate.
+- **Storage PUT is unretried.** A failed object leaves no `data.media` row (registration is the second half), so the orphan is an unreferenced storage object, not a broken library row.
+- **`media_set_items_v1` is read unfiltered up to 5000 rows** on every page load, to group members and pick set covers. This is the query most likely to grow unbounded.
+- **`?dl=` tray ids come from the URL** — validated as UUIDs by `parseIds`, capped at 500, and each mint still goes through `download_url` as the signed-in user.
+- **Selection UI depends on CSS `:has()`** (Safari 15.4+ / Chrome 105+). On an older browser the bulk bar is always visible rather than hidden — degraded, not broken.
+- **`redirect()` inside try/catch**: every action calls `backTo`/`redirect` outside its `try`, so Next's control-flow throw is never swallowed. Worth a second pair of eyes.
+- **`/library` ships 71.6 kB of client JS** (supabase-js, pulled in by the upload form). Could be trimmed with a dynamic import of the form behind the Upload `<details>`.

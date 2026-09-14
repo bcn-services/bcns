@@ -1,8 +1,11 @@
 # Review Report
 **Date:** 2026-09-13
-**Files Reviewed:** 8 (`lib/financials.ts`, `lib/overview.ts`, `app/financials/actions.ts`, `app/financials/page.tsx`, `app/page.tsx`, `app/globals.css`, `tests/financials.test.mjs`, `.claude/dev-team/engineer-report.md`)
-**Reviewer:** dt-review (Claude Opus 5), read-only. Scope = `git diff feat/shell-home..HEAD`.
-**Dimensions Swept:** Efficiency — clean · Reliability — 2 · Scalability — 2 · Safety & Security — clean · Fault Tolerance — 1 · Data Integrity — 1 · Over-Engineering — 1
+**Item:** C — Content Library + Creative Folder (`/library`)
+**Diff reviewed:** `git diff feat/shell-home...HEAD` (worktree `.claude/worktrees/library`)
+**Files Reviewed:** 7 (`lib/library.ts`, `app/library/actions.ts`, `app/library/UploadForm.tsx`, `app/library/page.tsx`, `app/globals.css`, `app/page.tsx`, `tests/library.test.mjs`)
+**Gates re-run:** `typecheck` clean · `lint` clean · `test` 124 pass / 0 fail / 1 skip
+**Dimensions Swept:** Efficiency (clean) · Reliability (4) · Scalability (2) · Safety & Security (2) · Fault Tolerance (1) · Data Integrity (2) · Over-Engineering (1)
+**Security battery rows swept:** Every-diff · DB query · state-changing form · renders user content · file upload · redirect from user input · quota counter
 
 ## Findings
 
@@ -11,74 +14,76 @@ None.
 
 ### Important
 
-`lib/financials.ts:320` — Reliability — Profit is the first signed metric fed to `pctDeltaOrNull`; when the previous period's profit is negative the division flips the sign, so a loss that shrank renders `↓ 50.0%` in the down tone and a loss that grew renders `↑` in the up tone (`Delta` derives arrow and colour from the same sign, `app/_components/Panel.tsx:38`). — Fix: for signed metrics divide by `Math.abs(previous)`, or return `null` when `previous < 0`. Same call site for the home Profit row at `lib/financials.ts:435`.
+**1. `app/library/UploadForm.tsx:95-101` — Reliability — a partly-failed batch reports success.**
+The `finally` block overwrites whatever error the loop set, whenever `done > 0`: upload 3 files, #1 succeeds and #2 fails → `break` → status is replaced with a green "Uploaded 1 file." and `form.reset()` clears the picker, so the user is told the upload worked and never learns files 2–3 were skipped.
+*Fix:* set `let failed = false` on each `break`; in `finally` only write the success line when `!failed`, else `Uploaded ${done} of ${files.length} — ${lastError}` with `bad: true`.
 
-`app/financials/actions.ts:72` — Fault Tolerance — `external_id: crypto.randomUUID()` is minted per invocation, so a double-clicked "Add Entry" or any retried POST writes a second identical ledger row and silently doubles Manual Income/Expenses and Profit for the range. — Fix: render a per-form idempotency token into a hidden field and pass it as `external_id`, so `save_record` upserts on the retry instead of inserting.
+**2. `app/globals.css:1278-1294` (with `app/library/page.tsx:349`) — Reliability — every bulk operation is unreachable without CSS `:has()`.**
+`.bulk-bar { display: none }` is revealed *only* by `.media-form:has(.media-check:checked)`, with no `@supports` fallback. On Safari < 15.4, Chrome < 105 or Firefox < 121 the bar stays hidden forever — Add tags, Add to set, Remove from set, Download and Delete cannot be reached at all. This is the inverse of the engineer report's flag ("always visible rather than hidden — degraded, not broken"); it is broken, not degraded.
+*Fix:* add `@supports not (selector(:has(*))) { .bulk-bar { display: flex } }` — one block, and it produces exactly the always-visible degradation the report claims.
+
+**3. `app/library/page.tsx:310` + `app/library/actions.ts:93` — Data Integrity — "Remove from set" targets the wrong set.**
+`bulkAction` reads `set_id` from the bulk bar's *Choose set…* `<select>` for both `add-set` and `remove-set`; the `open_set` hidden field submitted at page.tsx:310 is never read. Viewing set A with set B selected in the dropdown removes the files from **B**, silently; with nothing selected the user gets "Choose a set first." while standing inside the set they meant.
+*Fix:* in the `remove-set` branch, resolve the id as `parseIds([String(form.get("open_set") ?? "")])[0] ?? setId`.
+
+**4. `app/library/actions.ts:59` — Reliability — the whole validation-error branch of `codeFor` is dead.**
+`DataClientError` exposes `details` (data-client `dist/index.js:19`), not `detail`. Every BCNS3 raise in `bcns-data/supabase/migrations/20260912000500_api_rpcs.sql` is `message = 'validation', detail = '<field>'`, so `name_taken` / `bad_name` / `bad_tags` never match: creating a set whose name already exists shows "That didn't work. Please try again." and logs an unexpected-error line, and the user retries the same name forever. (`budget_reached` and `too_large` map correctly — those are the RAISE *message*, not the detail.)
+*Fix:* `const detail = String((err as { details?: string })?.details ?? "");`
+
+**5. `app/library/page.tsx:97-98` — Safety & Security — unvalidated `?error=` used as an object index 500s the page.**
+`ERRORS[errorCode]` with attacker-chosen `errorCode`: `ERRORS["__proto__"]` returns `Object.prototype`, which React renders as a child and throws "Objects are not valid as a React child", so `/library?error=__proto__` breaks the page for any signed-in user who opens the link (`?error=constructor` returns a function and renders nothing).
+*Fix:* `const errorMessage = Object.prototype.hasOwnProperty.call(ERRORS, errorCode) ? ERRORS[errorCode] : null;`
+
+**6. `app/library/page.tsx:92-93` — Reliability — repeated query params crash the render.**
+App-Router `searchParams` values are `string | string[]` at runtime, but `LibrarySearchParams` declares `string`, so TS never catches it. `?tag=a&tag=b` makes line 93 call `.toLowerCase()` on an Array → TypeError → 500; `?q=a&q=b` does the same via `matchesQuery`'s `query.trim()`. The neighbouring helpers survive only because `parsePopup` compares with `===` and `parseRange` regex-tests.
+*Fix:* coerce at the boundary — `String(searchParams.q ?? "").slice(0, 120)` and `String(searchParams.tag ?? "").slice(0, 40).toLowerCase()`.
 
 ### Minor
 
-`lib/financials.ts:159` — Data Integrity — `Number(a.amount_cents)` accepts any finite non-negative value (fractional, `1e300`) from a `records_v1` row, so a `financial_entry` written by another `save_record` caller (e.g. `agentTools`) bypasses the cent/bound rules the form enforces and can push period sums past `Number.MAX_SAFE_INTEGER`. — Fix: require `Number.isSafeInteger(amountCents) && amountCents > 0 && amountCents <= MAX_AMOUNT_MAJOR * 100`, else return `null`.
+**7. `app/library/actions.ts:41` — Reliability — `safeBack` rejects a legal search query.**
+`URLSearchParams` leaves `*` unencoded (it encodes `!'()~`), and `*` is not in the allowlist, so a search for `hero*` makes every form action in that view redirect to a bare `/library`, silently dropping the date range, the open set and the open item.
+*Fix:* add `*` to the character class.
 
-`app/financials/page.tsx:80` — Reliability — `campaign_daily_v1(...).limit(ROW_LIMIT)` has no `.order`, so which 1000 rows survive truncation is arbitrary and Ad Spend/Profit can be wrong unpredictably; the sibling `daily_summary_v1` query on line 76 does order. — Fix: add `.order("day", { ascending: false })` so the current period survives truncation ahead of the previous one.
+**8. `app/library/actions.ts:102` — Scalability — the `?dl=` tray URL can exceed Node's header limit.**
+500 ids × 37 chars ≈ 18.5 KB plus auth cookies, over Node's default 16 KB `maxHeaderSize`: the redirect lands on a 431 and the selection is lost. No select-all control exists, so reaching that count needs 400+ manual clicks — low likelihood, cheap guard.
+*Fix:* `ids.slice(0, 50)` when building the tray target.
 
-`lib/financials.ts:454` — Scalability — `.limit(ENTRY_ROW_LIMIT)` with `.order("occurred_at", desc)` spans `prevFrom..to`, so past 500 entries the *previous* period is dropped first and every manual/profit delta skews with no signal, rather than only the list truncating (deferred item, listed for the ceiling only). — Fix: when paging lands, fetch the two windows as separate bounded queries.
+**9. `app/library/actions.ts:193` — Data Integrity — a set description can be set but never cleared.**
+Rename omits `description` when the field is emptied (`...(rawDescription ? … : {})`) and `api.update_media_set` `coalesce`s, so emptying the input is a no-op with no feedback.
+*Fix:* always send `description: rawDescription` on `rename`.
 
-`lib/financials.ts:446` — Scalability — the `attributes->>date` range predicate cannot use a b-tree index (engineer-flagged), and this query now runs on every home render as well as every `/financials` render. — Fix: an expression index on `(attributes->>'date')` in bcns-data, or filter on `occurred_at` with a timezone-widened window and keep the exact bound check in `shapeEntries`.
+**10. `app/library/UploadForm.tsx:87-90` — Fault Tolerance — a failed registration orphans the uploaded object.**
+The PUT has already landed when `registerUpload` fails; nothing references the object, no UI can see it, and `purge_after` only applies to `data.media` rows — so a user retrying against an expired session accumulates one full-size billed object per attempt.
+*Fix:* `await supabase.storage.from("media").remove([path])` before the `break`.
 
-`lib/financials.ts:155` — Over-Engineering — the `row.occurred_at.slice(0, 10)` fallback for a missing `attributes.date` is unreachable: `financialRecordsQuery` filters on `attributes->>date`, which is NULL for exactly the rows the fallback exists to rescue. — Fix: drop the fallback, or move the range check out of the query so those rows can reach it.
+**11. `app/library/page.tsx:42-47` — Over-Engineering / Scalability (`ponytail:` ceiling) — in-memory paging cap.**
+Past 500 media rows the open-set view silently drops older members (`scope` maps member ids through `byId`, which only holds the newest 500), so a set's header count from `file_count` disagrees with the tiles rendered; `SET_ITEM_LIMIT = 5000` truncates the same way. Accepted tradeoff at SB scale and the upgrade note is already in place — recorded as the ceiling, not a defect.
 
-## Verified OK
+**12. `app/library/page.tsx:163-165` — Reliability — upload dead-end if the egress read fails.**
+`clientId` falls back to `allMedia[0].client_id`, so an empty library whose `egress_status_v1` read errored shows "Uploads are unavailable…" with no way out (no media → no fallback → no upload → no media). `api.egress_status_v1` selects from `data.clients` with a left join, so it always returns exactly one row; only an RLS/network failure reaches this path.
+*Fix (if it is worth one):* fall back to `client_v1.id` rather than to a media row.
 
-- **Money path.** `parseAmountToCents` (`lib/financials.ts:59`) is regex + integer arithmetic, no `parseFloat`/`Number(x)*100`. Probed directly: `1e3`, `1,000`, `+5`, `.5`, `12.`, `0`, `00`, `-3`, `0.005`, `999999999999`, `1000000000.01`, `NaN`, `Infinity`, `1.2.3`, Arabic-Indic `٣`, fullwidth `１２`, and a trailing zero-width space all return `null`; `0.01`→1, `12.34`→1234, `\t7\n`→700, cap `1000000000`→1e11 accepted. `\d` without the `u` flag keeps unicode digits out. `Number.isSafeInteger` guard present. 100k summed cents stay an exact safe integer.
-- **Delta ÷ 0.** `pctDeltaOrNull` returns `null` when `previous === 0` or either side is `null`; AOV guards `orders` truthiness at `lib/financials.ts:275` and `:116`.
-- **Formatting at render only.** Every division-to-major-units happens in `formatMoney`/`formatMoneyWhole` via `Intl` `maximumFractionDigits`, never in the totals.
-- **Server-side gate.** `parseEntryInput` re-checks date, type, category length, amount and note before any RPC; non-string `FormData` values (multipart `File`) fall through to rejection. HTML `required`/`step`/`max` are convenience only.
-- **`save_record` shape** matches DESIGN.md exactly: `external_id` a fresh UUID minted server-side (never client-supplied), `title` = category, `occurred_at` = the validated date, attributes `{date, type, category, amount_cents, note}`.
-- **Delete authorization.** `deleteFinancialEntry` re-reads `records_v1` for the posted id constrained to `kind='financial_entry'` + `source='dashboard'` under the signed-in user's RLS before calling `delete_record`, and passes the *same* id it verified — no TOCTOU gap and no path to another client's or another source's row. A non-UUID id errors the lookup and degrades to the `delete` message.
-- **Error path.** RPC failures are caught, logged server-side, and surfaced as a fixed `EntryErrorCode`; `entryErrorMessage` returns `null` for unknown codes, so a crafted `?error=` cannot render arbitrary text. No raw RPC error reaches the user.
-- **Redirect safety.** Every redirect target is the literal `/financials` plus a `URLSearchParams` query; `from`/`to` are `isValidYmd`-gated and `f_*` values are encoded — no open redirect from any form field.
-- **Reads.** `records_v1` is filtered server-side by `kind` + `source` + date range (not fetch-all-then-filter), bounded at 500 rows; the three `/financials` reads and the seven home reads are one `Promise.allSettled` each with per-source `unwrap` degrading to `—` rather than failing the page; no N+1; home and `/financials` each read `records_v1` once, in separate requests.
-- **Guardrails.** No `process.env` in the diff; `package.json`/`pnpm-lock.yaml` unchanged (no new deps); no service-role reference; writes are `save_record`/`delete_record` only; `export const dynamic = "force-dynamic"` keeps nothing at build time; zero client components or `"use client"` added.
-- **CSS/markup.** `app/globals.css` is +247 / −0 — a single appended `/* === item B: financials === */` block on existing tokens. No `dangerouslySetInnerHTML` anywhere in `app/` or `lib/`; user-entered category and note render as React children (escaped), and echoed `f_*` values render as `defaultValue` attributes (escaped).
-- **DESIGN.md conformance.** Seven tiles in spec order, Profit = revenue + manual income − ad spend − manual expenses (`computeProfit`), daily table omits empty days, "No entries yet." empty state, home Expenses row is manual-only with the item A ad-spend double-count removed.
+**13. `app/library/UploadForm.tsx:73-75` — Safety & Security — no content-type allow-list on upload.**
+`contentType` is taken from the browser and the `media` bucket declares no `allowed_mime_types` (`bcns-data/supabase/migrations/20260912000300_storage.sql:2-4`), so a member can store an HTML/SVG payload and later mint a signed URL for it. Blast radius is limited to the `*.supabase.co` origin — never the dashboard origin — and the actor must already be a member of the client. The real fix is platform-side (`allowed_mime_types` on the bucket), not this diff.
 
-## Commands Run
+## Verified clean
 
-```
-git log --oneline -5
-git diff feat/shell-home..HEAD --stat
-git status --short
-git diff feat/shell-home..HEAD -- app/page.tsx lib/overview.ts
-git diff feat/shell-home..HEAD -- package.json pnpm-lock.yaml
-git diff feat/shell-home..HEAD -- app/globals.css
-git diff feat/shell-home..HEAD --numstat -- app/globals.css
-git diff feat/shell-home..HEAD | grep -n "process\.env"
-cat -n lib/financials.ts lib/overview.ts lib/data.ts lib/panels.ts
-cat -n app/financials/actions.ts app/financials/page.tsx app/_components/MetricCard.tsx
-awk '/^## Financial Information/,/^## Content Library/' DESIGN.md
-grep -rn "dangerouslySetInnerHTML" app lib
-grep -rn "SERVICE_ROLE\|service_role" app lib
-grep -n "save_record\|delete_record\|records_v1" node_modules/@bcn-services/data-client/dist/index.d.ts
-node amt.mjs   # standalone probe of parseAmountToCents against 24 hostile inputs (run outside the worktree)
-```
+- **RPC discipline.** Every write is a named RPC through `lib/data.ts` as the signed-in user — `bulk_tag`, `set_media_set_items`, `delete_media`, `update_media`, `create/update/delete_media_set`, `download_url`, `register_upload`. No direct table write, no service-role key, no `process.env` outside `lib/env.ts` (grep-confirmed), no new dependency.
+- **Id validation.** Every id reaching an RPC passes `parseIds` (UUID-shaped, de-duplicated, capped at the RPCs' own 500). `?set=`, `?item=`, `?dl=` are all validated before use.
+- **`bulkAction` dispatch.** Closed `if/else` with a `failed` default; an unknown `op` cannot fall through to a write. `download` mints nothing. The first submit button in the grid form is "Add tags", so an Enter keypress cannot reach Delete.
+- **`set_media_set_items` semantics.** `add`/`remove` mapped one-to-one from `op`; the platform rejects any other action (BCNS3). Remove is the delete branch, not a rewrite.
+- **Egress.** Minting happens only on POST (`downloadMedia`); the tray renders per-file buttons and charges nothing on render or refresh, so a back-button or reload cannot re-spend. Controls render `disabled` from `egress_status_v1.exceeded`, `downloadMedia` re-reads the view before spending, and `api.download_url` raises `budget_reached` independently. `egressLine()`'s fail-open is **acceptable**: the only authoritative gate is the RPC, and failing closed would take downloads offline on a transient read error.
+- **Cross-tenant egress.** `api.download_url` scopes by `client_id = tenant`, and `byId`/the views are RLS-scoped, so no `?dl=` value can mint a URL for another client's media.
+- **Browser client construction.** `createBrowserClient(supabaseUrl, anonKey)` with both values passed as props from the server component via `getConfig()` — no `NEXT_PUBLIC_*` inlining, no service-role key, and the page still builds with no environment set.
+- **Upload path (engineer flag #4 answered).** `data.register_media` builds its regex as `'^' || client || '/orig/[0-9a-f-]{36}\.[a-z0-9]{1,8}$'` where `client` is the tenant from the caller's JWT, never from the input — so a signed-in user **cannot** register a path outside their own client prefix. Independently, `media_insert` on `storage.objects` requires `foldername[1] = active_client_id()` and `foldername[2] = 'orig'`, so a tampered `clientId` prop fails the PUT itself. The regex is a sufficient gate; `registerUpload` trusting the caller for path shape is fine. Size is capped server-side twice (bucket `file_size_limit`, BCNS5 in `register_media`); the filename is never used as a path (uuid + sanitized 8-char extension).
+- **Redirect safety.** `safeBack` forces a leading `?` from a character class with no `/`, so no open redirect is reachable; `redirect(url)` in `downloadMedia` uses a platform-minted Supabase signed URL. `redirect()` / `backTo()` is outside the `try` in all five actions (`actions.ts:79, 82, 110-114, 135, 163-164, 208-212`) — Next's control-flow throw is never swallowed.
+- **Escaping / XSS.** Titles, tags, set names, descriptions and the search echo all render as JSX text children or `defaultValue`; no `dangerouslySetInnerHTML` or `innerHTML` anywhere in `app/` or `lib/`. `?error=` renders only from the `ERRORS` map (see finding 5 for the indexing flaw, which is a crash, not an injection).
+- **Degradation.** All four reads go through `Promise.allSettled` + `unwrap`, so one failing view logs and renders empty rather than taking the page down; `thumbUrls` is wrapped in its own try. `router.refresh()` fires after a successful batch.
+- **Logging.** No secret, token or PII in any log line; platform detail goes to `console.error` and a generic string to the client.
+- **`app/page.tsx`.** The one-line change routes home's tiles through `mediaThumbPath()`, so both pages agree on what is signable. Correct.
+- **Tests.** `tests/library.test.mjs` is in the `test` script and the run reports 124 (up from 106 pre-item); assertions are pinned to literals, not to the module's own exported constants.
 
-No build, no dev server, no hosted call, no git state touched.
+## Notes for the orchestrator
 
-## STANDARDS.md Updates
-
-`STANDARDS.md` does not exist in this repo and was **not created**: the spawn scope for this review is "write ONLY `.claude/dev-team/review-report.md`" while dt-qa works the same worktree. Candidate project-specific rules for the orchestrator to land:
-
-## Money
-- **Integer minor units end to end**: amounts are parsed string→integer cents by regex (`lib/financials.ts parseAmountToCents`), summed as integers, and divided to major units only inside `formatMoney`/`formatMoneyWhole` via `Intl` `maximumFractionDigits`. Never `parseFloat`, never `* 100`.
-
-## Data access
-- **Form-supplied row ids are re-read before a write RPC**: a `delete_record`/mutating RPC taking an id from a form first re-reads the `*_v1` view for that id constrained to the expected `kind` + `source`, so RLS is not the only gate (`app/financials/actions.ts deleteFinancialEntry`).
-
-## Server actions
-- **Errors redirect with a fixed code, never free text**: failures `redirect('/<page>?error=<code>&f_*=…')`; the page maps the code through a closed `Record` that returns `null` for anything unknown, and echoes `f_*` back into `defaultValue` only. No raw RPC error string reaches the URL or the page.
-
-## Panels
-- **`null` means "no source", `0` means "a real zero"**: a sum returns `null` only when every component is absent (`sumPresent`), so an unconnected connector renders `—` and a genuine zero renders `$0`.
-
-## Styling
-- **`app/globals.css` is append-only per item**: each work item adds one `/* === item X: name === */` block at the end using existing tokens; existing rules are never edited.
+- `tests/qa-library.test.mjs` is **untracked** and the `package.json` line adding it to the `test` script is **uncommitted** in this worktree. Both are lost if the branch is pushed as-is.
+- Platform observation, outside this diff: `api.download_url` reads the ledger, compares to quota, then increments in a second statement — two concurrent downloads can each pass the check and overspend by one file. Belongs to `bcns-data`, not item C.
