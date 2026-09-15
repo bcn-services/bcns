@@ -351,6 +351,52 @@ summary::-webkit-details-marker {
   margin-bottom: 16px;
 }
 
+/* Daily row (chunk 4, not in the artboard): Daily Briefing, then the Daily
+   Financial Report. */
+.grid-daily {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.briefing__text {
+  margin: 4px 0 8px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+.briefing__flash {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.panel__meta {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+/* Label/value pairs laid out as a grid; no delta column, no dividers. */
+.rows--pairs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  column-gap: 28px;
+}
+
+.rows--pairs .row {
+  border-bottom: none;
+}
+
+.row--pair {
+  grid-template-columns: 1fr auto;
+}
+
 .grid-primary {
   display: grid;
   grid-template-columns: 1fr 1.18fr 1.02fr;
@@ -376,6 +422,9 @@ summary::-webkit-details-marker {
   }
   .meta-split {
     grid-template-columns: 1fr;
+  }
+  .grid-daily {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

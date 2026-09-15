@@ -25,12 +25,22 @@ function utcMsToYmd(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function addDaysYmd(ymd: string, days: number): string {
+export function addDaysYmd(ymd: string, days: number): string {
   return utcMsToYmd(ymdToUtcMs(ymd) + days * MS_DAY);
 }
 
 function spanDays(from: string, to: string): number {
   return Math.round((ymdToUtcMs(to) - ymdToUtcMs(from)) / MS_DAY) + 1;
+}
+
+/** True when Intl accepts `tz` as an IANA timezone (client_v1.timezone is free text). */
+export function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** "Today" in an IANA timezone, as YYYY-MM-DD. */

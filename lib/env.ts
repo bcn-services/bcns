@@ -21,6 +21,12 @@ function readFlag(name: string): boolean {
   return v === "1" || v === "true" || v === "yes";
 }
 
+/** A positive finite number, else undefined ("", "0", "-5", "abc" all read as unset). */
+function readPositiveNumber(name: string): number | undefined {
+  const v = Number(readEnv(name));
+  return Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
 export interface AppConfig {
   /** Direct Postgres connection string (Supabase project database). */
   databaseUrl?: string;
@@ -36,6 +42,8 @@ export interface AppConfig {
   anthropicApiKey?: string;
   /** Master switch for the opt-in AI module. Default OFF. */
   aiEnabled: boolean;
+  /** Monthly AI spend cap in USD (the daily briefing). Unset or not a positive number → no AI calls. */
+  aiMonthlyBudgetUsd?: number;
   /**
    * "own" (default): this app's own Supabase project. "shared": the bcns-data
    * shared platform via @bcn-services/data-client (lib/data.ts); no migrations and no
@@ -63,6 +71,7 @@ export function getConfig(): AppConfig {
     supabaseServiceRoleKey: readEnv("SUPABASE_SERVICE_ROLE_KEY"),
     anthropicApiKey: readEnv("ANTHROPIC_API_KEY"),
     aiEnabled: readFlag("AI_ENABLED"),
+    aiMonthlyBudgetUsd: readPositiveNumber("AI_MONTHLY_BUDGET_USD"),
     dataSource: readEnv("DATA_SOURCE")?.toLowerCase() === "shared" ? "shared" : "own",
     healthEmail: readEnv("HEALTH_EMAIL"),
     healthPassword: readEnv("HEALTH_PASSWORD"),

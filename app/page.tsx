@@ -12,6 +12,10 @@ import { getDataClient } from "@/lib/data";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
+import { dailyReportLines, loadDailyReport, yesterdayInTimezone, type DailyReport } from "@/lib/daily-report";
+import { SKIP_NOTES, aiGate, briefingFlash, capReached, loadSpend, loadStoredBriefing, type SkipReason, type StoredBriefing } from "@/lib/briefing";
+import { getConfig } from "@/lib/env";
+import { generateBriefingNow } from "@/app/actions";
 import { panelState } from "@/lib/panels";
 import { mediaThumbPath } from "@/lib/library";
 import {
@@ -21,6 +25,7 @@ import {
   computeOverviewMetrics,
   formatCompact,
   formatCount,
+  formatDayLabel,
   formatMoney,
   formatMoneyWhole,
   formatPercent,
@@ -38,7 +43,7 @@ import { MeetPanel } from "@/app/_components/MeetPanel";
 import { MondayPanel } from "@/app/_components/MondayPanel";
 import { MetricCard } from "@/app/_components/MetricCard";
 import { Panel, PanelButton, PanelHead, StateNote, Unconfigured, ViewAll, Delta } from "@/app/_components/Panel";
-import { ActivityIcon, FinanceIcon, LibraryIcon, MetaIcon, SourceTile } from "@/app/_components/icons";
+import { ActivityIcon, FinanceIcon, LibraryIcon, MetaIcon, NoteIcon, SourceTile } from "@/app/_components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +59,7 @@ function unwrap<T>(r: PromiseSettledResult<{ data: T[] | null; error: unknown }>
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: { from?: string; to?: string; popup?: string };
+  searchParams: { from?: string; to?: string; popup?: string; briefing?: string };
 }) {
   const client = await getDataClient();
   if (!client) return <Unconfigured />;
@@ -65,7 +70,16 @@ export default async function HomePage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
-  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
+  const yesterday = yesterdayInTimezone(shell.timezone);
+  const config = getConfig();
+  const briefingGate = aiGate(config);
+
+  const [storedR, spendR, dailyR, summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
+    // The stored briefing renders even with AI off (DESIGN.md "Daily Briefing").
+    loadStoredBriefing(client, yesterday),
+    briefingGate ? Promise.resolve(null) : loadSpend(client, shell.timezone, new Date()),
+    // Fixed to yesterday, not the header range (DESIGN.md "Daily Financial Report").
+    loadDailyReport(client, yesterday),
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: rows capped at 1000 (PostgREST's default); a large account over
     // a long range gets partial rollups. Upgrade: a per-range aggregate RPC in
@@ -81,6 +95,24 @@ export default async function HomePage({
     client.views.jobs_v1().eq("kind", "task").order("due_on", { ascending: true, nullsFirst: false }).limit(50),
     client.views.messages_v1().eq("kind", "meeting_note").order("occurred_at", { ascending: false }).limit(50),
   ]);
+
+  let dailyReport: DailyReport | null = null;
+  if (dailyR.status === "fulfilled") {
+    dailyReport = dailyR.value.report;
+    if (dailyR.value.errors.length) console.error(`home: daily report read failed for ${dailyR.value.errors.join(", ")}`);
+  } else {
+    console.error("home: daily report failed", dailyR.reason instanceof Error ? dailyR.reason.message : dailyR.reason);
+  }
+
+  const storedBriefing = storedR.status === "fulfilled" ? storedR.value : null;
+  // Hide the button when the run would be refused anyway; the 15-minute limit
+  // and an unpriced model are left to the action's result line.
+  let briefingBlock: SkipReason | null = briefingGate;
+  if (!briefingBlock) {
+    const spend = spendR.status === "fulfilled" ? spendR.value : null;
+    if (!spend) briefingBlock = "spend_unknown";
+    else if (capReached(spend.usd, config.aiMonthlyBudgetUsd as number)) briefingBlock = "cap_reached";
+  }
 
   const summary = unwrap(summaryR);
   const campaigns = unwrap(campaignR);
@@ -195,6 +227,11 @@ export default async function HomePage({
         <MetricCard label="Inventory" value={formatCount(metrics.inventory.value)} deltaPct={metrics.inventory.deltaPct} series={metrics.inventory.series} hasData={metrics.inventory.hasData} />
       </div>
 
+      <div className="grid-daily">
+        <DailyBriefingPanel day={yesterday} stored={storedBriefing} blocked={briefingBlock} flash={briefingFlash(searchParams.briefing)} range={range} />
+        <DailyReportPanel day={yesterday} report={dailyReport} />
+      </div>
+
       <div className="grid-primary">
         <ShopifyPanel state={shopifyState} metrics={metrics} connectHref={connectHref} />
         <MetaPanel
@@ -273,6 +310,74 @@ export default async function HomePage({
         </Panel>
       </div>
     </>
+  );
+}
+
+function DailyBriefingPanel({
+  day,
+  stored,
+  blocked,
+  flash,
+  range,
+}: {
+  day: string;
+  stored: StoredBriefing | null;
+  blocked: SkipReason | null;
+  flash: string | null;
+  range: { from: string; to: string };
+}) {
+  const blockedNote = blocked ? SKIP_NOTES[blocked] : null;
+  return (
+    <Panel className="panel--column">
+      <PanelHead tile={<NoteIcon />} title="Daily Briefing" right={<span className="panel__meta">Yesterday · {formatDayLabel(day)}</span>} />
+      {flash && flash !== blockedNote ? (
+        <p className="briefing__flash" role="status">
+          {flash}
+        </p>
+      ) : null}
+      <div className="panel__fill">
+        {stored ? (
+          <>
+            <p className="briefing__text">{stored.text}</p>
+            {stored.updatedAt ? <p className="panel__meta">Generated {formatRelativeTime(stored.updatedAt)}</p> : null}
+          </>
+        ) : (
+          <p className="state-note">No briefing for yesterday yet.</p>
+        )}
+      </div>
+      {blockedNote ? (
+        <p className="state-note">{blockedNote}</p>
+      ) : (
+        <form action={generateBriefingNow}>
+          <input type="hidden" name="from" value={range.from} />
+          <input type="hidden" name="to" value={range.to} />
+          <button className="btn-accent" type="submit">{`${stored ? "Regenerate" : "Generate"} Briefing  →`}</button>
+        </form>
+      )}
+    </Panel>
+  );
+}
+
+function DailyReportPanel({ day, report }: { day: string; report: DailyReport | null }) {
+  return (
+    <Panel className="panel--column">
+      <PanelHead tile={<FinanceIcon />} title="Daily Financial Report" right={<span className="panel__meta">Yesterday · {formatDayLabel(day)}</span>} />
+      <div className="panel__fill">
+        {report?.hasData ? (
+          <div className="rows rows--pairs">
+            {dailyReportLines(report).map((line) => (
+              <div className="row row--pair" key={line.key}>
+                <span className="row__label">{line.label}</span>
+                <span className="row__value">{line.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="state-note">No data yet.</p>
+        )}
+      </div>
+      <PanelButton href={`/financials${rangeQuery({ from: day, to: day })}`} label="Open Financials" />
+    </Panel>
   );
 }
 

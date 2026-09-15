@@ -10,6 +10,7 @@
 
 import type { DataClient } from "@bcn-services/data-client";
 import type { HealthLike } from "./panels";
+import { isValidTimezone } from "./overview";
 
 export const DEFAULT_TIMEZONE = "America/New_York";
 
@@ -31,7 +32,8 @@ export async function loadShellData(client: DataClient): Promise<ShellData> {
   if (clientR.status === "fulfilled" && !clientR.value.error && clientR.value.data) {
     const row = clientR.value.data as { name?: string | null; timezone?: string | null };
     clientName = row.name ?? null;
-    if (row.timezone) timezone = row.timezone;
+    if (row.timezone && isValidTimezone(row.timezone)) timezone = row.timezone;
+    else if (row.timezone) console.error(`shell: invalid client_v1.timezone "${row.timezone}", using ${DEFAULT_TIMEZONE}`);
   } else {
     console.error("shell: client_v1 read failed", clientR.status === "rejected" ? clientR.reason : clientR.value.error);
   }
