@@ -134,10 +134,11 @@ function isLiveRun(r: RunRow, now: Date): r is RunRow & { occurred_at: string } 
 }
 
 /** Upper bound on one call's cost, reserved against the cap before the call.
- *  ponytail: chars/2 over-counts tokens for JSON and English; switch to
- *  count_tokens if the reservation ever blocks a call that would have fit. */
+ *  One token per UTF-16 unit bounds CJK and emoji too.
+ *  ponytail: ~3-4x over-count for JSON and English; switch to count_tokens
+ *  if the reservation ever blocks a call that would have fit. */
 export function worstCaseUsd(model: string, promptChars: number): number | null {
-  return tokensToUsd(model, Math.ceil(promptChars / 2), MAX_TOKENS);
+  return tokensToUsd(model, promptChars, MAX_TOKENS);
 }
 
 /** Sum of runs in the client-local calendar month containing `now`. */
@@ -371,20 +372,20 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingOutcom
     return failed(`briefing_run reservation failed, model not called: ${errText(err)}`);
   }
 
-  // Re-read with every concurrent reservation visible: the earliest run in the
-  // window wins the rate limit, and the total must still fit the cap.
+  // Re-read with every concurrent reservation visible. On demand, any other
+  // live run in the window blocks, whatever its order: of two racing requests
+  // the later saver always sees the earlier one, so at most one proceeds (a
+  // same-instant double click may release both; the user retries). The total
+  // must still fit the cap.
+  // ponytail: a crash between reserve and release leaves the worst case live:
+  // on-demand blocked for 15 min and the month over-counted by one worst case.
   const after = await loadSpend(client, timezone, now);
   const mine = after?.runs.find((r) => r.external_id === runId);
-  const earlier = (r: RunRow & { occurred_at: string }) => {
-    const t = Date.parse(r.occurred_at);
-    const m = Date.parse(mine?.occurred_at ?? "");
-    return t < m || (t === m && (r.external_id ?? "") < runId);
-  };
   const blocked: SkipReason | "invisible" | null = !after
     ? "spend_unknown"
     : !mine
       ? "invisible"
-      : deps.onDemand && after.runs.some((r) => r !== mine && isLiveRun(r, now) && now.getTime() - Date.parse(r.occurred_at) < RATE_LIMIT_MS && earlier(r))
+      : deps.onDemand && after.runs.some((r) => r !== mine && isLiveRun(r, now) && now.getTime() - Date.parse(r.occurred_at) < RATE_LIMIT_MS)
         ? "rate_limited"
         : capReached(after.usd, cap)
           ? "cap_reached"

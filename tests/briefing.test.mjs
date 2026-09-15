@@ -20,6 +20,7 @@ import {
   runBriefing,
   runUsd,
   tokensToUsd,
+  worstCaseUsd,
 } from "../lib/briefing.ts";
 import { getConfig } from "../lib/env.ts";
 
@@ -358,10 +359,22 @@ test("concurrent on-demand: an earlier reservation in the window wins, this one 
   assert.deepEqual(JSON.parse(client.saved.at(-1).body), { released: "rate_limited", usd: 0 });
 });
 
-test("concurrent on-demand: a later reservation doesn't block the earlier one", async () => {
+test("concurrent on-demand: a reservation stamped later still blocks (save order, not stamp order, decides)", async () => {
   const other = { external_id: "briefing_run:other", occurred_at: new Date(NOW.getTime() + 1000).toISOString(), body: JSON.stringify({ reserved: true, usd: 0.01 }) };
-  const out = await go(fakeClient({ concurrent: [other] }), fakeAi(), { onDemand: true });
+  const fake = fakeAi();
+  const out = await go(fakeClient({ concurrent: [other] }), fake, { onDemand: true });
+  assert.equal(out.reason, "rate_limited");
+  assert.equal(fake.calls.length, 0);
+});
+
+test("concurrent cron: another reservation doesn't rate-limit the cron run", async () => {
+  const other = { external_id: "briefing_run:other", occurred_at: NOW.toISOString(), body: JSON.stringify({ reserved: true, usd: 0.01 }) };
+  const out = await go(fakeClient({ concurrent: [other] }), fakeAi());
   assert.equal(out.status, "saved");
+});
+
+test("the worst case counts one input token per character (bounds CJK/emoji)", () => {
+  assert.ok(worstCaseUsd("claude-haiku-4-5", 1_000_000) >= 1);
 });
 
 test("concurrent reservations that together pass the cap: released, no call", async () => {
