@@ -25,7 +25,7 @@ function utcMsToYmd(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function addDaysYmd(ymd: string, days: number): string {
+export function addDaysYmd(ymd: string, days: number): string {
   return utcMsToYmd(ymdToUtcMs(ymd) + days * MS_DAY);
 }
 

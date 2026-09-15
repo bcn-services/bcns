@@ -147,8 +147,9 @@ columns.
 
 ## Home `/`
 
-Grid per design: metric row → Shopify / Meta Ads / Financial Information →
-Google Meet / Monday.com / Content Library / Recent Activity.
+Grid per design: metric row → daily row (Daily Financial Report) → Shopify /
+Meta Ads / Financial Information → Google Meet / Monday.com / Content Library
+/ Recent Activity. The daily row is not in the artboard (chunk 4).
 
 - **Metric row (6 tiles)**: Total Revenue, Orders, Conversion Rate, ROAS, AOV,
   Inventory. Each: value, delta vs previous period, sparkline of the daily
@@ -178,6 +179,24 @@ Google Meet / Monday.com / Content Library / Recent Activity.
   media (`media_v1`) if fewer than 6 sets.
 - **Recent Activity panel**: latest 5 rows of `activity_v1`: source tile,
   text, relative time ("2m ago").
+
+### Daily Financial Report
+
+- **Placement**: the daily row (`.grid-daily`), between the metric row and
+  Shopify / Meta / Financial.
+- **Always yesterday** in the client's timezone (`client_v1.timezone`); the
+  header date range does not move it. Header right shows "Yesterday · Sep 13,
+  2026".
+- **Figures**: Revenue, Orders, AOV (`daily_summary_v1`), Ad Spend
+  (`campaign_daily_v1`), Manual Income, Manual Expenses (`records_v1`
+  `financial_entry`), Profit (same identity as `/financials`). A source with
+  no row for the day shows `—`, never `$0`. No deltas.
+- **Computed live** on every render (`lib/daily-report.ts`), not persisted.
+  `pnpm briefing` prints the same report to stdout.
+- **States**: data, or "No data yet." when no source has anything for the
+  day. No not-connected state: manual entries need no connector. A failed
+  read counts as no rows for that source and is logged.
+- Button "Open Financials  →" → `/financials` for that one day.
 
 ## Financial Information `/financials`
 

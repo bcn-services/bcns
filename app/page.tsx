@@ -12,6 +12,7 @@ import { getDataClient } from "@/lib/data";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
+import { dailyReportLines, loadDailyReport, yesterdayInTimezone, type DailyReport } from "@/lib/daily-report";
 import { panelState } from "@/lib/panels";
 import { mediaThumbPath } from "@/lib/library";
 import {
@@ -21,6 +22,7 @@ import {
   computeOverviewMetrics,
   formatCompact,
   formatCount,
+  formatDayLabel,
   formatMoney,
   formatMoneyWhole,
   formatPercent,
@@ -65,7 +67,11 @@ export default async function HomePage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
-  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
+  const yesterday = yesterdayInTimezone(shell.timezone);
+
+  const [dailyR, summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
+    // Fixed to yesterday, not the header range (DESIGN.md "Daily Financial Report").
+    loadDailyReport(client, yesterday),
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: rows capped at 1000 (PostgREST's default); a large account over
     // a long range gets partial rollups. Upgrade: a per-range aggregate RPC in
@@ -81,6 +87,14 @@ export default async function HomePage({
     client.views.jobs_v1().eq("kind", "task").order("due_on", { ascending: true, nullsFirst: false }).limit(50),
     client.views.messages_v1().eq("kind", "meeting_note").order("occurred_at", { ascending: false }).limit(50),
   ]);
+
+  let dailyReport: DailyReport | null = null;
+  if (dailyR.status === "fulfilled") {
+    dailyReport = dailyR.value.report;
+    if (dailyR.value.errors.length) console.error(`home: daily report read failed for ${dailyR.value.errors.join(", ")}`);
+  } else {
+    console.error("home: daily report failed", dailyR.reason instanceof Error ? dailyR.reason.message : dailyR.reason);
+  }
 
   const summary = unwrap(summaryR);
   const campaigns = unwrap(campaignR);
@@ -195,6 +209,10 @@ export default async function HomePage({
         <MetricCard label="Inventory" value={formatCount(metrics.inventory.value)} deltaPct={metrics.inventory.deltaPct} series={metrics.inventory.series} hasData={metrics.inventory.hasData} />
       </div>
 
+      <div className="grid-daily">
+        <DailyReportPanel day={yesterday} report={dailyReport} />
+      </div>
+
       <div className="grid-primary">
         <ShopifyPanel state={shopifyState} metrics={metrics} connectHref={connectHref} />
         <MetaPanel
@@ -273,6 +291,29 @@ export default async function HomePage({
         </Panel>
       </div>
     </>
+  );
+}
+
+function DailyReportPanel({ day, report }: { day: string; report: DailyReport | null }) {
+  return (
+    <Panel className="panel--column">
+      <PanelHead tile={<FinanceIcon />} title="Daily Financial Report" right={<span className="panel__meta">Yesterday · {formatDayLabel(day)}</span>} />
+      <div className="panel__fill">
+        {report?.hasData ? (
+          <div className="rows rows--pairs">
+            {dailyReportLines(report).map((line) => (
+              <div className="row row--pair" key={line.key}>
+                <span className="row__label">{line.label}</span>
+                <span className="row__value">{line.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="state-note">No data yet.</p>
+        )}
+      </div>
+      <PanelButton href={`/financials${rangeQuery({ from: day, to: day })}`} label="Open Financials" />
+    </Panel>
   );
 }
 
