@@ -268,7 +268,8 @@ test("a call reserves the worst case, overwrites it with tokens + usd, then save
   assert.equal(reserve.occurred_at, NOW.toISOString());
   const reserved = JSON.parse(reserve.body);
   assert.equal(reserved.reserved, true);
-  assert.ok(reserved.usd > 0.005, `reservation ${reserved.usd} covers max_tokens output`);
+  // 400 max_tokens × $5/MTok output = $0.002, plus input: the reservation must exceed output alone.
+  assert.ok(reserved.usd > 0.002, `reservation ${reserved.usd} covers max_tokens output`);
   assert.equal(cost.external_id, reserve.external_id);
   assert.deepEqual(JSON.parse(cost.body), { input_tokens: 1000, output_tokens: 200, usd: 0.002 });
   assert.equal(summary.kind, "briefing");
@@ -404,6 +405,7 @@ test("empty data: one call, no tools, payload says '—' and empty lists", async
   assert.equal(fake.calls.length, 1);
   const params = fake.calls[0];
   assert.equal(params.model, "claude-haiku-4-5");
+  assert.equal(params.max_tokens, 400, "hard length cap: 6 short lines fit well inside it");
   assert.equal("tools" in params, false);
   const payload = JSON.parse(params.messages[0].content);
   assert.equal(payload.day, DAY);
