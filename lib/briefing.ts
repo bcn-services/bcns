@@ -27,7 +27,10 @@ const PRICES_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
 };
 
-const MAX_TOKENS = 1024;
+/** The prompt asks for at most 6 short lines (~150 tokens); this is the hard
+ *  length cap so a runaway reply can't stretch the panel, and it keeps the
+ *  worst-case reservation small. */
+const MAX_TOKENS = 400;
 const ROW_LIMIT = 200;
 /** ponytail: one page of this month's runs. Hitting the limit reads as "spend
  *  unknown" (no call) rather than an undercount; page it if a client ever needs
