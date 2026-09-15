@@ -46,10 +46,15 @@ Learned on the 2026-09-14 rehearsal:
 - `read_all_orders` can only be requested **after** a distribution is chosen (Partner Dashboard →
   API access requests: "Choose your distribution model before requesting"). So S2 fails on a
   dev-store rehearsal by design; choose custom distribution for SB's domain first, then request it.
-- **Protected customer data Level 2 (name, email) is required.** The order pull reads
-  `customer{id email displayName}` and ShopifyQL needs Level 2; without it both return
-  `ACCESS_DENIED`. Partner Dashboard → API access requests → Protected customer data access →
+- **Protected customer data Level 2 is required.** The order pull reads
+  `customer{id email displayName}` (needs Name + Email); ShopifyQL needs all four fields (Name,
+  Email, Phone, Address). Without them each returns `ACCESS_DENIED`. Partner Dashboard → API access requests → Protected customer data access →
   step 1. Only App Store apps are reviewed; checklist S6 (fails) and S4 (warns) catch it.
+- **ShopifyQL (API ≥ 2025-10) returns `ShopifyqlQueryResponse { parseErrors tableData { columns rows } }`**,
+  rows keyed by column name; query mistakes land in `parseErrors`, not GraphQL `errors`. Daily
+  grouping is `TIMESERIES day` (bare `BY day` is a parse error). Dev store returned
+  `day:DAY_TIMESTAMP, sessions:INTEGER, conversion_rate:PERCENT`. Values are strings; `PERCENT` is a
+  0–1 fraction (`bounce_rate "1.0"` = both of a day's 2 sessions bounced); days with no sessions are `null`.
 - The method choice is permanent (*"You can't change the distribution method after you select
   it"*), so every client needs its own app.
 
@@ -63,10 +68,11 @@ Costs and risks:
   and exchange within minutes.
 - Custom distribution is one store (or one Plus org) per app → one Dev Dashboard app per client. Fine
   until the public app (REQUIREMENTS "Still open") is worth building.
-- **Doc ambiguity:** Shopify lists custom distribution as *"Installed on a single Shopify store, on
-  multiple stores that belong to the same Plus organization, or on transfer-disabled development
-  stores."* One reading limits the single store to dev/Plus stores; SB is on Basic. Settle it by
-  generating the link (step 2) — 5 minutes, before anything else.
+- **Basic plan accepted — confirmed 2026-09-14.** Shopify lists custom distribution as *"Installed on
+  a single Shopify store, on multiple stores that belong to the same Plus organization, or on
+  transfer-disabled development stores."* Generating the link for `saunaboy-2` (Basic, no Plus org)
+  succeeded, so the single-store reading holds. The "Allow multi-store install for one Plus
+  organization" box is ticked by default and locks with the link; on a non-Plus store it changes nothing.
 
 ## Option B — client credentials from an app in SB's own organization
 
@@ -100,13 +106,15 @@ store.
 
 ## Open items before connection day
 
-1. **Link check (Nate, 5 min):** create the app, generate a custom distribution link for SB's
-   confirmed live store domain. Refused → switch to B. Also confirm with Declan which store is live
-   (`saunaboy-2` is Basic, 0 orders, password-protected).
+1. **Link check — DONE 2026-09-14.** Custom distribution selected on `bcns-data`; link generated for
+   `saunaboy-2.myshopify.com` and accepted on Basic, so Option B is not needed. Nate confirmed it is
+   SB's real store: it redirects to `saunaboy.com`, still password-protected and pre-launch (0 orders,
+   payments not set up), so the first pull finds no data.
 2. **Rehearse on a bcns dev store first — DONE 2026-09-14** (`bcns-data-dev`, app version
    `bcns-data-3`, 6 scopes): hmac + state OK, exchange returned no `expires_in`/`refresh_token`,
    S1 PASS, S2 FAIL as expected (see "Learned" above), S4 `ACCESS_DENIED` → Level 2 needed. Re-run
-   after Level 2 is granted, and again with all 7 scopes once `read_all_orders` is approved.
+   after Level 2 (all four fields): S6 PASS, S4 returns sessions + conversion_rate rows. Re-run
+   again with all 7 scopes once `read_all_orders` is approved.
    Token prefix is `shpua_`; `redact()` now masks every `shp??_` prefix.
 3. **Checklist S1 prefix — RESOLVED (2026-09-13).** The check was: `scripts/checklist.ts` rejected
    any token not starting `shpat_`, and Shopify does not document the prefix of OAuth offline or
