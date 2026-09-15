@@ -147,7 +147,8 @@ columns.
 
 ## Home `/`
 
-Grid per design: metric row → daily row (Daily Financial Report) → Shopify /
+Grid per design: metric row → daily row (Daily Briefing, Daily Financial
+Report) → Shopify /
 Meta Ads / Financial Information → Google Meet / Monday.com / Content Library
 / Recent Activity. The daily row is not in the artboard (chunk 4).
 
@@ -180,10 +181,40 @@ Meta Ads / Financial Information → Google Meet / Monday.com / Content Library
 - **Recent Activity panel**: latest 5 rows of `activity_v1`: source tile,
   text, relative time ("2m ago").
 
+### Daily Briefing
+
+- **Placement**: first (wider) column of the daily row (`.grid-daily`), left
+  of the Daily Financial Report; the row stacks to one column at ≤1100px.
+  Header: note tile, "Daily Briefing", right "Yesterday · Sep 13, 2026".
+- **What it shows**: the stored `briefing` record for yesterday
+  (`external_id` `briefing:<day>`), plain text, then "Generated 2h ago". It
+  renders whenever the record exists, **including with AI off**.
+- **Where it comes from**: `pnpm briefing`, the droplet cron at 06:00
+  client-local (DEPLOY.md), or the button. One Messages call (no tools) on
+  the app-core default model over a JSON payload of yesterday's Daily
+  Financial Report figures plus `campaign_daily_v1`, `jobs_v1`,
+  `messages_v1` and `activity_v1` rows, with fields picked by name (titles,
+  statuses, numbers; no ids, owners, participants, bodies, detail or URLs).
+  Logic in `lib/briefing.ts`. No email.
+- **Empty state**: "No briefing for yesterday yet." above the button.
+- **AI-off state**: when AI is off, the key is missing, `AI_MONTHLY_BUDGET_USD`
+  is unset, or this month's spend has reached it, the button is replaced by
+  one line saying why and pointing at the Daily Financial Report. A stored
+  briefing still shows.
+- **On-demand button**: "Generate Briefing  →" ("Regenerate" once one
+  exists), a server action run as the signed-in user. At most one per 15
+  minutes, measured from the latest `briefing_run`. The result comes back as
+  one accent line under the header (updated / try later / budget used up).
+- **Cost**: every call saves one `briefing_run` record, first as a
+  worst-case reservation (before the call, so no call goes unrecorded), then
+  overwritten with tokens in/out and USD. This month's spend = the sum of
+  this month's (client-local) runs; if spend plus the worst case would reach
+  the cap, no call is made.
+
 ### Daily Financial Report
 
-- **Placement**: the daily row (`.grid-daily`), between the metric row and
-  Shopify / Meta / Financial.
+- **Placement**: the daily row (`.grid-daily`), right of the Daily Briefing,
+  between the metric row and Shopify / Meta / Financial.
 - **Always yesterday** in the client's timezone (`client_v1.timezone`); the
   header date range does not move it. Header right shows "Yesterday · Sep 13,
   2026".
@@ -264,5 +295,5 @@ change)**:
 
 ## Out of scope (this build)
 
-Daily Briefing (chunk 4), any chat/agent, writes back to Shopify/Meta/
+Any chat/agent, briefing email, writes back to Shopify/Meta/
 Monday/Meet, Meet or Monday pages, Drive indexing UI, QuickBooks.

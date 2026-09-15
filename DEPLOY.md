@@ -56,6 +56,76 @@ Everything above applies except the Supabase project and its secrets.
   `HEALTH_PASSWORD` in `/srv/<slug>/env` and restart `bcns-app@<slug>`.
   Otherwise health fails and the next deploy rolls back.
 
+## SB checklist (shared mode, slug `sb`)
+
+Tick each before the first deploy. Nothing here is scheduled or deployed by
+the repo.
+
+- **Platform:** client `sb` on bcns Connect (hosted project
+  `cnsxbglhredokjbvudfd`), smoke user `smoke+sb@bcn-services.com`, agent user
+  from bcns-data `add-member --slug sb --agent`.
+- **Droplet:** `infra/onboard-client.sh sb <port> <domain>` → Unix user `sb`,
+  `/srv/sb/{releases,current}`, `/srv/sb/env` (mode 600), unit
+  `bcns-app@sb`.
+- **`/srv/sb/env`:**
+
+  | Var | Value |
+  |---|---|
+  | `PORT` | the port given to `onboard-client.sh` |
+  | `DATA_SOURCE` | `shared` |
+  | `NEXT_PUBLIC_SUPABASE_URL` | `https://cnsxbglhredokjbvudfd.supabase.co` |
+  | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | platform anon key (Supabase `get_publishable_keys`) |
+  | `HEALTH_EMAIL` / `HEALTH_PASSWORD` | smoke user |
+  | `AGENT_EMAIL` / `AGENT_PASSWORD` | agent user (`pnpm briefing` signs in as it) |
+  | `AI_ENABLED` | `1` once SB approves the cap, else unset |
+  | `ANTHROPIC_API_KEY` | SB's own key (BYOK) |
+  | `AI_MONTHLY_BUDGET_USD` | the cap SB approved; unset = no AI calls |
+
+  Never `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL`.
+- **DNS (Cloudflare):** `<domain>` (a subdomain, or SB's own domain via
+  CNAME) → droplet IP, proxied, TLS "Full (strict)".
+- **UptimeRobot:** HTTP monitor on `https://<domain>/api/health`, 5-min
+  interval, alert to ops. It fails if the smoke login breaks.
+- **CI (repo `bcn-services/bcns-client-sb`):** secrets `GH_PACKAGES_TOKEN`,
+  `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (key for user `sb`); variables
+  `CLIENT_SLUG=sb`, `DATA_SOURCE=shared`. No `SUPABASE_DB_URL`.
+- **Morning briefing (06:00 client-local).** `pnpm briefing` is a source
+  script (`tsx scripts/briefing.ts`), and the standalone bundle in
+  `/srv/sb/current` has no `scripts/`. It runs from a checkout owned by `sb`:
+
+  ```bash
+  # as sb, once; repeat the pull + install after each deploy
+  git clone https://github.com/bcn-services/bcns-client-sb /srv/sb/src
+  cd /srv/sb/src && git checkout <deployed sha> && corepack pnpm install --frozen-lockfile --prod
+  ```
+
+  `@bcn-services/*` are private packages, so the install needs a read token
+  in `sb`'s `~/.npmrc`. Then a systemd timer (no PM2), in the client's
+  timezone (`client_v1.timezone`; the example uses New York). systemd applies
+  DST from the zone:
+
+  ```ini
+  # /etc/systemd/system/bcns-briefing@.service
+  [Service]
+  Type=oneshot
+  User=%i
+  WorkingDirectory=/srv/%i/src
+  EnvironmentFile=/srv/%i/env
+  ExecStart=/usr/bin/corepack pnpm briefing
+
+  # /etc/systemd/system/bcns-briefing@.timer
+  [Timer]
+  OnCalendar=*-*-* 06:00:00 America/New_York
+  Persistent=true
+  [Install]
+  WantedBy=timers.target
+  ```
+
+  Enable with `sudo systemctl enable --now bcns-briefing@sb.timer`. Check it
+  with `systemctl list-timers bcns-briefing@sb.timer` and
+  `journalctl -u bcns-briefing@sb`. A failed briefing exits 1 after printing
+  the Daily Financial Report, so it shows as a failed unit.
+
 ## Steps
 
 1. **Supabase** — create the client's project. Schema is applied only by CI:
