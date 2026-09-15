@@ -9,7 +9,8 @@ status: active
 
 **SB Command Center**: one dashboard over SB's Shopify, Meta Ads, Monday.com
 and Google Meet data, read from the shared bcns-data platform
-(`DATA_SOURCE=shared`), with a content library and a daily briefing. See
+(`DATA_SOURCE=shared`), with a content library and a Daily Financial Report
+(no AI in v1). See
 [`CLIENT.md`](CLIENT.md) for the brief and config decisions.
 
 Generated from the bcns hosted-web template, a **Next.js 14 (App Router,
