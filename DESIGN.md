@@ -147,8 +147,8 @@ columns.
 
 ## Home `/`
 
-Grid per design: metric row → daily row (Daily Briefing, Daily Financial
-Report) → Shopify /
+Grid per design: metric row → daily row (Daily Financial Report; the Daily
+Briefing joins it in the next version) → Shopify /
 Meta Ads / Financial Information → Google Meet / Monday.com / Content Library
 / Recent Activity. The daily row is not in the artboard (chunk 4).
 
@@ -182,6 +182,10 @@ Meta Ads / Financial Information → Google Meet / Monday.com / Content Library
   text, relative time ("2m ago").
 
 ### Daily Briefing
+
+**Not in v1** (no AI, agreed with Declan 2026-09-15): the panel comes off the
+v1 home and the Daily Financial Report has the daily row to itself. The spec
+below is kept for the next version, a daily briefing of tasks to do.
 
 - **Placement**: first (wider) column of the daily row (`.grid-daily`), left
   of the Daily Financial Report; the row stacks to one column at ≤1100px.

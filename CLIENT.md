@@ -21,9 +21,10 @@ layer; it never writes back to those systems.
   page shows each connection's live status.
 - **Content Library and Creative Folder:** upload, tag, search, creative sets,
   bulk tagging, and full-quality download.
-- **Daily Briefing:** an AI summary each morning of the previous day across
-  every source, plus an on-demand button. This is the only AI in v1; there's no
-  chat assistant.
+- **No AI in v1** (agreed with Declan 2026-09-15): the Daily Financial Report
+  is script-generated (`lib/daily-report.ts`, computed on every page load).
+  There's no AI summary and no chat assistant. A daily briefing of tasks to do
+  comes in the next version.
 
 ## Layout and visual (decided 2026-09-12, not built yet)
 
@@ -36,9 +37,10 @@ layer; it never writes back to those systems.
   Content Library (with the Creative Folder), and the Financial Information
   page. You reach each one by its header button or by clicking its panel on
   home, not through a nav (amended 2026-09-13).
-- **No agent.** The reference's "Ask the Command Center anything" strip and its
-  quick actions are out; the AI Agent is scoped as a separate product. The
-  Daily Briefing stays (it's in the signed quote).
+- **No agent, no AI.** The reference's "Ask the Command Center anything" strip
+  and its quick actions are out; the AI Agent is scoped as a separate product.
+  The Daily Briefing panel comes off the v1 home too (amended 2026-09-15; the
+  code stays in the repo, off, for the next version).
 - **Financial Information** combines the financial figures from every connected
   app: Shopify revenue, orders and AOV, and Meta ad spend. Its page may also
   let SB enter figures those apps don't track, stored as dashboard records
@@ -58,8 +60,8 @@ layer; it never writes back to those systems.
 | Decision | Choice | Where it lands |
 | --- | --- | --- |
 | Data source | **shared** (bcns-data platform, client `sb`) | Repo var `DATA_SOURCE=shared` (set). `supabase/` deleted. Data is read only through `lib/data.ts`. At deploy, `/srv/sb/env` holds the platform URL and anon key, plus `HEALTH_EMAIL`/`HEALTH_PASSWORD` = `smoke+sb@bcn-services.com` (keychain `bcns-smoke-sb`). |
-| Shape | **app only in v1** (decided 2026-09-15): no agent loop and no agent user. The morning briefing is `pnpm briefing` on the droplet timer, signed in as the smoke user; the Generate button runs as whoever is signed in. `agent/` stays in the repo, unused. | `/srv/sb/env`: `AGENT_EMAIL`/`AGENT_PASSWORD` = the `HEALTH_*` values |
-| AI feature | **on** for the daily briefing: BYOK at deploy, capped at a monthly ceiling SB approves. The build default stays off. | `.env.example` note, and `AI_ENABLED=1` + `ANTHROPIC_API_KEY` per deploy |
+| Shape | **app only in v1** (decided 2026-09-15): no agent loop, no agent user, nothing on a timer. The Daily Financial Report is computed on each page load. `agent/` and `scripts/briefing.ts` stay in the repo, unused. | No `AGENT_*` in `/srv/sb/env` |
+| AI feature | **off in v1** (agreed with Declan 2026-09-15). The next version's task briefing would turn it on: BYOK, capped at a monthly ceiling SB approves. | `AI_ENABLED` unset and no `ANTHROPIC_API_KEY` in `/srv/sb/env` |
 | Storage backend | **platform media RPCs** (data-client `media.*`) | `lib/storage.ts` stays `null` (note added) |
 | Webhook providers | **none**: the platform worker pulls every source | No `app/api/` provider routes |
 

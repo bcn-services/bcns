@@ -63,7 +63,7 @@ the repo.
 
 - **Platform:** client `sb` on bcns Connect (hosted project
   `cnsxbglhredokjbvudfd`), smoke user `smoke+sb@bcn-services.com`. No agent
-  user in v1 (CLIENT.md, Shape).
+  user and no AI in v1 (CLIENT.md, Shape and AI feature).
 - **Droplet:** `infra/onboard-client.sh sb <port> <domain>` → Unix user `sb`,
   `/srv/sb/{releases,current}`, `/srv/sb/env` (mode 600), unit
   `bcns-app@sb`.
@@ -76,12 +76,9 @@ the repo.
   | `NEXT_PUBLIC_SUPABASE_URL` | `https://cnsxbglhredokjbvudfd.supabase.co` |
   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | platform anon key (Supabase `get_publishable_keys`) |
   | `HEALTH_EMAIL` / `HEALTH_PASSWORD` | smoke user |
-  | `AGENT_EMAIL` / `AGENT_PASSWORD` | the smoke user again (`pnpm briefing` signs in as it); re-set both pairs after `rotate-smoke` |
-  | `AI_ENABLED` | `1` once SB approves the cap, else unset |
-  | `ANTHROPIC_API_KEY` | SB's own key (BYOK) |
-  | `AI_MONTHLY_BUDGET_USD` | the cap SB approved; unset = no AI calls |
 
-  Never `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL`.
+  Never `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL`. v1 leaves `AGENT_*`,
+  `AI_ENABLED`, `ANTHROPIC_API_KEY` and `AI_MONTHLY_BUDGET_USD` unset (no AI).
 - **DNS (Cloudflare):** `<domain>` (a subdomain, or SB's own domain via
   CNAME) → droplet IP, proxied, TLS "Full (strict)".
 - **UptimeRobot:** HTTP monitor on `https://<domain>/api/health`, 5-min
@@ -89,7 +86,10 @@ the repo.
 - **CI (repo `bcn-services/bcns-client-sb`):** secrets `GH_PACKAGES_TOKEN`,
   `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (key for user `sb`); variables
   `CLIENT_SLUG=sb`, `DATA_SOURCE=shared`. No `SUPABASE_DB_URL`.
-- **Morning briefing (06:00 client-local).** `pnpm briefing` is a source
+- **Morning briefing: not in v1, skip.** v1 has no AI and nothing on a timer;
+  the Daily Financial Report is computed on each page load. Kept for the next
+  version's task briefing, which also needs the AI vars above and
+  `AGENT_EMAIL`/`AGENT_PASSWORD`. `pnpm briefing` is a source
   script (`tsx scripts/briefing.ts`), and the standalone bundle in
   `/srv/sb/current` has no `scripts/`. It runs from a checkout owned by `sb`:
 
