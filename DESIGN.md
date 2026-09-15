@@ -205,9 +205,11 @@ Meta Ads / Financial Information → Google Meet / Monday.com / Content Library
   exists), a server action run as the signed-in user. At most one per 15
   minutes, measured from the latest `briefing_run`. The result comes back as
   one accent line under the header (updated / try later / budget used up).
-- **Cost**: every call saves one `briefing_run` record (tokens in/out and
-  USD). This month's spend = the sum of this month's (client-local) runs; at
-  or over the cap, no call is made.
+- **Cost**: every call saves one `briefing_run` record, first as a
+  worst-case reservation (before the call, so no call goes unrecorded), then
+  overwritten with tokens in/out and USD. This month's spend = the sum of
+  this month's (client-local) runs; if spend plus the worst case would reach
+  the cap, no call is made.
 
 ### Daily Financial Report
 

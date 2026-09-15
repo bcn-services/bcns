@@ -40,7 +40,10 @@ function fakeQuery(resolve, filters) {
   return q;
 }
 
-function fakeClient({ runs = [], stored = [], data = {}, fail = [], saveFailKinds = [] } = {}) {
+/** save_record upserts briefing_run rows into `runs` (newest first), like the
+ *  real RPC, so the re-read after a reservation sees it. `concurrent` rows
+ *  appear with the first reservation, as another request's would. */
+function fakeClient({ runs = [], stored = [], data = {}, fail = [], saveFailKinds = [], hideSaves = false, concurrent = [] } = {}) {
   const calls = {};
   const saved = [];
   const view = (name, rowsFor) => (cols) => {
@@ -64,6 +67,13 @@ function fakeClient({ runs = [], stored = [], data = {}, fail = [], saveFailKind
       save_record: async (args) => {
         if (saveFailKinds.includes(args.kind)) throw new Error("save failed");
         saved.push(args);
+        if (args.kind === BRIEFING_RUN_KIND && !hideSaves) {
+          runs.push(...concurrent.splice(0));
+          const row = { external_id: args.external_id, occurred_at: args.occurred_at, body: args.body };
+          const i = runs.findIndex((r) => r.external_id === args.external_id);
+          if (i >= 0) runs[i] = row;
+          else runs.unshift(row);
+        }
         return "rec-id";
       },
     },
@@ -72,13 +82,16 @@ function fakeClient({ runs = [], stored = [], data = {}, fail = [], saveFailKind
 
 function fakeAi({ text = "- Revenue was $300.", usage = { input_tokens: 1000, output_tokens: 200 }, model = "claude-haiku-4-5", throws = false } = {}) {
   const calls = [];
+  const options = [];
   return {
     calls,
+    options,
     ai: {
       defaultModel: model,
       messages: {
-        create: async (params) => {
+        create: async (params, opts) => {
           calls.push(params);
+          options.push(opts);
           if (throws) throw new Error("api down");
           return { content: [{ type: "text", text }], usage };
         },
@@ -243,15 +256,19 @@ test("token → usd at Haiku 4.5 prices ($1 in / $5 out per MTok)", () => {
 
 /* ------------------------------------------------------------ persistence */
 
-test("a call saves one briefing_run with tokens + usd, then the briefing", async () => {
+test("a call reserves the worst case, overwrites it with tokens + usd, then saves the briefing", async () => {
   const client = fakeClient();
   const out = await go(client, fakeAi());
   assert.equal(out.status, "saved");
   assert.equal(out.usd, 0.002);
-  const [cost, summary] = client.saved;
-  assert.equal(cost.kind, "briefing_run");
-  assert.match(cost.external_id, /^briefing_run:[0-9a-f-]{36}$/);
-  assert.equal(cost.occurred_at, NOW.toISOString());
+  const [reserve, cost, summary] = client.saved;
+  assert.equal(reserve.kind, "briefing_run");
+  assert.match(reserve.external_id, /^briefing_run:[0-9a-f-]{36}$/);
+  assert.equal(reserve.occurred_at, NOW.toISOString());
+  const reserved = JSON.parse(reserve.body);
+  assert.equal(reserved.reserved, true);
+  assert.ok(reserved.usd > 0.005, `reservation ${reserved.usd} covers max_tokens output`);
+  assert.equal(cost.external_id, reserve.external_id);
   assert.deepEqual(JSON.parse(cost.body), { input_tokens: 1000, output_tokens: 200, usd: 0.002 });
   assert.equal(summary.kind, "briefing");
   assert.equal(summary.external_id, `briefing:${DAY}`);
@@ -262,30 +279,106 @@ test("each call gets its own briefing_run id", async () => {
   const client = fakeClient();
   await go(client, fakeAi());
   await go(client, fakeAi());
-  const ids = client.saved.filter((s) => s.kind === "briefing_run").map((s) => s.external_id);
-  assert.equal(ids.length, 2);
-  assert.notEqual(ids[0], ids[1]);
+  const ids = new Set(client.saved.filter((s) => s.kind === "briefing_run").map((s) => s.external_id));
+  assert.equal(ids.size, 2);
 });
 
 test("the cost is recorded even when the summary save fails", async () => {
   const client = fakeClient({ saveFailKinds: ["briefing"] });
   const out = await go(client, fakeAi());
   assert.equal(out.status, "failed");
-  assert.deepEqual(client.saved.map((s) => s.kind), ["briefing_run"]);
+  assert.deepEqual(client.saved.map((s) => s.kind), ["briefing_run", "briefing_run"]);
 });
 
-test("a failed model call saves nothing", async () => {
+test("a failed model call keeps the worst-case reservation and saves no briefing", async () => {
   const client = fakeClient();
   const out = await go(client, fakeAi({ throws: true }));
   assert.equal(out.status, "failed");
-  assert.equal(client.saved.length, 0);
+  assert.equal(client.saved.length, 1);
+  assert.equal(JSON.parse(client.saved[0].body).reserved, true);
 });
 
 test("an empty reply records the cost but saves no briefing", async () => {
   const client = fakeClient();
   const out = await go(client, fakeAi({ text: "  " }));
   assert.equal(out.status, "failed");
-  assert.deepEqual(client.saved.map((s) => s.kind), ["briefing_run"]);
+  assert.deepEqual(client.saved.map((s) => s.kind), ["briefing_run", "briefing_run"]);
+});
+
+test("missing usage keeps the worst case as the recorded cost", async () => {
+  const client = fakeClient();
+  const out = await go(client, fakeAi({ usage: {} }));
+  assert.equal(out.status, "saved");
+  assert.equal(out.usd, JSON.parse(client.saved[0].body).usd);
+});
+
+test("the call runs with no SDK retries and a timeout", async () => {
+  const fake = fakeAi();
+  await go(fakeClient(), fake);
+  assert.equal(fake.options[0].maxRetries, 0);
+  assert.ok(fake.options[0].timeout > 0);
+});
+
+/* ------------------------------------------------------------ reservation */
+
+test("no tenant (reservation save fails): the model is never called", async () => {
+  const client = fakeClient({ saveFailKinds: ["briefing_run"] });
+  const fake = fakeAi();
+  const out = await go(client, fake, { onDemand: true });
+  assert.equal(out.status, "failed");
+  assert.match(out.message, /reservation failed/);
+  assert.equal(fake.calls.length, 0);
+});
+
+test("a reservation the re-read can't see: no model call, released", async () => {
+  const client = fakeClient({ hideSaves: true });
+  const fake = fakeAi();
+  const out = await go(client, fake);
+  assert.equal(out.status, "failed");
+  assert.equal(fake.calls.length, 0);
+  assert.equal(JSON.parse(client.saved.at(-1).body).released, "invisible");
+});
+
+test("the worst case must fit: $4.999 spent of $5 is cap reached, nothing saved", async () => {
+  const client = fakeClient({ runs: [run(4.999)] });
+  const fake = fakeAi();
+  const out = await go(client, fake);
+  assert.equal(out.reason, "cap_reached");
+  assert.equal(fake.calls.length, 0);
+  assert.equal(client.saved.length, 0);
+});
+
+test("concurrent on-demand: an earlier reservation in the window wins, this one is released", async () => {
+  const other = { external_id: "briefing_run:other", occurred_at: new Date(NOW.getTime() - 1000).toISOString(), body: JSON.stringify({ reserved: true, usd: 0.01 }) };
+  const client = fakeClient({ concurrent: [other] });
+  const fake = fakeAi();
+  const out = await go(client, fake, { onDemand: true });
+  assert.equal(out.reason, "rate_limited");
+  assert.equal(fake.calls.length, 0);
+  assert.deepEqual(JSON.parse(client.saved.at(-1).body), { released: "rate_limited", usd: 0 });
+});
+
+test("concurrent on-demand: a later reservation doesn't block the earlier one", async () => {
+  const other = { external_id: "briefing_run:other", occurred_at: new Date(NOW.getTime() + 1000).toISOString(), body: JSON.stringify({ reserved: true, usd: 0.01 }) };
+  const out = await go(fakeClient({ concurrent: [other] }), fakeAi(), { onDemand: true });
+  assert.equal(out.status, "saved");
+});
+
+test("concurrent reservations that together pass the cap: released, no call", async () => {
+  const other = { external_id: "briefing_run:other", occurred_at: NOW.toISOString(), body: JSON.stringify({ reserved: true, usd: 0.5 }) };
+  const client = fakeClient({ runs: [run(4.499)], concurrent: [other] });
+  const fake = fakeAi();
+  const out = await go(client, fake);
+  assert.equal(out.reason, "cap_reached");
+  assert.equal(fake.calls.length, 0);
+  assert.deepEqual(JSON.parse(client.saved.at(-1).body), { released: "cap_reached", usd: 0 });
+});
+
+test("released and far-future runs don't trip the rate limit", async () => {
+  const released = { external_id: "briefing_run:r", occurred_at: minutesAgo(1), body: JSON.stringify({ released: "rate_limited", usd: 0 }) };
+  const future = run(0.01, new Date(NOW.getTime() + 3_600_000).toISOString());
+  const out = await go(fakeClient({ runs: [future, released] }), fakeAi(), { onDemand: true });
+  assert.equal(out.status, "saved");
 });
 
 /* ---------------------------------------------------------------- payload */

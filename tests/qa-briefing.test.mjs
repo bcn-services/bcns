@@ -46,7 +46,19 @@ function fakeClient({ runs = [], data = {} } = {}) {
       messages_v1: view("messages_v1", () => data.messages ?? []),
       activity_v1: view("activity_v1", () => data.activity ?? []),
     },
-    rpc: { save_record: async (args) => (saved.push(args), "rec-id") },
+    rpc: {
+      // Upserts briefing_run rows like the real RPC, so the post-reservation re-read sees them.
+      save_record: async (args) => {
+        saved.push(args);
+        if (args.kind === "briefing_run") {
+          const row = { external_id: args.external_id, occurred_at: args.occurred_at, body: args.body };
+          const i = runs.findIndex((r) => r.external_id === args.external_id);
+          if (i >= 0) runs[i] = row;
+          else runs.unshift(row);
+        }
+        return "rec-id";
+      },
+    },
   };
 }
 
