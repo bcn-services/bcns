@@ -62,8 +62,8 @@ Tick each before the first deploy. Nothing here is scheduled or deployed by
 the repo.
 
 - **Platform:** client `sb` on bcns Connect (hosted project
-  `cnsxbglhredokjbvudfd`), smoke user `smoke+sb@bcn-services.com`, agent user
-  from bcns-data `add-member --slug sb --agent`.
+  `cnsxbglhredokjbvudfd`), smoke user `smoke+sb@bcn-services.com`. No agent
+  user in v1 (CLIENT.md, Shape).
 - **Droplet:** `infra/onboard-client.sh sb <port> <domain>` → Unix user `sb`,
   `/srv/sb/{releases,current}`, `/srv/sb/env` (mode 600), unit
   `bcns-app@sb`.
@@ -76,7 +76,7 @@ the repo.
   | `NEXT_PUBLIC_SUPABASE_URL` | `https://cnsxbglhredokjbvudfd.supabase.co` |
   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | platform anon key (Supabase `get_publishable_keys`) |
   | `HEALTH_EMAIL` / `HEALTH_PASSWORD` | smoke user |
-  | `AGENT_EMAIL` / `AGENT_PASSWORD` | agent user (`pnpm briefing` signs in as it) |
+  | `AGENT_EMAIL` / `AGENT_PASSWORD` | the smoke user again (`pnpm briefing` signs in as it); re-set both pairs after `rotate-smoke` |
   | `AI_ENABLED` | `1` once SB approves the cap, else unset |
   | `ANTHROPIC_API_KEY` | SB's own key (BYOK) |
   | `AI_MONTHLY_BUDGET_USD` | the cap SB approved; unset = no AI calls |
