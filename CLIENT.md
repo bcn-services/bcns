@@ -58,7 +58,7 @@ layer; it never writes back to those systems.
 | Decision | Choice | Where it lands |
 | --- | --- | --- |
 | Data source | **shared** (bcns-data platform, client `sb`) | Repo var `DATA_SOURCE=shared` (set). `supabase/` deleted. Data is read only through `lib/data.ts`. At deploy, `/srv/sb/env` holds the platform URL and anon key, plus `HEALTH_EMAIL`/`HEALTH_PASSWORD` = `smoke+sb@bcn-services.com` (keychain `bcns-smoke-sb`). |
-| Shape | **app + agent**. The agent loop (`pnpm agent`) is the intended runner for the daily briefing. | Ships as-is. |
+| Shape | **app only in v1** (decided 2026-09-15): no agent loop and no agent user. The morning briefing is `pnpm briefing` on the droplet timer, signed in as the smoke user; the Generate button runs as whoever is signed in. `agent/` stays in the repo, unused. | `/srv/sb/env`: `AGENT_EMAIL`/`AGENT_PASSWORD` = the `HEALTH_*` values |
 | AI feature | **on** for the daily briefing: BYOK at deploy, capped at a monthly ceiling SB approves. The build default stays off. | `.env.example` note, and `AI_ENABLED=1` + `ANTHROPIC_API_KEY` per deploy |
 | Storage backend | **platform media RPCs** (data-client `media.*`) | `lib/storage.ts` stays `null` (note added) |
 | Webhook providers | **none**: the platform worker pulls every source | No `app/api/` provider routes |
@@ -73,7 +73,5 @@ layer; it never writes back to those systems.
 - **Declan's inputs:** Meta partner access + act_id, Monday access and boards,
   a Meet notes sample, the Drive folder to index, confirmation of the live
   Shopify store, brand assets, and the team login list.
-- **Agent user:** `add-member --slug sb --agent` sets `AGENT_EMAIL`/`AGENT_PASSWORD`,
-  but only through a wizard confirm Nate answers.
 - **Infra:** droplet `/srv/sb/env`, repo var `CLIENT_SLUG`, DNS, UptimeRobot
   (see `DEPLOY.md`).

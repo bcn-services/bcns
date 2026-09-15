@@ -1,6 +1,6 @@
 /**
  * scripts/briefing.ts — `pnpm briefing`: the morning run the droplet cron
- * calls (DEPLOY.md). Signs in as the agent user, works out "yesterday" in the
+ * calls (DEPLOY.md). Signs in as AGENT_EMAIL (SB v1: the smoke user), works out "yesterday" in the
  * client's timezone (client_v1), and prints the Daily Financial Report.
  */
 
