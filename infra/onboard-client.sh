@@ -25,7 +25,7 @@ set -euo pipefail
 [ $# -eq 3 ] || [ $# -eq 4 ] \
   || { echo "usage: $0 <slug> <port> <domain> [cloudflare|certbot|<cert-dir>]" >&2; exit 1; }
 slug="$1"; port="$2"; domain="$3"; cert_mode="${4:-}"
-[[ "$slug" =~ ^[a-z0-9-]+$ ]] || { echo "slug must be [a-z0-9-]" >&2; exit 1; }
+[[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "slug must be [a-z0-9-] and not start with -" >&2; exit 1; }
 [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ] && [ "$port" -le 65535 ] \
   || { echo "port must be 1024-65535" >&2; exit 1; }
 [[ "$domain" =~ ^[a-zA-Z0-9.-]+$ ]] || { echo "domain must be [a-zA-Z0-9.-]" >&2; exit 1; }
@@ -56,10 +56,10 @@ esac
 # BCNS_PORTS_FILE overrides the location (tests).
 ports_file="${BCNS_PORTS_FILE:-$(cd "$(dirname "$0")" && pwd)/ports.txt}"
 [ -r "$ports_file" ] || { echo "ports registry not found: $ports_file (scp infra/ports.txt next to this script)" >&2; exit 1; }
-registered_port=$(awk -v s="$slug" '$1==s {print $2}' "$ports_file")
-port_owner=$(awk -v p="$port" '$2==p {print $1}' "$ports_file")
+registered_port=$(awk -v s="$slug" '/^[[:space:]]*#/{next} $1==s {print $2}' "$ports_file" | tr -d '\r' | head -n1)
+port_owner=$(awk -v p="$port" '/^[[:space:]]*#/{next} $2==p {print $1}' "$ports_file" | tr -d '\r' | head -n1)
 if [ -z "$registered_port" ]; then
-  echo "slug '$slug' is not in $ports_file -- add '$slug $port' to infra/ports.txt (scripts/new-app.sh does this) and re-run" >&2; exit 1
+  echo "slug '$slug' is not in $ports_file -- add '$slug $port' to infra/ports.txt, re-scp it next to this script, and re-run" >&2; exit 1
 fi
 if [ "$registered_port" != "$port" ]; then
   echo "slug '$slug' is registered on port $registered_port, not $port" >&2; exit 1
@@ -68,7 +68,9 @@ if [ "$port_owner" != "$slug" ]; then
   echo "port $port is registered to '$port_owner'" >&2; exit 1
 fi
 
-# Contact for Let's Encrypt expiry mail. Same address as apps/web/lib/site.ts `email`.
+# ACME account contact. certbot only applies -m when it registers a new account;
+# the droplet's existing account keeps whatever address registered it
+# (`certbot update_account -m ...` changes it). Same address as apps/web/lib/site.ts.
 certbot_email="${BCNS_CERTBOT_EMAIL:-nseluga@bcn-services.com}"
 acme_root=/var/www/acme
 
@@ -168,11 +170,15 @@ fi
 
 [ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
 
-useradd --system --create-home --home-dir "/srv/$slug" --shell /bin/bash "$slug"
+# Re-runnable: a certbot failure on a first run leaves the user in place.
+id -u "$slug" >/dev/null 2>&1 \
+  || useradd --system --create-home --home-dir "/srv/$slug" --shell /bin/bash "$slug"
 chmod 750 "/srv/$slug"
 install -d -o "$slug" -g "$slug" "/srv/$slug/releases" "/srv/$slug/.ssh"
 
 # Env file: this client's secrets only, unreadable to every other client.
+# Never overwritten -- a re-run must not truncate a live secrets file.
+if [ ! -e "/srv/$slug/env" ]; then
 cat > "/srv/$slug/env" <<EOF
 PORT=$port
 HOSTNAME=127.0.0.1
@@ -183,6 +189,7 @@ HOSTNAME=127.0.0.1
 EOF
 chown "$slug:$slug" "/srv/$slug/env"
 chmod 600 "/srv/$slug/env"
+fi
 
 # CI may restart this client's unit and nothing else. Validate before install —
 # a bad sudoers line breaks sudo droplet-wide.
@@ -193,6 +200,10 @@ install -m 440 "$tmp" "/etc/sudoers.d/bcns-$slug"
 rm -f "$tmp"
 
 vhost="/etc/nginx/sites-available/$slug"
+# Live vhosts get hand-edited; never silently revert one. BCNS_FORCE_VHOST=1 overrides.
+if [ -e "$vhost" ] && [ -z "${BCNS_FORCE_VHOST:-}" ]; then
+  echo "$vhost exists; refusing to overwrite (set BCNS_FORCE_VHOST=1 to re-render)" >&2; exit 1
+fi
 # `nginx -t && reload` does NOT abort under `set -e` (a failure on the left of
 # && is exempt), so a bad config used to fall through to the success message.
 enable_vhost() {
@@ -215,11 +226,13 @@ if [ "$cert_mode" = certbot ]; then
          -m "$certbot_email" --agree-tos --no-eff-email --non-interactive; then
       echo "certbot failed for $domain -- removing $slug vhost and aborting" >&2
       rm -f "/etc/nginx/sites-enabled/$slug" "$vhost"
-      systemctl reload nginx
+      systemctl reload nginx || true
       exit 1
     fi
   fi
-  # Stage 2: full vhost. Renewals reuse the webroot via the same port-80 block.
+  # Stage 2: full vhost. Renewals reuse the webroot via the same port-80 block;
+  # /etc/letsencrypt/renewal-hooks/deploy/reload-nginx (bootstrap.sh) makes
+  # nginx pick the renewed cert up.
   render_direct_vhost > "$vhost"
 else
   render_proxied_vhost > "$vhost"

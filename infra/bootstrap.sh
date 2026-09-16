@@ -54,8 +54,14 @@ ufw --force enable
 # nginx: TLS termination with a Cloudflare Origin CA cert; per-client vhosts
 # are dropped in by onboard-client.sh. Default server rejects unknown hosts.
 install -d -m 700 /etc/ssl/cloudflare
-# ACME HTTP-01 webroot for onboard-client.sh's certbot mode.
+# ACME HTTP-01 webroot for onboard-client.sh's certbot mode, and the renewal
+# hook: certbot.timer renews on disk but nginx keeps the loaded cert in memory
+# until reloaded -- without this every certbot host serves an expired cert at
+# ~day 90.
 install -d -m 755 /var/www/acme
+install -d /etc/letsencrypt/renewal-hooks/deploy
+printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
 
 # Every vhost below references these cert paths, so nginx cannot even load its
 # config until they exist -- and the real Cloudflare Origin CA cert is a manual
@@ -78,6 +84,15 @@ server {
     listen [::]:443 ssl default_server;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    return 444;
+}
+# platform-v1: certbot-mode vhosts listen on 80. Without this block nginx would
+# promote the alphabetically-first `listen 80` vhost to default_server and
+# unknown-Host requests on :80 would 301 to that client instead of dropping.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
     return 444;
 }
 EOF

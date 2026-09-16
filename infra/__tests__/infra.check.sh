@@ -95,6 +95,12 @@ check "accepts a registered slug/port pair"            "$(tryp sb 3101 sb.bcn-se
 check "refuses when the registry file is missing"      "$(BCNS_PORTS_FILE=$work/none BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" sb 3101 sb.bcn-services.com >/dev/null 2>&1; echo $?)" "1"
 check "refuses an unknown cert mode"                   "$(tryp sb 3101 sb.bcn-services.com bogus)"    "1"
 check "refuses a relative cert dir"                    "$(tryp sb 3101 sb.bcn-services.com certs/x)"  "1"
+check "refuses a slug with a leading hyphen"           "$(tryp -sb 3101 sb.bcn-services.com)"         "1"
+# Review fix: a commented-out registry line must not count as a registration.
+printf '# mcp 3103 retired\nl2detailz 3100\nsb 3101\r\n' > "$reg"
+check "registry ignores comment lines"                 "$(tryp mcp 3103 mcp.bcn-services.com)"        "1"
+check "registry tolerates CRLF"                        "$(tryp sb 3101 sb.bcn-services.com)"          "0"
+printf 'l2detailz 3100\nsb 3101\n' > "$reg"
 
 # The committed registry itself: unique slugs, unique ports, every port in range.
 regs=$(grep -v '^#' "$here/ports.txt" | grep -c .)
