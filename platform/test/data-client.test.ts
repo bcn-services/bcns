@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   agentTools, createDataClient, DataClientError, runTool, signIn as dcSignIn, ToolInputError,
-} from '../packages/data-client/src/index.js'
+} from '../../packages/data-client/src/index.js'
 import { CLIENTS, decodeJwt, localKeys, mediaId, signIn, sql, SUPABASE_URL, USERS } from './helpers.js'
 
 async function dataClientAs(user: (typeof USERS)[keyof typeof USERS]) {

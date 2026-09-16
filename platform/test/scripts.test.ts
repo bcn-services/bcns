@@ -15,7 +15,7 @@ import { main as churn } from '../scripts/churn.js'
 import { main as hardDelete } from '../scripts/hard-delete.js'
 import { main as exportClient } from '../scripts/export.js'
 import { checklist } from '../scripts/checklist.js'
-import { signIn } from '../packages/data-client/src/index.js'
+import { signIn } from '../../packages/data-client/src/index.js'
 
 const SLUG = 'zz-script-test'
 const SLUG2 = 'zz-script-test2'

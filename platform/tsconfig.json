@@ -9,5 +9,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["worker/src", "scripts", "test", "packages/data-client/src"]
+  "include": ["worker/src", "scripts", "test", "../packages/data-client/src"]
 }
