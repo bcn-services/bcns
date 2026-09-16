@@ -14,7 +14,7 @@
  *    exposes only `api`; keeping it that way is the point.
  */
 
-import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2.116";
 import { bearer, type Caller, type CallerMembership } from "./guard.ts";
 import type { InviteDeps } from "../invite-member/handler.ts";
 import type { MintDeps } from "../mint-agent-login/handler.ts";
@@ -27,6 +27,30 @@ const NO_SESSION = { auth: { persistSession: false, autoRefreshToken: false } };
 
 function admin(): SupabaseClient {
   return createClient(URL_, SERVICE, NO_SESSION);
+}
+
+interface AdminUser {
+  id: string;
+  email?: string;
+  app_metadata?: Record<string, unknown>;
+}
+
+/**
+ * Exact-email lookup through the GoTrue admin API. supabase-js has no
+ * getUserByEmail and listUsers pages newest-first, so one page misses older
+ * users; `filter` is GoTrue's server-side ILIKE on email/phone, narrowed to an
+ * exact match here.
+ */
+async function findUser(email: string): Promise<AdminUser | null> {
+  const wanted = email.toLowerCase();
+  const url = `${URL_.replace(/\/+$/, "")}/auth/v1/admin/users?filter=${encodeURIComponent(wanted)}&per_page=50`;
+  const response = await fetch(url, {
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`admin user lookup failed: ${response.status}`);
+  const body = (await response.json()) as { users?: AdminUser[] };
+  return body.users?.find((u) => u.email?.toLowerCase() === wanted) ?? null;
 }
 
 function caller(request: Request): SupabaseClient {
@@ -77,10 +101,7 @@ export function inviteDeps(request: Request): InviteDeps {
       return { userId: data?.user?.id ?? null, error: error?.message };
     },
     async findUserByEmail(email: string) {
-      // No getUserByEmail in the admin API; one filtered page is enough.
-      const { data } = await admin().auth.admin.listUsers({ page: 1, perPage: 200 });
-      const found = data?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-      return found?.id ?? null;
+      return (await findUser(email))?.id ?? null;
     },
   };
 }
@@ -91,7 +112,7 @@ export function mintDeps(request: Request): MintDeps {
   return {
     ...base,
     randomPassword,
-    async getClientSlug(_clientId: string) {
+    async getClientSlug() {
       const { data } = await as.schema("api").from("client_v1").select("slug").maybeSingle();
       return (data?.slug as string | undefined) ?? null;
     },
@@ -105,8 +126,7 @@ export function mintDeps(request: Request): MintDeps {
       });
       if (created.data?.user) return { userId: created.data.user.id };
       // Already exists: rotate, exactly like `add-member.ts --agent` re-run.
-      const { data } = await a.auth.admin.listUsers({ page: 1, perPage: 200 });
-      const existing = data?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      const existing = await findUser(email);
       if (!existing) return { userId: null, error: created.error?.message };
       if (existing.app_metadata?.bcns_agent !== true) {
         // Rotation-hijack guard, same as the CLI: never re-password a human.
@@ -115,7 +135,7 @@ export function mintDeps(request: Request): MintDeps {
       const updated = await a.auth.admin.updateUserById(existing.id, { password });
       return { userId: updated.error ? null : existing.id, error: updated.error?.message };
     },
-    async insertMembership(userId: string, clientId: string, role: "member", _isSmoke: boolean) {
+    async insertMembership(userId: string, clientId: string, role: "member") {
       await base.insertMembership(userId, clientId, role);
     },
   };

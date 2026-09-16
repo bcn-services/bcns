@@ -18,7 +18,10 @@ begin
   if data.active_client_role() is distinct from 'owner' then
     raise exception using errcode = 'BCNS2', message = 'forbidden_role';
   end if;
-  if member_role is null or member_role not in ('member', 'owner') then
+  -- 'member' only: authenticated can call this RPC straight through PostgREST,
+  -- so accepting 'owner' would let any owner attach an arbitrary auth user as a
+  -- co-owner. Owner promotion is a future feature with its own RPC.
+  if member_role is null or member_role <> 'member' then
     raise exception using errcode = 'BCNS3', message = 'validation', detail = 'role';
   end if;
   -- memberships.user_id is the primary key: one user belongs to one client.
@@ -30,7 +33,10 @@ begin
   values (target_user_id, tenant, member_role::data.member_role)
   -- Re-inviting an existing member is idempotent. is_smoke is never touched:
   -- only the operator CLI mints a smoke user, and remove_member refuses to drop one.
-  on conflict (user_id) do update set role = excluded.role;
+  -- The WHERE makes the cross-tenant guard atomic: a row inserted for another
+  -- client between the check above and this statement is left untouched.
+  on conflict (user_id) do update set role = excluded.role
+    where data.memberships.client_id = excluded.client_id;
 end $$;
 
 -- Default EXECUTE goes to PUBLIC on a new function; strip it, then allow-list,

@@ -2,6 +2,9 @@
   "extends": "../../platform/tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    // platform/tsconfig.json turns this on for the Deno Edge Function tests; it is
+    // illegal once noEmit is off (TS5096), so it must be reset here.
+    "allowImportingTsExtensions": false,
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src"

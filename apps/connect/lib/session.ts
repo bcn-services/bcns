@@ -107,6 +107,8 @@ export async function callFunction(
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
+    // A hung function must not pin the server action; the non-ok branch handles the abort.
+    signal: AbortSignal.timeout(10_000),
   });
   const json = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   return { ok: response.ok, status: response.status, json };

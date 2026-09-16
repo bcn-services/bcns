@@ -28,6 +28,8 @@ export async function evaluateHealth(
     const response = await fetchImpl(`${env.supabaseUrl.replace(/\/+$/, "")}/auth/v1/health`, {
       headers: env.supabaseAnonKey ? { apikey: env.supabaseAnonKey } : {},
       cache: "no-store",
+      // Shorter than the uptime monitor's own timeout, so a half-open GoTrue reads as unreachable.
+      signal: AbortSignal.timeout(5_000),
     });
     if (response.ok) return { status: 200, body: { ok: true, platform: "connected" } };
   } catch {

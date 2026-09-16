@@ -74,6 +74,14 @@ every database write with the **caller's own JWT** through
 the tenant from the JWT and re-checks the owner role in SQL. Granting `service_role`
 rights on `data` would have been the smaller diff and a much larger blast radius.
 
+### Known ceiling: invite frequency
+
+Nothing in `invite-member` caps how often an owner can invite. The only limit is
+GoTrue's project-wide email rate limit (Auth → Rate Limits in the dashboard), so a
+hostile owner could make the platform mail arbitrary addresses from the bcns
+sending domain up to that ceiling. Accepted for v1 (owners are hand-onboarded
+clients); add a per-client counter in `api.add_member` if that ever changes.
+
 ### Edge Function secrets
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are injected

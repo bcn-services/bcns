@@ -55,6 +55,11 @@ export function buildEmail(request: ConnectionRequest): ResendEmail {
 }
 
 /** The same message as a mailto:, for the no-key path. */
+/** What the journal gets: who asked for which source, never the email body. */
+function describe(request: ConnectionRequest): string {
+  return `${request.clientSlug}/${request.source}`;
+}
+
 export function mailtoLink(request: ConnectionRequest): string {
   const email = buildEmail(request);
   const query = new URLSearchParams({ subject: email.subject, body: email.text });
@@ -80,7 +85,7 @@ export async function requestConnection(
   const email = buildEmail(request);
 
   if (!apiKey) {
-    log(`[connect] connection request (no RESEND_API_KEY): ${JSON.stringify(email)}`);
+    log(`[connect] connection request (no RESEND_API_KEY): ${describe(request)}`);
     return { sent: false, mailto: mailtoLink(request) };
   }
 
@@ -92,11 +97,12 @@ export async function requestConnection(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(email),
+      signal: AbortSignal.timeout(10_000),
     });
     if (response.ok) return { sent: true };
-    log(`[connect] resend rejected the request (${response.status}): ${JSON.stringify(email)}`);
+    log(`[connect] resend rejected the request (${response.status}): ${describe(request)}`);
   } catch (error) {
-    log(`[connect] resend unreachable (${String(error)}): ${JSON.stringify(email)}`);
+    log(`[connect] resend unreachable (${String(error)}): ${describe(request)}`);
   }
   // A send that fails still has to leave the member a way through.
   return { sent: false, mailto: mailtoLink(request) };

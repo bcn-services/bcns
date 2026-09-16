@@ -26,7 +26,7 @@ export interface CallerMembership {
 export interface GuardDeps {
   /** Verify a bearer token with the auth server (anon client + getUser). */
   getUser(accessToken: string): Promise<Caller | null>;
-  /** Read data.memberships with the service role — there is no api view for it. */
+  /** Read the caller's own row from api.memberships_v1 with the caller's JWT (RLS-scoped). */
   getMembership(userId: string): Promise<CallerMembership | null>;
 }
 

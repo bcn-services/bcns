@@ -29,7 +29,7 @@ export default async function AccessPage() {
             sees exactly the same data you do, scoped by the same rules — no more, and never another
             client&apos;s. Hand it to a script, a reporting job, or an AI assistant so it can read
             your workspace without anybody sharing a personal password. Minting again rotates the
-            password, which instantly retires the old one.
+            password; the old password stops working.
           </p>
           <MintForm />
         </CardContent>
