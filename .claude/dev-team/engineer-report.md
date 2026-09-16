@@ -1,39 +1,30 @@
 ---
 # Engineer Report
-**Task:** PLAN item 8 — render each case study's `screenshots[]` on `/work/[slug]` with `next/image`
-**Branch:** worktree-past-work-case-studies
-**Date:** 2026-07-28
+**Task:** platform-v1 chunk 4 — add a "Sign in" link to the marketing site header pointing at https://connect.bcn-services.com
+**Branch:** pv1/4-hub
+**Date:** 2026-09-16
 
 ## Design Decisions
-- New `apps/web/lib/case-study-images.ts`: static-import map keyed by registry `src` string — orchestrator-prescribed, implemented as given. Static imports make a deleted PNG a webpack build error and an unregistered `src` a `CaseStudyImageNotFoundError` thrown during prerender (also a build failure); a plain string `src` would validate at no point in the build. Also supplies intrinsic width/height, so no dimensions are hardcoded.
-- Kept the map out of `lib/content.ts` — the test suite imports that file under `node --experimental-strip-types`, which cannot import a `.png`.
-- Screenshots block guarded on `item.screenshots.length > 0`, one `<Reveal as="figure">` per shot (reused the existing scroll-in, no new motion vocabulary), image `className="h-auto w-full rounded-xl border border-border"` matching `packages/ui/src/card.tsx`'s Card exactly (verified: `rounded-xl border border-border`) rather than guessing.
-- `sizes="(min-width: 768px) 672px, 100vw"` — matches the `max-w-2xl` (672px) container width, Tailwind's `md` breakpoint.
-- No `priority` prop → Next defaults to `loading="lazy"` (verified below).
-- Added `sharp` as a direct dependency of `apps/web` — `next build` warned twice ("For production Image Optimization... 'sharp' package is strongly recommended") before this; it's next/image's own first-party optional peer, not a discretionary library pick, so no research gate applied. Warnings are gone after adding it.
+- Added `siteConfig.signIn: { label, href }` as a field separate from `siteConfig.nav` in `apps/web/lib/site.ts` — grepped all `siteConfig.nav` usages first (`site-header.tsx` x2, `site-footer.tsx`) and confirmed `nav` is mapped as in-page anchor/scroll targets, so an external URL doesn't belong in that array.
+- Rendered as a plain `<a>` (not `next/link`, since it's external) with `rel="noopener"` — no new component, styled with the exact className strings already used by the adjacent nav `<Link>`s (desktop: text link style; mobile: block disclosure-item style).
+- No `content.ts`/`CONTENT.md` change — `signIn` is a nav/config constant per CLAUDE.md's `lib/site.ts` scope, not marketing copy.
 
 ## Files Changed
-- `apps/web/lib/case-study-images.ts` — new: static import map + `caseStudyImage()` lookup that throws on a miss.
-- `apps/web/app/work/[slug]/page.tsx` — added the screenshots block after the Problem/Approach/Outcome sections, inside the same `<Container>`.
-- `apps/web/package.json` / `pnpm-lock.yaml` — added `sharp` (eliminates the only build warning; see Design Decisions).
-- `apps/web/__tests__/work-slug-page.test.mjs` — replaced the obsolete "page.tsx does not read screenshots" trip-wire (its own failure message: "the empty-array safety net needs re-adding") with (1) a source-level assertion that the block is still guarded by `item.screenshots.length > 0`, since neither live registry item has an empty array to exercise the built-HTML path, and (2) a new built-HTML check that every screenshot's `alt` (checked against entity-decoded raw HTML, since `alt` is an attribute, not text — tag-stripping would erase it) and `caption` actually render.
+- `apps/web/lib/site.ts` — added `signIn` field to `siteConfig`.
+- `apps/web/components/site-header.tsx` — added the Sign-in `<a>` after the desktop nav items (inside `<nav>`) and inside the mobile `<details>` disclosure, before the existing CTA link.
 
 ## Deferred / Out of Scope
-- Did not touch `content.ts` or `CONTENT.md` — no new fields/labels added, per the task's explicit constraint.
-- Did not write real caption copy — `[INPUT: ...]` placeholders render verbatim, per PLAN item 9's gate.
-- No live-browser mobile/desktop overflow screenshot: `h-auto w-full` inside the same `mx-auto max-w-2xl` container hierarchy already used (and QA-proven overflow-safe) by the Problem/Approach/Outcome block directly above it — no fixed widths, scale transforms, or negative margins introduced, so I relied on that structural equivalence rather than a `resize_window` check that prior runs found flaky in this sandbox.
+- Nothing deferred; scope was exactly the header link.
 
 ## Flags for Reviewer
-- `lib/case-study-images.ts` is a hand-synced mirror of `screenshots[].src` — a third sync point in this feature area (team-memory already tracks the CONTENT.md mirror and the earlier `[INPUT:` token allowlist history). Drift fails loud (build/prerender error), not silent, by design.
-- `next/image`'s default `deviceSizes` produced an 8-entry srcset up to 3840w for a 672px-max display width (visible in built HTML) — not customized; flag if a reviewer wants `images.deviceSizes` trimmed in `next.config.mjs` to cut generated variants.
-- No external calls / no retry-sensitive writes in this change — pure static asset pipeline.
+- No hot paths, queries, or retry-sensitive writes touched — pure static link.
+- Verified `apps/web/__tests__/isolation.test.mjs` stays green since the addition is a plain `<a href>` string, not a `fetch` call, so it doesn't trip the "no fetch to connect/mcp/sb subdomains" check.
 
 ## Verification
-- `cd apps/web && npx tsc --noEmit` — clean, no output.
-- `corepack pnpm --filter @nseluga/web build` — 0 lines matching `warn`/`Warning`/`Image` after adding `sharp` (2 sharp-missing warnings before). `/work/delucas` and `/work/l2detailz` both `● SSG`.
-- `corepack pnpm test` (repo root) — **88 pass / 0 fail / 0 skip** (baseline was 87/0/0; +1 net from replacing 1 obsolete test with 2 new ones).
-- Lazy-load count in prerendered HTML: `grep -o 'loading="lazy"' .next/server/app/work/l2detailz.html | wc -l` → **2** (matches its 2 screenshots); `delucas.html` → **1** (matches its 1 screenshot). Zero `fetchpriority="high"`/`loading="eager"` occurrences.
-- `pointer-events-none` audit: `SectionAtmosphere`'s two absolutely-positioned decorative layers (glow div(s), pattern div) both already carry `pointer-events-none` — unchanged by this item. `page.tsx` itself has no other `absolute`-positioned elements.
-- Median of 5 production renders of `/work/l2detailz` (`next start -p 3100`, killed by PID via `lsof -ti tcp:3100` after): 0.002382s, 0.002465s, **0.003060s (median)**, 0.003895s, 0.011277s — well under the 1s budget.
-- Confirmed the optimizer pipeline end-to-end on the live server: the `/_next/image?...` URL referenced by `/work/delucas` returned `HTTP 200`, `content-type: image/png`, real bytes.
-- Tree left clean — no mutation performed to prove the build-failure path (QA owns that per the task).
+1. `corepack pnpm turbo run build typecheck lint test --filter=@bcn-services/web --concurrency=1` — Tasks: 3 successful, 4 total (build/typecheck/lint clean; test task "failed" only because of the pre-existing counted failure below). Test totals: `# tests 86 # pass 85 # fail 1`, `Failing test: __tests__/a2-fix-verification.test.mjs — description not wired to SectionHeading` — matches `docs/architecture/baselines/2026-09-15/bcns/test-counts.txt:16-17` exactly (pre-existing, not introduced by this change).
+2. `cd apps/web && node --test __tests__/isolation.test.mjs` — 4/4 pass.
+3. Gate (d) re-capture (`next start -p 3417`, curl'd all 9 baseline routes + `/work/delucas` + `/work/l2detailz`, normalized): `RESULT: CHECK (4/11 identical)`. `privacy.html`, `robots.txt.html`, `sitemap.xml.html`, `terms.html` IDENTICAL (no header link on those templates/no change). `__.html`, `about.html`, `pricing.html`, `services.html`, `work.html` DIFFER by exactly 4 token lines each: 2 are the new Sign-in `<a>` (desktop + mobile), 2 are that same anchor's HTML re-serialized inside the RSC flight `self.__next_f.push` payload (same shared header, so it shows twice per route) — no other diff lines. `work-delucas.html`/`work-l2detailz.html` report MISSING on the baseline side — expected, the 2026-09-15 baseline capture never included per-slug `/work/*` routes (only the 9 top-level routes), so this is a gap in gate-d's original scope, not a regression. Output saved to `/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/gate-d-chunk4/normalize.txt`. Server killed after capture.
+4. `git status --short -- apps/web`: `M apps/web/components/site-header.tsx`, `M apps/web/lib/site.ts`. `git diff --stat -- apps/web`: 2 files changed, 15 insertions(+).
+
+## Unexpected
+- Mid-task, this agent's working directory was silently switched by the harness to a sibling worktree (`pv1-3-tenant`, another engineer's branch) between two tool calls, with no action taken by this agent. Caught it immediately via `pwd`/`git branch --show-current` before running any command there, and used `EnterWorktree` with `path` to switch back to `pv1-4-hub` before continuing. No files were read or written in `pv1-3-tenant`.

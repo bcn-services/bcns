@@ -30,6 +30,13 @@ export function SiteHeader() {
                 {item.label}
               </Link>
             ))}
+            <a
+              href={siteConfig.signIn.href}
+              rel="noopener"
+              className="rounded-sm text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {siteConfig.signIn.label}
+            </a>
           </nav>
 
           <ThemeToggle />
@@ -56,6 +63,13 @@ export function SiteHeader() {
                   {item.label}
                 </Link>
               ))}
+              <a
+                href={siteConfig.signIn.href}
+                rel="noopener"
+                className="block rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                {siteConfig.signIn.label}
+              </a>
               <Link
                 href="/#contact"
                 className="lift-button mt-1 block rounded-lg bg-foreground px-5 py-2.5 text-center text-sm font-medium text-background"

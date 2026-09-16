@@ -1,0 +1,4 @@
+# $ for r in bcns-data bcns-client-sb bcns-app-template; do GITHUB_TOKEN= gh repo edit bcn-services/$r --visibility public --accept-visibility-change-consequences; done   (2026-09-16, after secret-scan.md CLEAN; Nate: "need them all to be public so they can use free github minutes")
+bcns-data: PUBLIC
+bcns-client-sb: PUBLIC
+bcns-app-template: PUBLIC

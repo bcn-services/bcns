@@ -1,0 +1,122 @@
+=== http://localhost:3999/ ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "6d9kyu1ble1auz"
+Content-Type: text/html; charset=utf-8
+Content-Length: 60816
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/about ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "jvd3olf2gbwqu"
+Content-Type: text/html; charset=utf-8
+Content-Length: 42511
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/pricing ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "83s9x4qzk516zf"
+Content-Type: text/html; charset=utf-8
+Content-Length: 55779
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/services ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "4aq8m3l2lz1jg2"
+Content-Type: text/html; charset=utf-8
+Content-Length: 71930
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/work ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "9z76usqoicxve"
+Content-Type: text/html; charset=utf-8
+Content-Length: 43980
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/privacy ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "g9dlliipk47z1"
+Content-Type: text/html; charset=utf-8
+Content-Length: 10375
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/terms ===
+HTTP/1.1 200 OK
+Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+X-Powered-By: Next.js
+Cache-Control: s-maxage=31536000, stale-while-revalidate
+ETag: "e7oqku88ds7z9"
+Content-Type: text/html; charset=utf-8
+Content-Length: 10383
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== http://localhost:3999/sitemap.xml ===
+HTTP/1.1 200 OK
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-nextjs-cache: HIT
+cache-control: public, max-age=0, must-revalidate
+content-type: application/xml
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+
+=== http://localhost:3999/robots.txt ===
+HTTP/1.1 200 OK
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-nextjs-cache: HIT
+cache-control: public, max-age=0, must-revalidate
+content-type: text/plain
+Date: Wed, 16 Sep 2026 05:23:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+

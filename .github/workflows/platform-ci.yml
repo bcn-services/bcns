@@ -1,0 +1,39 @@
+name: platform-ci
+# bcns-data's ci.yml, path-filtered to the platform after the merge (docs/architecture/platform-v1.md chunk 1).
+on:
+  push:
+    branches: [main]
+    paths: [platform/**, packages/data-client/**, package.json, pnpm-lock.yaml, .github/workflows/platform-ci.yml]
+  pull_request:
+    paths: [platform/**, packages/data-client/**, package.json, pnpm-lock.yaml, .github/workflows/platform-ci.yml]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version from root packageManager
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+          github-token: ${{ github.token }}
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - name: start local stack (migrations + seed)
+        run: supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,supavisor
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @bcn-services/data-client build
+        working-directory: .
+      - name: worker image builds
+        run: docker build -f platform/worker/Dockerfile -t bcns-data-worker:ci .
+        working-directory: .
+      - if: always()
+        run: supabase stop --no-backup

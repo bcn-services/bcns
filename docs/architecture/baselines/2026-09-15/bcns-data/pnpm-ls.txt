@@ -1,0 +1,32 @@
+# $ corepack pnpm@10 ls --depth 0   (root)
+Legend: production dependency, [34moptional only[39m, [33mdev only[39m
+
+[1mbcns-data[90m@0.1.0[39m [2m/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data[22m[1m[2m (PRIVATE)[22m[1m[22m
+[2m│[22m
+[2m│   [22m[96mdependencies:[39m
+[2m├── [22m@aws-sdk/client-s3[90m@3.1131.0[39m
+[2m├── [22m@supabase/supabase-js[90m@2.116.0[39m
+[2m├── [22mp-limit[90m@6.2.0[39m
+[2m├── [22mpg[90m@8.23.0[39m
+[2m├── [22msharp[90m@0.34.5[39m
+[2m├── [22mzod[90m@3.25.76[39m
+[2m│[22m
+[2m│   [22m[96mdevDependencies:[39m
+[2m├── [22m[33m@types/node[39m[90m@22.20.2[39m
+[2m├── [22m[33m@types/pg[39m[90m@8.23.1[39m
+[2m├── [22m[33mjose[39m[90m@6.2.12[39m
+[2m├── [22m[33mtsx[39m[90m@4.23.13[39m
+[2m├── [22m[33mtypescript[39m[90m@5.9.3[39m
+[2m└── [22m[33mvitest[39m[90m@3.2.7[39m
+
+[2m12 packages[22m
+
+# $ corepack pnpm@10 ls --depth 0   (packages/data-client)
+Legend: production dependency, [34moptional only[39m, [33mdev only[39m
+
+[1m@bcn-services/data-client[90m@0.3.0[39m [2m/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/packages/data-client[22m[1m[22m
+[2m│[22m
+[2m│   [22m[96mdependencies:[39m
+[2m└── [22m@supabase/supabase-js[90m@2.116.0[39m
+
+[2m1 package[22m

@@ -1,0 +1,19 @@
+# root gates summary (full log in job tmp)
+1:# $ corepack pnpm lint && corepack pnpm typecheck && corepack pnpm build && corepack pnpm test  (worktree root, da937e4)
+38:[1m Tasks:    [32m[1m5 successful[0m, 5 total[0m
+83:[1m Tasks:    [32m[1m6 successful[0m, 6 total[0m
+185:[1m Tasks:    [32m[1m3 successful[0m, 3 total[0m
+1383:[36m@bcn-services/web:test: [0m# tests 86
+1385:[36m@bcn-services/web:test: [0m# pass 85
+1386:[36m@bcn-services/web:test: [0m# fail 1
+1388:[36m@bcn-services/web:test: [0m# skipped 0
+1396:[1m Tasks:    [32m[1m3 successful[0m, 7 total[0m
+1516:# tests 21
+1518:# pass 21
+1519:# fail 0
+1521:# skipped 0
+
+## data-client dist/index.d.ts vs baseline (Opus 5 reviewer re-ran; appended 2026-09-16)
+$ diff packages/data-client/dist/index.d.ts docs/architecture/baselines/2026-09-15/bcns-data/data-client-index.d.ts; echo exit=$?
+exit=0
+  603537 packages/data-client/dist/index.d.ts

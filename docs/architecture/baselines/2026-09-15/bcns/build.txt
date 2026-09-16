@@ -1,0 +1,60 @@
+# $ corepack pnpm build
+
+> bcns@0.0.0 build /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns
+> turbo run build
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/app-core, @bcn-services/config, @bcn-services/ui, @bcn-services/web
+   • Running build in 4 packages
+   • Remote caching disabled
+
+[36m@bcn-services/web:build: [0mcache hit, replaying logs [2m8246ac6817f01281[0m
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m> @bcn-services/web@0.0.0 build /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web
+[36m@bcn-services/web:build: [0m> next build
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Creating an optimized production build ...
+[36m@bcn-services/web:build: [0m [32m[1m✓[22m[39m Compiled successfully
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Linting and checking validity of types ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Collecting page data ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (0/15) ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (3/15) 
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (7/15) 
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (11/15) 
+[36m@bcn-services/web:build: [0m [32m[1m✓[22m[39m Generating static pages (15/15)
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Finalizing page optimization ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Collecting build traces ...
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+[36m@bcn-services/web:build: [0m┌ ○ /                                    47.9 kB         [37m[1m158 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /_not-found                          870 B            [37m[1m88 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /about                               1.68 kB         [37m[1m109 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /icon.svg                            0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /pricing                             1.12 kB         [37m[1m111 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /privacy                             142 B          [37m[1m87.3 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /robots.txt                          0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /services                            1.67 kB         [37m[1m104 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /sitemap.xml                         0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /terms                               142 B          [37m[1m87.3 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /work                                2.2 kB          [37m[1m110 kB[22m[39m
+[36m@bcn-services/web:build: [0m└ ● /work/[slug]                         2.2 kB          [37m[1m110 kB[22m[39m
+[36m@bcn-services/web:build: [0m    ├ /work/delucas
+[36m@bcn-services/web:build: [0m    └ /work/l2detailz
+[36m@bcn-services/web:build: [0m+ First Load JS shared by all            [37m[1m87.2 kB[22m[39m
+[36m@bcn-services/web:build: [0m  ├ chunks/120-3e163a75275e0f89.js       31.6 kB
+[36m@bcn-services/web:build: [0m  ├ chunks/16b899b3-5d6c72f7b8646651.js  53.6 kB
+[36m@bcn-services/web:build: [0m  └ other shared chunks (total)          1.95 kB
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m○  (Static)  prerendered as static content
+[36m@bcn-services/web:build: [0m●  (SSG)     prerendered as static HTML (uses [36mgetStaticProps[39m)
+[36m@bcn-services/web:build: [0m
+
+[1m Tasks:    [32m[1m1 successful[0m, 1 total[0m
+[1mCached:    [1m1 cached[0m, 1 total[0m
+[1m  Time:    [1m44ms[0m [1m[38;2;18;45;128m>[0m[0;1m[1m[38;2;4;45;162m>[0m[0;1m[1m[38;2;1;45;194m>[0m[0;1m[1m[38;2;6;45;221m [0m[0;1m[1m[38;2;21;45;241mF[0m[0;1m[1m[38;2;44;45;252mU[0m[0;1m[1m[38;2;73;45;254mL[0m[0;1m[1m[38;2;106;45;247mL[0m[0;1m[1m[38;2;141;45;230m [0m[0;1m[1m[38;2;175;45;206mT[0m[0;1m[1m[38;2;205;45;176mU[0m[0;1m[1m[38;2;229;45;142mR[0m[0;1m[1m[38;2;246;45;107mB[0m[0;1m[1m[38;2;254;45;74mO[0m[0;1m[0m[0m
+
+EXIT:0

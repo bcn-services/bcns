@@ -1,0 +1,12 @@
+# gate (d): local `next start` HTML of the 9 marketing routes, chunk 0 (main @6188584, baselines/2026-09-15/bcns/local-html/) vs pv1/1-merge worktree build (job tmp web-now/), both normalized with the same regexes (build id dir, chunk/main-app/page/layout hashes, escaped buildId, media/css hashes, sitemap lastmod, RSC flight ids). Normalizer: pv1-gates/gate-d-normalize.py
+# $ python3 gate-d-normalize.py baselines/2026-09-15/bcns/local-html job-tmp/web-now
+__.html: IDENTICAL after normalization (60350 bytes)
+about.html: IDENTICAL after normalization (42163 bytes)
+pricing.html: IDENTICAL after normalization (55431 bytes)
+privacy.html: IDENTICAL after normalization (10213 bytes)
+robots.txt.html: IDENTICAL after normalization (67 bytes)
+services.html: IDENTICAL after normalization (71666 bytes)
+sitemap.xml.html: IDENTICAL after normalization (1023 bytes)
+terms.html: IDENTICAL after normalization (10221 bytes)
+work.html: IDENTICAL after normalization (43616 bytes)
+RESULT: PASS (9/9 identical)

@@ -1,0 +1,25 @@
+# $ corepack pnpm build  (Route (app) table from apps/web build output)
+Route (app)                              Size     First Load JS
+┌ ○ /                                    47.9 kB         158 kB
+├ ○ /_not-found                          870 B            88 kB
+├ ○ /about                               1.68 kB         109 kB
+├ ○ /icon.svg                            0 B                0 B
+├ ○ /pricing                             1.12 kB         111 kB
+├ ○ /privacy                             142 B          87.3 kB
+├ ○ /robots.txt                          0 B                0 B
+├ ○ /services                            1.67 kB         104 kB
+├ ○ /sitemap.xml                         0 B                0 B
+├ ○ /terms                               142 B          87.3 kB
+├ ○ /work                                2.2 kB          110 kB
+└ ● /work/[slug]                         2.2 kB          110 kB
+    ├ /work/delucas
+    └ /work/l2detailz
++ First Load JS shared by all            87.2 kB
+  ├ chunks/120-3e163a75275e0f89.js       31.6 kB
+  ├ chunks/16b899b3-5d6c72f7b8646651.js  53.6 kB
+  └ other shared chunks (total)          1.95 kB
+
+
+○  (Static)  prerendered as static content
+●  (SSG)     prerendered as static HTML (uses getStaticProps)
+

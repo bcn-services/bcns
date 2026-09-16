@@ -1,0 +1,30 @@
+# gate (g) connect — 2026-09-16T08:55:01Z — release b3267be
+$ curl -sSI https://connect.bcn-services.com/api/health
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Wed, 16 Sep 2026 08:55:01 GMT
+Content-Type: application/json
+Connection: keep-alive
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+
+$ curl -sS https://connect.bcn-services.com/api/health
+{"ok":true,"platform":"connected"}
+$ openssl s_client -showcerts -connect connect.bcn-services.com:443 -servername connect.bcn-services.com </dev/null 2>/dev/null | openssl x509 -noout -issuer -subject -dates
+issuer=C=US, O=Let's Encrypt, CN=YE1
+subject=CN=connect.bcn-services.com
+notBefore=Sep 16 05:17:49 2026 GMT
+notAfter=Dec 15 05:17:48 2026 GMT
+$ verify return code
+Verify return code: 0 (ok)
+$ curl -sSI https://connect.bcn-services.com/ | grep -iE "^(HTTP|location)"
+HTTP/1.1 307 Temporary Redirect
+location: https://connect.bcn-services.com/login
+$ title
+<title>bcns Connect</title>
+$ l2detailz md5s (expect 9177c4718a01d039bebbb0bc5b9cb790 / 20bfad516f730a24b1ff29c4f6504462)
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+active
+active
+active
+/srv/connect/releases/b3267be328432677cab8fc3b69c5735dc951292c

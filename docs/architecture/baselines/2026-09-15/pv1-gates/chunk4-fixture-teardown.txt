@@ -1,0 +1,9 @@
+## local fixture teardown — 2026-09-16T09:12:30Z
+DELETE 1
+DELETE 1
+auth admin delete user → HTTP 200
+sb clients: 0
+smoke users: 0
+memberships for smoke: 0
+[2m Test Files [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m      Tests [22m [1m[32m161 passed[39m[22m[2m | [22m[90m1 todo[39m[90m (162)[39m

@@ -1,0 +1,184 @@
+# $ diff -rq -x node_modules -x .git -x dist -x .next -x .temp -x .turbo -x tsconfig.tsbuildinfo clean/bcns-data platform
+Only in bcns-data/.github/workflows: ci.yml
+Only in bcns-data/.github/workflows: deploy-worker.yml
+Files bcns-data/package.json and platform/package.json differ
+Only in bcns-data: packages
+Only in bcns-data: pnpm-lock.yaml
+Only in bcns-data: pnpm-workspace.yaml
+Files bcns-data/test/data-client.test.ts and platform/test/data-client.test.ts differ
+Files bcns-data/test/scripts.test.ts and platform/test/scripts.test.ts differ
+Files bcns-data/tsconfig.json and platform/tsconfig.json differ
+Files bcns-data/worker/Dockerfile and platform/worker/Dockerfile differ
+
+# $ diff -rq (same excludes) clean/bcns-client-sb apps/sb
+Only in bcns-client-sb/.github/workflows: deploy.yml
+Only in bcns-client-sb: .npmrc
+Files bcns-client-sb/package.json and apps/sb/package.json differ
+Only in bcns-client-sb: pnpm-lock.yaml
+Only in bcns-client-sb: pnpm-workspace.yaml
+
+# $ diff -rq -x node_modules -x dist clean/bcns-data/packages/data-client packages/data-client
+Only in packages/data-client: .turbo
+Files bcns-data/packages/data-client/package.json and packages/data-client/package.json differ
+Files bcns-data/packages/data-client/tsconfig.json and packages/data-client/tsconfig.json differ
+# $ diff clean/bcns-data/{tsconfig.json,test/*.ts,package.json,worker/Dockerfile} vs platform (unified)
+--- bcns-data/tsconfig.json	2026-09-15 22:16:59
++++ platform/tsconfig.json	2026-09-15 22:21:08
+@@ -9,5 +9,5 @@
+     "noEmit": true,
+     "types": ["node"]
+   },
+-  "include": ["worker/src", "scripts", "test", "packages/data-client/src"]
++  "include": ["worker/src", "scripts", "test", "../packages/data-client/src"]
+ }
+--- bcns-data/test/data-client.test.ts	2026-09-15 22:16:59
++++ platform/test/data-client.test.ts	2026-09-15 22:21:08
+@@ -1,7 +1,7 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import {
+   agentTools, createDataClient, DataClientError, runTool, signIn as dcSignIn, ToolInputError,
+-} from '../packages/data-client/src/index.js'
++} from '../../packages/data-client/src/index.js'
+ import { CLIENTS, decodeJwt, localKeys, mediaId, signIn, sql, SUPABASE_URL, USERS } from './helpers.js'
+ 
+ async function dataClientAs(user: (typeof USERS)[keyof typeof USERS]) {
+--- bcns-data/test/scripts.test.ts	2026-09-15 22:16:59
++++ platform/test/scripts.test.ts	2026-09-15 22:21:08
+@@ -15,7 +15,7 @@
+ import { main as hardDelete } from '../scripts/hard-delete.js'
+ import { main as exportClient } from '../scripts/export.js'
+ import { checklist } from '../scripts/checklist.js'
+-import { signIn } from '../packages/data-client/src/index.js'
++import { signIn } from '../../packages/data-client/src/index.js'
+ 
+ const SLUG = 'zz-script-test'
+ const SLUG2 = 'zz-script-test2'
+--- bcns-data/package.json	2026-09-15 22:16:59
++++ platform/package.json	2026-09-15 22:26:40
+@@ -1,5 +1,5 @@
+ {
+-  "name": "bcns-data",
++  "name": "@bcn-services/platform",
+   "version": "0.1.0",
+   "private": true,
+   "type": "module",
+@@ -12,10 +12,10 @@
+     "tick": "tsx worker/src/index.ts",
+     "contract:update": "tsx test/contract-update.ts",
+     "db:reset": "supabase db reset",
+-    "db:types": "supabase gen types --lang typescript --schema api --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres > packages/data-client/src/database.types.ts"
++    "db:types": "supabase gen types --lang typescript --schema api --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres > ../packages/data-client/src/database.types.ts"
+   },
+   "dependencies": {
+-    "@aws-sdk/client-s3": "^3.700.0",
++    "@aws-sdk/client-s3": "^3.1131.0",
+     "@supabase/supabase-js": "^2.58.0",
+     "p-limit": "^6.2.0",
+     "pg": "^8.16.3",
+--- bcns-data/worker/Dockerfile	2026-09-15 22:16:59
++++ platform/worker/Dockerfile	2026-09-15 22:32:15
+@@ -1,10 +1,21 @@
+ # Cloud Run Job image (§5.1). tsx runs the TypeScript directly — no build step to keep in sync.
++# Build context is the MONOREPO ROOT (docker build -f platform/worker/Dockerfile .): the lockfile
++# lives there since bcns-data became platform/ (docs/architecture/platform-v1.md, chunk 1).
+ FROM node:22-slim
+ WORKDIR /app
+ # sharp ships prebuilt linux binaries; nothing else needs a toolchain.
+-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+-# pnpm 10 to match CI: 11's default minimumReleaseAge policy rejects a just-refreshed lockfile.
+-# --prod keeps the image to the runtime tree; tsx is added on top to run the TypeScript as-is.
+-RUN npm i -g pnpm@10 && pnpm install --prod --frozen-lockfile --filter bcns-data && pnpm add tsx@4.20.5
+-COPY worker ./worker
+-CMD ["pnpm", "exec", "tsx", "worker/src/index.ts"]
++# pnpm needs every workspace package.json to validate the frozen lockfile, so copy them all.
++COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
++COPY platform/package.json platform/
++COPY apps/web/package.json apps/web/
++COPY apps/sb/package.json apps/sb/
++COPY packages/ui/package.json packages/ui/
++COPY packages/config/package.json packages/config/
++COPY packages/app-core/package.json packages/app-core/
++COPY packages/data-client/package.json packages/data-client/
++# pnpm pinned to the root packageManager. --prod keeps the image to the runtime tree; tsx is
++# installed globally to run the TypeScript as-is (pnpm 9 refuses `pnpm add` into a --prod tree).
++RUN npm i -g pnpm@9.15.0 tsx@4.20.5 && pnpm install --prod --frozen-lockfile --filter @bcn-services/platform
++COPY platform/worker ./platform/worker
++WORKDIR /app/platform
++CMD ["tsx", "worker/src/index.ts"]
+--- bcns-data/packages/data-client/tsconfig.json	2026-09-15 22:16:59
++++ packages/data-client/tsconfig.json	2026-09-15 22:21:08
+@@ -1,5 +1,5 @@
+ {
+-  "extends": "../../tsconfig.json",
++  "extends": "../../platform/tsconfig.json",
+   "compilerOptions": {
+     "noEmit": false,
+     "declaration": true,
+--- bcns-data/packages/data-client/package.json	2026-09-15 22:16:59
++++ packages/data-client/package.json	2026-09-15 22:27:09
+@@ -28,5 +28,9 @@
+     "type": "git",
+     "url": "https://github.com/bcn-services/bcns-data.git",
+     "directory": "packages/data-client"
++  },
++  "devDependencies": {
++    "@types/node": "^22.9.0",
++    "typescript": "^5.6.3"
+   }
+ }
+--- bcns-client-sb/package.json	2026-09-15 22:17:01
++++ apps/sb/package.json	2026-09-15 22:21:08
+@@ -1,12 +1,11 @@
+ {
+-  "name": "@bcn-services/bcns-client-sb",
++  "name": "@bcn-services/sb",
+   "version": "0.0.0",
+   "private": true,
+-  "packageManager": "pnpm@11.15.1",
+   "scripts": {
+-    "dev": "next dev -p 3100",
++    "dev": "next dev",
+     "build": "tsx scripts/check-env.ts && next build",
+-    "start": "next start -p 3100",
++    "start": "next start",
+     "lint": "eslint .",
+     "typecheck": "tsc --noEmit",
+     "agent": "tsx agent/index.ts",
+@@ -15,9 +14,9 @@
+     "clean": "rm -rf .next .turbo node_modules"
+   },
+   "dependencies": {
+-    "@bcn-services/app-core": "^0.2.0",
+-    "@bcn-services/data-client": "^0.2.0",
+-    "@bcn-services/ui": "^0.1.1",
++    "@bcn-services/app-core": "workspace:*",
++    "@bcn-services/data-client": "workspace:*",
++    "@bcn-services/ui": "workspace:*",
+     "@supabase/ssr": "^0.12.7",
+     "@supabase/supabase-js": "^2.116.0",
+     "next": "14.2.18",
+@@ -25,7 +24,7 @@
+     "react-dom": "^18.3.1"
+   },
+   "devDependencies": {
+-    "@bcn-services/config": "^0.1.1",
++    "@bcn-services/config": "workspace:*",
+     "@types/node": "^22.9.0",
+     "@types/react": "^18.3.12",
+     "@types/react-dom": "^18.3.1",
+
+## Re-run after merge a61f811 (78cdda9 carried Nate's DESIGN.md/REQUIREMENTS.md edits) — 2026-09-16
+$ diff -rq -x node_modules -x .git -x dist -x .next -x .temp -x .turbo -x tsconfig.tsbuildinfo /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data platform
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/.github/workflows: ci.yml
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/.github/workflows: deploy-worker.yml
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/DESIGN.md and platform/DESIGN.md differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/REQUIREMENTS.md and platform/REQUIREMENTS.md differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/package.json and platform/package.json differ
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data: packages
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data: pnpm-lock.yaml
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data: pnpm-workspace.yaml
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/test/data-client.test.ts and platform/test/data-client.test.ts differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/test/scripts.test.ts and platform/test/scripts.test.ts differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/tsconfig.json and platform/tsconfig.json differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/worker/Dockerfile and platform/worker/Dockerfile differ
+(DESIGN.md / REQUIREMENTS.md: prose only — §8 supersede note, platform-shape bullets + R40–R45; see 78cdda9)

@@ -1,0 +1,1301 @@
+# $ corepack pnpm test
+
+> bcns@0.0.0 test /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns
+> turbo run test && pnpm test:docs && pnpm test:infra
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/app-core, @bcn-services/config, @bcn-services/ui, @bcn-services/web
+   • Running test in 4 packages
+   • Remote caching disabled
+
+[36m@bcn-services/web:build: [0mcache miss, executing [2m8246ac6817f01281[0m
+[35m@bcn-services/app-core:test: [0mcache bypass, force executing [2m9f69c002224c5472[0m
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m> @bcn-services/app-core@0.2.0 test /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/app-core
+[35m@bcn-services/app-core:test: [0m> tsx tests/pricing.test.mjs && tsx tests/subscription.test.mjs && tsx tests/anthropic.test.mjs && tsx tests/health.test.mjs && tsx tests/webhooks.test.mjs && tsx tests/qa-app-core.test.mjs && tsx tests/fix-app-core.test.mjs
+[35m@bcn-services/app-core:test: [0m
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m> @bcn-services/web@0.0.0 build /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web
+[36m@bcn-services/web:build: [0m> next build
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Creating an optimized production build ...
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mformatUsd
+[35m@bcn-services/app-core:test: [0m  ✓ formats whole hundreds of dollars
+[35m@bcn-services/app-core:test: [0m  ✓ formats thousands with a separator
+[35m@bcn-services/app-core:test: [0m  ✓ formats the advanced setup fee
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mmonthlyCharge — standard tier
+[35m@bcn-services/app-core:test: [0m  ✓ 15 seats: no overage
+[35m@bcn-services/app-core:test: [0m  ✓ 16 seats: exactly one overage seat
+[35m@bcn-services/app-core:test: [0m  ✓ 40 seats: 25 overage seats
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mmonthlyCharge — advanced tier
+[35m@bcn-services/app-core:test: [0m  ✓ 15 seats: no overage
+[35m@bcn-services/app-core:test: [0m  ✓ 16 seats: exactly one overage seat
+[35m@bcn-services/app-core:test: [0m  ✓ 40 seats: 25 overage seats
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mmonthlyCharge — input guards
+[35m@bcn-services/app-core:test: [0m  ✓ rejects negative seats
+[35m@bcn-services/app-core:test: [0m  ✓ rejects non-integer seats
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0msetupFeeCents
+[35m@bcn-services/app-core:test: [0m  ✓ standard setup fee
+[35m@bcn-services/app-core:test: [0m  ✓ advanced setup fee
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m13 passed, 0 failed
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mdecideAccess
+[35m@bcn-services/app-core:test: [0m  ✓ active -> provision
+[35m@bcn-services/app-core:test: [0m  ✓ trialing -> provision
+[35m@bcn-services/app-core:test: [0m  ✓ past_due -> suspend
+[35m@bcn-services/app-core:test: [0m  ✓ canceled -> suspend
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mdecideFromEvent
+[35m@bcn-services/app-core:test: [0m  ✓ reads status off a Stripe event
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m5 passed, 0 failed
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mcreateAnthropicClient — happy path
+[35m@bcn-services/app-core:test: [0m  ✓ builds a client from a valid key via injected ctor
+[35m@bcn-services/app-core:test: [0m  ✓ defaults the model to DEFAULT_MODEL
+[35m@bcn-services/app-core:test: [0m  ✓ honors an explicit model override
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mcreateAnthropicClient — key validation
+[35m@bcn-services/app-core:test: [0m  ✓ throws MissingApiKeyError on missing key
+[35m@bcn-services/app-core:test: [0m  ✓ throws MissingApiKeyError on empty key
+[35m@bcn-services/app-core:test: [0m  ✓ throws MissingApiKeyError on whitespace-only key
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m6 passed, 0 failed
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mTAP version 13
+[35m@bcn-services/app-core:test: [0m# Subtest: health: unconfigured Supabase env is ok/unconfigured, ping never called
+[35m@bcn-services/app-core:test: [0mok 1 - health: unconfigured Supabase env is ok/unconfigured, ping never called
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 1.301625
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m# Subtest: health: url without anon key still counts as unconfigured
+[35m@bcn-services/app-core:test: [0mok 2 - health: url without anon key still counts as unconfigured
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 0.142
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m# Subtest: health: reachable DB reports connected
+[35m@bcn-services/app-core:test: [0mok 3 - health: reachable DB reports connected
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 0.099125
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m# Subtest: health: failing ping reports error and not-ok
+[35m@bcn-services/app-core:test: [0mok 4 - health: failing ping reports error and not-ok
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 0.148959
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m1..4
+[35m@bcn-services/app-core:test: [0m# tests 4
+[35m@bcn-services/app-core:test: [0m# suites 0
+[35m@bcn-services/app-core:test: [0m# pass 4
+[35m@bcn-services/app-core:test: [0m# fail 0
+[35m@bcn-services/app-core:test: [0m# cancelled 0
+[35m@bcn-services/app-core:test: [0m# skipped 0
+[35m@bcn-services/app-core:test: [0m# todo 0
+[35m@bcn-services/app-core:test: [0m# duration_ms 6.954292
+[35m@bcn-services/app-core:test: [0mTAP version 13
+[35m@bcn-services/app-core:test: [0m# Subtest: webhooks: fail-closed default verifier rejects, handler never runs
+[35m@bcn-services/app-core:test: [0mok 1 - webhooks: fail-closed default verifier rejects, handler never runs
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 1.061708
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m# Subtest: webhooks: duplicate event id is processed exactly once
+[35m@bcn-services/app-core:test: [0mok 2 - webhooks: duplicate event id is processed exactly once
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 0.153667
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m# Subtest: webhooks: distinct event ids are each handled
+[35m@bcn-services/app-core:test: [0mok 3 - webhooks: distinct event ids are each handled
+[35m@bcn-services/app-core:test: [0m  ---
+[35m@bcn-services/app-core:test: [0m  duration_ms: 0.113416
+[35m@bcn-services/app-core:test: [0m  ...
+[35m@bcn-services/app-core:test: [0m1..3
+[35m@bcn-services/app-core:test: [0m# tests 3
+[35m@bcn-services/app-core:test: [0m# suites 0
+[35m@bcn-services/app-core:test: [0m# pass 3
+[35m@bcn-services/app-core:test: [0m# fail 0
+[35m@bcn-services/app-core:test: [0m# cancelled 0
+[35m@bcn-services/app-core:test: [0m# skipped 0
+[35m@bcn-services/app-core:test: [0m# todo 0
+[35m@bcn-services/app-core:test: [0m# duration_ms 5.336792
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mmonthlyCharge — exact overage math
+[35m@bcn-services/app-core:test: [0m  ✓ 16 seats standard: base 149_00 + 1*20_00 = 169_00 total
+[35m@bcn-services/app-core:test: [0m  ✓ 40 seats advanced: base 349_00 + 25*20_00 = 849_00 total
+[35m@bcn-services/app-core:test: [0m  ✓ breakdown fields echo tier and seats
+[35m@bcn-services/app-core:test: [0m  ✓ totalCents always equals baseCents + overageCents
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mmonthlyCharge — seat boundaries
+[35m@bcn-services/app-core:test: [0m  ✓ exactly 15 seats (INCLUDED_SEATS): overageSeats 0, no overage
+[35m@bcn-services/app-core:test: [0m  ✓ 14 seats (below included): overageSeats 0
+[35m@bcn-services/app-core:test: [0m  ✓ 0 seats: base only, no overage
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mmonthlyCharge — invalid seat inputs rejected
+[35m@bcn-services/app-core:test: [0m  ✓ negative seats throws
+[35m@bcn-services/app-core:test: [0m  ✓ non-integer seats throws
+[35m@bcn-services/app-core:test: [0m  ✓ NaN seats throws
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0msetupFeeCents / formatUsd sanity
+[35m@bcn-services/app-core:test: [0m  ✓ setup fees match PRICING and differ per tier
+[35m@bcn-services/app-core:test: [0m  ✓ formatUsd renders the required exact strings
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mdecideAccess — status mapping
+[35m@bcn-services/app-core:test: [0m  ✓ trialing maps to provision
+[35m@bcn-services/app-core:test: [0m  ✓ past_due maps to suspend
+[35m@bcn-services/app-core:test: [0m  ✓ active provisions, canceled suspends
+[35m@bcn-services/app-core:test: [0m  ✓ decideFromEvent reads status off the event (trialing -> provision)
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mcreateAnthropicClient — key validation edge cases
+[35m@bcn-services/app-core:test: [0m  ✓ empty-string key throws MissingApiKeyError
+[35m@bcn-services/app-core:test: [0m  ✓ whitespace-only key throws MissingApiKeyError
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mcreateAnthropicClient — key passthrough via injected ctor
+[35m@bcn-services/app-core:test: [0m  ✓ valid key is passed through (trimmed) to the injected ClientCtor
+[35m@bcn-services/app-core:test: [0m  ✓ defaults model to DEFAULT_MODEL, honors explicit override
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m20 passed, 0 failed
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mPRICING deep-freeze (runtime immutability)
+[35m@bcn-services/app-core:test: [0m  ✓ the PRICING map itself is frozen
+[35m@bcn-services/app-core:test: [0m  ✓ each nested tier object is frozen
+[35m@bcn-services/app-core:test: [0m  ✓ mutating a nested tier field throws in strict mode and leaves it intact
+[35m@bcn-services/app-core:test: [0m  ✓ adding/replacing a tier on the map throws and leaves it intact
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mformatUsd — cents vs whole dollars
+[35m@bcn-services/app-core:test: [0m  ✓ renders exact cents when present
+[35m@bcn-services/app-core:test: [0m  ✓ renders sub-dollar cents with leading zero
+[35m@bcn-services/app-core:test: [0m  ✓ whole-dollar cases stay bare (existing-test contract)
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0mformatUsd — guards & negatives
+[35m@bcn-services/app-core:test: [0m  ✓ throws on NaN
+[35m@bcn-services/app-core:test: [0m  ✓ throws on Infinity / -Infinity
+[35m@bcn-services/app-core:test: [0m  ✓ formats negatives as credits (whole and with cents)
+[35m@bcn-services/app-core:test: [0m
+[35m@bcn-services/app-core:test: [0m10 passed, 0 failed
+[35m@bcn-services/app-core:test: [0m
+[36m@bcn-services/web:build: [0m [32m[1m✓[22m[39m Compiled successfully
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Linting and checking validity of types ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Collecting page data ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (0/15) ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (3/15) 
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (7/15) 
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (11/15) 
+[36m@bcn-services/web:build: [0m [32m[1m✓[22m[39m Generating static pages (15/15)
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Finalizing page optimization ...
+[36m@bcn-services/web:build: [0m [37m[1m [22m[39m Collecting build traces ...
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+[36m@bcn-services/web:build: [0m┌ ○ /                                    47.9 kB         [37m[1m158 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /_not-found                          870 B            [37m[1m88 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /about                               1.68 kB         [37m[1m109 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /icon.svg                            0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /pricing                             1.12 kB         [37m[1m111 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /privacy                             142 B          [37m[1m87.3 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /robots.txt                          0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /services                            1.67 kB         [37m[1m104 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /sitemap.xml                         0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /terms                               142 B          [37m[1m87.3 kB[22m[39m
+[36m@bcn-services/web:build: [0m├ ○ /work                                2.2 kB          [37m[1m110 kB[22m[39m
+[36m@bcn-services/web:build: [0m└ ● /work/[slug]                         2.2 kB          [37m[1m110 kB[22m[39m
+[36m@bcn-services/web:build: [0m    ├ /work/delucas
+[36m@bcn-services/web:build: [0m    └ /work/l2detailz
+[36m@bcn-services/web:build: [0m+ First Load JS shared by all            [37m[1m87.2 kB[22m[39m
+[36m@bcn-services/web:build: [0m  ├ chunks/120-3e163a75275e0f89.js       31.6 kB
+[36m@bcn-services/web:build: [0m  ├ chunks/16b899b3-5d6c72f7b8646651.js  53.6 kB
+[36m@bcn-services/web:build: [0m  └ other shared chunks (total)          1.95 kB
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m
+[36m@bcn-services/web:build: [0m○  (Static)  prerendered as static content
+[36m@bcn-services/web:build: [0m●  (SSG)     prerendered as static HTML (uses [36mgetStaticProps[39m)
+[36m@bcn-services/web:build: [0m
+[32m@bcn-services/web:test: [0mcache bypass, force executing [2m7c501faae4ae702e[0m
+[32m@bcn-services/web:test: [0m
+[32m@bcn-services/web:test: [0m> @bcn-services/web@0.0.0 test /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web
+[32m@bcn-services/web:test: [0m> node --experimental-strip-types --test __tests__/*.mjs
+[32m@bcn-services/web:test: [0m
+[32m@bcn-services/web:test: [0mTAP version 13
+[32m@bcn-services/web:test: [0m# [1] PastWorkItem.link is optional
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items is an array
+[32m@bcn-services/web:test: [0m#   PASS: item without link field has undefined link (not a required string)
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].link is undefined (optional — OK)
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].link is undefined (optional — OK)
+[32m@bcn-services/web:test: [0m# [2] AboutContent — successor fields present in registry (about replaced aboutFounder)
+[32m@bcn-services/web:test: [0m#   PASS: about.description present
+[32m@bcn-services/web:test: [0m#   PASS: about.description is a non-empty string (real copy landed in B3)
+[32m@bcn-services/web:test: [0m# [3] about-founder.tsx — no hardcoded 'Background' or 'Credentials' strings
+[32m@bcn-services/web:test: [0m#   PASS: about-founder.tsx does not contain hardcoded "Background"
+[32m@bcn-services/web:test: [0m#   PASS: about-founder.tsx does not contain hardcoded "Credentials"
+[32m@bcn-services/web:test: [0m# [4] past-work.tsx — anchor only rendered when link is truthy
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx contains {link && ... (conditional anchor)
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx anchor has target="_blank"
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx anchor has rel="noopener noreferrer"
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx does NOT render unconditional <a> for link
+[32m@bcn-services/web:test: [0m# Results: 12 passed, 1 failed
+[32m@bcn-services/web:test: [0m#   FAIL: about-founder.tsx passes description to SectionHeading — description not wired to SectionHeading
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/a2-fix-verification.test.mjs
+[32m@bcn-services/web:test: [0mnot ok 1 - __tests__/a2-fix-verification.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 154.014542
+[32m@bcn-services/web:test: [0m  location: '/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/__tests__/a2-fix-verification.test.mjs:1:1'
+[32m@bcn-services/web:test: [0m  failureType: 'testCodeFailure'
+[32m@bcn-services/web:test: [0m  exitCode: 1
+[32m@bcn-services/web:test: [0m  signal: ~
+[32m@bcn-services/web:test: [0m  error: 'test failed'
+[32m@bcn-services/web:test: [0m  code: 'ERR_TEST_FAILURE'
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64305) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64305) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/site.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# [1] siteContent has all 5 new section keys
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pastWork exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.reviews exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pricing exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.faq exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.about exists
+[32m@bcn-services/web:test: [0m# [2] Collection sections use extensible arrays (not fixed tuples)
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items is an Array
+[32m@bcn-services/web:test: [0m#   PASS: reviews.items is an Array
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers is an Array
+[32m@bcn-services/web:test: [0m#   PASS: faq.items is an Array
+[32m@bcn-services/web:test: [0m# [3] Collection arrays are seeded (non-empty) OR a holding state covers the gap
+[32m@bcn-services/web:test: [0m#   PASS: pastWork has content: non-empty items OR a populated holdingState
+[32m@bcn-services/web:test: [0m#   PASS: reviews has content: non-empty items OR a populated holdingState
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers has >= 1 entry
+[32m@bcn-services/web:test: [0m#   PASS: faq.items has >= 1 entry
+[32m@bcn-services/web:test: [0m# [4] PastWork and Reviews items carry [SLOT: ...] or [INPUT: ...] placeholders
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].title is real copy, not a placeholder
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].outcome is real copy, not a placeholder
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].title is real copy, not a placeholder
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].outcome is real copy, not a placeholder
+[32m@bcn-services/web:test: [0m# [5] about has required fields (aboutFounder restructured into about + founders[] in B2)
+[32m@bcn-services/web:test: [0m#   PASS: about.eyebrow present
+[32m@bcn-services/web:test: [0m#   PASS: about.title present
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[].bio present on every founder
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[].credentials is an Array on every founder
+[32m@bcn-services/web:test: [0m# [6] siteConfig.nav routes to the page hosting each of the 5 sections
+[32m@bcn-services/web:test: [0m#   PASS: nav routes to "/work" (hosts the past-work section)
+[32m@bcn-services/web:test: [0m#   PASS: nav routes to "/work" (hosts the reviews section)
+[32m@bcn-services/web:test: [0m#   PASS: nav routes to "/pricing" (hosts the pricing section)
+[32m@bcn-services/web:test: [0m#   PASS: nav routes to "/pricing" (hosts the faq section)
+[32m@bcn-services/web:test: [0m#   PASS: nav routes to "/about" (hosts the about section)
+[32m@bcn-services/web:test: [0m# Results: 26 passed, 0 failed
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/a2-new-sections.test.mjs
+[32m@bcn-services/web:test: [0mok 2 - __tests__/a2-new-sections.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 238.992791
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# [1] Privacy page content
+[32m@bcn-services/web:test: [0m#   PASS: privacy/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: privacy page contains labeled slot
+[32m@bcn-services/web:test: [0m#   PASS: privacy page does not contain real legal prose
+[32m@bcn-services/web:test: [0m#   PASS: privacy page exports default function
+[32m@bcn-services/web:test: [0m# [2] Terms page content
+[32m@bcn-services/web:test: [0m#   PASS: terms/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: terms page contains labeled slot
+[32m@bcn-services/web:test: [0m#   PASS: terms page does not contain real legal prose
+[32m@bcn-services/web:test: [0m#   PASS: terms page exports default function
+[32m@bcn-services/web:test: [0m# [3] Footer href values
+[32m@bcn-services/web:test: [0m#   PASS: footer has href="/privacy"
+[32m@bcn-services/web:test: [0m#   PASS: footer has href="/terms"
+[32m@bcn-services/web:test: [0m#   PASS: footer does NOT have href="\#" for privacy/terms
+[32m@bcn-services/web:test: [0m# [4] Sitemap routes
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /privacy route
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /terms route
+[32m@bcn-services/web:test: [0m#   PASS: sitemap uses siteConfig.url as base
+[32m@bcn-services/web:test: [0m#   PASS: sitemap privacy uses siteConfig.url template
+[32m@bcn-services/web:test: [0m#   PASS: sitemap terms uses siteConfig.url template
+[32m@bcn-services/web:test: [0m# [5] site.ts config shape
+[32m@bcn-services/web:test: [0m#   PASS: site.ts has name: "bcns"
+[32m@bcn-services/web:test: [0m#   PASS: site.ts has domain field
+[32m@bcn-services/web:test: [0m#   PASS: site.ts has email field
+[32m@bcn-services/web:test: [0m#   PASS: site.ts has url field
+[32m@bcn-services/web:test: [0m#   PASS: site.ts has TODO comments
+[32m@bcn-services/web:test: [0m# Results: 21 passed, 0 failed
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/a4-legal-pages.test.mjs
+[32m@bcn-services/web:test: [0mok 3 - __tests__/a4-legal-pages.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 78.030375
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# [1] Route page files exist
+[32m@bcn-services/web:test: [0m#   PASS: app/services/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: app/pricing/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: app/about/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: app/work/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: app/privacy/page.tsx exists
+[32m@bcn-services/web:test: [0m#   PASS: app/terms/page.tsx exists
+[32m@bcn-services/web:test: [0m# [2] Home page is thin — hero + nav-cards + contact only
+[32m@bcn-services/web:test: [0m#   PASS: home imports Hero
+[32m@bcn-services/web:test: [0m#   PASS: home imports NavCards
+[32m@bcn-services/web:test: [0m#   PASS: home imports ContactSection
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import ProblemSolution
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import DeliveryModels
+[32m@bcn-services/web:test: [0m#   PASS: home DOES import HowItWorks
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import Pricing
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import Faq
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import AboutFounder
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import PastWork
+[32m@bcn-services/web:test: [0m#   PASS: home does NOT import Reviews
+[32m@bcn-services/web:test: [0m# [3] ProblemSolution + DeliveryModels absent from all pages
+[32m@bcn-services/web:test: [0m#   PASS: app/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m#   PASS: app/services/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/services/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m#   PASS: app/pricing/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/pricing/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m#   PASS: app/about/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/about/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m#   PASS: app/work/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/work/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m#   PASS: app/privacy/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/privacy/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m#   PASS: app/terms/page.tsx: no ProblemSolution import
+[32m@bcn-services/web:test: [0m#   PASS: app/terms/page.tsx: no DeliveryModels import
+[32m@bcn-services/web:test: [0m# [4] site-header.tsx nav links
+[32m@bcn-services/web:test: [0m#   PASS: header uses siteConfig.nav
+[32m@bcn-services/web:test: [0m#   PASS: header logo href is /
+[32m@bcn-services/web:test: [0m#   PASS: header CTA points to /\#contact
+[32m@bcn-services/web:test: [0m#   PASS: nav has /services
+[32m@bcn-services/web:test: [0m#   PASS: nav has /work
+[32m@bcn-services/web:test: [0m#   PASS: nav has /pricing
+[32m@bcn-services/web:test: [0m#   PASS: nav has /about
+[32m@bcn-services/web:test: [0m#   PASS: nav order: Services before Work
+[32m@bcn-services/web:test: [0m#   PASS: nav order: Work before Pricing
+[32m@bcn-services/web:test: [0m#   PASS: nav order: Pricing before About
+[32m@bcn-services/web:test: [0m#   PASS: nav does NOT have hash anchors for main items
+[32m@bcn-services/web:test: [0m# [5] Sitemap lists all routes
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /services
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /pricing
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /about
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /work
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /privacy
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes /terms
+[32m@bcn-services/web:test: [0m#   PASS: sitemap includes root /
+[32m@bcn-services/web:test: [0m# [6] Per-route component assignments
+[32m@bcn-services/web:test: [0m#   PASS: services page has SiteHeader
+[32m@bcn-services/web:test: [0m#   PASS: services page has SiteFooter
+[32m@bcn-services/web:test: [0m#   PASS: services page does NOT have ProblemSolution
+[32m@bcn-services/web:test: [0m#   PASS: services page does NOT have DeliveryModels
+[32m@bcn-services/web:test: [0m#   PASS: pricing page has Pricing component
+[32m@bcn-services/web:test: [0m#   PASS: pricing page has Faq
+[32m@bcn-services/web:test: [0m#   PASS: about page has AboutFounder
+[32m@bcn-services/web:test: [0m#   PASS: work page has PastWork
+[32m@bcn-services/web:test: [0m#   PASS: work page has Reviews
+[32m@bcn-services/web:test: [0m# Results: 58 passed, 0 failed
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/b1-multi-page-routing.test.mjs
+[32m@bcn-services/web:test: [0mok 4 - __tests__/b1-multi-page-routing.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 63.233
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# [1] Registry shapes: NavCardsContent, AboutContent, HoldingState
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.navCards exists
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items is array
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items has 4 entries
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[0] has title
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[0] has description
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[0] has href
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[1] has title
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[1] has description
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[1] has href
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[2] has title
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[2] has description
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[2] has href
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[3] has title
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[3] has description
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[3] has href
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.about exists (renamed from aboutFounder)
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.aboutFounder does NOT exist
+[32m@bcn-services/web:test: [0m#   PASS: about.founders is array
+[32m@bcn-services/web:test: [0m#   PASS: about.founders has exactly 2 entries
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0] has name
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0] has roleLine
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0] has bio
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0] has credentials array
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1] has name
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1] has roleLine
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1] has bio
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1] has credentials array
+[32m@bcn-services/web:test: [0m#   PASS: about.whyBcns is string
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState exists
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState has title/body/ctaLabel
+[32m@bcn-services/web:test: [0m#   PASS: reviews.holdingState exists
+[32m@bcn-services/web:test: [0m#   PASS: reviews.holdingState has title/body/ctaLabel
+[32m@bcn-services/web:test: [0m# [2] /about: about-founder.tsx renders two founder cards
+[32m@bcn-services/web:test: [0m#   PASS: about-founder reads siteContent.about
+[32m@bcn-services/web:test: [0m#   PASS: about-founder does NOT read siteContent.aboutFounder
+[32m@bcn-services/web:test: [0m#   PASS: about-founder maps over founders array
+[32m@bcn-services/web:test: [0m#   PASS: about-founder renders founder.name
+[32m@bcn-services/web:test: [0m#   PASS: about-founder renders founder.roleLine
+[32m@bcn-services/web:test: [0m#   PASS: about-founder renders founder.bio
+[32m@bcn-services/web:test: [0m#   PASS: app/about/page.tsx imports AboutFounder
+[32m@bcn-services/web:test: [0m#   PASS: founders[0] name is a non-empty string
+[32m@bcn-services/web:test: [0m#   PASS: founders[1] name is a non-empty string
+[32m@bcn-services/web:test: [0m#   PASS: founders[0] and founders[1] are distinct entries
+[32m@bcn-services/web:test: [0m# [3] /work: holding-state when empty, item grid when populated
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx has items.length === 0 branch
+[32m@bcn-services/web:test: [0m#   PASS: reviews.tsx has items.length === 0 branch
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx renders holdingState.title
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx renders holdingState.body
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx renders holdingState.ctaLabel
+[32m@bcn-services/web:test: [0m#   PASS: reviews.tsx renders holdingState.title
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx has item grid branch (maps over items)
+[32m@bcn-services/web:test: [0m#   PASS: reviews.tsx has item grid branch (maps over items)
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items is seeded with the 2 case-study entries
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState.title stays populated (holding-state branch still viable)
+[32m@bcn-services/web:test: [0m#   PASS: reviews.items is empty array by default
+[32m@bcn-services/web:test: [0m#   PASS: pastWork holding state title is a non-empty string
+[32m@bcn-services/web:test: [0m#   PASS: injected item has title and outcome fields (matches PastWorkItem shape)
+[32m@bcn-services/web:test: [0m#   PASS: past-work.tsx renders workTitle from item
+[32m@bcn-services/web:test: [0m#   PASS: holding-state branch appears before grid branch in past-work.tsx (ternary order)
+[32m@bcn-services/web:test: [0m# [4] Pricing: 3 tiers, free-string prices, price is string not number
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers is array
+[32m@bcn-services/web:test: [0m#   PASS: pricing has exactly 3 tiers
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0] has name
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0] price is a string (not number)
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0] has description
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0] has features array
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1] has name
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1] price is a string (not number)
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1] has description
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1] has features array
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2] has name
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2] price is a string (not number)
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2] has description
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2] has features array
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tsx renders price as text (not toLocaleString/toFixed)
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tsx maps over tiers
+[32m@bcn-services/web:test: [0m#   PASS: tier-3 name is a non-empty string
+[32m@bcn-services/web:test: [0m#   PASS: tier-3 price is a non-empty string
+[32m@bcn-services/web:test: [0m# [5] NavCards reads from siteContent.navCards.items (not inline cards const)
+[32m@bcn-services/web:test: [0m#   PASS: nav-cards.tsx reads from siteContent
+[32m@bcn-services/web:test: [0m#   PASS: nav-cards.tsx extracts navCards from siteContent
+[32m@bcn-services/web:test: [0m#   PASS: nav-cards.tsx does NOT have inline cards array literal
+[32m@bcn-services/web:test: [0m#   PASS: nav-cards.tsx maps over items
+[32m@bcn-services/web:test: [0m# Results: 79 passed, 0 failed
+[32m@bcn-services/web:test: [0m# (node:64308) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64308) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/b2-registry-rework.test.mjs
+[32m@bcn-services/web:test: [0mok 5 - __tests__/b2-registry-rework.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 240.692792
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# [1] content.ts: zero [SLOT: occurrences
+[32m@bcn-services/web:test: [0m#   PASS: content.ts has zero [SLOT: occurrences
+[32m@bcn-services/web:test: [0m# [2] Rendered pages: zero [SLOT: in built HTML
+[32m@bcn-services/web:test: [0m#   PASS: index.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m#   PASS: about.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m#   PASS: pricing.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m#   PASS: services.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m#   PASS: work.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m#   PASS: privacy.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m#   PASS: terms.html: zero [SLOT:
+[32m@bcn-services/web:test: [0m# [3] Rendered pages: all [INPUT: tokens are registry-defined
+[32m@bcn-services/web:test: [0m#   PASS: registry-derived [INPUT: token set is correct
+[32m@bcn-services/web:test: [0m# [4] Spot-checks: verbatim values from appendix
+[32m@bcn-services/web:test: [0m#   PASS: hero.headline === "Get your business ready for the future"
+[32m@bcn-services/web:test: [0m#   PASS: navCards[0].title === "Our Service"
+[32m@bcn-services/web:test: [0m#   PASS: navCards[1].title === "Past Work"
+[32m@bcn-services/web:test: [0m#   PASS: navCards[2].title === "Pricing"
+[32m@bcn-services/web:test: [0m#   PASS: navCards[3].title === "About"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].name === "bcns Connect"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].name === "Deluxe build"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].name === "AI consulting"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[0].question === "Do you use AI?"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState.title === "Our first builds are in progress"
+[32m@bcn-services/web:test: [0m# [5] Behavioral: hero headline appears in built index.html
+[32m@bcn-services/web:test: [0m#   PASS: index.html contains hero headline verbatim
+[32m@bcn-services/web:test: [0m#   PASS: index.html contains nav card title "Our Service"
+[32m@bcn-services/web:test: [0m#   PASS: index.html contains nav card title "Pricing"
+[32m@bcn-services/web:test: [0m#   PASS: work.html contains delucas case-study title
+[32m@bcn-services/web:test: [0m#   PASS: work.html contains l2detailz case-study title
+[32m@bcn-services/web:test: [0m#   PASS: work.html contains delucas outcome
+[32m@bcn-services/web:test: [0m#   PASS: work.html contains l2detailz outcome
+[32m@bcn-services/web:test: [0m#   PASS: pricing.html contains "bcns Connect"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.html contains "Deluxe build"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.html contains "AI consulting"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.html contains FAQ q1
+[32m@bcn-services/web:test: [0m# Results: 30 passed, 0 failed, 0 skipped
+[32m@bcn-services/web:test: [0m# (node:64309) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64309) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/b3-copy-wiring.test.mjs
+[32m@bcn-services/web:test: [0mok 6 - __tests__/b3-copy-wiring.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 141.468709
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# --- Test 1: top-level section keys in CONTENT.md ---
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.buildingBlocks mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.howItWorks mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.connect mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.useCases mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.aiConsult mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.contactSection mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pastWork mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.reviews mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pricing mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.faq mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.about mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.navCards mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pageMeta mentioned in CONTENT.md
+[32m@bcn-services/web:test: [0m# --- Test 2: leaf string field names appear in CONTENT.md ---
+[32m@bcn-services/web:test: [0m#   PASS: field "badge" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "headline" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "subheadline" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "ctaPrimary" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "ctaSecondary" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "proofPoints" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "eyebrow" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "title" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "description" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "items" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "step" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "tag" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "highlights" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "slug" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "problem" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "approach" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "outcome" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "screenshots" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "src" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "alt" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "caption" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "link" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "holdingState" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "quote" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "author" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "role" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "company" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "tiers" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "price" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "features" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "question" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "answer" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "founders" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "roleLine" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "photo" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "bio" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "credentials" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "whyBcns" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "navCards" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "href" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m#   PASS: field "pageMeta" documented in CONTENT.md
+[32m@bcn-services/web:test: [0m# --- Test 3: /work flip instruction documented ---
+[32m@bcn-services/web:test: [0m#   PASS: flip instruction contains "pastWork.items"
+[32m@bcn-services/web:test: [0m#   PASS: flip instruction contains "holding state disappears automatically"
+[32m@bcn-services/web:test: [0m# --- Test 4: [INPUT: …] convention documented ---
+[32m@bcn-services/web:test: [0m#   PASS: CONTENT.md contains "[INPUT:" section header or explanation
+[32m@bcn-services/web:test: [0m#   PASS: CONTENT.md explains what [INPUT: …] strings are
+[32m@bcn-services/web:test: [0m# --- Results: 59 passed, 0 failed ---
+[32m@bcn-services/web:test: [0m# ALL PASS
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/b4-content-md.test.mjs
+[32m@bcn-services/web:test: [0mok 7 - __tests__/b4-content-md.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 242.583167
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64335) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64335) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: pastWork registry has at least one screenshot (walk isn't vacuous)
+[32m@bcn-services/web:test: [0mok 8 - pastWork registry has at least one screenshot (walk isn't vacuous)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.811291
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: public/case-studies directory exists
+[32m@bcn-services/web:test: [0mok 9 - public/case-studies directory exists
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.108667
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every screenshots[].src resolves to a real file on disk
+[32m@bcn-services/web:test: [0mok 10 - every screenshots[].src resolves to a real file on disk
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.462667
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: public/case-studies contains exactly the files the registry references (no orphans)
+[32m@bcn-services/web:test: [0mok 11 - public/case-studies contains exactly the files the registry references (no orphans)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.691334
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: public/case-studies contains exactly three PNGs
+[32m@bcn-services/web:test: [0mok 12 - public/case-studies contains exactly three PNGs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.265916
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64337) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64337) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# [1] siteContent exports all section keys
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.howItWorks exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.useCases exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.contactSection exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pastWork exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.reviews exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pricing exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.faq exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.about exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.navCards exists
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.pageMeta exists
+[32m@bcn-services/web:test: [0m# [2] Each section has required string fields
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero.badge present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero.headline present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero.subheadline present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero.ctaPrimary present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero.ctaSecondary present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.hero.proofPoints present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.howItWorks.eyebrow present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.howItWorks.title present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.howItWorks.description present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.howItWorks.items present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.useCases.eyebrow present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.useCases.title present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.useCases.description present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.useCases.items present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.contactSection.eyebrow present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.contactSection.title present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.contactSection.description present
+[32m@bcn-services/web:test: [0m#   PASS: siteContent.contactSection.highlights present
+[32m@bcn-services/web:test: [0m# [3] Tuple arrays have correct lengths
+[32m@bcn-services/web:test: [0m#   PASS: hero.proofPoints is length 3
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items is length 3
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items is length 4
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights is length 3
+[32m@bcn-services/web:test: [0m# [4] All string values are non-empty (SLOT/step placeholders still allowed)
+[32m@bcn-services/web:test: [0m#   PASS: hero.badge = "bcns Connect: your whole business in one place"
+[32m@bcn-services/web:test: [0m#   PASS: hero.headline = "Get your business ready for the future"
+[32m@bcn-services/web:test: [0m#   PASS: hero.subheadline = "bcns Connect brings the tools you already use into one place, so AI and software can finally work from your real business"
+[32m@bcn-services/web:test: [0m#   PASS: hero.ctaPrimary = "Book a free consult"
+[32m@bcn-services/web:test: [0m#   PASS: hero.ctaSecondary = "See how it works"
+[32m@bcn-services/web:test: [0m#   PASS: hero.proofPoints[0] = "Keep the tools you already use"
+[32m@bcn-services/web:test: [0m#   PASS: hero.proofPoints[1] = "$200 a month, no setup fee"
+[32m@bcn-services/web:test: [0m#   PASS: hero.proofPoints[2] = "Build on top whenever you're ready"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.eyebrow = "What we offer"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.title = "Three building blocks for a business that's ready for AI."
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.description = "Everyone starts with bcns Connect. Add a custom build or a day of AI consulting whenever you're ready."
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[0].step = "01"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[0].title = "bcns Connect"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[0].description = "Every tool your business runs on, connected in one organized place. Ready for your team, the AI tools you choose, or anything you build next."
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[1].step = "02"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[1].title = "Deluxe builds"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[1].description = "An AI agent, an app, a dashboard, anything really. Custom built on top of Connect around how your business already works."
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[2].step = "03"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[2].title = "AI consulting"
+[32m@bcn-services/web:test: [0m#   PASS: buildingBlocks.items[2].description = "One day spent on your business. We find where AI actually helps, build it with you, and get your team using it."
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.eyebrow = "Our process"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.title = "From first call to your personalized product. We're here to assist at every step."
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.description = "You communicate your needs, we build you a tool that accommodates them."
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[0].step = "01"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[0].title = "The call"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[0].description = "A 30-minute conversation about how your business runs and where the friction is at no cost to you. We ask questions to help you figure out exactly what you need."
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[1].step = "02"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[1].title = "The plan"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[1].description = "We write up exactly what we'll build, what it costs, and when it lands. You get the chance to review it and make sure it's tailored to your exact needs."
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[2].step = "03"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[2].title = "The build"
+[32m@bcn-services/web:test: [0m#   PASS: howItWorks.items[2].description = "We connect your tools and build anything you asked for on top, then let you test it and refine it until it's right. Once launched, we host it, maintain it and support your needs so you can focus on your business."
+[32m@bcn-services/web:test: [0m#   PASS: connect.eyebrow = "bcns Connect"
+[32m@bcn-services/web:test: [0m#   PASS: connect.title = "How bcns Connect works"
+[32m@bcn-services/web:test: [0m#   PASS: connect.description = "One connection for your whole business."
+[32m@bcn-services/web:test: [0m#   PASS: connect.rate = "$200 / month"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[0].step = "01"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[0].title = "We connect the tools you already use"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[0].description = "Your online store, ad accounts, project boards, calendar, email and files. We plug into each one, and nothing about how you use them changes."
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[1].step = "02"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[1].title = "Everything lands in one organized place"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[1].description = "Customers, orders, money, messages and files, sorted the same way no matter where they came from and kept current on their own. For the first time, all of it can be searched and compared together."
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[2].step = "03"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[2].title = "You put it to work"
+[32m@bcn-services/web:test: [0m#   PASS: connect.steps[2].description = "Your team sees the whole business at once. The AI tools you already use can work from your real data instead of guesses. And anything we build for you with Deluxe starts from here."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.eyebrow = "Our services"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.title = "The building blocks of a business ready for what's next"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.description = "bcns Connect is the foundation every business starts on. Deluxe builds and AI consulting add to it when you're ready."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.blockEyebrow = "Deluxe builds"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.blockTitle = "Anything you need, custom built on top of Connect."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.blockDescription = "Starting at $5,000 setup and $300/month on top of Connect. If you have a pain point, we can build a tool to alleviate it."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[0].tag = "Agents"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[0].title = "AI Agents"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[0].description = "An assistant that already knows your business. It answers questions about your customers, orders and money, drafts replies, and flags what needs you, working from your real data."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[1].tag = "Apps"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[1].title = "Custom Apps"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[1].description = "Booking systems, back-office tools, customer portals. Built around how you already work, and reading from the same data as everything else."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[2].tag = "Insight"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[2].title = "Dashboards & Reporting"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[2].description = "One place to hold all your business analytics. Your data is already connected, so we build the views that are useful to you."
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[3].tag = "Other"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[3].title = "Something Else"
+[32m@bcn-services/web:test: [0m#   PASS: useCases.items[3].description = "Your options aren't limited to what we've done before. If you have a pain point, we can build a tool to alleviate it."
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.eyebrow = "AI consulting"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.title = "How an AI consult works"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.description = "One day, spent on your business."
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.rate = "$1,000 / day"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[0].step = "01"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[0].title = "We look at the work you already do"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[0].description = "We go through your week with you and find the parts that are repetitive, slow, or typed in twice. Most of a business does not need AI. We tell you which parts of yours do."
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[1].step = "02"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[1].title = "We build one of them with you watching"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[1].description = "We take the task costing you the most hours and build the workflow for it while you watch, so you see how it was put together and not just the finished thing."
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[2].step = "03"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[2].title = "Your team uses it on real work"
+[32m@bcn-services/web:test: [0m#   PASS: aiConsult.steps[2].description = "The rest of the day is your people running it on their own jobs, with us there when something breaks."
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.eyebrow = "Get in touch"
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.title = "Tell us what's slowing you down"
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.description = "Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to get you connected."
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights[0].title = "Free consult"
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights[0].description = "A 30-minute call about how your business runs. No obligations or cost to you."
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights[1].title = "Fixed quote"
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights[1].description = "You approve the exact product and its price before any work starts."
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights[2].title = "Your data"
+[32m@bcn-services/web:test: [0m#   PASS: contactSection.highlights[2].description = "We host and maintain everything for you. Your data is always yours and we'll hand it over at any time."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.eyebrow = "Past work"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.title = "Past work"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.description = "What we've built, and what it changed for the businesses using it."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].slug = "delucas"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].title = "DeLuca's revenue dashboard"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].tag = "Restaurant · Bookkeeping"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].problem = "He was not tracking revenue or costs. The only signal he had about the business was the amount that landed in his bank account."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].approach = "A dashboard that fills itself by parsing his email and pulling the rest through direct API access. Recurring items like rent are set once as rules."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].outcome = "He can see monthly revenue, spending, and what he is paying for, without doing anything to keep it current."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].screenshots[0].src = "/case-studies/delucas-dashboard.png"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].screenshots[0].alt = "DeLuca's dashboard showing monthly money in, spent, and profit totals above a 12-month profit bar chart and an expenses-by-category breakdown."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[0].screenshots[0].caption = "The monthly view: money in, money out, profit, and which categories the spending went to."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].slug = "l2detailz"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].title = "L2 Detailz booking site and admin"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].tag = "Auto detailing · Booking"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].problem = "Bookings arrived as unsorted email and the schedule was kept by hand, costing time and leaving room for error. He also could not post his own deals."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].approach = "We rebuilt his HTML site as a web app with an admin login, so bookings, scheduling, and on-site promotions are managed in one place."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].outcome = "He manages scheduling, routes, and site promotions in one place, without the manual hours or the room for error."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].screenshots[0].src = "/case-studies/l2detailz-frontend.png"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].screenshots[0].alt = "L2 Detailz marketing site showing the Essential, Signature, and Prestige detailing package cards with pricing and included services."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].screenshots[0].caption = "The public site, with the three detailing packages and what each includes."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].screenshots[1].src = "/case-studies/l2detailz-calendar.png"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].screenshots[1].alt = "L2 Detailz admin calendar in month view with scheduled detailing jobs listed across the days of the month."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.items[1].screenshots[1].caption = "The admin calendar: every booking with its time, package, and vehicle, in month view."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState.title = "Our first builds are in progress"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState.body = "We're building for our first clients right now. Case studies land here as projects wrap. Each one covers the problem, what we built, and what changed."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState.ctaLabel = "Want to be one of them? Book a free consult."
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.holdingState.ctaHref = "/\#contact"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.caseStudy.backLabel = "Back to Work"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.caseStudy.problemLabel = "The problem"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.caseStudy.approachLabel = "Our approach"
+[32m@bcn-services/web:test: [0m#   PASS: pastWork.caseStudy.outcomeLabel = "The outcome"
+[32m@bcn-services/web:test: [0m#   PASS: reviews.eyebrow = "Reviews"
+[32m@bcn-services/web:test: [0m#   PASS: reviews.title = "Reviews"
+[32m@bcn-services/web:test: [0m#   PASS: reviews.description = "Hear from our past clients about what it was like to work with us."
+[32m@bcn-services/web:test: [0m#   PASS: reviews.holdingState.title = "No reviews yet. That changes with our first client."
+[32m@bcn-services/web:test: [0m#   PASS: reviews.holdingState.body = "We pride ourselves on quality service and communication. We value your feedback and will share it here as soon as we have it."
+[32m@bcn-services/web:test: [0m#   PASS: reviews.holdingState.ctaLabel = "Want to be one of them? Book a free consult."
+[32m@bcn-services/web:test: [0m#   PASS: reviews.holdingState.ctaHref = "/\#contact"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.eyebrow = "Pricing"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.title = "We charge you for what you actually need and no more."
+[32m@bcn-services/web:test: [0m#   PASS: pricing.description = "Every business starts on bcns Connect for a flat monthly rate with no setup fee. Deluxe builds and AI consulting are added on top when you need them."
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].id = "connect"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].name = "bcns Connect"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].price = "$200 per month"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].seats = "No setup fee."
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].description = "The foundation for everything else. Every tool your business runs on, connected and organized in one place."
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].features[0] = "Connects the tools you already use"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].features[1] = "Your data organized and kept current automatically"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].features[2] = "Ready for your team and the AI tools you choose"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[0].features[3] = "Hosting, backups and support included"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].id = "deluxe"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].name = "Deluxe build"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].price = "$5,000+ setup"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].setup = "$5,000+ setup"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].monthly = "+ from $300/mo on top of Connect"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].description = "Anything custom built on top of your Connect data: an agent, an app, a dashboard."
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].features[0] = "Scoped and quoted after our consult"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].features[1] = "Built around how you already work"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].features[2] = "30 days of fixes and tweaks included"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[1].features[3] = "One year of bug fixes, free"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].id = "consulting"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].name = "AI consulting"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].price = "$1,000 / day"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].description = "Want to learn how to integrate AI into your business? We can teach you modern best practices and practical applications."
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].features[0] = "Audit your business for AI opportunities"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].features[1] = "Learn how to build impactful AI workflows"
+[32m@bcn-services/web:test: [0m#   PASS: pricing.tiers[2].features[2] = "Hands-on training for your team"
+[32m@bcn-services/web:test: [0m#   PASS: faq.eyebrow = "FAQ"
+[32m@bcn-services/web:test: [0m#   PASS: faq.title = "The questions we'd ask too"
+[32m@bcn-services/web:test: [0m#   PASS: faq.description = "Anything else, ask in the form and we'll answer straight."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[0].question = "Do you use AI?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[0].answer = "AI is the most powerful tool on Earth, but it isn't magic. We have created custom AI tools to streamline our workflows and ensure quality products for our clients. It allows us to build faster and more efficiently to tend to your needs when you need it. "
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[1].question = "Do I need to be technical to work with you?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[1].answer = "No. We ask about your business and help you figure out how to streamline your processes. We emphasize clear communication and will ensure you can understand everything you need to about your solution."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[2].question = "What does the monthly fee cover?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[2].answer = "Your bcns Connect fee keeps your tools connected and your data current. It covers hosting, backups, security patches, bug fixes and support. A Deluxe build adds its own monthly fee to cover the same care for what we built you."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[3].question = "Does my tool use AI?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[3].answer = "bcns Connect gets your business ready for AI. Whether to use it is up to you. Some of our Deluxe builds use AI, but only when it is actually the right tool for the job."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[4].question = "What happens if I want to cancel?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[4].answer = "You are free to cancel any time. You will retain access for the time paid for and receive all your data once the service ends."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[5].question = "What is bcns Connect?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[5].answer = "It connects the software your business already runs on a
+[32m@bcn-services/web:test: [0m# nd keeps everything organized in one place, so your team, AI tools and anything we build for you all work from the same information."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[6].question = "Do I have to stop using my current software?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[6].answer = "No. Connect works alongside your tools. You keep using them exactly as you do today."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[7].question = "Can I use my data with other tools?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[7].answer = "Yes. Your data is yours. Once it's organized in Connect, you can plug in the AI assistants and apps you already like."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[8].question = "What does a Deluxe build add?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[8].answer = "Something custom built for you on top of Connect: an AI agent, an app, a dashboard, anything really. We scope it with you and give you a fixed quote before any work starts."
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[9].question = "Is my data private?"
+[32m@bcn-services/web:test: [0m#   PASS: faq.items[9].answer = "Yes. Only you and your team can see your data, and we'll hand over a full copy any time, free."
+[32m@bcn-services/web:test: [0m#   PASS: about.eyebrow = "About"
+[32m@bcn-services/web:test: [0m#   PASS: about.title = "The people behind bcns"
+[32m@bcn-services/web:test: [0m#   PASS: about.description = "Two founders. One builds, one makes sure it's worth building."
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0].name = "Nate Seluga"
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0].roleLine = "Engineering"
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0].bio = "Nate builds the tools. He is drawn to efficiency, and to software that optimizes your workflow exactly how you want it to. Time spent inside day-to-day operations showed him how much of a workday goes to operations that could be automated but weren't, due to the inconvenience of change and hesitation to pay for outside solutions that aren't tailored to the existing process. He has extensive experience creating tools to reduce friction in his own work. bcns exists because that toolbox should not stop with the person who built it."
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[0].credentials[0] = "Computer science, Harvey Mudd College"
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1].name = "Brandon Chung"
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1].roleLine = "Business & clients"
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1].bio = "Brandon studies economics at New York University and has worked in business evaluation and optimization, including time as an investor. That work comes down to one question asked repeatedly: what enables a business to make money, and what is quietly slowing down that process. He has spent time finding the businesses and projects that already work and identifying what would make them work better. On a bcns project he owns scoping and communication, meaning he is the one who advises you on solutions that are worth building."
+[32m@bcn-services/web:test: [0m#   PASS: about.founders[1].credentials[0] = "Economics, New York University"
+[32m@bcn-services/web:test: [0m#   PASS: about.whyBcns = "Every business we have worked in runs on at least one process that could be faster. The software sold to fix it is built for the general version of the problem, not the one that business actually has. We started bcns to build the specific one."
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[0].title = "Our Service"
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[0].description = "bcns Connect, custom Deluxe builds and AI consulting. The three building blocks and how they fit together."
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[1].title = "Past Work"
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[1].description = "Scheduling apps, revenue trackers and more. What we've built, and what it changed for the businesses using it."
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[2].title = "Pricing"
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[2].description = "Understand our pricing model and what it covers. We charge you for what you actually need and no more."
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[3].title = "About"
+[32m@bcn-services/web:test: [0m#   PASS: navCards.items[3].description = "Learn more about the team behind bcns and why we do what we do."
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.home.title = "bcns: Get Your Small Business Ready for AI"
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.home.description = "bcns Connect brings the tools your small business already uses into one organized place, ready for AI and custom software. $200/month, no setup fee. Book a free 30-minute consult."
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.services.title = "What We Offer | bcns"
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.services.description = "bcns Connect, custom Deluxe builds and AI consulting for small businesses. Three building blocks for a business that's ready for AI."
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.work.title = "Past Work | bcns"
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.work.description = "Case studies from bcns client builds. Each one covers the problem, what we built, and what changed. First projects in progress now."
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.pricing.title = "Pricing | bcns"
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.pricing.description = "bcns Connect is $200/month with no setup fee. Deluxe builds start at $5,000 setup plus $300/month on top of Connect. AI consulting at $1,000 per day. Fixed quotes, no hourly surprises."
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.about.title = "About bcns | Two Founders, Custom Software"
+[32m@bcn-services/web:test: [0m#   PASS: pageMeta.about.description = "Nate builds. Brandon makes sure it's worth building. Two founders who left generic tools behind to build custom software that fits small businesses."
+[32m@bcn-services/web:test: [0m# [5] siteConfig.name / .domain / .email not duplicated in content.ts
+[32m@bcn-services/web:test: [0m#   PASS: siteConfig.name not in content.ts
+[32m@bcn-services/web:test: [0m#   PASS: siteConfig.domain not in content.ts
+[32m@bcn-services/web:test: [0m#   PASS: siteConfig.email not in content.ts
+[32m@bcn-services/web:test: [0m# Results: 242 passed, 0 failed
+[32m@bcn-services/web:test: [0m# Subtest: __tests__/content-registry.test.mjs
+[32m@bcn-services/web:test: [0mok 9 - __tests__/content-registry.test.mjs
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 256.518833
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64356) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64356) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: registry has at least one past-work item (guards against a vacuously-passing empty walk)
+[32m@bcn-services/web:test: [0mok 14 - registry has at least one past-work item (guards against a vacuously-passing empty walk)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 15.811917
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: the card <Link> in past-work.tsx carries a focus-visible:ring- treatment
+[32m@bcn-services/web:test: [0mok 15 - the card <Link> in past-work.tsx carries a focus-visible:ring- treatment
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 25.67175
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: no <a> is nested inside another <a>, across every built page under .next/server/app
+[32m@bcn-services/web:test: [0mok 16 - no <a> is nested inside another <a>, across every built page under .next/server/app
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 21.307625
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built /work page has at least items.length + 1 anchors (guards against a vacuously-passing empty scan)
+[32m@bcn-services/web:test: [0mok 17 - built /work page has at least items.length + 1 anchors (guards against a vacuously-passing empty scan)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.211375
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every registry slug appears as href="/work/<slug>" in the built /work page
+[32m@bcn-services/web:test: [0mok 18 - every registry slug appears as href="/work/<slug>" in the built /work page
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.158083
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64357) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64357) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: pastWork.items has exactly 2 entries
+[32m@bcn-services/web:test: [0mok 19 - pastWork.items has exactly 2 entries
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 10.373042
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: slugs are exactly delucas and l2detailz
+[32m@bcn-services/web:test: [0mok 20 - slugs are exactly delucas and l2detailz
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.410042
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every slug is unique
+[32m@bcn-services/web:test: [0mok 21 - every slug is unique
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.922125
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every slug matches ^[a-z0-9-]+$
+[32m@bcn-services/web:test: [0mok 22 - every slug matches ^[a-z0-9-]+$
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 5.342875
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every item's title is filled real copy within 60 chars
+[32m@bcn-services/web:test: [0mok 23 - every item's title is filled real copy within 60 chars
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.3605
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every item's problem is filled real copy within 150 chars
+[32m@bcn-services/web:test: [0mok 24 - every item's problem is filled real copy within 150 chars
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 9.88525
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every item's approach is filled real copy within 150 chars
+[32m@bcn-services/web:test: [0mok 25 - every item's approach is filled real copy within 150 chars
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.242791
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every item's outcome is filled real copy within 120 chars
+[32m@bcn-services/web:test: [0mok 26 - every item's outcome is filled real copy within 120 chars
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.230708
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every item's screenshots is an array
+[32m@bcn-services/web:test: [0mok 27 - every item's screenshots is an array
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.868
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: any populated screenshot entry has the { src, alt, caption } shape
+[32m@bcn-services/web:test: [0mok 28 - any populated screenshot entry has the { src, alt, caption } shape
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 1.169583
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64383) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64383) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: criterion 1: pricing has three cards; Connect and Deluxe carry their pricing fields
+[32m@bcn-services/web:test: [0mok 29 - criterion 1: pricing has three cards; Connect and Deluxe carry their pricing fields
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.544833
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: criterion 2: exact strings appear across pricing registry
+[32m@bcn-services/web:test: [0mok 30 - criterion 2: exact strings appear across pricing registry
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.087209
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: criterion 2b: new tier prices match spec
+[32m@bcn-services/web:test: [0mok 31 - criterion 2b: new tier prices match spec
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.104833
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: criterion 3: no old pricing figures anywhere in registry
+[32m@bcn-services/web:test: [0mok 32 - criterion 3: no old pricing figures anywhere in registry
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.132167
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: criterion 4: no old FAQ cost answer; FAQ reflects new pricing structure
+[32m@bcn-services/web:test: [0mok 33 - criterion 4: no old FAQ cost answer; FAQ reflects new pricing structure
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 14.697
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: criterion 5: content.ts has no em-dashes and no banned buzzwords / SaaS / 'we help'
+[32m@bcn-services/web:test: [0mok 34 - criterion 5: content.ts has no em-dashes and no banned buzzwords / SaaS / 'we help'
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 5.366458
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: consulting tier: renders day-rate price of $1,000
+[32m@bcn-services/web:test: [0mok 35 - consulting tier: renders day-rate price of $1,000
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.37825
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: criterion 1b: pricing.tsx component renders tier prices and optional fields
+[32m@bcn-services/web:test: [0mok 36 - criterion 1b: pricing.tsx component renders tier prices and optional fields
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.348709
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64386) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64386) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: hero proofPoints no longer say 'Use it forever, free'
+[32m@bcn-services/web:test: [0mok 37 - hero proofPoints no longer say 'Use it forever, free'
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 1.322083
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: the bcns Connect tier communicates bcns hosts/runs it
+[32m@bcn-services/web:test: [0mok 38 - the bcns Connect tier communicates bcns hosts/runs it
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.36125
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: 'whether we work together or not' appears zero times
+[32m@bcn-services/web:test: [0mok 39 - 'whether we work together or not' appears zero times
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.267084
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: no claim that software runs without bcns or client owns the code
+[32m@bcn-services/web:test: [0mok 40 - no claim that software runs without bcns or client owns the code
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.129917
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: a contact highlight states data is the client's and handed over on request
+[32m@bcn-services/web:test: [0mok 41 - a contact highlight states data is the client's and handed over on request
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.345833
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: content.ts contains no em-dash
+[32m@bcn-services/web:test: [0mok 42 - content.ts contains no em-dash
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.068041
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: content.ts contains no 'SaaS'
+[32m@bcn-services/web:test: [0mok 43 - content.ts contains no 'SaaS'
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.050875
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: content.ts contains no 'we help'
+[32m@bcn-services/web:test: [0mok 44 - content.ts contains no 'we help'
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.081584
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: howItWorks build step reframed toward hosting/maintaining
+[32m@bcn-services/web:test: [0mok 45 - howItWorks build step reframed toward hosting/maintaining
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 1.891584
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64387) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64387) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: a FAQ entry explains the monthly fee covers hosting, backups, and bug fixes
+[32m@bcn-services/web:test: [0mok 46 - a FAQ entry explains the monthly fee covers hosting, backups, and bug fixes
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 4.668167
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built /pricing HTML explains monthly fee includes hosting, backups, bug fixes
+[32m@bcn-services/web:test: [0mok 47 - built /pricing HTML explains monthly fee includes hosting, backups, bug fixes
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 1.630833
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: a FAQ entry states stop-paying means hosting stops and data is exported
+[32m@bcn-services/web:test: [0mok 48 - a FAQ entry states stop-paying means hosting stops and data is exported
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.508833
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: new faq items are em-dash-free
+[32m@bcn-services/web:test: [0mok 49 - new faq items are em-dash-free
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.243042
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: new faq items contain no 'SaaS' and no 'we help'
+[32m@bcn-services/web:test: [0mok 50 - new faq items contain no 'SaaS' and no 'we help'
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.218583
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: faq.items[0] question is unchanged (W3 appended, did not renumber)
+[32m@bcn-services/web:test: [0mok 51 - faq.items[0] question is unchanged (W3 appended, did not renumber)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.131291
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64416) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64416) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: Connect and Deluxe carry setup/monthly/seats fields
+[32m@bcn-services/web:test: [0mok 52 - Connect and Deluxe carry setup/monthly/seats fields
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 7.082875
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents pricing value: bcns Connect.seats = "No setup fee."
+[32m@bcn-services/web:test: [0mok 53 - CONTENT.md documents pricing value: bcns Connect.seats = "No setup fee."
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.119541
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents pricing value: Deluxe build.setup = "$5,000+ setup"
+[32m@bcn-services/web:test: [0mok 54 - CONTENT.md documents pricing value: Deluxe build.setup = "$5,000+ setup"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.38575
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents pricing value: Deluxe build.monthly = "+ from $300/mo on top of Connect"
+[32m@bcn-services/web:test: [0mok 55 - CONTENT.md documents pricing value: Deluxe build.monthly = "+ from $300/mo on top of Connect"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.117916
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md contains pricing literal: $200
+[32m@bcn-services/web:test: [0mok 56 - CONTENT.md contains pricing literal: $200
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.232709
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md contains pricing literal: $5,000
+[32m@bcn-services/web:test: [0mok 57 - CONTENT.md contains pricing literal: $5,000
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.059083
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md contains pricing literal: $300
+[32m@bcn-services/web:test: [0mok 58 - CONTENT.md contains pricing literal: $300
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.043667
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md contains pricing literal: $1,000
+[32m@bcn-services/web:test: [0mok 59 - CONTENT.md contains pricing literal: $1,000
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.135208
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: key FAQ questions exist in the registry
+[32m@bcn-services/web:test: [0mok 60 - key FAQ questions exist in the registry
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.783791
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents FAQ question: "What does the monthly fee cover?"
+[32m@bcn-services/web:test: [0mok 61 - CONTENT.md documents FAQ question: "What does the monthly fee cover?"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 1.076208
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents FAQ question: "Does my tool use AI?"
+[32m@bcn-services/web:test: [0mok 62 - CONTENT.md documents FAQ question: "Does my tool use AI?"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.161583
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents FAQ question: "What happens if I want to cancel?"
+[32m@bcn-services/web:test: [0mok 63 - CONTENT.md documents FAQ question: "What happens if I want to cancel?"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.05125
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md reflects FAQ concept: hosting
+[32m@bcn-services/web:test: [0mok 64 - CONTENT.md reflects FAQ concept: hosting
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.144541
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md reflects FAQ concept: export
+[32m@bcn-services/web:test: [0mok 65 - CONTENT.md reflects FAQ concept: export
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.154334
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# (node:64435) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+[32m@bcn-services/web:test: [0m# (Use `node --trace-warnings ...` to show where the warning was created)
+[32m@bcn-services/web:test: [0m# (node:64435) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/lib/content.ts is not specified and it doesn't parse as CommonJS.
+[32m@bcn-services/web:test: [0m# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+[32m@bcn-services/web:test: [0m# To eliminate this warning, add "type": "module" to /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web/package.json.
+[32m@bcn-services/web:test: [0m# Subtest: registry has at least one past-work item (guards against a vacuously-passing empty walk)
+[32m@bcn-services/web:test: [0mok 66 - registry has at least one past-work item (guards against a vacuously-passing empty walk)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.8065
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: page.tsx sources the three section labels from siteContent.pastWork.caseStudy, not literals
+[32m@bcn-services/web:test: [0mok 67 - page.tsx sources the three section labels from siteContent.pastWork.caseStudy, not literals
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.201625
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: page.tsx calls notFound() when the slug lookup misses (no fallback shell, no fabricated copy)
+[32m@bcn-services/web:test: [0mok 68 - page.tsx calls notFound() when the slug lookup misses (no fallback shell, no fabricated copy)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.1375
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents caseStudy.backLabel = "Back to Work"
+[32m@bcn-services/web:test: [0mok 69 - CONTENT.md documents caseStudy.backLabel = "Back to Work"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.053083
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents caseStudy.problemLabel = "The problem"
+[32m@bcn-services/web:test: [0mok 70 - CONTENT.md documents caseStudy.problemLabel = "The problem"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.112875
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents caseStudy.approachLabel = "Our approach"
+[32m@bcn-services/web:test: [0mok 71 - CONTENT.md documents caseStudy.approachLabel = "Our approach"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.036375
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CONTENT.md documents caseStudy.outcomeLabel = "The outcome"
+[32m@bcn-services/web:test: [0mok 72 - CONTENT.md documents caseStudy.outcomeLabel = "The outcome"
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.098917
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: build prerenders exactly one static .html file per registry slug, no more no less
+[32m@bcn-services/web:test: [0mok 73 - build prerenders exactly one static .html file per registry slug, no more no less
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.636917
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built /work/delucas HTML renders its own problem/approach/outcome verbatim
+[32m@bcn-services/web:test: [0mok 74 - built /work/delucas HTML renders its own problem/approach/outcome verbatim
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.51325
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built /work/delucas <title> and meta description trace to its own registry fields
+[32m@bcn-services/web:test: [0mok 75 - built /work/delucas <title> and meta description trace to its own registry fields
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.466625
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built /work/l2detailz HTML renders its own problem/approach/outcome verbatim
+[32m@bcn-services/web:test: [0mok 76 - built /work/l2detailz HTML renders its own problem/approach/outcome verbatim
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.719042
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built /work/l2detailz <title> and meta description trace to its own registry fields
+[32m@bcn-services/web:test: [0mok 77 - built /work/l2detailz <title> and meta description trace to its own registry fields
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.146
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: the two case studies have different <title> and meta description
+[32m@bcn-services/web:test: [0mok 78 - the two case studies have different <title> and meta description
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.268
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: every rendered narrative field is real copy (no placeholder regression)
+[32m@bcn-services/web:test: [0mok 79 - every rendered narrative field is real copy (no placeholder regression)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.105166
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: page.tsx guards the screenshots block on item.screenshots.length > 0 (no empty wrapper for an item with no screenshots)
+[32m@bcn-services/web:test: [0mok 80 - page.tsx guards the screenshots block on item.screenshots.length > 0 (no empty wrapper for an item with no screenshots)
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.037458
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: built HTML renders every registry screenshot's alt text and caption
+[32m@bcn-services/web:test: [0mok 81 - built HTML renders every registry screenshot's alt text and caption
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.391541
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m# Subtest: CASE_STUDY_IMAGES (lib/case-study-images.ts) exactly mirrors the registry's screenshot srcs, in both directions
+[32m@bcn-services/web:test: [0mok 82 - CASE_STUDY_IMAGES (lib/case-study-images.ts) exactly mirrors the registry's screenshot srcs, in both directions
+[32m@bcn-services/web:test: [0m  ---
+[32m@bcn-services/web:test: [0m  duration_ms: 0.167542
+[32m@bcn-services/web:test: [0m  ...
+[32m@bcn-services/web:test: [0m1..82
+[32m@bcn-services/web:test: [0m# tests 82
+[32m@bcn-services/web:test: [0m# suites 0
+[32m@bcn-services/web:test: [0m# pass 81
+[32m@bcn-services/web:test: [0m# fail 1
+[32m@bcn-services/web:test: [0m# cancelled 0
+[32m@bcn-services/web:test: [0m# skipped 0
+[32m@bcn-services/web:test: [0m# todo 0
+[32m@bcn-services/web:test: [0m# duration_ms 515.749917
+[32m@bcn-services/web:test: [0m[41m[30m ELIFECYCLE [39m[49m [31mTest failed. See above for more details.[39m
+[1m@bcn-services/web#test: [0m[31m[1m ERROR [0m [31m[1mcommand (/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web) /Users/nateseluga/.local/share/pnpm/pnpm run test exited (1)[0m
+
+[1m Tasks:    [32m[1m2 successful[0m, 3 total[0m
+[1mCached:    [1m0 cached[0m, 3 total[0m
+[1m  Time:    [1m24.883s[0m [0m
+[1mFailed:    [31m[1m@bcn-services/web#test[0m[0m
+
+[31;40m ERROR [0m [31;49mrun failed: command  exited (1)[0m
+[41m[30m ELIFECYCLE [39m[49m [31mTest failed. See above for more details.[39m
+EXIT:1

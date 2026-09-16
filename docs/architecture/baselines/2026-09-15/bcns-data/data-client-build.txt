@@ -1,0 +1,5 @@
+# $ corepack pnpm@10 --filter @bcn-services/data-client build
+
+> @bcn-services/data-client@0.3.0 build /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/packages/data-client
+> tsc
+

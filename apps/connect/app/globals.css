@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * The bcns palette, same HSL tokens as the marketing site (apps/web) so the
+   * hub reads as one product with it. Ink is a soft charcoal, never pure black.
+   */
+  :root {
+    --background: 220 60% 99%;
+    --foreground: 220 13% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%;
+
+    --primary: 214 64% 57%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 75% 97%;
+    --secondary-foreground: 220 13% 9%;
+
+    --muted: 215 75% 97%;
+    --muted-foreground: 223 4% 35%;
+
+    --accent: 214 88% 73%;
+    --accent-foreground: 216 64% 22%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 33% 90%;
+    --input: 217 25% 82%;
+    --ring: 214 64% 57%;
+
+    --radius: 0.75rem;
+
+    /* No webfont: the hub is an operator console, not a landing page. */
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: var(--font-sans);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}
