@@ -110,9 +110,21 @@ If Declan sends credentials before chunk 1 lands: deploy the frozen `bcns-client
 - Worker tick green after the first post-merge deploy; RLS forbidden-read green on `main`.
 - Docs: this repo's CLAUDE.md rewritten for the layout; `hosted-web-model.md` marked superseded; `hosting-reference.md`, os client READMEs, and the "bcns-data is bcns Connect" memory updated; repos archived.
 
+### 9. Final UX + visual polish pass on `apps/connect` (deferred, not scoped)
+
+Flagged 2026-09-16 (Nate), after chunks 0–4 landed. Not a chunk in the build-order sense —
+no plan, no gate, waits on 0–8 finishing and on real client usage to react to. Known items to
+fold in when this starts:
+- Dashboard's source card doesn't belong grouped with real connectors (Shopify/Meta/monday/Meet/Drive) — give it its own spot on the page.
+- Source card sorting/ordering.
+- Uploads and Dashboard aren't connectors — they're the client's own manual data channels (a browser upload, a record typed into the app) and can never leave the "Not connected / Request connection" state that pattern implies. Needs its own treatment.
+- Uploads currently writes bytes into Supabase Storage via `register_upload` (`source='upload'` in `data.media`) — decided 2026-09-16 (Nate) that this duplicates what the Drive connector already does and isn't where files should live going forward: storage stays on Drive, the dashboard only browses/searches what's already there. Decide whether to deprecate `register_upload`/the `upload` source or repoint it at Drive.
+- `drive` has no hub card at all: `HUB_SOURCES` in `apps/connect/lib/sources.ts` lists 6 of the 7 `data.source` values, missing `drive` even though the worker's drive connector is built and writes health rows.
+- General UX/visual pass on the hub once it has real traffic to learn from.
+
 ## Order and parallelism
 
-0 → 1 serial and verification-heavy. 3 starts once 1's layout exists; 4 and 6 after 3. 2 is Nate steps plus script edits, in parallel with 1. 5's partner-dashboard steps start day 1 (Nate); its code follows 4's skeleton. 7 after 2 and 4. 8 last. A first orchestrate session realistically lands 0, 1, 3 and the hub skeleton, with every hosted step queued as a wizard.
+0 → 1 serial and verification-heavy. 3 starts once 1's layout exists; 4 and 6 after 3. 2 is Nate steps plus script edits, in parallel with 1. 5's partner-dashboard steps start day 1 (Nate); its code follows 4's skeleton. 7 after 2 and 4. 8 last. 9 waits on all of 0–8 and is not scheduled. A first orchestrate session realistically lands 0, 1, 3 and the hub skeleton, with every hosted step queued as a wizard.
 
 ## Calendar constraints
 
