@@ -1,0 +1,45 @@
+### sb.bcn-services.com
+$ curl -sSI https://sb.bcn-services.com/api/health
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Wed, 16 Sep 2026 06:17:03 GMT
+Content-Type: text/html
+$ openssl s_client -showcerts -connect sb.bcn-services.com:443 -servername sb.bcn-services.com </dev/null | grep -E 'issuer=|subject=|Verify return|Verification'
+subject=CN=sb.bcn-services.com
+issuer=C=US, O=Let's Encrypt, CN=YE1
+Verification: OK
+Verify return code: 0 (ok)
+$ curl -sS -o /dev/null -w '%{http_code}
+' http://sb.bcn-services.com/x
+301
+
+### connect.bcn-services.com
+$ curl -sSI https://connect.bcn-services.com/api/health
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Wed, 16 Sep 2026 06:17:04 GMT
+Content-Type: text/html
+$ openssl s_client -showcerts -connect connect.bcn-services.com:443 -servername connect.bcn-services.com </dev/null | grep -E 'issuer=|subject=|Verify return|Verification'
+subject=CN=connect.bcn-services.com
+issuer=C=US, O=Let's Encrypt, CN=YE1
+Verification: OK
+Verify return code: 0 (ok)
+$ curl -sS -o /dev/null -w '%{http_code}
+' http://connect.bcn-services.com/x
+301
+
+### mcp.bcn-services.com
+$ curl -sSI https://mcp.bcn-services.com/api/health
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Wed, 16 Sep 2026 06:17:04 GMT
+Content-Type: text/html
+$ openssl s_client -showcerts -connect mcp.bcn-services.com:443 -servername mcp.bcn-services.com </dev/null | grep -E 'issuer=|subject=|Verify return|Verification'
+subject=CN=mcp.bcn-services.com
+issuer=C=US, O=Let's Encrypt, CN=YE1
+Verification: OK
+Verify return code: 0 (ok)
+$ curl -sS -o /dev/null -w '%{http_code}
+' http://mcp.bcn-services.com/x
+301
+

@@ -1,0 +1,49 @@
+# Chunk 2 droplet onboarding — 2026-09-16 06:15-06:17 UTC, as root over ~/.ssh/id_ed25519_bcns
+# Script: infra/onboard-client.sh @ 57bba92 (md5 0082ccb2390d1662c96a06a86b0d8aae), infra/ports.txt (md5 e99c400c922bde6779003432ff1760b3)
+
+## Pre-flight (Opus 5 review items 5, 6)
+dig +short {sb,connect,mcp}.bcn-services.com            -> 146.190.138.141 (all three)
+grep authenticator /etc/letsencrypt/renewal/l2details.com.conf -> authenticator = webroot (not standalone; :80 occupancy is not a regression)
+ufw status numbered                                     -> [17] 80,443/tcp ALLOW IN Anywhere (already live)
+ss -ltnp                                                -> nginx already on :80 and :443 (00-default has :80 default_server return 444 by hand edit; repo heredoc realigned in 57bba92)
+certbot 2.9.0; /etc/letsencrypt/renewal-hooks/deploy/ was EMPTY -> installed reload-nginx hook (review item 4)
+
+## md5 BEFORE
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+3ec5a9fe7fd377b175110431318f94d5  /etc/nginx/sites-available/00-default
+
+## Runs (one at a time)
+bash /root/onboard-client.sh sb 3101 sb.bcn-services.com
+  Successfully received certificate. /etc/letsencrypt/live/sb.bcn-services.com/fullchain.pem, expires 2026-12-15
+  nginx: configuration file /etc/nginx/nginx.conf test is successful
+  Created symlink .../bcns-app@sb.service; Onboarded sb on port 3101 (sb.bcn-services.com, tls: certbot)
+bash /root/onboard-client.sh connect 3102 connect.bcn-services.com
+  Successfully received certificate. expires 2026-12-15; nginx test successful; Onboarded connect on port 3102 (tls: certbot)
+bash /root/onboard-client.sh mcp 3103 mcp.bcn-services.com
+  Successfully received certificate. expires 2026-12-15; nginx test successful; Onboarded mcp on port 3103 (tls: certbot)
+
+## Deploy public key (~/.config/bcns/deploy_key.pub, local md5 cf34f7cd94c8e453f290ccb21c4a728f)
+-rw------- 1 sb sb           96  /srv/sb/.ssh/authorized_keys       cf34f7cd94c8e453f290ccb21c4a728f
+-rw------- 1 connect connect 96  /srv/connect/.ssh/authorized_keys  cf34f7cd94c8e453f290ccb21c4a728f
+-rw------- 1 mcp mcp         96  /srv/mcp/.ssh/authorized_keys      cf34f7cd94c8e453f290ccb21c4a728f
+Login test with the private half (~/.ssh/id_ed25519_bcns_deploy, fingerprint SHA256:Mq+i+uhSkaJSAzQJsJM0o9FPVh7WO9tBaA3wbjDrxSk):
+  sb@146.190.138.141      -> sb      drwxr-xr-x sb sb /srv/sb/releases
+  connect@146.190.138.141 -> connect drwxr-xr-x connect connect /srv/connect/releases
+  mcp@146.190.138.141     -> mcp     drwxr-xr-x mcp mcp /srv/mcp/releases
+
+## /srv/connect/env
+scp ~/.config/bcns/connect.env -> /root/connect.env.in; appended to the templated /srv/connect/env (keeps PORT/HOSTNAME the unit needs); source removed.
+chown connect:connect, chmod 600 -> -rw------- 1 connect connect 247
+Key names only (values never printed): PORT HOSTNAME SHOPIFY_CLIENT_ID SHOPIFY_CLIENT_SECRET
+
+## State after
+/etc/letsencrypt/live: connect.bcn-services.com l2details.com mcp.bcn-services.com sb.bcn-services.com
+/etc/sudoers.d: bcns-connect bcns-l2detailz bcns-mcp bcns-sb
+systemctl is-enabled bcns-app@{sb,connect,mcp,l2detailz} -> enabled x4; bcns-app@l2detailz is-active -> active
+curl -H "Host: nope.example" http://127.0.0.1/ -> 000 (still dropped)
+
+## md5 AFTER (identical to BEFORE)
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+3ec5a9fe7fd377b175110431318f94d5  /etc/nginx/sites-available/00-default

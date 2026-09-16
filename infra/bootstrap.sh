@@ -8,7 +8,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ufw fail2ban unattended-upgrades rsync curl gnupg \
+apt-get install -y ufw fail2ban unattended-upgrades rsync curl gnupg certbot \
   nginx s3cmd openssl
 
 # postgresql-client matching Supabase's Postgres major (17) — Ubuntu's default
@@ -36,6 +36,11 @@ echo "PasswordAuthentication no" > /etc/ssh/sshd_config.d/00-bcns.conf
 systemctl reload ssh
 
 # Firewall: SSH open; web only from Cloudflare (the WAF is decoration otherwise)
+# platform-v1 (2026-09-15): hosts under bcn-services.com resolve straight to the
+# droplet (no Cloudflare) and get Let's Encrypt certs over HTTP-01, so the live
+# droplet ALSO carries `ufw allow 80,443/tcp` from Anywhere (rule present since
+# the pre-Cloudflare launch; see docs/architecture/baselines/2026-09-15/droplet).
+# A fresh droplet built from this script needs that rule added by hand.
 ipv4=$(curl -fsS https://www.cloudflare.com/ips-v4) || { echo "CF ipv4 fetch failed" >&2; exit 1; }
 ipv6=$(curl -fsS https://www.cloudflare.com/ips-v6) || { echo "CF ipv6 fetch failed" >&2; exit 1; }
 ufw default deny incoming
@@ -49,6 +54,14 @@ ufw --force enable
 # nginx: TLS termination with a Cloudflare Origin CA cert; per-client vhosts
 # are dropped in by onboard-client.sh. Default server rejects unknown hosts.
 install -d -m 700 /etc/ssl/cloudflare
+# ACME HTTP-01 webroot for onboard-client.sh's certbot mode, and the renewal
+# hook: certbot.timer renews on disk but nginx keeps the loaded cert in memory
+# until reloaded -- without this every certbot host serves an expired cert at
+# ~day 90.
+install -d -m 755 /var/www/acme
+install -d /etc/letsencrypt/renewal-hooks/deploy
+printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
 
 # Every vhost below references these cert paths, so nginx cannot even load its
 # config until they exist -- and the real Cloudflare Origin CA cert is a manual
@@ -65,8 +78,14 @@ if [ ! -s /etc/ssl/cloudflare/origin.pem ] || [ ! -s /etc/ssl/cloudflare/origin.
 fi
 
 rm -f /etc/nginx/sites-enabled/default
+# platform-v1: :80 is a default_server too. certbot-mode vhosts listen on 80;
+# without this nginx would promote the alphabetically-first `listen 80` vhost
+# and unknown-Host requests on :80 would 301 to that client instead of dropping.
+# Matches the live droplet file (md5 3ec5a9fe7fd377b175110431318f94d5).
 cat > /etc/nginx/sites-available/00-default <<'EOF'
 server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
