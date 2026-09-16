@@ -179,3 +179,21 @@ test("TENANT_MATCHER exempts the health route and static assets", () => {
     assert.equal(pattern.test(path), true, path);
   }
 });
+
+test("behind nginx: the redirect uses the Host header, not the internal server origin", async () => {
+  // Standalone `node server.js` reports request.url as https://localhost:3101/…;
+  // the proxy sets Host to the public name. The browser must land on the latter.
+  const req = new NextRequest("https://localhost:3101/dashboard", {
+    headers: { host: "sb.bcn-services.com", "x-forwarded-proto": "https" },
+  });
+  const response = await tenantMiddleware()(req);
+  assert.equal(response.headers.get("location"), "https://sb.bcn-services.com/login");
+});
+
+test("behind nginx: X-Forwarded-Host is ignored (nginx passes it through, so it is client-controlled)", async () => {
+  const req = new NextRequest("https://localhost:3101/dashboard", {
+    headers: { host: "sb.bcn-services.com", "x-forwarded-proto": "https", "x-forwarded-host": "evil.example" },
+  });
+  const response = await tenantMiddleware()(req);
+  assert.equal(new URL(response.headers.get("location")).host, "sb.bcn-services.com");
+});
