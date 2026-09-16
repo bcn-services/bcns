@@ -1,0 +1,104 @@
+# $ supabase db reset && corepack pnpm --filter @bcn-services/platform test  (worktree platform/, dfcf45b)
+Restarting containers...
+Finished supabase db reset on branch platform-v1.
+{"target":"local","version":"","message":"Reset local database."}
+
+> @bcn-services/platform@0.1.0 test /Users/nateseluga/bcns/.claude/worktrees/pv1-1-merge/platform
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/Users/nateseluga/bcns/.claude/worktrees/pv1-1-merge/platform[39m
+
+ [32m✓[39m test/worker.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 2057[2mms[22m[39m
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2monboard creates the client, its owning membership, and a smoke user
+[22m[39monboarded zz-script-test (2db16495-bd54-4c44-8110-f1906e38d7dc)
+smoke user: smoke+zz-script-test@bcn-services.com
+smoke password (save now, shown once): BrM4Ytff-ZLCF8JDbms5vtZx
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2monboard --sources writes source_tokens + connector_schedule from the connector defaults
+[22m[39monboarded zz-script-test2 (3a0eda4d-aea5-4e1f-9a70-b852448c8026)
+smoke user: smoke+zz-script-test2@bcn-services.com
+smoke password (save now, shown once): F3ZEPsSdgngKE4E7G50O1g7U
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2mset-quota updates egress_quota_bytes
+[22m[39mzz-script-test quota set to 5 GiB (5368709120 bytes)
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2mimport-media uploads a file and registers it via data.register_media
+[22m[39mimported 1, skipped 0 (already present) of 1 files from /var/folders/pf/jgfmjd9j39z8dmn0hk1cgswh0000gn/T/bcns-import-eeQR2O
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2madd-member --agent refuses to rotate a user that already owns the agent+ address but was not minted by --agent
+[22m[39minvite email unavailable (Error sending invite email); created agent+zz-script-test2@bcn-services.com directly
+temporary password (save now, shown once): gxseOGXC6oU6qBRtrNleGWfK
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2madd-member --agent refuses to rotate a user that already owns the agent+ address but was not minted by --agent
+[22m[39madded agent+zz-script-test2@bcn-services.com to zz-script-test2 as owner
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2mchurn sets status = churned and stamps churned_at
+[22m[39mzz-script-test churned at Tue Sep 15 2026 22:30:08 GMT-0700 (Pacific Daylight Time)
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2mexport writes CSV per canonical table, raw.jsonl and files/
+[22m[39mexported zz-script-test to /var/folders/pf/jgfmjd9j39z8dmn0hk1cgswh0000gn/T/bcns-export-ip1ERs
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2mhard-delete archives the export, then removes the client, its rows, and its storage objects
+[22m[39marchived export to /var/folders/pf/jgfmjd9j39z8dmn0hk1cgswh0000gn/T/bcns-archive-FyrIyo/zz-script-test/2026-09-16.tar.gz
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2mhard-delete archives the export, then removes the client, its rows, and its storage objects
+[22m[39mhard-deleted zz-script-test: 1 storage objects, 2 auth user(s), all rows
+
+[90mstdout[2m | test/scripts.test.ts[2m > [22m[2mscripts[2m > [22m[2madd-source[2m > [22m[2mattaches monday to an existing client exactly as onboard does
+[22m[39monboarded zz-script-test3 (380f3fb0-7d8d-4a8e-bb2a-e719adef8d27)
+smoke user: smoke+zz-script-test3@bcn-services.com
+smoke password (save now, shown once): 0o2RdM3xOAIAVziIm9RXC_Pl
+
+[90mstderr[2m | test/scripts.test.ts
+[22m[39mcleanup zz-script-test Error: no client with slug zz-script-test
+
+[90mstdout[2m | test/scripts.test.ts
+[22m[39marchived export to /var/folders/pf/jgfmjd9j39z8dmn0hk1cgswh0000gn/T/bcns-archive-FyrIyo/zz-script-test2/2026-09-16.tar.gz
+
+[90mstdout[2m | test/scripts.test.ts
+[22m[39mhard-deleted zz-script-test2: 0 storage objects, 2 auth user(s), all rows
+
+[90mstdout[2m | test/scripts.test.ts
+[22m[39marchived export to /var/folders/pf/jgfmjd9j39z8dmn0hk1cgswh0000gn/T/bcns-archive-FyrIyo/zz-script-test3/2026-09-16.tar.gz
+
+[90mstdout[2m | test/scripts.test.ts
+[22m[39mhard-deleted zz-script-test3: 0 storage objects, 1 auth user(s), all rows
+
+ [32m✓[39m test/scripts.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 5433[2mms[22m[39m
+   [33m[2m✓[22m[39m scripts[2m > [22monboard creates the client, its owning membership, and a smoke user [33m 1653[2mms[22m[39m
+   [33m[2m✓[22m[39m scripts[2m > [22madd-member --agent creates a non-smoke member whose password signs in with the client_id claim, and re-run rotates it [33m 2188[2mms[22m[39m
+ [32m✓[39m test/media-set-position.qa.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 2254[2mms[22m[39m
+   [33m[2m✓[22m[39m media-set position: add path[2m > [22mappends new items after current max, in media_ids order [33m 1553[2mms[22m[39m
+ [32m✓[39m test/connectors.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 301[2mms[22m[39m
+ [32m✓[39m test/catalog.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 3169[2mms[22m[39m
+   [33m[2m✓[22m[39m catalog[2m > [22mhook_mints_claims [33m 2370[2mms[22m[39m
+ [32m✓[39m test/data-client.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 2622[2mms[22m[39m
+   [33m[2m✓[22m[39m @bcn-services/data-client[2m > [22ma view read returns only the caller tenant's rows [33m 1577[2mms[22m[39m
+ [32m✓[39m test/pin-search-path.qa.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1789[2mms[22m[39m
+   [33m[2m✓[22m[39m pin_search_path (QA)[2m > [22mjwt_client_id resolves through api.report_dashboard_version (tenant_or_raise -> active_client_id -> jwt_client_id) [33m 1539[2mms[22m[39m
+ [32m✓[39m test/rehearsal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2322[2mms[22m[39m
+ [32m✓[39m test/media-set-position.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1876[2mms[22m[39m
+   [33m[2m✓[22m[39m media_set_items.position[2m > [22mthe add path appends at the end, in media_ids order [33m 1392[2mms[22m[39m
+ [32m✓[39m test/drive-tombstone.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1722[2mms[22m[39m
+   [33m[2m✓[22m[39m drive tombstone[2m > [22msoft-deletes a file missing from a later complete listing and undeletes it when it reappears [33m 432[2mms[22m[39m
+ [32m✓[39m test/qa-shopify-rehearsal.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m test/tenant.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 2764[2mms[22m[39m
+   [33m[2m✓[22m[39m tenant isolation[2m > [22mrpc_every_write_scoped [33m 1782[2mms[22m[39m
+   [33m[2m✓[22m[39m tenant isolation[2m > [22mforbidden_read_views [33m 321[2mms[22m[39m
+ [32m✓[39m test/storage.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1966[2mms[22m[39m
+   [33m[2m✓[22m[39m storage[2m > [22mstorage_prefix_isolation [33m 1641[2mms[22m[39m
+ [32m✓[39m test/qa-checklist-s1.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m test/qa-tokens-probe.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1661[2mms[22m[39m
+ [32m✓[39m test/qa-drive-storage-cleanup.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 5327[2mms[22m[39m
+   [33m[2m✓[22m[39m drive-tombstone.test.ts Storage cleanup[2m > [22mleaves the media bucket free of orphaned objects after the real suite runs [33m 5270[2mms[22m[39m
+ [32m✓[39m test/qa-checklist-import-cycle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1110[2mms[22m[39m
+   [33m[2m✓[22m[39m cold-import ordering around the connectors registry[2m > [22mscripts/checklist.ts imports cleanly as the first module (no registry edge) [33m 571[2mms[22m[39m
+   [33m[2m✓[22m[39m cold-import ordering around the connectors registry[2m > [22mindex.ts first, then checklist.ts, still works (the order every worker caller uses) [33m 303[2mms[22m[39m
+ [32m✓[39m test/qa-shopify-handle.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m      Tests [22m [1m[32m142 passed[39m[22m[2m | [22m[90m1 todo[39m[90m (143)[39m
+[2m   Start at [22m 22:29:59
+[2m   Duration [22m 43.06s[2m (transform 426ms, setup 0ms, collect 2.86s, tests 36.45s, environment 2ms, prepare 1.41s)[22m
+

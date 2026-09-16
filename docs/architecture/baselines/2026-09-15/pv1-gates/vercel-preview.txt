@@ -1,0 +1,28 @@
+# Vercel preview for pv1/1-merge head da937e4 (deployment 6474608763, 2026-09-16T05:45:31Z) — FAILED, cause is a dashboard setting
+
+# $ gh api repos/bcn-services/bcns/deployments/6474608763/statuses -q '.[] | [.state,.environment_url] | @tsv'
+failure	https://bcns-landing-bve9ewbyt-bcns.vercel.app
+
+# Vercel dashboard → bcns-landing → deployment 6tgrx4vUCAbGcTxzSie4m9xWEhbE (read via Chrome, Work profile):
+Build Failed
+Command "turbo run build --filter=@nseluga/web..." exited with 1
+
+# The wizard (job b3f31944) set the build command with the PRE-RENAME package name. apps/web has been
+# @bcn-services/web since main bc19e91 "chore: rename npm scope @nseluga to @bcn-services" (Sep 12). This is
+# the first deployment since that setting changed, so it fails on ANY commit that passes the ignored-build filter.
+
+# Local reproduction from apps/web (Vercel Root Directory):
+# $ corepack pnpm exec turbo run build --filter=web...
+• turbo 2.10.4
+  × No package found with name 'web' in workspace
+# $ corepack pnpm exec turbo run build --filter=@bcn-services/web...
+@bcn-services/web:build:
+ Tasks:    1 successful, 1 total
+
+# Morning step (dashboard, not repo): Vercel → bcns-landing → Settings → Build & Deployment → Build Command =
+#   turbo run build --filter=@bcn-services/web...
+# then Redeploy da937e4 (or push). Gate (d) is proven locally in gate-d.txt (9/9 routes identical modulo build ids).
+
+# Ignored-build filter DID work: pv1/0-baselines (docs only) produced 0 deployments:
+# $ gh api "repos/bcn-services/bcns/deployments?sha=<pv1/0-baselines head>" -q length
+0
