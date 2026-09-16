@@ -1,0 +1,176 @@
+# $ supabase link --project-ref cnsxbglhredokjbvudfd && supabase db diff --linked
+Initialising login role...
+Creating shadow database...
+17.6.1.166: Pulling from supabase/postgres
+e75b0fcbc3c7: Pulling fs layer
+d986c8884f27: Pulling fs layer
+5a5c0b8593c4: Pulling fs layer
+505c75182779: Pulling fs layer
+0e47bf984900: Pulling fs layer
+3cf0dd786b29: Pulling fs layer
+fe762ad18010: Pulling fs layer
+3b88f0bbdd9a: Pulling fs layer
+088a7b4576eb: Pulling fs layer
+9faf69553d39: Pulling fs layer
+5ec287902def: Pulling fs layer
+f8f2d72181e4: Pulling fs layer
+24a5248f73aa: Pulling fs layer
+6fee2e018f5c: Pulling fs layer
+7ff7933b567f: Pulling fs layer
+99c2d2a3bd33: Pulling fs layer
+8229c4f73fa8: Pulling fs layer
+2b64c5dfde6e: Pulling fs layer
+3fc59f42fce4: Pulling fs layer
+50693bbcb8fc: Pulling fs layer
+3996312ff031: Pulling fs layer
+d16ae40e7326: Pulling fs layer
+0809673992db: Pulling fs layer
+639b390c683d: Pulling fs layer
+59876d316b95: Pulling fs layer
+05bd18fe26a0: Pulling fs layer
+1cb079c4a882: Pulling fs layer
+626444b11972: Pulling fs layer
+99c2d2a3bd33: Download complete
+d986c8884f27: Download complete
+5a5c0b8593c4: Download complete
+e75b0fcbc3c7: Download complete
+0e47bf984900: Download complete
+3cf0dd786b29: Download complete
+5ec287902def: Download complete
+50693bbcb8fc: Download complete
+3996312ff031: Download complete
+44136fa355b3: Already exists
+505c75182779: Download complete
+9faf69553d39: Download complete
+8229c4f73fa8: Download complete
+3fc59f42fce4: Download complete
+05bd18fe26a0: Download complete
+088a7b4576eb: Download complete
+1cb079c4a882: Download complete
+626444b11972: Download complete
+3b88f0bbdd9a: Download complete
+0809673992db: Download complete
+639b390c683d: Download complete
+7ff7933b567f: Download complete
+24a5248f73aa: Download complete
+fe762ad18010: Download complete
+59876d316b95: Download complete
+2b64c5dfde6e: Download complete
+d16ae40e7326: Download complete
+f8f2d72181e4: Download complete
+9e1f9d5705c6: Download complete
+f8f2d72181e4: Pull complete
+24a5248f73aa: Pull complete
+6fee2e018f5c: Download complete
+6fee2e018f5c: Pull complete
+d986c8884f27: Pull complete
+505c75182779: Pull complete
+088a7b4576eb: Pull complete
+3b88f0bbdd9a: Pull complete
+fe762ad18010: Pull complete
+99c2d2a3bd33: Pull complete
+3cf0dd786b29: Pull complete
+50693bbcb8fc: Pull complete
+3996312ff031: Pull complete
+9faf69553d39: Pull complete
+8229c4f73fa8: Pull complete
+3fc59f42fce4: Pull complete
+05bd18fe26a0: Pull complete
+0809673992db: Pull complete
+639b390c683d: Pull complete
+7ff7933b567f: Pull complete
+59876d316b95: Pull complete
+2b64c5dfde6e: Pull complete
+d16ae40e7326: Pull complete
+5a5c0b8593c4: Pull complete
+e75b0fcbc3c7: Pull complete
+0e47bf984900: Pull complete
+5ec287902def: Pull complete
+1cb079c4a882: Pull complete
+626444b11972: Pull complete
+Digest: sha256:b3bfedb107413abb3b8cb0d0874b0414a1dceb3d55bc0c778de6ad22d1f7dc86
+Status: Downloaded newer image for public.ecr.aws/supabase/postgres:17.6.1.166
+public.ecr.aws/supabase/postgres:17.6.1.166
+Initialising schema...
+v1.73.1: Pulling from supabase/storage-api
+e4b7b66e524f: Pulling fs layer
+a6f36c1182d9: Pulling fs layer
+d5e5c2cf93e2: Pulling fs layer
+97506db9d0d5: Pulling fs layer
+83d35ec162b9: Pulling fs layer
+b201731d047c: Pulling fs layer
+419d982a377f: Pulling fs layer
+8f16ae8e753f: Pulling fs layer
+4135400def2a: Pulling fs layer
+acada5626780: Pulling fs layer
+10b2fb45ecb8: Pulling fs layer
+5dd822597f10: Pulling fs layer
+d09c58bad58e: Pulling fs layer
+e4b7b66e524f: Download complete
+a6f36c1182d9: Download complete
+d09c58bad58e: Download complete
+97506db9d0d5: Download complete
+83d35ec162b9: Download complete
+419d982a377f: Download complete
+8f16ae8e753f: Download complete
+4135400def2a: Download complete
+44136fa355b3: Already exists
+10b2fb45ecb8: Download complete
+6d2422164723: Download complete
+acada5626780: Download complete
+5dd822597f10: Download complete
+d5e5c2cf93e2: Download complete
+b201731d047c: Download complete
+d5e5c2cf93e2: Pull complete
+97506db9d0d5: Pull complete
+83d35ec162b9: Pull complete
+a6f36c1182d9: Pull complete
+419d982a377f: Pull complete
+4135400def2a: Pull complete
+b201731d047c: Pull complete
+acada5626780: Pull complete
+8f16ae8e753f: Pull complete
+5dd822597f10: Pull complete
+e4b7b66e524f: Pull complete
+e4b7b66e524f: Pull complete
+d09c58bad58e: Pull complete
+10b2fb45ecb8: Pull complete
+Digest: sha256:c24fb33cc2fa38d0f9582a30312907fc56da333fb9ba0646833186197e4982f3
+Status: Downloaded newer image for public.ecr.aws/supabase/storage-api:v1.73.1
+public.ecr.aws/supabase/storage-api:v1.73.1
+v2.197.0: Pulling from supabase/gotrue
+2d710e537411: Pulling fs layer
+a3a316c5ce21: Pulling fs layer
+28ddbbdf4855: Pulling fs layer
+3441f90f9083: Pulling fs layer
+75135058766b: Pulling fs layer
+2d710e537411: Download complete
+75135058766b: Download complete
+28ddbbdf4855: Download complete
+3441f90f9083: Download complete
+44136fa355b3: Already exists
+2d710e537411: Pull complete
+75135058766b: Pull complete
+4504e983fa00: Download complete
+a3a316c5ce21: Download complete
+a3a316c5ce21: Pull complete
+28ddbbdf4855: Pull complete
+3441f90f9083: Pull complete
+Digest: sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b
+Status: Downloaded newer image for public.ecr.aws/supabase/gotrue:v2.197.0
+public.ecr.aws/supabase/gotrue:v2.197.0
+Seeding globals from roles.sql...
+Applying migration 20260912000100_schema.sql...
+Applying migration 20260912000200_access.sql...
+Applying migration 20260912000300_storage.sql...
+Applying migration 20260912000400_api_views.sql...
+Applying migration 20260912000500_api_rpcs.sql...
+Applying migration 20260912000600_drive_source.sql...
+Applying migration 20260914000100_pin_search_path.sql...
+Applying migration 20260914000200_media_set_position.sql...
+Diffing schemas...
+Finished supabase db diff on branch main.
+
+Found drop statements in schema diff. Please double check if these are expected:
+DROP EXTENSION pg_net
+{"diff":"-- Migration unit 1: schema_changes\n-- Transaction mode: transactional\n-- Boundary reason: default\n\nSET check_function_bodies = false;\n\nDROP EXTENSION pg_net;\n\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE UPDATE ON SEQUENCES FROM anon;\n\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE UPDATE ON SEQUENCES FROM authenticated;\n\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE UPDATE ON SEQUENCES FROM service_role;\n\nCREATE FUNCTION public.rls_auto_enable()\n  RETURNS event_trigger\n  LANGUAGE plpgsql\n  SECURITY DEFINER\n  SET search_path TO 'pg_catalog'\n  AS $function$\nDECLARE\n  cmd record;\nBEGIN\n  FOR cmd IN\n    SELECT *\n    FROM pg_event_trigger_ddl_commands()\n    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')\n      AND object_type IN ('table','partitioned table')\n  LOOP\n     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN\n      BEGIN\n        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);\n        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;\n      EXCEPTION\n        WHEN OTHERS THEN\n          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;\n      END;\n     ELSE\n        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;\n     END IF;\n  END LOOP;\nEND;\n$function$;\n\nREVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC;\n\nCREATE EVENT TRIGGER ensure_rls\n  ON ddl_command_end\n  WHEN TAG IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')\n  EXECUTE FUNCTION public.rls_auto_enable();","file":null,"files":[],"schemas":[],"engine":"pg-delta","dropStatements":["DROP EXTENSION pg_net"],"message":"Diff complete."}

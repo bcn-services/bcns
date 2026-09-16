@@ -1,0 +1,5 @@
+# $ corepack pnpm@10 typecheck
+
+> bcns-data@0.1.0 typecheck /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data
+> tsc --noEmit -p tsconfig.json
+

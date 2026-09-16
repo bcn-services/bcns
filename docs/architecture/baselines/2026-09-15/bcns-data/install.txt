@@ -1,0 +1,31 @@
+# $ corepack pnpm@10 install --frozen-lockfile
+   [33m│[39m                                              [33m│[39m
+[33m   ╰──────────────────────────────────────────────╯[39m
+[33m[39m
+Progress: resolved [96m114[39m, reused [96m0[39m, downloaded [96m61[39m, added [96m13[39m
+Progress: resolved [96m114[39m, reused [96m0[39m, downloaded [96m114[39m, added [96m114[39m, done
+
+[96mdependencies:[39m
+[32m+[39m @aws-sdk/client-s3 [90m3.1131.0[39m
+[32m+[39m @supabase/supabase-js [90m2.116.0[39m
+[32m+[39m p-limit [90m6.2.0[39m
+[32m+[39m pg [90m8.23.0[39m
+[32m+[39m sharp [90m0.34.5[39m
+[32m+[39m zod [90m3.25.76[39m
+
+[96mdevDependencies:[39m
+[32m+[39m @types/node [90m22.20.2[39m
+[32m+[39m @types/pg [90m8.23.1[39m
+[32m+[39m jose [90m6.2.12[39m
+[32m+[39m tsx [90m4.23.13[39m
+[32m+[39m typescript [90m5.9.3[39m
+[32m+[39m vitest [90m3.2.7[39m
+
+[33m╭ Warning ─────────────────────────────────────────────────────────────────────╮[39m
+[33m│[39m                                                                              [33m│[39m
+[33m│[39m   Ignored build scripts: esbuild@0.28.2, sharp@0.34.5.                       [33m│[39m
+[33m│[39m   Run "pnpm approve-builds" to pick which dependencies should be allowed     [33m│[39m
+[33m│[39m   to run scripts.                                                            [33m│[39m
+[33m│[39m                                                                              [33m│[39m
+[33m╰──────────────────────────────────────────────────────────────────────────────╯[39m
+Done in 2.2s using pnpm v10.34.5

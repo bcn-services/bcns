@@ -1,0 +1,18 @@
+# extracted from build.txt: Next.js Route (app) table
+[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+┌ ƒ /                                    179 B          [37m[1m94.1 kB[22m[39m
+├ ○ /_not-found                          872 B            [37m[1m88 kB[22m[39m
+├ ƒ /api/health                          0 B                [37m[1m0 B[22m[39m
+├ ƒ /financials                          179 B          [37m[1m94.1 kB[22m[39m
+├ ƒ /library                             71.7 kB         [37m[1m166 kB[22m[39m
+└ ƒ /login                               138 B          [37m[1m87.3 kB[22m[39m
++ First Load JS shared by all            [37m[1m87.2 kB[22m[39m
+  ├ chunks/588-2c06830bfa17e291.js       31.6 kB
+  ├ chunks/7d771d05-7f362a5f28352d72.js  53.6 kB
+  └ other shared chunks (total)          1.96 kB
+
+
+ƒ Middleware                             [37m[1m87.3 kB[22m[39m
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

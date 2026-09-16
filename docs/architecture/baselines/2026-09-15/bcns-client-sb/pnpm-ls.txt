@@ -1,0 +1,26 @@
+# $ corepack pnpm ls --depth 0
+[43m[33m[[39m[49m[43m[30mWARN[39m[49m[43m[33m][39m[49m Ignored project-level auth setting "//npm.pkg.github.com/:_authToken" in "/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-client-sb/.npmrc": environment variables are not expanded in registry credentials that come from a project .npmrc, because that file is committed to the repository and could leak the secret to an attacker-controlled registry. Move this credential to a trusted source that pnpm still expands — put the line in your user-level ~/.npmrc, or set it with pnpm config set (for example, run: pnpm config set "//npm.pkg.github.com/:_authToken" <value>). See https://pnpm.io/npmrc
+Legend: production dependency, [34moptional only[39m, [33mdev only[39m
+
+[1m@bcn-services/bcns-client-sb[90m@0.0.0[39m [2m/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-client-sb[22m[1m[2m (PRIVATE)[22m[1m[22m
+[2m│[22m
+[2m│   [22m[96mdependencies:[39m
+[2m├── [22m@bcn-services/app-core[90m@0.2.0[39m
+[2m├── [22m@bcn-services/data-client[90m@0.2.0[39m
+[2m├── [22m@bcn-services/ui[90m@0.1.1[39m
+[2m├── [22m@supabase/ssr[90m@0.12.7[39m
+[2m├── [22m@supabase/supabase-js[90m@2.116.0[39m
+[2m├── [22mnext[90m@14.2.18[39m
+[2m├── [22mreact[90m@18.3.1[39m
+[2m├── [22mreact-dom[90m@18.3.1[39m
+[2m│[22m
+[2m│   [22m[96mdevDependencies:[39m
+[2m├── [22m[33m@bcn-services/config[39m[90m@0.1.1[39m
+[2m├── [22m@types/node[90m@22.20.1[39m
+[2m├── [22m[33m@types/react[39m[90m@18.3.31[39m
+[2m├── [22m[33m@types/react-dom[39m[90m@18.3.7[39m
+[2m├── [22m[33meslint[39m[90m@9.39.5[39m
+[2m├── [22m[33mtsx[39m[90m@4.23.1[39m
+[2m└── [22m[33mtypescript[39m[90m@5.9.3[39m
+
+[2m15 packages[22m

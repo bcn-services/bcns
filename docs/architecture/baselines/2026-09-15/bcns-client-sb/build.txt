@@ -1,0 +1,37 @@
+# $ DATA_SOURCE=shared corepack pnpm build
+[43m[33m[[39m[49m[43m[30mWARN[39m[49m[43m[33m][39m[49m Ignored project-level auth setting "//npm.pkg.github.com/:_authToken" in "/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-client-sb/.npmrc": environment variables are not expanded in registry credentials that come from a project .npmrc, because that file is committed to the repository and could leak the secret to an attacker-controlled registry. Move this credential to a trusted source that pnpm still expands — put the line in your user-level ~/.npmrc, or set it with pnpm config set (for example, run: pnpm config set "//npm.pkg.github.com/:_authToken" <value>). See https://pnpm.io/npmrc
+[2m$ tsx scripts/check-env.ts && next build[22m
+  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+
+ [37m[1m [22m[39m Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (113kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (267kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ [32m[1m✓[22m[39m Compiled successfully
+ [37m[1m [22m[39m Linting and checking validity of types ...
+ [37m[1m [22m[39m Collecting page data ...
+ [37m[1m [22m[39m Generating static pages (0/7) ...
+ [37m[1m [22m[39m Generating static pages (1/7) 
+ [37m[1m [22m[39m Generating static pages (3/7) 
+ [37m[1m [22m[39m Generating static pages (5/7) 
+ [32m[1m✓[22m[39m Generating static pages (7/7)
+ [37m[1m [22m[39m Finalizing page optimization ...
+ [37m[1m [22m[39m Collecting build traces ...
+
+[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+┌ ƒ /                                    179 B          [37m[1m94.1 kB[22m[39m
+├ ○ /_not-found                          872 B            [37m[1m88 kB[22m[39m
+├ ƒ /api/health                          0 B                [37m[1m0 B[22m[39m
+├ ƒ /financials                          179 B          [37m[1m94.1 kB[22m[39m
+├ ƒ /library                             71.7 kB         [37m[1m166 kB[22m[39m
+└ ƒ /login                               138 B          [37m[1m87.3 kB[22m[39m
++ First Load JS shared by all            [37m[1m87.2 kB[22m[39m
+  ├ chunks/588-2c06830bfa17e291.js       31.6 kB
+  ├ chunks/7d771d05-7f362a5f28352d72.js  53.6 kB
+  └ other shared chunks (total)          1.96 kB
+
+
+ƒ Middleware                             [37m[1m87.3 kB[22m[39m
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
