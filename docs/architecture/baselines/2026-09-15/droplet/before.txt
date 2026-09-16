@@ -1,0 +1,66 @@
+# droplet 146.190.138.141 read-only state capture, 2026-09-15 (before any platform-v1 change). Sections are labeled with the command that produced them. env file line-count only; contents never read.
+# $ md5sum /etc/nginx/sites-available/l2detailz /etc/nginx/sites-available/00-default /etc/systemd/system/bcns-app@.service /etc/ssl/cloudflare/origin.pem
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+3ec5a9fe7fd377b175110431318f94d5  /etc/nginx/sites-available/00-default
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+dd2a55091119f5fca9b6d92a2effef25  /etc/ssl/cloudflare/origin.pem
+
+# $ ls -l /etc/nginx/sites-enabled
+total 0
+lrwxrwxrwx 1 root root 37 Aug  1 00:23 00-default -> /etc/nginx/sites-available/00-default
+lrwxrwxrwx 1 root root 36 Aug  1 00:23 l2detailz -> /etc/nginx/sites-available/l2detailz
+
+# $ systemctl show bcns-app@l2detailz -p MainPID -p ActiveState -p ExecMainStartTimestamp
+MainPID=513731
+ExecMainStartTimestamp=Fri 2026-09-11 06:08:18 UTC
+ActiveState=active
+
+# $ ufw status numbered
+Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] OpenSSH                    ALLOW IN    Anywhere                  
+[ 2] 80,443/tcp                 ALLOW IN    173.245.48.0/20           
+[ 3] 80,443/tcp                 ALLOW IN    103.21.244.0/22           
+[ 4] 80,443/tcp                 ALLOW IN    103.22.200.0/22           
+[ 5] 80,443/tcp                 ALLOW IN    103.31.4.0/22             
+[ 6] 80,443/tcp                 ALLOW IN    141.101.64.0/18           
+[ 7] 80,443/tcp                 ALLOW IN    108.162.192.0/18          
+[ 8] 80,443/tcp                 ALLOW IN    190.93.240.0/20           
+[ 9] 80,443/tcp                 ALLOW IN    188.114.96.0/20           
+[10] 80,443/tcp                 ALLOW IN    197.234.240.0/22          
+[11] 80,443/tcp                 ALLOW IN    198.41.128.0/17           
+[12] 80,443/tcp                 ALLOW IN    162.158.0.0/15            
+[13] 80,443/tcp                 ALLOW IN    104.16.0.0/13             
+[14] 80,443/tcp                 ALLOW IN    104.24.0.0/14             
+[15] 80,443/tcp                 ALLOW IN    172.64.0.0/13             
+[16] 80,443/tcp                 ALLOW IN    131.0.72.0/22             
+[17] 80,443/tcp                 ALLOW IN    Anywhere                   # temp: pre-Cloudflare launch, remove when CF fronts origin
+[18] OpenSSH (v6)               ALLOW IN    Anywhere (v6)             
+[19] 80,443/tcp                 ALLOW IN    2400:cb00::/32            
+[20] 80,443/tcp                 ALLOW IN    2606:4700::/32            
+[21] 80,443/tcp                 ALLOW IN    2803:f800::/32            
+[22] 80,443/tcp                 ALLOW IN    2405:b500::/32            
+[23] 80,443/tcp                 ALLOW IN    2405:8100::/32            
+[24] 80,443/tcp                 ALLOW IN    2a06:98c0::/29            
+[25] 80,443/tcp                 ALLOW IN    2c0f:f248::/32            
+[26] 80,443/tcp (v6)            ALLOW IN    Anywhere (v6)              # temp: pre-Cloudflare launch, remove when CF fronts origin
+
+
+# $ ls /srv
+l2detailz
+
+# $ ls /etc/letsencrypt/live
+README
+l2details.com
+
+# $ ls /etc/letsencrypt/renewal 2>/dev/null
+l2details.com.conf
+
+# $ certbot --version
+certbot 2.9.0
+
+# $ cat /srv/l2detailz/env | grep -c .
+10
+

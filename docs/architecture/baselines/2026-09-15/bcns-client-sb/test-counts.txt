@@ -1,0 +1,39 @@
+# $ corepack pnpm test — result counts (identical for both env variants: DATA_SOURCE=shared, and no env at all)
+
+# tests 248
+# suites 0
+# pass 247
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 4109.344709   (DATA_SOURCE=shared run)
+# duration_ms 2059.063417   (no-env run)
+
+NOTE: doc expects 247 tests. Actual node:test total is 248 (1 skipped + 247 passing).
+The 247 figure matches PASS count, not total count. 0 failures either way.
+
+Per-file isolated runs (tsx --test <single file>, DATA_SOURCE=shared):
+
+tests/rls-forbidden-read.test.mjs:
+# tests 1
+# suites 0
+# pass 0
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 306.067417
+-> the single test in this file is SKIPPED: "rls: anon key cannot read arbitrary tables without a policy # SKIP Supabase env not configured — live RLS probe skipped"
+   This is the only skipped test in the whole suite (accounts for the 248 vs 247 gap).
+
+tests/shared-mode.test.mjs:
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1897.906291
+-> all 8 tests pass.

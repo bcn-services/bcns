@@ -1,0 +1,32 @@
+# $ corepack pnpm typecheck
+
+> bcns@0.0.0 typecheck /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns
+> turbo run typecheck
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/app-core, @bcn-services/config, @bcn-services/ui, @bcn-services/web
+   • Running typecheck in 4 packages
+   • Remote caching disabled
+
+[32m@bcn-services/web:typecheck: [0mcache miss, executing [2m0723fb24db0d3824[0m
+[35m@bcn-services/ui:typecheck: [0mcache miss, executing [2m4de003b39566a6f3[0m
+[36m@bcn-services/app-core:typecheck: [0mcache miss, executing [2mfa979483ef871cde[0m
+[36m@bcn-services/app-core:typecheck: [0m
+[36m@bcn-services/app-core:typecheck: [0m> @bcn-services/app-core@0.2.0 typecheck /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/app-core
+[36m@bcn-services/app-core:typecheck: [0m> tsc --noEmit
+[36m@bcn-services/app-core:typecheck: [0m
+[32m@bcn-services/web:typecheck: [0m
+[32m@bcn-services/web:typecheck: [0m> @bcn-services/web@0.0.0 typecheck /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web
+[32m@bcn-services/web:typecheck: [0m> tsc --noEmit
+[32m@bcn-services/web:typecheck: [0m
+[35m@bcn-services/ui:typecheck: [0m
+[35m@bcn-services/ui:typecheck: [0m> @bcn-services/ui@0.1.1 typecheck /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/ui
+[35m@bcn-services/ui:typecheck: [0m> tsc --noEmit
+[35m@bcn-services/ui:typecheck: [0m
+
+[1m Tasks:    [32m[1m3 successful[0m, 3 total[0m
+[1mCached:    [1m0 cached[0m, 3 total[0m
+[1m  Time:    [1m3.2s[0m [0m
+
+EXIT:0

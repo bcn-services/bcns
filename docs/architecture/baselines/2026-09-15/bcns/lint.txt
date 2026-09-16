@@ -1,0 +1,32 @@
+# $ corepack pnpm lint
+
+> bcns@0.0.0 lint /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns
+> turbo run lint
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/app-core, @bcn-services/config, @bcn-services/ui, @bcn-services/web
+   • Running lint in 4 packages
+   • Remote caching disabled
+
+[36m@bcn-services/app-core:lint: [0mcache miss, executing [2m05e72e2841b9604b[0m
+[35m@bcn-services/ui:lint: [0mcache miss, executing [2m4add08f2a0429f27[0m
+[32m@bcn-services/web:lint: [0mcache miss, executing [2m97562ce647bd876e[0m
+[32m@bcn-services/web:lint: [0m
+[32m@bcn-services/web:lint: [0m> @bcn-services/web@0.0.0 lint /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web
+[32m@bcn-services/web:lint: [0m> eslint .
+[32m@bcn-services/web:lint: [0m
+[35m@bcn-services/ui:lint: [0m
+[35m@bcn-services/ui:lint: [0m> @bcn-services/ui@0.1.1 lint /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/ui
+[35m@bcn-services/ui:lint: [0m> eslint .
+[35m@bcn-services/ui:lint: [0m
+[36m@bcn-services/app-core:lint: [0m
+[36m@bcn-services/app-core:lint: [0m> @bcn-services/app-core@0.2.0 lint /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/app-core
+[36m@bcn-services/app-core:lint: [0m> eslint .
+[36m@bcn-services/app-core:lint: [0m
+
+[1m Tasks:    [32m[1m3 successful[0m, 3 total[0m
+[1mCached:    [1m0 cached[0m, 3 total[0m
+[1m  Time:    [1m2.807s[0m [0m
+
+EXIT:0

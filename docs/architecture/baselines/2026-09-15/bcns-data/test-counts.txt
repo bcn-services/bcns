@@ -1,0 +1,12 @@
+# derived from test.txt (corepack pnpm@10 test)
+
+Test Files: 18 passed (18)
+Tests: 142 passed | 1 todo/skipped (143 total) | 0 failed
+  (the 1 todo shows as '1 skipped' in test/connectors.test.ts's per-file line, per-file 6 tests | 1 skipped)
+
+-- per-file lines (test/tenant.test.ts, test/data-client.test.ts) --
+ ✓ test/data-client.test.ts (15 tests) 2054ms
+ ✓ test/tenant.test.ts (8 tests) 2161ms
+
+-- grep -in 'forbidden' across full test.txt --
+(no matches for 'forbidden')
