@@ -6,6 +6,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    // The Edge Function handlers import each other with explicit .ts extensions
+    // because Deno requires them; noEmit is already on, so this is safe here.
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node"]
   },
