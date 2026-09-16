@@ -1276,7 +1276,13 @@ is 404; greps the build output for the service-role key prefix. (R5, R39)
 
 ## 8. Dashboard template — shared-platform mode (R37, R38)
 
-Design of the contract only; the template and package are separate repos.
+> 2026-09-15: the repo split below is superseded. Template, package, hub, MCP server and client
+> apps live in `bcn-services/bcns` after the merge (`apps/_template`, `packages/data-client` as
+> `workspace:*`, `packages/tenant`, `apps/connect`, `apps/mcp`, `apps/<slug>`); this document
+> moves there as `platform/DESIGN.md`. The contract below is unchanged. Layout, chunks and
+> verification: `bcn-services/bcns` → `docs/architecture/platform-v1.md`.
+
+Design of the contract only.
 
 - **Package `@bcn-services/data-client`** (new, shared): `createDataClient({ supabaseUrl, anonKey })`
   returns a typed Supabase client whose `Database` type is generated from schema `api` only

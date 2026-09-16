@@ -20,6 +20,26 @@ below is checked against "does this stay near-fixed at 1,000 clients."
 
 Each with its one-line why. Re-open only on a concrete failure.
 
+**Platform shape (2026-09-15; plan and chunks in `bcn-services/bcns` → `docs/architecture/platform-v1.md`)**
+- One repo: this codebase merges into `bcn-services/bcns` as `platform/` + `packages/data-client`,
+  with the hub, MCP server and Deluxe client apps under `apps/`. *Atomic changes across schema,
+  client, hub and apps; agent sessions see the whole system; the UI kit already lives there.*
+- One domain: `connect.bcn-services.com` (hub), `mcp.bcn-services.com`, `<slug>.bcn-services.com`
+  per client app. Marketing stays on Vercel and only links to the hub. *Product on the real brand;
+  hub down never takes the site down.*
+- One login: Supabase session cookie on `.bcn-services.com`. *No second sign-in between hub and app.*
+- One process per app (own unit, port, memory cap, deploy). Never per-client modules in one
+  process. *A crash or bad deploy stays inside one app.*
+- Thin hub, no token entry: pasted credentials stay a bcns CLI task. *A token form is the one
+  frontend that adds risk without adding self-serve.*
+- v1 = OAuth connect flows built and the Shopify, Meta and Monday apps submitted. A source's
+  Connect button goes live as its approval lands; before that it requests a connection from bcns.
+  *Third-party review is calendar-bound; the build is not.*
+- Agent and software access = hub credential page + hosted MCP server over `api.*_v1`. No own REST
+  facade. *PostgREST is already the endpoint; MCP is the plug agents accept.*
+- The merge changes no behaviour in any of the three repos, proven against baselines captured
+  first. *Everything works today.*
+
 **Tenancy and access**
 - One shared Supabase project; `client_id` on every row; RLS is the tenant boundary. *One schema,
   one migration, one project to back up; isolation is a policy, not a database.*
@@ -29,9 +49,9 @@ Each with its one-line why. Re-open only on a concrete failure.
 - Roles: `member` (read all, upload/tag media, trigger dashboard actions) and `owner` (also
   add/remove users). No viewer role, no per-panel permissions. *SB's reference shows no admin
   surface; add roles when a client needs one.*
-- No platform frontend, no self-signup, no client accounts on the platform. bcns creates users and
-  membership rows (Supabase dashboard / SQL). Dashboards host the login page against the shared
-  project. *Admin UI earns itself only when a bcns employee must not have DB access.*
+- ~~No platform frontend~~ (superseded 2026-09-15 by the thin hub above). Still true: no
+  self-signup; bcns creates the first owner. The hub's owner invites the rest through an Edge
+  Function holding the service role. *Self-signup is a sales step, not a product step.*
 - bcns pastes source credentials into a token table readable only by the service role.
   *Onboarding is a bcns task; a token UI is a frontend.*
 - Service-role key lives only in the platform worker and on bcns's machine. Dashboards hold the
@@ -234,6 +254,27 @@ Checkable statements. "Must" = platform fails acceptance without it.
 - R38. Template builds and serves with no env vars and AI off, unchanged from today.
 - R39. Dashboard CI logs in as the client's smoke user and asserts it reads only its own rows.
 
+**Platform v1 (2026-09-15)**
+- R40. Hub app at `connect.bcn-services.com`: sign in; sources with state and health
+  (`connector_health_v1`, last pull); team (owner invites/removes, sets role); access page (mint or
+  rotate an agent login, API URL, MCP URL, snippets); link to the client's app (`clients.app_url`).
+- R41. Session cookie domain `.bcn-services.com`; hub and every client app share one session.
+- R42. Each app is its own process, port, unit and deploy job; a hub or app failure is invisible to
+  the others and to the marketing site. A repo test forbids `apps/web` importing from platform code.
+- R43. Privileged hub actions (invite, agent credential) run in Supabase Edge Functions that check
+  the `owner` claim; the service-role key never reaches the droplet.
+- R44. OAuth connect flows in the hub for Shopify (state + HMAC, three GDPR webhooks), Meta
+  (`ads_read`, data-deletion callback) and Monday; tokens land in the existing token row; pasted
+  tokens keep working; a source's button reads "Request connection" until its app is approved.
+- R45. Hosted MCP server at `mcp.bcn-services.com` exposing data-client `agentTools()` over
+  streamable HTTP; bearer Supabase access token; RLS is the only scope.
+- R46. `packages/tenant` ships the cookie helpers and `requireMembership({ expectedClientId })`;
+  client apps pin their tenant, the hub does not.
+- R47. `apps/_template` + `scripts/new-app.sh <slug> <port>` stamp a shared-platform app inside
+  the repo; own-project mode is gone.
+- R48. Merge verification: `diff -r` per imported repo, equal test counts, empty `supabase db diff`,
+  marketing preview HTML equal to the production baseline, worker image builds from the new path.
+
 **SB defaults (config, not platform requirements)**
 - Timezone America/New_York; report hour 06:00; email delivery on.
 - Sources: Shopify (orders, products, inventory, sessions if exposed), Meta Ads (daily insights per
@@ -248,16 +289,16 @@ Checkable statements. "Must" = platform fails acceptance without it.
 
 ## Out of scope
 
-- Any platform UI (admin, token entry, health page). bcns uses the Supabase dashboard and SQL.
-- A hand-written read/write API. PostgREST over `api.*` views and RPCs is the API.
+- A bcns staff admin UI and any token-entry form. bcns uses the Supabase dashboard, SQL and the
+  CLI scripts. (The client-facing hub is in scope: R40.)
+- A hand-written read/write API. PostgREST over `api.*` views and RPCs is the API; the MCP server
+  (R45) is a transport over the same views, not a second API.
 - QuickBooks, Klaviyo, TikTok, Amazon, or any source not listed for SB.
 - An AI agent / free-form chat. Separate product, separately scoped.
 - Write-back to any source.
 - Briefing or reporting code in the platform.
 - Archiving old raw partitions to Spaces (trigger noted below).
 - Per-client droplets or any always-on platform server.
-- Rewriting `hosting-reference.md` (it still describes a platform droplet, OAuth-in-UI, and a
-  read API; it is stale against this document and needs a pass after the design session).
 - Legacy one-off builds (Technology Associates, l2detailz) keep their own architecture.
 
 ## Still open
@@ -273,8 +314,10 @@ Only what was explicitly deferred.
 - Third role / per-panel permissions. Trigger: a client asks.
 - Zero-row `stale` heuristic tuning after the first false alarm.
 - Promotion of the briefing into the shared package. Trigger: second client wants one.
-- Shopify OAuth app (Partner app `bcns-data`: hosted OAuth callback, the three mandatory GDPR
-  webhooks, dev-store test, app review). Until then each store connects with a custom-app Admin
-  API token pasted into `onboard`. Trigger: more than a few Shopify clients, or the connect page.
-- Self-serve connect page (client clicks Connect per source instead of Nate running `onboard`).
-  Trigger: enough clients that hand onboarding is the bottleneck.
+- ~~Shopify OAuth app~~ and ~~self-serve connect page~~: decided 2026-09-15, now R40 and R44.
+- Own REST facade with API keys and per-call metering. Trigger: usage-based billing, or leaving
+  Supabase.
+- OAuth 2.1 on the MCP server (Supabase as auth server). Trigger: an agent product that cannot
+  pass a bearer token.
+- Google OAuth app with restricted-scope verification. Trigger: a second client on Drive/Meet.
+- Flatten `platform/` into root `supabase/` and `worker/`. Trigger: the nesting costs a session.
