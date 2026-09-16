@@ -1,0 +1,9 @@
+.env*
+!.env.example
+# real client samples; repo root only, test/fixtures is synthetic and committed
+/fixtures/
+node_modules/
+dist/
+.next/
+.vercel/
+.DS_Store

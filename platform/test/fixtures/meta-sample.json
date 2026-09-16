@@ -1,0 +1,185 @@
+{
+  "account": {
+    "id": "act_1001",
+    "timezone_name": "America/New_York",
+    "currency": "USD"
+  },
+  "campaigns": {
+    "data": [
+      {
+        "id": "23850001",
+        "name": "Campaign 1",
+        "status": "ACTIVE",
+        "effective_status": "ACTIVE",
+        "objective": "OUTCOME_SALES",
+        "updated_time": "2026-09-01T10:00:00+0000"
+      },
+      {
+        "id": "23850002",
+        "name": "Campaign 2",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "objective": "OUTCOME_TRAFFIC",
+        "updated_time": "2026-09-02T10:00:00+0000"
+      }
+    ],
+    "paging": {
+      "cursors": {
+        "before": "c0",
+        "after": "c1"
+      }
+    }
+  },
+  "ads": {
+    "data": [
+      {
+        "id": "23860001",
+        "name": "Ad 1",
+        "adset_id": "23855001",
+        "campaign_id": "23850001",
+        "status": "ACTIVE",
+        "effective_status": "ACTIVE",
+        "updated_time": "2026-09-03T10:00:00+0000",
+        "creative": {
+          "id": "23870001",
+          "name": "Creative 1",
+          "image_hash": "hash1",
+          "thumbnail_url": "https://example.test/t1.jpg",
+          "object_story_spec": {
+            "page_id": "1001"
+          }
+        }
+      },
+      {
+        "id": "23860002",
+        "name": "Ad 2",
+        "adset_id": "23855001",
+        "campaign_id": "23850002",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "updated_time": "2026-09-04T10:00:00+0000",
+        "creative": {
+          "id": "23870002",
+          "name": "Creative 2",
+          "image_hash": "hash2",
+          "thumbnail_url": "https://example.test/t2.jpg",
+          "object_story_spec": {
+            "page_id": "1001"
+          }
+        }
+      }
+    ],
+    "paging": {
+      "cursors": {
+        "before": "a0",
+        "after": "a1"
+      }
+    }
+  },
+  "campaign_insights": {
+    "data": [
+      {
+        "campaign_id": "23850001",
+        "campaign_name": "Campaign 1",
+        "date_start": "2026-09-10",
+        "date_stop": "2026-09-10",
+        "spend": "125.50",
+        "impressions": "4300",
+        "clicks": "210",
+        "reach": "3900",
+        "actions": [
+          {
+            "action_type": "omni_purchase",
+            "value": "7"
+          }
+        ],
+        "action_values": [
+          {
+            "action_type": "omni_purchase",
+            "value": "912.30"
+          }
+        ]
+      },
+      {
+        "campaign_id": "23850002",
+        "campaign_name": "Campaign 2",
+        "date_start": "2026-09-10",
+        "date_stop": "2026-09-10",
+        "spend": "40.00",
+        "impressions": "1200",
+        "clicks": "55",
+        "reach": "1100",
+        "actions": [
+          {
+            "action_type": "purchase",
+            "value": "2"
+          }
+        ],
+        "action_values": [
+          {
+            "action_type": "purchase",
+            "value": "180.00"
+          }
+        ]
+      }
+    ],
+    "paging": {
+      "cursors": {
+        "before": "i0",
+        "after": "i1"
+      }
+    }
+  },
+  "ad_insights": {
+    "data": [
+      {
+        "ad_id": "23860001",
+        "ad_name": "Ad 1",
+        "adset_id": "23855001",
+        "campaign_id": "23850001",
+        "date_start": "2026-09-10",
+        "date_stop": "2026-09-10",
+        "spend": "95.50",
+        "impressions": "3100",
+        "clicks": "160",
+        "reach": "2800",
+        "actions": [
+          {
+            "action_type": "omni_purchase",
+            "value": "5"
+          }
+        ],
+        "action_values": [
+          {
+            "action_type": "omni_purchase",
+            "value": "640.00"
+          }
+        ]
+      }
+    ],
+    "paging": {
+      "cursors": {
+        "before": "j0",
+        "after": "j1"
+      }
+    }
+  },
+  "adimages": {
+    "data": [
+      {
+        "hash": "hash1",
+        "url": "https://example.test/img1.jpg",
+        "permalink_url": "https://example.test/p1",
+        "width": 1200,
+        "height": 628
+      },
+      {
+        "hash": "hash2",
+        "url": "https://example.test/img2.jpg",
+        "permalink_url": "https://example.test/p2",
+        "width": 1080,
+        "height": 1080
+      }
+    ]
+  }
+}

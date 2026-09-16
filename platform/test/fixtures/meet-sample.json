@@ -1,0 +1,43 @@
+{
+  "files": {
+    "files": [
+      {
+        "id": "doc1",
+        "name": "Weekly Sync - Notes by Gemini",
+        "createdTime": "2026-09-08T15:00:00.000Z",
+        "modifiedTime": "2026-09-08T16:02:00.000Z",
+        "webViewLink": "https://docs.example.test/d/doc1/edit",
+        "owners": [
+          {
+            "displayName": "Person 1",
+            "emailAddress": "person1@example.test"
+          }
+        ]
+      },
+      {
+        "id": "doc2",
+        "name": "Kickoff - Notes by Gemini",
+        "createdTime": "2026-09-09T15:00:00.000Z",
+        "modifiedTime": "2026-09-09T16:10:00.000Z",
+        "webViewLink": "https://docs.example.test/d/doc2/edit",
+        "owners": [
+          {
+            "displayName": "Person 2",
+            "emailAddress": "person2@example.test"
+          }
+        ]
+      }
+    ],
+    "nextPageToken": null
+  },
+  "exports": {
+    "doc1": "Weekly Sync - Notes by Gemini\n\nAttendees\nPerson 1, Person 2\n\nSummary\nDiscussed item 1 and item 2.\n",
+    "doc2": "Kickoff - Notes by Gemini\n\nAttendees\nPerson 2, Person 3\n\nSummary\nAgreed on the first milestone.\n"
+  },
+  "token": {
+    "access_token": "fake-access-token",
+    "expires_in": 3600,
+    "token_type": "Bearer",
+    "scope": "https://www.googleapis.com/auth/drive.readonly"
+  }
+}
