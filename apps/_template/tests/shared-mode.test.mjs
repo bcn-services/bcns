@@ -3,7 +3,7 @@
  * DESIGN.md §8's own/shared switch).
  *  - config: no `dataSource` field — there is nothing to switch
  *  - build gate: scripts/check-env.ts rejects a service-role key, from the
- *    shell env or a .env file, unconditionally
+ *    shell env or a .env file, whenever the platform is configured
  *  - health: evaluateSharedHealth branches (no network; probe injected)
  */
 
@@ -39,16 +39,28 @@ function checkEnv(env, envFile) {
   }
 }
 
+const PLATFORM = { NEXT_PUBLIC_SUPABASE_URL: "https://platform.supabase.co" };
+
 test("build gate: a service key in the shell env fails", () => {
-  assert.equal(checkEnv({ SUPABASE_SERVICE_ROLE_KEY: "x" }), 1);
+  assert.equal(checkEnv({ ...PLATFORM, SUPABASE_SERVICE_ROLE_KEY: "x" }), 1);
 });
 
 test("build gate: a service key in .env.local is caught too", () => {
-  assert.equal(checkEnv({}, "SUPABASE_SERVICE_ROLE_KEY=x\n"), 1);
+  assert.equal(
+    checkEnv({}, `NEXT_PUBLIC_SUPABASE_URL=${PLATFORM.NEXT_PUBLIC_SUPABASE_URL}\nSUPABASE_SERVICE_ROLE_KEY=x\n`),
+    1,
+  );
+});
+
+test("build gate: a keyless build ignores an unrelated service key in the shell", () => {
+  // No NEXT_PUBLIC_SUPABASE_URL = nothing to bypass RLS on. Failing here would
+  // block `pnpm build` on any dev machine that exports a service key for
+  // something else entirely.
+  assert.equal(checkEnv({ SUPABASE_SERVICE_ROLE_KEY: "x" }), 0);
 });
 
 test("build gate: no service key passes", () => {
-  assert.equal(checkEnv({}), 0);
+  assert.equal(checkEnv({ ...PLATFORM }), 0);
 });
 
 const base = {

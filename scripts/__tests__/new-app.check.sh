@@ -19,8 +19,9 @@ check(){ if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (got '$2', want '$3')"; 
 tree="$work/repo"
 mkdir -p "$tree/scripts" "$tree/apps/_template/app" "$tree/infra"
 cp "$here/new-app.sh" "$tree/scripts/new-app.sh"
-cp -R "$here/../../infra/ports.txt" "$tree/infra/ports.txt" 2>/dev/null \
-  || printf '# slug port\nl2detailz 3100\nsb 3101\nconnect 3102\nmcp 3103\n' > "$tree/infra/ports.txt"
+# Fixture registry, not the real infra/ports.txt: the collision cases below name
+# specific slugs/ports, so they must not drift when a real client is added.
+printf '# slug port\nl2detailz 3100\nsb 3101\nconnect 3102\nmcp 3103\n' > "$tree/infra/ports.txt"
 cat > "$tree/apps/_template/package.json" <<'EOF'
 { "name": "@bcn-services/_template", "version": "0.0.0" }
 EOF
@@ -48,8 +49,15 @@ for r in _template web sb connect mcp; do
 done
 
 echo "registry collisions"
-check "rejects port already in infra/ports.txt"  "$(run brandnew 3101 >/dev/null 2>&1; echo $?)" "1"
-check "rejects slug already in infra/ports.txt"  "$(run sb 3199 >/dev/null 2>&1; echo $?)"        "1"
+# Each case must be decided by exactly ONE guard, or a rotted guard hides behind
+# another. 'sb' was useless here: the reserved-slug list rejects it first.
+# 'l2detailz' is registered in the fixture but is neither reserved nor a dir.
+check "rejects slug already in infra/ports.txt (slug guard)" \
+  "$(run l2detailz 3199 >/dev/null 2>&1; echo $?)" "1"
+check "rejects port already registered to another slug (port guard)" \
+  "$(run brandnew 3101 >/dev/null 2>&1; echo $?)" "1"
+check "rejects a fresh slug taking l2detailz's port (port guard)" \
+  "$(run brandnew-two 3100 >/dev/null 2>&1; echo $?)" "1"
 check "rejects apps/<slug> already existing" \
   "$(mkdir -p "$tree/apps/taken"; run taken 3199 >/dev/null 2>&1; echo $?; rmdir "$tree/apps/taken")" "1"
 
@@ -82,9 +90,14 @@ check "ports.txt slugs still unique" \
   "$(grep -v '^[[:space:]]*#' "$tree/infra/ports.txt" | awk '{print $1}' | sort -u | wc -l | tr -d ' ')" "$regs"
 check "ports.txt ports still unique" \
   "$(grep -v '^[[:space:]]*#' "$tree/infra/ports.txt" | awk '{print $2}' | sort -u | wc -l | tr -d ' ')" "$regs"
+# The rewrite goes through mktemp (mode 600); the registry must stay readable.
+check "ports.txt stays world-readable" \
+  "$(stat -f '%OLp' "$tree/infra/ports.txt" 2>/dev/null || stat -c '%a' "$tree/infra/ports.txt")" "644"
 
 echo "idempotence"
-check "second run with the same slug refuses" "$(run coventry-hills 3110 >/dev/null 2>&1; echo $?)" "1"
+# This one is caught by the apps/<slug> exists guard, not the registry — which
+# is the point of idempotence. The registry guards are covered above.
+check "second run with the same slug refuses (dir-exists guard)" "$(run coventry-hills 3110 >/dev/null 2>&1; echo $?)" "1"
 check "second run with the same port (new slug) refuses" "$(run coventry-hills-two 3110 >/dev/null 2>&1; echo $?)" "1"
 
 echo "syntax"

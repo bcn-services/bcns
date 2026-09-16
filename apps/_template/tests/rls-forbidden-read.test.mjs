@@ -61,8 +61,11 @@ test(
     const { data: rows, error } = await client.views.memberships_v1();
     assert.equal(error, null, `memberships_v1 read failed: ${error?.message}`);
 
-    // Robust to zero rows other than the smoke user's own membership — never
-    // assumes seed data beyond the account this test signs in as.
+    // The smoke user is a member of its own client, so memberships_v1 must
+    // return at least that row. Zero rows means the read silently returned
+    // nothing and the loop below would assert nothing at all.
+    assert.ok((rows ?? []).length >= 1, "smoke user must see at least one own row");
+
     for (const row of rows ?? []) {
       assert.equal(row.client_id, ownClientId, "row leaked another client's data");
       if (expectedClientId) {

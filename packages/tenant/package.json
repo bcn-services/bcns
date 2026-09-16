@@ -31,7 +31,7 @@
     "build": "tsc",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/cookies.test.mjs tests/membership.test.mjs tests/middleware.test.mjs",
+    "test": "tsx --test tests/cookies.test.mjs tests/matcher.test.mjs tests/membership.test.mjs tests/middleware.test.mjs",
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {

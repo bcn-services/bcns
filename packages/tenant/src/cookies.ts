@@ -39,6 +39,12 @@ export function readTenantEnv(): TenantEnv | null {
   return { supabaseUrl, supabaseAnonKey };
 }
 
+/**
+ * Callers merge these over @supabase/ssr's own options as `{ ...options,
+ * ...shared }` — ours win. Deliberate: the four keys here are host-derived and
+ * ssr's are generic defaults, and ssr sets no other key that this shadows
+ * (`maxAge`/`expires`/`httpOnly` are absent here and survive the merge).
+ */
 export interface TenantCookieOptions {
   domain?: string;
   path: "/";
@@ -46,16 +52,31 @@ export interface TenantCookieOptions {
   secure: boolean;
 }
 
+/** Hosts reached over plain http, where a Secure cookie would never be sent. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+/** Host header minus its port. Bracketed IPv6 literals keep their brackets. */
+function hostnameOf(host: string | null | undefined): string {
+  const raw = (host ?? "").trim().toLowerCase();
+  if (raw.startsWith("[")) return raw.slice(0, raw.indexOf("]") + 1);
+  return raw.split(":")[0] ?? "";
+}
+
 /**
- * Cookie attributes for the request's host. Only a real bcn-services.com host
- * gets the shared parent domain (and therefore Secure); localhost and Vercel
- * preview hosts get a plain host-only, non-secure cookie so they still work
- * over http.
+ * Cookie attributes for the request's host. Two independent decisions:
+ *
+ * - `domain`: only a real bcn-services.com host gets the shared parent domain,
+ *   so a session minted at the hub is already valid at every app. Anything
+ *   else (localhost, a Vercel preview) gets a host-only cookie.
+ * - `secure`: derived from the hostname alone, NOT from the domain rule. A
+ *   Vercel preview is https and must keep Secure; only loopback is http. An
+ *   unknown/missing host is treated as public, which fails closed.
  */
 export function cookieOptions(host: string | null | undefined): TenantCookieOptions {
-  const hostname = (host ?? "").split(":")[0]?.toLowerCase() ?? "";
+  const hostname = hostnameOf(host);
   const onParentDomain = hostname === PARENT_HOST || hostname.endsWith(`.${PARENT_HOST}`);
+  const secure = !LOOPBACK_HOSTS.has(hostname);
   return onParentDomain
-    ? { domain: COOKIE_DOMAIN, path: "/", sameSite: "lax", secure: true }
-    : { path: "/", sameSite: "lax", secure: false };
+    ? { domain: COOKIE_DOMAIN, path: "/", sameSite: "lax", secure }
+    : { path: "/", sameSite: "lax", secure };
 }

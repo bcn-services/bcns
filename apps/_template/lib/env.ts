@@ -66,3 +66,25 @@ export function getConfig(): AppConfig {
     hasServiceRoleKey: Boolean(readEnv("SUPABASE_SERVICE_ROLE_KEY")),
   };
 }
+
+/**
+ * What the middleware should do about the tenant pin, given an environment.
+ *
+ * - `skip`   — no platform Supabase env: local dev without the platform. The
+ *              tenant middleware already no-ops in that case; serve as before.
+ * - `deny`   — the platform IS configured but EXPECTED_CLIENT_ID is not. The
+ *              pin would silently vanish and this app would serve ANY signed-in
+ *              member of ANY client, so fail closed instead (R39).
+ * - `pin`    — normal operation: pin this app to that client id.
+ *
+ * Pure and env-injectable so the decision is testable without a Next runtime.
+ */
+export type PinDecision = { kind: "skip" } | { kind: "deny" } | { kind: "pin"; clientId: string };
+
+export function pinOrDeny(env: Record<string, string | undefined> = process.env): PinDecision {
+  const url = env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!url) return { kind: "skip" };
+  const clientId = env.EXPECTED_CLIENT_ID?.trim();
+  if (!clientId) return { kind: "deny" };
+  return { kind: "pin", clientId };
+}

@@ -23,6 +23,10 @@ function readEnv(name: string): string | undefined {
 
 export async function middleware(request: NextRequest) {
   if (getConfig().dataSource !== "shared") return NextResponse.next();
+  // The pin is OPTIONAL here, unlike apps/_template which fails closed: SB is
+  // already live and EXPECTED_CLIENT_ID is set in a separate cutover step, so
+  // denying on unset would take a running app down. Remove this exemption once
+  // /srv/sb/env carries the value.
   return tenantMiddleware({ expectedClientId: readEnv("EXPECTED_CLIENT_ID") })(request);
 }
 

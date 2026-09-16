@@ -137,6 +137,33 @@ test("signed in to another client: signed out and sent to ?error=wrong-client", 
   );
 });
 
+test("a redirect carries the cookies @supabase/ssr wrote on the response", async () => {
+  // signOut() makes @supabase/ssr call setAll with the cleared auth cookie.
+  // NextResponse.redirect() starts with empty headers, so the middleware has to
+  // copy them over — otherwise the browser keeps the dead session and loops.
+  const cookie = sessionCookie({ client_id: OTHER_CLIENT_ID, client_role: "owner" });
+  const response = await tenantMiddleware({ expectedClientId: CLIENT_ID })(
+    request("/dashboard", { cookie })
+  );
+  assert.equal(response.status, 307);
+  const written = response.cookies.getAll();
+  assert.ok(written.length >= 1, "the redirect must carry the Set-Cookie headers");
+  assert.ok(
+    written.some((c) => c.name.startsWith("sb-") && c.value === ""),
+    `the cleared auth cookie must survive the redirect (got ${JSON.stringify(written)})`
+  );
+});
+
+test("no membership: the stale session is signed out before the redirect", async () => {
+  const response = await tenantMiddleware()(request("/dashboard", { cookie: sessionCookie({}) }));
+  assert.equal(response.status, 307);
+  assert.ok(
+    calls.some((url) => url.includes("/auth/v1/logout")),
+    "a session with no membership must be dropped, or it loops on every request"
+  );
+  assert.ok(response.cookies.getAll().length >= 1, "the clear must ride the redirect");
+});
+
 test("an unpinned app accepts any membership", async () => {
   const cookie = sessionCookie({ client_id: OTHER_CLIENT_ID, client_role: "member" });
   const response = await tenantMiddleware()(request("/dashboard", { cookie }));

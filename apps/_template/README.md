@@ -46,7 +46,9 @@ the per-app `ANTHROPIC_API_KEY` plus its `AI_ENABLED` flag.
 
 - **`lib/env.ts`** — lazy config accessor; the keyless-run guarantee.
 - **`middleware.ts`** — `@bcn-services/tenant`'s `tenantMiddleware`: refreshes
-  the shared session cookie and pins this app to `EXPECTED_CLIENT_ID`.
+  the shared session cookie and pins this app to `EXPECTED_CLIENT_ID`. The pin
+  fails closed — with the platform configured and `EXPECTED_CLIENT_ID` unset it
+  denies every request rather than serving unpinned (see `DEPLOY.md`).
 - **`app/api/health`** (`lib/shared-health.ts`) — signs in as the client's
   smoke user and reads its platform row; 503 rolls a bad deploy back.
 - **`lib/webhooks.ts`** (→ app-core) — generic inbound-webhook hygiene seam.

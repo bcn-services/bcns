@@ -94,14 +94,17 @@ the template.
 - Webhook providers: Undecided (template default: none)
 EOF
 
-# Append to infra/ports.txt, keep it sorted by port (header stays on top).
+# Append to infra/ports.txt, keep it sorted by port. Only the LEADING comment
+# block is treated as a header (`next` while still in it, `exit` at the first
+# entry) — a comment further down would otherwise be floated to the top.
 tmp=$(mktemp)
 {
-  awk '/^[[:space:]]*#/ || /^[[:space:]]*$/' "$ports_file"
+  awk '/^[[:space:]]*#/ || /^[[:space:]]*$/ { print; next } { exit }' "$ports_file"
   { grep -v '^[[:space:]]*#' "$ports_file" | grep -v '^[[:space:]]*$'; printf '%s %s\n' "$slug" "$port"; } \
     | sort -k2,2n
 } > "$tmp"
 mv "$tmp" "$ports_file"
+chmod 644 "$ports_file"   # mktemp gives 600; the registry is world-readable.
 
 echo "created apps/$slug (@bcn-services/$slug), port $port"
 echo "next steps:"
@@ -109,3 +112,8 @@ echo "  1. corepack pnpm install"
 echo "  2. fill in apps/$slug/CLIENT.md open questions"
 echo "  3. corepack pnpm --filter @bcn-services/$slug dev"
 echo "  4. infra/onboard-client.sh $slug $port <domain> — provisions the droplet"
+echo "  5. add '$slug' to .github/workflows/deploy-app.yml: on.push.paths (apps/$slug/**)"
+echo "     AND strategy.matrix.slug — a push deploys nothing for $slug until you do"
+echo "  6. set EXPECTED_CLIENT_ID in /srv/$slug/env from clients.id in the platform"
+echo "     project — this script does NOT set it, and the app denies every request"
+echo "     until it is set (see apps/$slug/DEPLOY.md)"

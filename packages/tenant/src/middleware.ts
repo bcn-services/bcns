@@ -49,15 +49,29 @@ export function tenantMiddleware(
     // The login page must stay reachable, or every rejection would loop.
     if (result.ok || request.nextUrl.pathname === loginPath) return response;
 
+    // A rejection still has to carry whatever @supabase/ssr wrote onto
+    // `response`: a refreshed token, or the cleared cookies `signOut()` just
+    // queued. NextResponse.redirect() starts with empty headers, so copy them
+    // across — otherwise the session change is silently dropped and the next
+    // request arrives with the stale cookie, looping forever.
+    const redirectTo = (target: string): NextResponse => {
+      const redirect = NextResponse.redirect(new URL(target, request.url));
+      for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+      return redirect;
+    };
+
     if (result.reason === "wrong-client") {
       // Signed in, but to someone else's tenant: drop the session so the next
       // sign-in starts clean instead of bouncing off this app forever.
       await supabase.auth.signOut();
-      return NextResponse.redirect(new URL(`${loginPath}?error=wrong-client`, request.url));
+      return redirectTo(`${loginPath}?error=wrong-client`);
     }
     if (result.reason === "no-membership") {
-      return NextResponse.redirect(new URL(`${loginPath}?error=no-membership`, request.url));
+      // Same reason: a signed-in user with no membership keeps a valid session,
+      // so without signOut() every request would bounce off this redirect.
+      await supabase.auth.signOut();
+      return redirectTo(`${loginPath}?error=no-membership`);
     }
-    return NextResponse.redirect(new URL(loginPath, request.url));
+    return redirectTo(loginPath);
   };
 }

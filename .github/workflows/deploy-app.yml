@@ -51,8 +51,8 @@ jobs:
       - name: Test
         run: pnpm --filter "@bcn-services/$SLUG" test
       - name: Build (Next standalone)
-        env:
-          DATA_SOURCE: shared # scripts/check-env.ts gate
+        # No DATA_SOURCE: shared-platform is the only mode now, and
+        # scripts/check-env.ts gates on SUPABASE_SERVICE_ROLE_KEY, not on this.
         run: |
           pnpm --filter "@bcn-services/$SLUG" build
           # In a workspace, standalone nests the app under its repo path; server.js lives there.

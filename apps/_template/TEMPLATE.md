@@ -25,7 +25,7 @@ is always green here.
 
 | Decision | Where it lands | Template default |
 | --- | --- | --- |
-| Tenant pin | `EXPECTED_CLIENT_ID` in the deploy env (`/srv/<slug>/env`) — `@bcn-services/tenant`'s middleware rejects a session whose membership doesn't match | Unset = middleware pins to no client (R39 fails closed once configured) |
+| Tenant pin | `EXPECTED_CLIENT_ID` in the deploy env (`/srv/<slug>/env`), set by the operator from `clients.id` — `@bcn-services/tenant`'s middleware rejects a session whose membership doesn't match | Required. Unset with the platform configured = middleware DENIES every request (fails closed, R39); unset with no platform env = local dev, passes through |
 | Storage backend | `lib/storage.ts` — implement and return the adapter in `getStorageAdapter()` | `null` (file features off); platform default is Supabase Storage, WebDAV the documented alternative |
 | AI feature | `AI_ENABLED` in `.env.example` note + per-deploy env | Off (`maybeGetAiClient` returns null) |
 | Webhook providers | Provider routes under `app/api/`, wired through `lib/webhooks.ts` seams | None ship; fail-closed `unverifiedVerifier` |

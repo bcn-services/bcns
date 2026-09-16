@@ -35,6 +35,15 @@ under `infra/` — one copy per droplet, not per app.
 `SUPABASE_SERVICE_ROLE_KEY`: `/api/health` returns 503 if it's present, so
 the deploy rolls back (`scripts/check-env.ts` also fails the build on it).
 
+**`EXPECTED_CLIENT_ID` is required, and the middleware fails closed.** The
+operator copies it by hand from `clients.id` in the platform project —
+`scripts/new-app.sh` does not set it. With `NEXT_PUBLIC_SUPABASE_URL` set and
+`EXPECTED_CLIENT_ID` unset or blank, `middleware.ts` denies every request:
+browsers are sent to `/login?error=misconfigured`, `/api/*` gets a 500 JSON
+body `{"error":"misconfigured"}`. An unset pin would otherwise admit any
+signed-in member of any client (R39). With `NEXT_PUBLIC_SUPABASE_URL` also
+unset — local dev with no platform — every request passes through as before.
+
 **Rotating the smoke password** (`rotate-smoke`) must also update
 `HEALTH_PASSWORD` in `/srv/<slug>/env` and restart `bcns-app@<slug>`.
 Otherwise health fails and the next deploy rolls back.
@@ -44,7 +53,12 @@ Otherwise health fails and the next deploy rolls back.
 1. **Onboard on the platform** — no schema changes here; the platform
    (`platform/`) owns the schema for every app.
 2. **Env** — write `/srv/<slug>/env` per above.
-3. **App** — push to `main`, or `workflow_dispatch` with `slug: <slug>`.
+3. **App** — **before the first deploy**, add `<slug>` to
+   `.github/workflows/deploy-app.yml`: both the `on.push.paths` list
+   (`apps/<slug>/**`) and the `strategy.matrix.slug` array. Until then a push
+   to `main` deploys nothing for this app and only `workflow_dispatch` with an
+   explicit `slug` works. Then: push to `main`, or `workflow_dispatch` with
+   `slug: <slug>`.
    `.github/workflows/deploy-app.yml` builds the Next standalone bundle in
    CI, rsyncs it to `/srv/<slug>/releases/<sha>/`, flips the
    `/srv/<slug>/current` symlink, restarts `bcns-app@<slug>`, health-checks,
