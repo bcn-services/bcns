@@ -67,6 +67,7 @@ const base = {
   aiEnabled: false,
   supabaseUrl: "http://platform.test",
   supabaseAnonKey: "anon",
+  expectedClientId: "a0000000-0000-4000-8000-000000000001",
   healthEmail: "smoke+sb@bcn-services.com",
   healthPassword: "pw",
   hasServiceRoleKey: false,
@@ -83,6 +84,17 @@ test("health: keyless run is ok/unconfigured and never probes", async () => {
   });
   assert.deepEqual(r, { ok: true, platform: "unconfigured" });
   assert.equal(called, false);
+});
+
+test("health: platform configured but no tenant pin fails (mirrors pinOrDeny; /api/health is outside the middleware)", async () => {
+  let called = false;
+  const r = await evaluateSharedHealth({ ...base, expectedClientId: undefined }, async () => {
+    called = true;
+  });
+  assert.deepEqual(r, { ok: false, platform: "error", reason: "tenant_pin_missing" });
+  assert.equal(called, false);
+  const blank = await evaluateSharedHealth({ ...base, expectedClientId: "  " }, okProbe);
+  assert.equal(blank.reason, "tenant_pin_missing");
 });
 
 test("health: platform configured but no probe login is a failure", async () => {

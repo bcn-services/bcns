@@ -19,7 +19,7 @@ import type { AppConfig } from "./env";
 export interface SharedHealthReport {
   ok: boolean;
   platform: "connected" | "unconfigured" | "error";
-  reason?: "service_key_present" | "health_login_missing" | "probe_failed";
+  reason?: "service_key_present" | "tenant_pin_missing" | "health_login_missing" | "probe_failed";
 }
 
 export interface ProbeCreds {
@@ -60,9 +60,12 @@ export async function evaluateSharedHealth(
 ): Promise<SharedHealthReport> {
   // Runtime twin of scripts/check-env.ts: the droplet env is never seen at build.
   if (config.hasServiceRoleKey) return { ok: false, platform: "error", reason: "service_key_present" };
-  const { supabaseUrl, supabaseAnonKey, healthEmail, healthPassword } = config;
+  const { supabaseUrl, supabaseAnonKey, expectedClientId, healthEmail, healthPassword } = config;
   // Keyless template runs stay green (R38 contract).
   if (!supabaseUrl || !supabaseAnonKey) return { ok: true, platform: "unconfigured" };
+  // /api/health sits outside the tenant middleware, so mirror pinOrDeny here:
+  // a deploy without the pin denies every user request and must not look healthy.
+  if (!expectedClientId?.trim()) return { ok: false, platform: "error", reason: "tenant_pin_missing" };
   // Pointed at the platform but no probe login: a deploy mistake, fail loudly.
   if (!healthEmail || !healthPassword) return { ok: false, platform: "error", reason: "health_login_missing" };
   try {

@@ -40,7 +40,9 @@ operator copies it by hand from `clients.id` in the platform project —
 `scripts/new-app.sh` does not set it. With `NEXT_PUBLIC_SUPABASE_URL` set and
 `EXPECTED_CLIENT_ID` unset or blank, `middleware.ts` denies every request:
 browsers are sent to `/login?error=misconfigured`, `/api/*` gets a 500 JSON
-body `{"error":"misconfigured"}`. An unset pin would otherwise admit any
+body `{"error":"misconfigured"}`. `/api/health` sits outside the middleware
+(matcher) and instead reports `{"ok":false,"reason":"tenant_pin_missing"}`
+with 503, so the deploy workflow rolls the release back. An unset pin would otherwise admit any
 signed-in member of any client (R39). With `NEXT_PUBLIC_SUPABASE_URL` also
 unset — local dev with no platform — every request passes through as before.
 

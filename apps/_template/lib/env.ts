@@ -33,6 +33,8 @@ export interface AppConfig {
   anthropicApiKey?: string;
   /** Master switch for the opt-in AI module. Default OFF. */
   aiEnabled: boolean;
+  /** Tenant pin: the platform `clients.id` this app serves (see pinOrDeny). */
+  expectedClientId?: string;
   /** The client's smoke-user login that /api/health signs in with. */
   healthEmail?: string;
   healthPassword?: string;
@@ -59,6 +61,7 @@ export function getConfig(): AppConfig {
     supabaseAnonKey: readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     anthropicApiKey: readEnv("ANTHROPIC_API_KEY"),
     aiEnabled: readFlag("AI_ENABLED"),
+    expectedClientId: readEnv("EXPECTED_CLIENT_ID"),
     healthEmail: readEnv("HEALTH_EMAIL"),
     healthPassword: readEnv("HEALTH_PASSWORD"),
     agentEmail: readEnv("AGENT_EMAIL"),

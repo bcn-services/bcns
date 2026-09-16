@@ -10,12 +10,14 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { TENANT_MATCHER } from "../src/middleware.ts";
 
 const appsDir = fileURLToPath(new URL("../../../apps/", import.meta.url));
-const APPS = ["sb", "_template"];
+// Every app with a middleware.ts, so a stamped app is checked too (web has none).
+const APPS = readdirSync(appsDir).filter((d) => existsSync(`${appsDir}${d}/middleware.ts`));
+assert.ok(APPS.includes("sb") && APPS.includes("_template"), `expected sb and _template in ${APPS}`);
 
 /** The array literal assigned to `matcher:` in a middleware file. */
 function matcherLiteral(source) {
