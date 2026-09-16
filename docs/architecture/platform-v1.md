@@ -117,8 +117,7 @@ no plan, no gate, waits on 0–8 finishing and on real client usage to react to.
 fold in when this starts:
 - Dashboard's source card doesn't belong grouped with real connectors (Shopify/Meta/monday/Meet/Drive) — give it its own spot on the page.
 - Source card sorting/ordering.
-- Uploads and Dashboard aren't connectors — they're the client's own manual data channels (a browser upload, a record typed into the app) and can never leave the "Not connected / Request connection" state that pattern implies. Needs its own treatment.
-- Uploads currently writes bytes into Supabase Storage via `register_upload` (`source='upload'` in `data.media`) — decided 2026-09-16 (Nate) that this duplicates what the Drive connector already does and isn't where files should live going forward: storage stays on Drive, the dashboard only browses/searches what's already there. Decide whether to deprecate `register_upload`/the `upload` source or repoint it at Drive.
+- Uploads and Dashboard aren't connectors — they're the client's own manual data channels (a browser upload, a record typed into the app) and can never leave the "Not connected / Request connection" state that pattern implies. Needs its own treatment. (The Uploads storage-path fix itself is decided already — see "Deferred, with triggers" below, not waiting on this pass.)
 - `drive` has no hub card at all: `HUB_SOURCES` in `apps/connect/lib/sources.ts` lists 6 of the 7 `data.source` values, missing `drive` even though the worker's drive connector is built and writes health rows.
 - General UX/visual pass on the hub once it has real traffic to learn from.
 
@@ -151,6 +150,7 @@ Vercel ignored-build step and build command · GCP WIF re-scope run · GitHub se
 
 ## Deferred, with triggers
 
+- Deprecate `register_upload`'s Supabase Storage path (`source='upload'` in `data.media`) and repoint the hub's Uploads affordance at Drive — decided 2026-09-16 (Nate): storage stays on Drive, the dashboard only browses/searches what's there through the Drive connector already built in chunk 0. Trigger: before any client uploads a real file through it, or the next time `apps/connect`/`register_upload` is touched, whichever comes first — not gated on chunk 9 or on real client usage, since the direction is already decided.
 - Own REST facade with API keys and metering — usage-based billing or leaving Supabase.
 - OAuth 2.1 on the MCP server — an agent product that cannot pass a bearer token.
 - Google OAuth app with restricted-scope verification — second client on Drive/Meet.
