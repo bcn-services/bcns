@@ -19,7 +19,7 @@ Connect differs from a client app in exactly two ways:
 - Droplet onboarded for this slug: `infra/onboard-client.sh connect 3102 connect.bcn-services.com`
   → Unix user `connect`, `/srv/connect/{releases,current}`, `/srv/connect/env`
   (mode 600), nginx vhost, unit `bcns-app@connect`.
-- Cloudflare: `connect.bcn-services.com` → droplet IP, proxied, TLS "Full (strict)".
+- DNS: `connect.bcn-services.com` A record → droplet IP (no Cloudflare proxy). TLS is a Let's Encrypt cert issued by `infra/onboard-client.sh` (HTTP-01 webroot, auto-renewed by certbot).
 - Repo secrets already in place for the other apps: `GH_PACKAGES_TOKEN`,
   `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (key for the `connect` user).
 
