@@ -1,0 +1,75 @@
+## gate (i) — hub standalone next start on 127.0.0.1:3102 against LOCAL Supabase http://127.0.0.1:54321 — 2026-09-16T09:09:00Z — commit 7130b66
+session: GoTrue password grant as smoke+sb@bcn-services.com (keychain bcns-smoke-sb), injected as @supabase/ssr cookie sb-127-auth-token=base64-<b64url(session)>
+fresh password-grant claims: client_role=member client_id=ae196fbf-c726-4648-8b6e-6d1933aa9744
+
+$ curl -sSI -H 'Cookie: <session>' http://127.0.0.1:3102/
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+
+$ curl -sSI -H 'Cookie: <session>' http://127.0.0.1:3102/team
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+
+$ curl -sSI -H 'Cookie: <session>' http://127.0.0.1:3102/access
+HTTP/1.1 307 Temporary Redirect
+Location: /?error=forbidden
+Content-Type: text/html; charset=utf-8
+
+$ curl -sSI -H 'Cookie: <session>' http://127.0.0.1:3102/login
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+
+$ curl -sSI -H 'Cookie: <session>' http://127.0.0.1:3102/api/health
+HTTP/1.1 200 OK
+content-type: application/json
+
+$ signed OUT: curl -sSI http://127.0.0.1:3102/  (Next normalises loopback Host to localhost; prod: gate-g/connect.txt)
+HTTP/1.1 307 Temporary Redirect
+location: http://localhost:3102/login
+
+$ /api/health body
+{"ok":true,"platform":"connected"}
+
+## assertions (member view)
+PASS  / renders client name Saunaboy  → Saunaboy
+PASS  / sources: Shopify  → Shopify
+PASS  / sources: Meta  → meta
+PASS  / sources: monday  → Monday
+PASS  / Request connection buttons  → Request connection
+PASS  / health badge  → Not connected
+PASS  / last pull  → Last success: <!-- -->never
+PASS  / Open your dashboard  → Open your dashboard
+PASS  / SB link href  → https://sb.bcn-services.com
+PASS  /team renders (member: smoke rows hidden by design)  → Members
+PASS  /login renders form  → Sign in
+counts: Request connection ×12
+PASS  no service-role string in any page HTML
+
+## owner addendum: /team hides is_smoke rows from members and /access is owner-only, so the LOCAL fixture is promoted for this capture
+$ psql update data.memberships set role=owner where user_id=792a1d8c-… and client_id=ae196fbf-…
+UPDATE 1
+fresh password-grant claims: client_role=owner client_id=ae196fbf-c726-4648-8b6e-6d1933aa9744
+
+$ curl -sSI -H 'Cookie: <owner session>' http://127.0.0.1:3102/team
+HTTP/1.1 200 OK
+
+$ curl -sSI -H 'Cookie: <owner session>' http://127.0.0.1:3102/access
+HTTP/1.1 200 OK
+
+/team text: Connect|Saunaboy|Sign out|Team|Everyone who can sign in to this workspace. Owners can invite and remove.|Members|owner|health check|you|Invite someone|Send invite|
+
+/access text: Connect|Saunaboy|Sign out|Access|Give your own software — or an AI agent — a login of its own.|Agent login|What it is, and what it can reach|Mint agent login|MCP server|Coming soon|The hosted MCP server at|
+
+PASS  /team lists the smoke membership row (792a1d8c)  → 792a1d8c
+PASS  /team shows role owner  → Owner
+PASS  /team owner sees invite form  → Send invite
+PASS  /access renders for owner (mint UI)  → Mint agent login
+PASS  /access review copy applied  → the old password stops working
+
+$ psql revert fixture to member
+UPDATE 1
+
+## server log tail
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 342ms

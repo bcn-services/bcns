@@ -1,0 +1,45 @@
+## gate (g) sb — 2026-09-16T07:57:52Z — release b044d56
+$ curl -sSI https://sb.bcn-services.com/api/health
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Wed, 16 Sep 2026 07:57:52 GMT
+Content-Type: application/json
+Connection: keep-alive
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+
+
+$ curl -s https://sb.bcn-services.com/api/health
+{"ok":true,"platform":"connected"}
+$ openssl s_client -showcerts -connect sb.bcn-services.com:443 -servername sb.bcn-services.com </dev/null 2>/dev/null | openssl x509 -noout -issuer -subject -dates
+issuer=C=US, O=Let's Encrypt, CN=YE1
+subject=CN=sb.bcn-services.com
+notBefore=Sep 16 05:17:01 2026 GMT
+notAfter=Dec 15 05:17:00 2026 GMT
+$ openssl s_client … | grep "Verify return code"
+Verify return code: 0 (ok)
+$ curl -sSI https://sb.bcn-services.com/ (unauth → login redirect expected)
+HTTP/1.1 307 Temporary Redirect
+Server: nginx/1.24.0 (Ubuntu)
+Date: Wed, 16 Sep 2026 07:57:52 GMT
+Connection: keep-alive
+location: https://localhost:3101/login
+$ ssh root md5sum l2detailz vhost + unit (baseline 9177c471… / 20bfad51…)
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+active
+active
+/srv/sb/releases/b044d56153210d9de92268000b9a421a2f7cd61b
+
+## sb redeploy 2026-09-16T08:01:00Z — release fb26507dd98756de801d2684efae0e9ed666fd46 (tenant redirect fix)
+$ curl -sSI https://sb.bcn-services.com/
+HTTP/1.1 307 Temporary Redirect
+location: https://sb.bcn-services.com/login
+$ curl -sSI https://sb.bcn-services.com/api/health
+HTTP/1.1 200 OK
+{"ok":true,"platform":"connected"}
+$ curl -sS https://sb.bcn-services.com/login | grep -o "<title>[^<]*</title>"
+<title>Saunaboy Command Center</title>
+$ ssh root md5sum l2detailz
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+active

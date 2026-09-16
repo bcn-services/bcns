@@ -1,0 +1,116 @@
+## migrations ROLLBACK proof on LOCAL Supabase — 2026-09-16T08:32:31Z — commit 3c06808
+$ psql "$DB_URL" -v ON_ERROR_STOP=1 -c BEGIN -f platform/supabase/migrations/20260916000100_clients_app_url.sql -c ROLLBACK
+------------
+          1
+(1 row)
+
+ROLLBACK
+WARNING:  there is no transaction in progress
+$ psql "$DB_URL" -v ON_ERROR_STOP=1 -c BEGIN -f platform/supabase/migrations/20260916000200_add_member_rpc.sql -c ROLLBACK
+------------
+          1
+(1 row)
+
+ROLLBACK
+WARNING:  there is no transaction in progress
+$ after: column app_url absent, function absent (rollback held)
+0
+app_url columns: 0
+api.add_member functions: 0
+
+## re-proof after review fixes — 2026-09-16T08:51:15Z
+$ psql "$DB_URL" -v ON_ERROR_STOP=1 -c begin -f platform/supabase/migrations/20260916000100_clients_app_url.sql -c rollback
+ALTER TABLE
+CREATE VIEW
+ROLLBACK
+$ psql "$DB_URL" -v ON_ERROR_STOP=1 -c begin -f platform/supabase/migrations/20260916000200_add_member_rpc.sql -c rollback
+REVOKE
+GRANT
+ROLLBACK
+$ single-session: apply add_member, exercise it as an authenticated owner/member, rollback
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+SET
+                                                                   set_config                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ {"sub":"792a1d8c-f66b-48eb-adac-bf5611799730","role":"authenticated","client_id":"ae196fbf-c726-4648-8b6e-6d1933aa9744","client_role":"owner"}
+(1 row)
+
+-- owner adding a member: expect OK
+ERROR:  forbidden_role
+CONTEXT:  PL/pgSQL function api.add_member(uuid,text) line 5 at RAISE
+$ after rollback
+api.add_member functions: 0
+stray membership rows: 0
+
+## add_member exercise (single txn, rolled back) — 2026-09-16T08:51:57Z. Role comes from data.memberships joined on the JWT client_id (access.sql:36-39), so rows are arranged inside the txn.
+                                                                claims_sb_owner                                                                 
+------------------------------------------------------------------------------------------------------------------------------------------------
+ {"sub":"792a1d8c-f66b-48eb-adac-bf5611799730","role":"authenticated","client_id":"ae196fbf-c726-4648-8b6e-6d1933aa9744","client_role":"owner"}
+(1 row)
+
+-- 1. sb owner adds a member: expect OK
+ERROR:  insert or update on table "memberships" violates foreign key constraint "memberships_user_id_fkey"
+DETAIL:  Key (user_id)=(11111111-1111-4111-8111-111111111111) is not present in table "users".
+CONTEXT:  SQL statement "insert into data.memberships (user_id, client_id, role)
+  values (target_user_id, tenant, member_role::data.member_role)
+  -- Re-inviting an existing member is idempotent. is_smoke is never touched:
+  -- only the operator CLI mints a smoke user, and remove_member refuses to drop one.
+  -- The WHERE makes the cross-tenant guard atomic: a row inserted for another
+  -- client between the check above and this statement is left untouched.
+  on conflict (user_id) do update set role = excluded.role
+    where data.memberships.client_id = excluded.client_id"
+PL/pgSQL function api.add_member(uuid,text) line 18 at SQL statement
+$ after rollback
+api.add_member functions: 0
+stray rows: 0
+fixture role: member
+
+## add_member exercise, take 2 (targets exist in auth.users) — 2026-09-16T08:52:22Z
+ claims_sb_owner 
+-----------------
+ t
+(1 row)
+
+-- 1. sb owner adds a member: expect OK
+ ok 
+----
+ f
+(1 row)
+
+-- 1b. idempotent re-add: expect OK, still one row
+ ok 
+----
+ f
+(1 row)
+
+-- 2. sb owner passes role=owner: expect BCNS3 validation
+NOTICE:  rejected as expected: validation (BCNS3)
+-- 3. acme owner tries to re-pointunterminated quoted string
+
+ claims_acme_owner 
+-------------------
+ t
+(1 row)
+
+NOTICE:  rejected as expected: validation (BCNS3)
+-- 4. sb member (row reverted) with a FORGED owner claim: expect BCNS2 forbidden_role
+ claims_forged 
+---------------
+ t
+(1 row)
+
+NOTICE:  rejected as expected: forbidden_role (BCNS2)
+-- rows inside txn (only t1, in sb, as member)
+               user_id                |              client_id               |  role  
+--------------------------------------+--------------------------------------+--------
+ 11111111-1111-4111-8111-111111111111 | ae196fbf-c726-4648-8b6e-6d1933aa9744 | member
+(1 row)
+
+$ after rollback
+api.add_member functions: 0
+stray auth users: 0
+fixture role: member
+NOTE: api.add_member returns void; `... is null` on a void result prints `f` in Postgres, so the `ok=f` in steps 1/1b is a probe artifact. Proof of success = no exception raised and the in-txn row listing (t1 in sb as member, exactly one row after the idempotent re-add). Steps 2/3/4 raised BCNS3/BCNS3/BCNS2 as designed. Everything rolled back; post-checks clean.
