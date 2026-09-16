@@ -1,0 +1,61 @@
+# turbo test summary (full 189KB log in job tmp); grep of per-package summary lines
+@bcn-services/web:test: # Results: 79 passed, 0 failed
+@bcn-services/web:test: # Results: 30 passed, 0 failed, 0 skipped
+@bcn-services/web:test: # --- Results: 59 passed, 0 failed ---
+@bcn-services/web:test: # Results: 242 passed, 0 failed
+@bcn-services/app-core:test: 13 passed, 0 failed
+@bcn-services/web:test: # tests 86
+@bcn-services/web:test: # pass 85
+@bcn-services/web:test: # fail 1
+@bcn-services/web:test: # skipped 0
+@bcn-services/web:test: # todo 0
+@bcn-services/web:test:  ELIFECYCLE  Test failed. See above for more details.
+@bcn-services/sb:test: # briefing: briefing_run read failed { message: 'boom' }
+@bcn-services/sb:test: # Subtest: a failed model call keeps the worst-case reservation and saves no briefing
+@bcn-services/sb:test: ok 30 - a failed model call keeps the worst-case reservation and saves no briefing
+@bcn-services/app-core:test: 5 passed, 0 failed
+@bcn-services/sb:test: # Subtest: a failed read is named and treated as no rows, others still count
+@bcn-services/sb:test: ok 59 - a failed read is named and treated as no rows, others still count
+@bcn-services/app-core:test: 6 passed, 0 failed
+@bcn-services/app-core:test: # tests 4
+@bcn-services/app-core:test: # pass 4
+@bcn-services/app-core:test: # fail 0
+@bcn-services/app-core:test: # skipped 0
+@bcn-services/app-core:test: # todo 0
+@bcn-services/app-core:test: # tests 3
+@bcn-services/app-core:test: # pass 3
+@bcn-services/app-core:test: # fail 0
+@bcn-services/app-core:test: # skipped 0
+@bcn-services/app-core:test: # todo 0
+@bcn-services/app-core:test:   ✓ valid key is passed through (trimmed) to the injected ClientCtor
+@bcn-services/app-core:test: 20 passed, 0 failed
+@bcn-services/sb:test: # [health] shared platform probe failed: boom
+@bcn-services/sb:test: # Subtest: health: probe passes -> connected; probe throws -> probe_failed
+@bcn-services/sb:test: ok 248 - health: probe passes -> connected; probe throws -> probe_failed
+@bcn-services/sb:test: # tests 248
+@bcn-services/sb:test: # pass 247
+@bcn-services/sb:test: # fail 0
+@bcn-services/sb:test: # skipped 1
+@bcn-services/sb:test: # todo 0
+@bcn-services/app-core:test: 10 passed, 0 failed
+@bcn-services/platform:test:  ✓ test/scripts.test.ts (18 tests) 7872ms
+@bcn-services/platform:test:  ✓ test/qa-drive-storage-cleanup.test.ts (2 tests) 5541ms
+@bcn-services/platform:test:  ✓ test/catalog.test.ts (14 tests) 3023ms
+@bcn-services/platform:test:  ✓ test/tenant.test.ts (8 tests) 2964ms
+@bcn-services/platform:test:  ✓ test/data-client.test.ts (15 tests) 2927ms
+@bcn-services/platform:test:  ✓ test/rehearsal.test.ts (5 tests) 3166ms
+@bcn-services/platform:test:  ✓ test/media-set-position.qa.test.ts (15 tests) 4352ms
+@bcn-services/platform:test:  ✓ test/worker.test.ts (11 tests) 3490ms
+@bcn-services/platform:test:  ✓ test/storage.test.ts (4 tests) 9605ms
+@bcn-services/platform:test:  ✓ test/media-set-position.test.ts (8 tests) 6580ms
+@bcn-services/platform:test:  ✓ test/pin-search-path.qa.test.ts (10 tests) 2110ms
+@bcn-services/platform:test:  ✓ test/drive-tombstone.test.ts (1 test) 1541ms
+@bcn-services/platform:test:  ✓ test/qa-tokens-probe.test.ts (2 tests) 1424ms
+@bcn-services/platform:test:  ✓ test/qa-checklist-import-cycle.test.ts (3 tests) 892ms
+@bcn-services/platform:test:  ✓ test/connectors.test.ts (6 tests | 1 skipped) 382ms
+@bcn-services/platform:test:  ✓ test/qa-shopify-rehearsal.test.ts (11 tests) 43ms
+@bcn-services/platform:test:  ✓ test/qa-checklist-s1.test.ts (4 tests) 18ms
+@bcn-services/platform:test:  ✓ test/qa-shopify-handle.test.ts (6 tests) 3ms
+@bcn-services/platform:test:  Test Files  18 passed (18)
+@bcn-services/platform:test:       Tests  142 passed | 1 todo (143)
+ ERROR  run failed: command  exited (1)

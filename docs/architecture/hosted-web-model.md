@@ -105,6 +105,15 @@ Revisit the single-droplet choice once steady spend passes **~$150–200/mo**.
 
 ### Repo model: one repo per client business
 
+> **Superseded 2026-09-15.** Platform-v1 (`platform-v1.md`) reverses this for
+> platform clients: the bcns Connect platform (`platform/`) and the Deluxe apps
+> (`apps/<slug>`, first `apps/sb`) live in this monorepo, stamped from
+> `apps/_template` by `scripts/new-app.sh` and deployed by slug through
+> `.github/workflows/deploy-app.yml`. Legacy one-off builds (Technology
+> Associates, l2detailz) keep their own repos. The text below is the earlier
+> decision, kept for the record.
+
+
 **Each client business gets its own repo.** This **reverses the old Part II
 "monorepo, separate repos rejected" decision.**
 

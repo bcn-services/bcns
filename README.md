@@ -111,6 +111,8 @@ This is a pnpm monorepo, so the deploy hinges on one project setting:
 
 **Project → Settings → Build & Deployment → Root Directory = `apps/web`**
 
+**Platform-v1 (2026-09-15):** the repo is now a workspace with `apps/sb`, `platform/`, `packages/data-client`. Vercel keeps Root Directory = `apps/web` and uses two settings so unrelated pushes neither build nor break the site: Build Command `turbo run build --filter=@bcn-services/web...` (the package name — `web` or the old `@nseluga/web` make turbo exit 1) and Ignored Build Step `git diff --quiet HEAD^ HEAD -- :/apps/web :/packages/ui :/packages/config :/packages/app-core :/package.json :/pnpm-lock.yaml`. `apps/web/__tests__/isolation.test.mjs` asserts the site imports nothing from `apps/*`, `platform/` or `packages/{data-client,tenant}`.
+
 Leave everything else on auto-detect. Vercel reads the Next.js preset from
 `apps/web`, and because "Include files outside the Root Directory" is on by
 default, it still installs from the workspace root (`pnpm-lock.yaml`,

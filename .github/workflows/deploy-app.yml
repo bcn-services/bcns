@@ -1,0 +1,99 @@
+name: deploy-app
+
+# Ships one client app (apps/<slug>) to the droplet as bcns-app@<slug>.
+# Ported from bcns-client-sb's deploy.yml (docs/architecture/platform-v1.md chunk 1):
+# the migrate job is gone — the platform (platform/supabase) owns the schema, so every
+# app here is shared-platform mode. Build → rsync standalone → activate + health-check
+# with rollback, unchanged from the SB pipeline.
+#
+# push: any app whose files changed gets its own matrix leg.
+# workflow_dispatch: pass the slug to redeploy one app on demand.
+
+on:
+  push:
+    branches: [main]
+    paths: [apps/sb/**, apps/connect/**, apps/mcp/**, packages/**, package.json, pnpm-lock.yaml, .github/workflows/deploy-app.yml]
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: app slug (apps/<slug>, bcns-app@<slug>)
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-app-${{ inputs.slug || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # dispatch → the one slug; push → every deployable app.
+        slug: ${{ inputs.slug && fromJSON(format('["{0}"]', inputs.slug)) || fromJSON('["sb","connect"]') }}
+    env:
+      SLUG: ${{ matrix.slug }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version from root packageManager
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # must match the droplet's Node
+          cache: pnpm
+      - name: Authenticate GitHub Packages (@bcn-services/app-core)
+        run: pnpm config set "//npm.pkg.github.com/:_authToken" "${{ secrets.GH_PACKAGES_TOKEN }}"
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: pnpm --filter "@bcn-services/$SLUG" test
+      - name: Build (Next standalone)
+        env:
+          DATA_SOURCE: shared # scripts/check-env.ts gate
+        run: |
+          pnpm --filter "@bcn-services/$SLUG" build
+          # In a workspace, standalone nests the app under its repo path; server.js lives there.
+          app="apps/$SLUG"
+          cp -r "$app/.next/static" "$app/.next/standalone/$app/.next/static"
+          if [ -d "$app/public" ]; then cp -r "$app/public" "$app/.next/standalone/$app/public"; fi
+          # bcns-app@.service runs `node server.js` in /srv/<slug>/current (unit is shared with
+          # l2detailz, unchanged). Shim at the release root; Next's server.js chdirs to its own dir.
+          printf "require('./apps/%s/server.js');\n" "$SLUG" > "$app/.next/standalone/server.js"
+      - name: Ship release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          rsync -az --delete -e "ssh -i ~/.ssh/id_deploy" \
+            "apps/$SLUG/.next/standalone/" "$SLUG@$HOST:/srv/$SLUG/releases/$GITHUB_SHA/"
+      - name: Activate, health-check, prune (auto-rollback on failure)
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SLUG@$HOST" "
+            set -e
+            prev=\$(readlink /srv/$SLUG/current || true)
+            ln -sfn /srv/$SLUG/releases/$GITHUB_SHA /srv/$SLUG/current
+            sudo systemctl restart bcns-app@$SLUG
+            sleep 5
+            port=\$(grep '^PORT=' /srv/$SLUG/env | cut -d= -f2)
+            # Retries cover slow boot and the shared-mode health sign-in (cold token cache).
+            if ! curl -sf --retry 5 --retry-delay 3 --retry-connrefused --max-time 10 \"http://localhost:\$port/api/health\"; then
+              echo 'health check failed — rolling back' >&2
+              if [ -n \"\$prev\" ]; then
+                ln -sfn \"\$prev\" /srv/$SLUG/current
+                sudo systemctl restart bcns-app@$SLUG
+              fi
+              exit 1
+            fi
+            # Prune old releases, never the one 'current' points at.
+            cur=\$(readlink /srv/$SLUG/current)
+            ls -dt /srv/$SLUG/releases/*/ | sed 's:/\$::' | grep -vx \"\$cur\" | tail -n +5 | xargs -r rm -rf
+          "

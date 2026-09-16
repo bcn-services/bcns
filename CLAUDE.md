@@ -80,4 +80,4 @@ Superseded 2026-09-15: client apps become `apps/<slug>` in this repo, stamped by
 
 ## Deploy
 
-Vercel free tier. The one required project setting is **Root Directory = `apps/web`** — everything else stays on auto-detect, and there is intentionally no `vercel.json` (see README → Deploy). Set the three env vars in the Vercel dashboard. No database, no paid services beyond a domain.
+Vercel free tier. Required project settings: **Root Directory = `apps/web`**, Build Command `turbo run build --filter=@bcn-services/web...`, and the Ignored Build Step from README → Deploy (platform-v1). Everything else stays on auto-detect, and there is intentionally no `vercel.json` (see README → Deploy). Set the three env vars in the Vercel dashboard. No database, no paid services beyond a domain.

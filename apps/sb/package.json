@@ -1,0 +1,35 @@
+{
+  "name": "@bcn-services/sb",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "tsx scripts/check-env.ts && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "agent": "tsx agent/index.ts",
+    "briefing": "tsx scripts/briefing.ts",
+    "test": "tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs tests/overview.test.mjs tests/panels.test.mjs tests/financials.test.mjs tests/qa-shell-home.test.mjs tests/library.test.mjs tests/qa-library.test.mjs tests/qa-financials.test.mjs tests/qa-monday-meet.test.mjs tests/daily-report.test.mjs tests/qa-daily-report.test.mjs tests/briefing.test.mjs tests/qa-briefing.test.mjs",
+    "clean": "rm -rf .next .turbo node_modules"
+  },
+  "dependencies": {
+    "@bcn-services/app-core": "workspace:*",
+    "@bcn-services/data-client": "workspace:*",
+    "@bcn-services/ui": "workspace:*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "14.2.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@bcn-services/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^9.15.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.6.3"
+  }
+}

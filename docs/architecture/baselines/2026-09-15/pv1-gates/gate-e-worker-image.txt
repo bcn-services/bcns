@@ -1,0 +1,79 @@
+# $ docker build -f platform/worker/Dockerfile -t bcns-worker:pv1 .  (worktree root, dfcf45b)
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  627.9MB
+Step 1/14 : FROM node:22-slim
+ ---> 83f487e0a634
+Step 2/14 : WORKDIR /app
+ ---> Using cache
+ ---> e3f1c5ffa057
+Step 3/14 : COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+ ---> Using cache
+ ---> 732abd92baf7
+Step 4/14 : COPY platform/package.json platform/
+ ---> Using cache
+ ---> 354bafe07079
+Step 5/14 : COPY apps/web/package.json apps/web/
+ ---> Using cache
+ ---> 2afae7279a08
+Step 6/14 : COPY apps/sb/package.json apps/sb/
+ ---> Using cache
+ ---> 7c5538cee263
+Step 7/14 : COPY packages/ui/package.json packages/ui/
+ ---> Using cache
+ ---> 434bfda74942
+Step 8/14 : COPY packages/config/package.json packages/config/
+ ---> Using cache
+ ---> 4ebdc59f5d0a
+Step 9/14 : COPY packages/app-core/package.json packages/app-core/
+ ---> Using cache
+ ---> 6ebcd3aaa790
+Step 10/14 : COPY packages/data-client/package.json packages/data-client/
+ ---> Using cache
+ ---> 3b7c1a548b5e
+Step 11/14 : RUN npm i -g pnpm@9.15.0 tsx@4.20.5 && pnpm install --prod --frozen-lockfile --filter @bcn-services/platform
+ ---> Running in 68bacf299141
+
+added 6 packages in 5s
+
+3 packages are looking for funding
+  run `npm fund` for details
+[91mnpm notice
+npm notice New major version of npm available! 10.9.8 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+[0mLockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+.                                        |  +59 ++++++
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 9.15.0 → 12.4.2.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.4.2   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+Progress: resolved 59, reused 0, downloaded 25, added 10
+Progress: resolved 59, reused 0, downloaded 58, added 58
+Progress: resolved 59, reused 0, downloaded 59, added 59, done
+.../sharp@0.34.5/node_modules/sharp install$ node install/check.js || npm run build
+.../sharp@0.34.5/node_modules/sharp install: Done
+Done in 3.1s
+ ---> Removed intermediate container 68bacf299141
+ ---> c644dc1e46d0
+Step 12/14 : COPY platform/worker ./platform/worker
+ ---> d77fcdbe5d7f
+Step 13/14 : WORKDIR /app/platform
+ ---> Running in 65d9a3dfb4b3
+ ---> Removed intermediate container 65d9a3dfb4b3
+ ---> 6ab7dda46bdc
+Step 14/14 : CMD ["tsx", "worker/src/index.ts"]
+ ---> Running in 2dc31b5c7f37
+ ---> Removed intermediate container 2dc31b5c7f37
+ ---> 1edb8ec4a6b1
+Successfully built 1edb8ec4a6b1
+Successfully tagged bcns-worker:pv1

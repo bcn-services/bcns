@@ -1,0 +1,29 @@
+# Builds platform/worker/ and updates the Cloud Run Job (DESIGN §5.1). Needs repo secrets/vars:
+#   GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT (secrets); GCP_PROJECT, GCP_REGION (vars).
+# Runtime env (DATABASE_URL, SUPABASE_*, RESEND_API_KEY, ...) is set on the job itself, not here.
+name: deploy-worker
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [platform/worker/**, platform/package.json, package.json, pnpm-lock.yaml, .github/workflows/deploy-worker.yml]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    env:
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/bcns/bcns-data-worker:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+      - run: docker build -f platform/worker/Dockerfile -t "$IMAGE" . && docker push "$IMAGE"
+      - run: >
+          gcloud run jobs update bcns-data-worker --region ${{ vars.GCP_REGION }} --image "$IMAGE"
+          --tasks ${{ vars.TASK_COUNT || 2 }} --parallelism ${{ vars.TASK_COUNT || 2 }}
+          --task-timeout 600 --max-retries 0 --cpu 1 --memory 1Gi

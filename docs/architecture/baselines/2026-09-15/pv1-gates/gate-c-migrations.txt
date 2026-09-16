@@ -1,0 +1,26 @@
+# Gate (c): schema drift vs hosted project cnsxbglhredokjbvudfd — equals baseline
+
+# $ supabase db diff --linked   (worktree platform/, link state copied from the chunk 0 clean clone)
+#   Hung twice with no output (>14 min, process asleep, stdin=/dev/null): headless shell cannot supply the
+#   linked db password from the OS keyring. Killed. Morning step: run it in a tty and confirm the output equals
+#   ../bcns-data/db-diff.txt (baseline drift = DROP EXTENSION pg_net + rls_auto_enable event trigger + default
+#   sequence privileges; pre-existing, not introduced by this branch).
+
+# Fallback proof (allowed by the plan): hosted applied migrations == branch migration files == baseline list.
+
+# Supabase MCP list_migrations(project_id=cnsxbglhredokjbvudfd)  [2026-09-16 ~06:00 UTC]
+{"migrations":[{"version":"20260912000100","name":"schema"},{"version":"20260912000200","name":"access"},{"version":"20260912000300","name":"storage"},{"version":"20260912000400","name":"api_views"},{"version":"20260912000500","name":"api_rpcs"},{"version":"20260912000600","name":"drive_source"},{"version":"20260914000100","name":"pin_search_path"},{"version":"20260914000200","name":"media_set_position"}]}
+
+# $ ls platform/supabase/migrations   (branch pv1/1-merge)
+20260912000100_schema.sql
+20260912000200_access.sql
+20260912000300_storage.sql
+20260912000400_api_views.sql
+20260912000500_api_rpcs.sql
+20260912000600_drive_source.sql
+20260914000100_pin_search_path.sql
+20260914000200_media_set_position.sql
+
+# $ diff <(ls platform/supabase/migrations) <(ls clean/bcns-data/supabase/migrations) && echo IDENTICAL_TO_CLEAN_CLONE
+IDENTICAL_TO_CLEAN_CLONE
+# baseline list: ../bcns-data/migrations.txt (same 8 files; local migration list local==remote for all 8)

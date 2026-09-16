@@ -1,0 +1,6 @@
+# sb gates summary (full log in job tmp)
+43:@bcn-services/sb:build: Route (app)                              Size     First Load JS
+1310:@bcn-services/sb:test: # tests 248
+1312:@bcn-services/sb:test: # pass 247
+1313:@bcn-services/sb:test: # fail 0
+1315:@bcn-services/sb:test: # skipped 1
