@@ -121,6 +121,7 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   download_url: { args: { media_id: mediaId('beta', 1) }, expect: 'BCNS4' },
   report_dashboard_version: { args: { app_version: '0', api_version: 'v1' }, expect: 'none' },
   remove_member: { args: { target_user_id: USERS.betaMember.id }, expect: 'BCNS4' },
+  add_member: { args: { target_user_id: USERS.betaMember.id }, expect: 'BCNS3' }, // beta's user belongs to another client → other_client
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */

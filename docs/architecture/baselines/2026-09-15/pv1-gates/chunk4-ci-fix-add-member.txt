@@ -1,0 +1,97 @@
+# CI fix — platform-ci run 35078584232 on 48b022f failed:
+#   test/catalog.test.ts:187 + test/tenant.test.ts:18 → 'no RPC_ARGS entry for add_member'
+# Cause: CI's fresh 'supabase start' applies 20260916000200_add_member_rpc.sql; the local stack had it applied+rolled back
+#   (chunk4-migrations-rollback.txt), so the local suite never enumerated add_member from pg_proc.
+# Fix: RPC_ARGS.add_member in platform/test/helpers.ts (acme owner → beta member = BCNS3 other_client).
+
+# local DB: api.add_member present before?
+0
+applying 20260916000200_add_member_rpc.sql to local DB
+add_member
+bulk_tag
+create_media_set
+delete_media
+delete_media_set
+delete_record
+download_url
+register_upload
+remove_member
+reorder_media_set_items
+report_dashboard_version
+restore_media
+save_record
+set_media_set_items
+update_media
+update_media_set
+
+$ corepack pnpm turbo run test --filter=@bcn-services/platform --concurrency=1
+@bcn-services/platform:test:  ✓ test/scripts.test.ts (18 tests) 14499ms
+@bcn-services/platform:test:    ✓ scripts > onboard creates the client, its owning membership, and a smoke user  3667ms
+@bcn-services/platform:test:    ✓ scripts > onboard --sources writes source_tokens + connector_schedule from the connector defaults  389ms
+@bcn-services/platform:test:    ✓ scripts > import-media uploads a file and registers it via data.register_media  897ms
+@bcn-services/platform:test:    ✓ scripts > add-member --agent creates a non-smoke member whose password signs in with the client_id claim, and re-run rotates it  5133ms
+@bcn-services/platform:test:    ✓ scripts > add-member --agent refuses to rotate a user that already owns the agent+ address but was not minted by --agent  544ms
+@bcn-services/platform:test:    ✓ scripts > export writes CSV per canonical table, raw.jsonl and files/  333ms
+@bcn-services/platform:test:    ✓ scripts > hard-delete archives the export, then removes the client, its rows, and its storage objects  1000ms
+@bcn-services/platform:test:    ✓ scripts > add-source > attaches monday to an existing client exactly as onboard does  973ms
+@bcn-services/platform:test:  ✓ test/qa-drive-storage-cleanup.test.ts (2 tests) 8897ms
+@bcn-services/platform:test:    ✓ drive-tombstone.test.ts Storage cleanup > leaves the media bucket free of orphaned objects after the real suite runs  8626ms
+@bcn-services/platform:test:  ✓ test/data-client.test.ts (15 tests) 6912ms
+@bcn-services/platform:test:    ✓ @bcn-services/data-client > a view read returns only the caller tenant's rows  2695ms
+@bcn-services/platform:test:    ✓ @bcn-services/data-client > rpc.save_record round-trips and rpc.delete_record removes it  743ms
+@bcn-services/platform:test:    ✓ @bcn-services/data-client > a cross-tenant download_url throws DataClientError not_found  597ms
+@bcn-services/platform:test:    ✓ @bcn-services/data-client > media.upload stores a file and media.downloadUrl signs it, cleaned up after  509ms
+@bcn-services/platform:test:    ✓ signIn > returns a client whose health() reads the seeded tenant  378ms
+@bcn-services/platform:test:    ✓ signIn > refreshes when within 60s of expiry and shares one in-flight refresh across concurrent callers  599ms
+@bcn-services/platform:test:  ✓ test/tenant.test.ts (8 tests) 7151ms
+@bcn-services/platform:test:    ✓ tenant isolation > rpc_every_write_scoped  3827ms
+@bcn-services/platform:test:    ✓ tenant isolation > forbidden_read_views  1285ms
+@bcn-services/platform:test:    ✓ tenant isolation > anon_key_zero  304ms
+@bcn-services/platform:test:    ✓ tenant isolation > membership_removed_next_request  706ms
+@bcn-services/platform:test:    ✓ tenant isolation > client_churned_next_request  431ms
+@bcn-services/platform:test:  ✓ test/media-set-position.qa.test.ts (15 tests) 5243ms
+@bcn-services/platform:test:    ✓ media-set position: backfill > backfill block orders position by added_at per set (re-run against a temp copy)  324ms
+@bcn-services/platform:test:    ✓ media-set position: add path > appends new items after current max, in media_ids order  2603ms
+@bcn-services/platform:test:    ✓ media-set position: add path > re-adding an existing member leaves no gap: the new id lands at max+1  358ms
+@bcn-services/platform:test:    ✓ media-set position: reorder RPC > view is ordered by position, not insertion/added_at order  387ms
+@bcn-services/platform:test:    ✓ media-set position: reorder RPC > strict validation: extra id -> BCNS3, nothing written  402ms
+@bcn-services/platform:test:    ✓ media-set position: reorder RPC > strict validation: duplicate id -> BCNS3, nothing written  311ms
+@bcn-services/platform:test:    ✓ media-set position: reorder RPC > strict validation: null -> BCNS3, nothing written  300ms
+@bcn-services/platform:test:  ✓ test/rehearsal.test.ts (5 tests) 4880ms
+@bcn-services/platform:test:    ✓ connection-day rehearsal > 'shopify': fixture → runOne → raw → canonical → api view as a member  663ms
+@bcn-services/platform:test:    ✓ connection-day rehearsal > 'meta': fixture → runOne → raw → canonical → api view as a member  562ms
+@bcn-services/platform:test:  ✓ test/media-set-position.test.ts (8 tests) 5365ms
+@bcn-services/platform:test:    ✓ media_set_items.position > the add path appends at the end, in media_ids order  2949ms
+@bcn-services/platform:test:    ✓ media_set_items.position > re-adding an existing id alongside a new one leaves no gap  639ms
+@bcn-services/platform:test:    ✓ media_set_items.position > reorder_media_set_items renumbers to the array index  610ms
+@bcn-services/platform:test:    ✓ media_set_items.position > a media_ids array that is not exactly the members is BCNS3 and writes nothing  405ms
+@bcn-services/platform:test:  ✓ test/catalog.test.ts (14 tests) 5145ms
+@bcn-services/platform:test:    ✓ catalog > hook_mints_claims  2698ms
+@bcn-services/platform:test:    ✓ catalog > exposed_schemas_api_only  675ms
+@bcn-services/platform:test:    ✓ catalog > internal_tables_unreachable  466ms
+@bcn-services/platform:test:    ✓ catalog > rpc_sets_client_from_claim  430ms
+@bcn-services/platform:test:    ✓ catalog > no_claim_zero_rows  313ms
+@bcn-services/platform:test:  ✓ test/worker.test.ts (11 tests) 4110ms
+@bcn-services/platform:test:    ✓ worker > worker_claim_no_double_process  572ms
+@bcn-services/platform:test:  ✓ test/storage.test.ts (4 tests) 5091ms
+@bcn-services/platform:test:    ✓ storage > storage_prefix_isolation  2997ms
+@bcn-services/platform:test:    ✓ storage > thumb_prefix_cross_tenant  874ms
+@bcn-services/platform:test:    ✓ storage > download_ticket_required  779ms
+@bcn-services/platform:test:    ✓ storage > storage_budget_deny  432ms
+@bcn-services/platform:test:  ✓ test/pin-search-path.qa.test.ts (10 tests) 3458ms
+@bcn-services/platform:test:    ✓ pin_search_path (QA) > jwt_client_id resolves through api.report_dashboard_version (tenant_or_raise -> active_client_id -> jwt_client_id)  2764ms
+@bcn-services/platform:test:  ✓ test/drive-tombstone.test.ts (1 test) 2443ms
+@bcn-services/platform:test:    ✓ drive tombstone > soft-deletes a file missing from a later complete listing and undeletes it when it reappears  473ms
+@bcn-services/platform:test:  ✓ test/qa-tokens-probe.test.ts (2 tests) 2321ms
+@bcn-services/platform:test:  ✓ test/qa-checklist-import-cycle.test.ts (3 tests) 1452ms
+@bcn-services/platform:test:    ✓ cold-import ordering around the connectors registry > scripts/checklist.ts imports cleanly as the first module (no registry edge)  534ms
+@bcn-services/platform:test:    ✓ cold-import ordering around the connectors registry > the URL helper leaf imports cleanly on its own  406ms
+@bcn-services/platform:test:    ✓ cold-import ordering around the connectors registry > index.ts first, then checklist.ts, still works (the order every worker caller uses)  506ms
+@bcn-services/platform:test:  ✓ test/connectors.test.ts (6 tests | 1 skipped) 676ms
+@bcn-services/platform:test:  ✓ test/qa-shopify-rehearsal.test.ts (11 tests) 95ms
+@bcn-services/platform:test:  ✓ test/edge-mint-agent-login.test.ts (9 tests) 59ms
+@bcn-services/platform:test:  ✓ test/edge-invite-member.test.ts (10 tests) 43ms
+@bcn-services/platform:test:  ✓ test/qa-checklist-s1.test.ts (4 tests) 34ms
+@bcn-services/platform:test:  ✓ test/qa-shopify-handle.test.ts (6 tests) 6ms
+@bcn-services/platform:test:  Test Files  20 passed (20)
+@bcn-services/platform:test:       Tests  161 passed | 1 todo (162)
