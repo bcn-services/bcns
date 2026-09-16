@@ -25,6 +25,7 @@ export const siteConfig = {
     { label: "Pricing", href: "/pricing" },
     { label: "About", href: "/about" },
   ],
+  signIn: { label: "Sign in", href: "https://connect.bcn-services.com" },
 } as const;
 
 export type SiteConfig = typeof siteConfig;
