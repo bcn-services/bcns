@@ -13,8 +13,9 @@ COPY packages/ui/package.json packages/ui/
 COPY packages/config/package.json packages/config/
 COPY packages/app-core/package.json packages/app-core/
 COPY packages/data-client/package.json packages/data-client/
-# pnpm pinned to the root packageManager. --prod keeps the image to the runtime tree; tsx is added on top to run the TypeScript as-is.
-RUN npm i -g pnpm@9.15.0 && pnpm install --prod --frozen-lockfile --filter @bcn-services/platform && cd platform && pnpm add tsx@4.20.5
+# pnpm pinned to the root packageManager. --prod keeps the image to the runtime tree; tsx is
+# installed globally to run the TypeScript as-is (pnpm 9 refuses `pnpm add` into a --prod tree).
+RUN npm i -g pnpm@9.15.0 tsx@4.20.5 && pnpm install --prod --frozen-lockfile --filter @bcn-services/platform
 COPY platform/worker ./platform/worker
 WORKDIR /app/platform
-CMD ["pnpm", "exec", "tsx", "worker/src/index.ts"]
+CMD ["tsx", "worker/src/index.ts"]
