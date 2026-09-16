@@ -1,0 +1,78 @@
+# $ corepack pnpm -r ls --depth 0
+Legend: production dependency, [34moptional only[39m, [33mdev only[39m
+
+[1m[4mbcns@0.0.0 /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns (PRIVATE)[24m[22m
+
+[96mdevDependencies:[39m
+[33mprettier[39m [90m3.9.5[39m
+[33mturbo[39m [90m2.10.4[39m
+typescript [90m5.9.3[39m
+
+[1m[4m@bcn-services/web@0.0.0 /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/apps/web (PRIVATE)[24m[22m
+
+[96mdependencies:[39m
+@bcn-services/ui [90mlink:../../packages/ui[39m
+class-variance-authority [90m0.7.1[39m
+clsx [90m2.1.1[39m
+framer-motion [90m13.1.1[39m
+lucide-react [90m0.454.0[39m
+next [90m14.2.18[39m
+next-themes [90m0.4.6[39m
+react [90m18.3.1[39m
+react-dom [90m18.3.1[39m
+sharp [90m0.35.3[39m
+tailwind-merge [90m2.6.1[39m
+
+[96mdevDependencies:[39m
+@bcn-services/config [90mlink:../../packages/config[39m
+@types/node [90m22.20.1[39m
+[33m@types/react[39m [90m18.3.31[39m
+[33m@types/react-dom[39m [90m18.3.7[39m
+[33mautoprefixer[39m [90m10.5.2[39m
+[33meslint[39m [90m9.39.4[39m
+[33mpostcss[39m [90m8.5.16[39m
+[33mtailwindcss[39m [90m3.4.19[39m
+typescript [90m5.9.3[39m
+
+[1m[4m@bcn-services/app-core@0.2.0 /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/app-core[24m[22m
+
+[96mdependencies:[39m
+@anthropic-ai/sdk [90m0.39.0[39m
+
+[96mdevDependencies:[39m
+@bcn-services/config [90mlink:../config[39m
+@types/node [90m22.20.1[39m
+eslint [90m9.39.4[39m
+[33mtsx[39m [90m4.23.1[39m
+typescript [90m5.9.3[39m
+
+[1m[4m@bcn-services/config@0.1.1 /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/config[24m[22m
+
+[96mdependencies:[39m
+@eslint/js [90m9.39.4[39m
+@next/eslint-plugin-next [90m15.5.20[39m
+eslint-config-prettier [90m9.1.2[39m
+globals [90m15.15.0[39m
+typescript-eslint [90m8.63.0[39m
+
+[96mdevDependencies:[39m
+eslint [90m9.39.4[39m
+[33mtailwindcss[39m [90m3.4.19[39m
+typescript [90m5.9.3[39m
+
+[1m[4m@bcn-services/ui@0.1.1 /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns/packages/ui[24m[22m
+
+[96mdependencies:[39m
+class-variance-authority [90m0.7.1[39m
+clsx [90m2.1.1[39m
+lucide-react [90m0.454.0[39m
+react [90m18.3.1[39m
+react-dom [90m18.3.1[39m
+tailwind-merge [90m2.6.1[39m
+
+[96mdevDependencies:[39m
+@bcn-services/config [90mlink:../config[39m
+[33m@types/react[39m [90m18.3.31[39m
+[33m@types/react-dom[39m [90m18.3.7[39m
+eslint [90m9.39.4[39m
+typescript [90m5.9.3[39m

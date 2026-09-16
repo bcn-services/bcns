@@ -1,0 +1,13 @@
+# $ ls supabase/migrations
+20260912000100_schema.sql
+20260912000200_access.sql
+20260912000300_storage.sql
+20260912000400_api_views.sql
+20260912000500_api_rpcs.sql
+20260912000600_drive_source.sql
+20260914000100_pin_search_path.sql
+20260914000200_media_set_position.sql
+
+# $ supabase migration list --local
+Connecting to local database...
+{"migrations":[{"local":"20260912000100","remote":"20260912000100","time":"2026-09-12 00:01:00"},{"local":"20260912000200","remote":"20260912000200","time":"2026-09-12 00:02:00"},{"local":"20260912000300","remote":"20260912000300","time":"2026-09-12 00:03:00"},{"local":"20260912000400","remote":"20260912000400","time":"2026-09-12 00:04:00"},{"local":"20260912000500","remote":"20260912000500","time":"2026-09-12 00:05:00"},{"local":"20260912000600","remote":"20260912000600","time":"2026-09-12 00:06:00"},{"local":"20260914000100","remote":"20260914000100","time":"2026-09-14 00:01:00"},{"local":"20260914000200","remote":"20260914000200","time":"2026-09-14 00:02:00"}],"message":"Migrations listed"}

@@ -1,0 +1,20 @@
+# $ docker build -f worker/Dockerfile -t bcns-data-worker:baseline .
+ ---> e3f1c5ffa057
+Step 3/6 : COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+ ---> Using cache
+ ---> 7cac3355ffd5
+Step 4/6 : RUN npm i -g pnpm@10 && pnpm install --prod --frozen-lockfile --filter bcns-data && pnpm add tsx@4.20.5
+ ---> Using cache
+ ---> dcba67baa8bf
+Step 5/6 : COPY worker ./worker
+ ---> a569abb5ce31
+Step 6/6 : CMD ["pnpm", "exec", "tsx", "worker/src/index.ts"]
+ ---> Running in 9ba414de6610
+ ---> Removed intermediate container 9ba414de6610
+ ---> 8533d50ff718
+Successfully built 8533d50ff718
+Successfully tagged bcns-data-worker:baseline
+
+# $ docker images bcns-data-worker:baseline
+IMAGE                       ID             DISK USAGE   CONTENT SIZE   EXTRA
+bcns-data-worker:baseline   8533d50ff718        597MB          133MB        

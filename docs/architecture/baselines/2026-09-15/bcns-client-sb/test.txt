@@ -1,0 +1,2517 @@
+# $ DATA_SOURCE=shared corepack pnpm test
+# $ DATA_SOURCE=shared corepack pnpm test
+[43m[33m[[39m[49m[43m[30mWARN[39m[49m[43m[33m][39m[49m Ignored project-level auth setting "//npm.pkg.github.com/:_authToken" in "/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-client-sb/.npmrc": environment variables are not expanded in registry credentials that come from a project .npmrc, because that file is committed to the repository and could leak the secret to an attacker-controlled registry. Move this credential to a trusted source that pnpm still expands — put the line in your user-level ~/.npmrc, or set it with pnpm config set (for example, run: pnpm config set "//npm.pkg.github.com/:_authToken" <value>). See https://pnpm.io/npmrc
+[2m$ tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs tests/overview.test.mjs tests/panels.test.mjs tests/financials.test.mjs tests/qa-shell-home.test.mjs tests/library.test.mjs tests/qa-library.test.mjs tests/qa-financials.test.mjs tests/qa-monday-meet.test.mjs tests/daily-report.test.mjs tests/qa-daily-report.test.mjs tests/briefing.test.mjs tests/qa-briefing.test.mjs[22m
+TAP version 13
+# Subtest: agent: calls read_view once via runTool and returns the final text
+ok 1 - agent: calls read_view once via runTool and returns the final text
+  ---
+  duration_ms: 4.46425
+  ...
+# Subtest: agent: a tool error becomes an is_error tool_result, loop continues
+ok 2 - agent: a tool error becomes an is_error tool_result, loop continues
+  ---
+  duration_ms: 0.520291
+  ...
+# Subtest: agent: running out of maxTurns throws instead of returning empty text
+ok 3 - agent: running out of maxTurns throws instead of returning empty text
+  ---
+  duration_ms: 0.477292
+  ...
+# Subtest: flag OFF: createAnthropicClient is never called
+ok 4 - flag OFF: createAnthropicClient is never called
+  ---
+  duration_ms: 1.666792
+  ...
+# Subtest: flag OFF with key present: still no invocation
+ok 5 - flag OFF with key present: still no invocation
+  ---
+  duration_ms: 0.186041
+  ...
+# Subtest: flag ON but no key: factory not called, returns null
+ok 6 - flag ON but no key: factory not called, returns null
+  ---
+  duration_ms: 0.12475
+  ...
+# Subtest: flag ON with key: factory IS called once (control case)
+ok 7 - flag ON with key: factory IS called once (control case)
+  ---
+  duration_ms: 1.148208
+  ...
+# Subtest: isAiEnabled reflects the flag
+ok 8 - isAiEnabled reflects the flag
+  ---
+  duration_ms: 0.155042
+  ...
+# briefing: briefing_run read failed { message: [32m'boom'[39m }
+# Subtest: AI off: no model call, nothing saved
+ok 9 - AI off: no model call, nothing saved
+  ---
+  duration_ms: 4.816708
+  ...
+# Subtest: key missing: no model call, nothing saved
+ok 10 - key missing: no model call, nothing saved
+  ---
+  duration_ms: 0.2605
+  ...
+# Subtest: cap unset: no model call even with AI on and a key
+ok 11 - cap unset: no model call even with AI on and a key
+  ---
+  duration_ms: 0.134541
+  ...
+# Subtest: the gates are checked in order: off, then key, then cap
+ok 12 - the gates are checked in order: off, then key, then cap
+  ---
+  duration_ms: 0.055
+  ...
+# Subtest: cap reached: spend exactly at the cap stops the call
+ok 13 - cap reached: spend exactly at the cap stops the call
+  ---
+  duration_ms: 0.535917
+  ...
+# Subtest: cap not reached: spend just under the cap still calls
+ok 14 - cap not reached: spend just under the cap still calls
+  ---
+  duration_ms: 1.323584
+  ...
+# Subtest: capReached is spent >= cap
+ok 15 - capReached is spent >= cap
+  ---
+  duration_ms: 0.048875
+  ...
+# Subtest: last month's runs don't count toward this month's cap
+ok 16 - last month's runs don't count toward this month's cap
+  ---
+  duration_ms: 2.515333
+  ...
+# Subtest: the month is the client's local month
+ok 17 - the month is the client's local month
+  ---
+  duration_ms: 0.595917
+  ...
+# Subtest: a malformed run body counts as $0, not NaN
+ok 18 - a malformed run body counts as $0, not NaN
+  ---
+  duration_ms: 0.304583
+  ...
+# Subtest: spend unknown (run read fails): no model call
+ok 19 - spend unknown (run read fails): no model call
+  ---
+  duration_ms: 0.65775
+  ...
+# Subtest: a full page of runs reads as spend unknown rather than an undercount
+ok 20 - a full page of runs reads as spend unknown rather than an undercount
+  ---
+  duration_ms: 0.632917
+  ...
+# Subtest: a model without a known price is refused
+ok 21 - a model without a known price is refused
+  ---
+  duration_ms: 0.187209
+  ...
+# Subtest: on demand: a run 10 minutes ago is rate limited
+ok 22 - on demand: a run 10 minutes ago is rate limited
+  ---
+  duration_ms: 0.291625
+  ...
+# Subtest: on demand: exactly 15 minutes later is allowed
+ok 23 - on demand: exactly 15 minutes later is allowed
+  ---
+  duration_ms: 0.725458
+  ...
+# Subtest: the cron run is not rate limited
+ok 24 - the cron run is not rate limited
+  ---
+  duration_ms: 0.526875
+  ...
+# Subtest: the rate limit reads the latest run, which the query orders first
+ok 25 - the rate limit reads the latest run, which the query orders first
+  ---
+  duration_ms: 1.061416
+  ...
+# Subtest: token → usd at Haiku 4.5 prices ($1 in / $5 out per MTok)
+ok 26 - token → usd at Haiku 4.5 prices ($1 in / $5 out per MTok)
+  ---
+  duration_ms: 0.047792
+  ...
+# Subtest: a call reserves the worst case, overwrites it with tokens + usd, then saves the briefing
+ok 27 - a call reserves the worst case, overwrites it with tokens + usd, then saves the briefing
+  ---
+  duration_ms: 0.547042
+  ...
+# Subtest: each call gets its own briefing_run id
+ok 28 - each call gets its own briefing_run id
+  ---
+  duration_ms: 1.027084
+  ...
+# Subtest: the cost is recorded even when the summary save fails
+ok 29 - the cost is recorded even when the summary save fails
+  ---
+  duration_ms: 0.657125
+  ...
+# Subtest: a failed model call keeps the worst-case reservation and saves no briefing
+ok 30 - a failed model call keeps the worst-case reservation and saves no briefing
+  ---
+  duration_ms: 0.42075
+  ...
+# Subtest: an empty reply records the cost but saves no briefing
+ok 31 - an empty reply records the cost but saves no briefing
+  ---
+  duration_ms: 0.387042
+  ...
+# Subtest: missing usage keeps the worst case as the recorded cost
+ok 32 - missing usage keeps the worst case as the recorded cost
+  ---
+  duration_ms: 0.368
+  ...
+# Subtest: the call runs with no SDK retries and a timeout
+ok 33 - the call runs with no SDK retries and a timeout
+  ---
+  duration_ms: 0.3915
+  ...
+# Subtest: no tenant (reservation save fails): the model is never called
+ok 34 - no tenant (reservation save fails): the model is never called
+  ---
+  duration_ms: 0.248542
+  ...
+# Subtest: a reservation the re-read can't see: no model call, released
+ok 35 - a reservation the re-read can't see: no model call, released
+  ---
+  duration_ms: 2.505542
+  ...
+# Subtest: the worst case must fit: $4.999 spent of $5 is cap reached, nothing saved
+ok 36 - the worst case must fit: $4.999 spent of $5 is cap reached, nothing saved
+  ---
+  duration_ms: 0.690333
+  ...
+# Subtest: concurrent on-demand: an earlier reservation in the window wins, this one is released
+ok 37 - concurrent on-demand: an earlier reservation in the window wins, this one is released
+  ---
+  duration_ms: 0.507209
+  ...
+# Subtest: concurrent on-demand: a reservation stamped later still blocks (save order, not stamp order, decides)
+ok 38 - concurrent on-demand: a reservation stamped later still blocks (save order, not stamp order, decides)
+  ---
+  duration_ms: 0.383459
+  ...
+# Subtest: concurrent cron: another reservation doesn't rate-limit the cron run
+ok 39 - concurrent cron: another reservation doesn't rate-limit the cron run
+  ---
+  duration_ms: 0.419417
+  ...
+# Subtest: the worst case counts one input token per character (bounds CJK/emoji)
+ok 40 - the worst case counts one input token per character (bounds CJK/emoji)
+  ---
+  duration_ms: 0.037417
+  ...
+# Subtest: concurrent reservations that together pass the cap: released, no call
+ok 41 - concurrent reservations that together pass the cap: released, no call
+  ---
+  duration_ms: 0.455625
+  ...
+# Subtest: released and far-future runs don't trip the rate limit
+ok 42 - released and far-future runs don't trip the rate limit
+  ---
+  duration_ms: 2.088084
+  ...
+# Subtest: empty data: one call, no tools, payload says '—' and empty lists
+ok 43 - empty data: one call, no tools, payload says '—' and empty lists
+  ---
+  duration_ms: 0.381458
+  ...
+# Subtest: payload carries yesterday's rows and no ids or PII
+ok 44 - payload carries yesterday's rows and no ids or PII
+  ---
+  duration_ms: 1.254833
+  ...
+# Subtest: the reads never select id, owner, participant, body, detail or url columns
+ok 45 - the reads never select id, owner, participant, body, detail or url columns
+  ---
+  duration_ms: 0.381542
+  ...
+# Subtest: yesterday's local day bounds the timestamped reads
+ok 46 - yesterday's local day bounds the timestamped reads
+  ---
+  duration_ms: 0.366625
+  ...
+# Subtest: the stored briefing renders from records, and a blank one reads as none
+ok 47 - the stored briefing renders from records, and a blank one reads as none
+  ---
+  duration_ms: 0.121375
+  ...
+# Subtest: flash codes map to fixed copy; anything else renders nothing
+ok 48 - flash codes map to fixed copy; anything else renders nothing
+  ---
+  duration_ms: 0.049833
+  ...
+# Subtest: AI_MONTHLY_BUDGET_USD: a positive number, anything else is unset
+ok 49 - AI_MONTHLY_BUDGET_USD: a positive number, anything else is unset
+  ---
+  duration_ms: 0.214959
+  ...
+# Subtest: yesterday follows the client's timezone, not UTC
+ok 50 - yesterday follows the client's timezone, not UTC
+  ---
+  duration_ms: 16.650458
+  ...
+# Subtest: yesterday crosses month and leap-year boundaries
+ok 51 - yesterday crosses month and leap-year boundaries
+  ---
+  duration_ms: 0.29
+  ...
+# Subtest: merges the day's revenue, orders, AOV, ad spend and manual entries
+ok 52 - merges the day's revenue, orders, AOV, ad spend and manual entries
+  ---
+  duration_ms: 1.109209
+  ...
+# Subtest: empty day is 'No data yet', never a fake $0
+ok 53 - empty day is 'No data yet', never a fake $0
+  ---
+  duration_ms: 0.074208
+  ...
+# Subtest: rows only for other days still count as no data
+ok 54 - rows only for other days still count as no data
+  ---
+  duration_ms: 0.126291
+  ...
+# Subtest: manual entries alone are data; missing sources stay null
+ok 55 - manual entries alone are data; missing sources stay null
+  ---
+  duration_ms: 0.057458
+  ...
+# Subtest: zero orders gives no AOV instead of dividing by zero
+ok 56 - zero orders gives no AOV instead of dividing by zero
+  ---
+  duration_ms: 0.086834
+  ...
+# Subtest: lines are the seven figures in tile order, '—' where absent
+ok 57 - lines are the seven figures in tile order, '—' where absent
+  ---
+  duration_ms: 0.713375
+  ...
+# Subtest: loadDailyReport reads exactly the one day from each source
+ok 58 - loadDailyReport reads exactly the one day from each source
+  ---
+  duration_ms: 0.568959
+  ...
+# Subtest: a failed read is named and treated as no rows, others still count
+ok 59 - a failed read is named and treated as no rows, others still count
+  ---
+  duration_ms: 0.352292
+  ...
+# Subtest: every source empty → No data yet with no errors
+ok 60 - every source empty → No data yet with no errors
+  ---
+  duration_ms: 0.14175
+  ...
+# Subtest: parseAmountToCents: accepts a positive amount with at most 2 decimals
+ok 61 - parseAmountToCents: accepts a positive amount with at most 2 decimals
+  ---
+  duration_ms: 0.624375
+  ...
+# Subtest: parseAmountToCents: rejects everything else
+ok 62 - parseAmountToCents: rejects everything else
+  ---
+  duration_ms: 0.265917
+  ...
+# Subtest: parseAmountToCents: no float drift on cent boundaries
+ok 63 - parseAmountToCents: no float drift on cent boundaries
+  ---
+  duration_ms: 0.058834
+  ...
+# Subtest: parseEntryInput: a valid entry becomes the exact save_record attributes
+ok 64 - parseEntryInput: a valid entry becomes the exact save_record attributes
+  ---
+  duration_ms: 15.096375
+  ...
+# Subtest: parseEntryInput: an omitted note is null, not an empty string
+ok 65 - parseEntryInput: an omitted note is null, not an empty string
+  ---
+  duration_ms: 1.264
+  ...
+# Subtest: parseEntryInput: rejects a bad date
+ok 66 - parseEntryInput: rejects a bad date
+  ---
+  duration_ms: 0.2365
+  ...
+# Subtest: parseEntryInput: rejects a type outside income|expense
+ok 67 - parseEntryInput: rejects a type outside income|expense
+  ---
+  duration_ms: 0.086792
+  ...
+# Subtest: parseEntryInput: rejects an empty or over-length category
+ok 68 - parseEntryInput: rejects an empty or over-length category
+  ---
+  duration_ms: 0.067292
+  ...
+# Subtest: parseEntryInput: rejects a bad amount
+ok 69 - parseEntryInput: rejects a bad amount
+  ---
+  duration_ms: 0.215584
+  ...
+# Subtest: parseEntryInput: rejects a note over 500 characters
+ok 70 - parseEntryInput: rejects a note over 500 characters
+  ---
+  duration_ms: 0.294125
+  ...
+# Subtest: entryErrorMessage: known codes render, unknown text does not
+ok 71 - entryErrorMessage: known codes render, unknown text does not
+  ---
+  duration_ms: 0.275292
+  ...
+# Subtest: toFinancialEntry: reads a well-formed records_v1 row
+ok 72 - toFinancialEntry: reads a well-formed records_v1 row
+  ---
+  duration_ms: 0.261542
+  ...
+# Subtest: toFinancialEntry: drops rows that are not usable entries
+ok 73 - toFinancialEntry: drops rows that are not usable entries
+  ---
+  duration_ms: 0.161666
+  ...
+# Subtest: toFinancialEntry: falls back to the row title, but never to occurred_at
+ok 74 - toFinancialEntry: falls back to the row title, but never to occurred_at
+  ---
+  duration_ms: 0.11975
+  ...
+# Subtest: toFinancialEntry: rejects amounts the form could never have produced
+ok 75 - toFinancialEntry: rejects amounts the form could never have produced
+  ---
+  duration_ms: 0.183583
+  ...
+# Subtest: computeFinancialTiles: a loss that shrank is a rise, not a fall
+ok 76 - computeFinancialTiles: a loss that shrank is a rise, not a fall
+  ---
+  duration_ms: 0.43675
+  ...
+# Subtest: shapeEntries: keeps the range, newest first, stable on ties
+ok 77 - shapeEntries: keeps the range, newest first, stable on ties
+  ---
+  duration_ms: 1.019709
+  ...
+# Subtest: sumEntries: splits income from expenses
+ok 78 - sumEntries: splits income from expenses
+  ---
+  duration_ms: 0.112458
+  ...
+# Subtest: computeProfit: DESIGN.md identity revenue + income - spend - expenses
+ok 79 - computeProfit: DESIGN.md identity revenue + income - spend - expenses
+  ---
+  duration_ms: 0.079
+  ...
+# Subtest: computeFinancialTotals: per-source nulls when a source has no rows
+ok 80 - computeFinancialTotals: per-source nulls when a source has no rows
+  ---
+  duration_ms: 0.073166
+  ...
+# Subtest: computeFinancialTotals: sums each source and derives AOV and profit
+ok 81 - computeFinancialTotals: sums each source and derives AOV and profit
+  ---
+  duration_ms: 0.074083
+  ...
+# Subtest: computeFinancialTotals: manual entries alone still yield a profit
+ok 82 - computeFinancialTotals: manual entries alone still yield a profit
+  ---
+  duration_ms: 0.041625
+  ...
+# Subtest: computeFinancialTiles: the seven DESIGN.md tiles, in order, with deltas
+ok 83 - computeFinancialTiles: the seven DESIGN.md tiles, in order, with deltas
+  ---
+  duration_ms: 0.109
+  ...
+# Subtest: computeFinancialTiles: an untouched account has no values and no deltas
+ok 84 - computeFinancialTiles: an untouched account has no values and no deltas
+  ---
+  duration_ms: 0.047708
+  ...
+# Subtest: computeDailyRows: one row per day with something, newest first
+ok 85 - computeDailyRows: one row per day with something, newest first
+  ---
+  duration_ms: 0.162584
+  ...
+# Subtest: computeDailyRows: days outside the range are dropped and same-day rows merge
+ok 86 - computeDailyRows: days outside the range are dropped and same-day rows merge
+  ---
+  duration_ms: 0.060541
+  ...
+# Subtest: computeDailyRows: nothing anywhere means no rows at all
+ok 87 - computeDailyRows: nothing anywhere means no rows at all
+  ---
+  duration_ms: 0.032333
+  ...
+# Subtest: pickCurrency: first reported currency wins, else USD
+ok 88 - pickCurrency: first reported currency wins, else USD
+  ---
+  duration_ms: 0.055417
+  ...
+# Subtest: computeFinancialRows: four rows in DESIGN.md order with labels
+ok 89 - computeFinancialRows: four rows in DESIGN.md order with labels
+  ---
+  duration_ms: 0.095333
+  ...
+# Subtest: computeFinancialRows: Expenses is manual expenses alone, never ad spend
+ok 90 - computeFinancialRows: Expenses is manual expenses alone, never ad spend
+  ---
+  duration_ms: 0.121959
+  ...
+# Subtest: computeFinancialRows: deltas compare against the previous period
+ok 91 - computeFinancialRows: deltas compare against the previous period
+  ---
+  duration_ms: 0.044125
+  ...
+# Subtest: computeFinancialRows: an empty account stays null rather than showing 0
+ok 92 - computeFinancialRows: an empty account stays null rather than showing 0
+  ---
+  duration_ms: 0.038208
+  ...
+# Subtest: computeFinancialRows: manual entries alone render without a connector
+ok 93 - computeFinancialRows: manual entries alone render without a connector
+  ---
+  duration_ms: 0.042958
+  ...
+# Subtest: computeFinancialRows: negative profit when spend exceeds revenue
+ok 94 - computeFinancialRows: negative profit when spend exceeds revenue
+  ---
+  duration_ms: 0.02975
+  ...
+# Subtest: mediaLabel prefers the title, falls back to filename then Untitled
+ok 95 - mediaLabel prefers the title, falls back to filename then Untitled
+  ---
+  duration_ms: 0.571708
+  ...
+# Subtest: mediaThumbPath signs the thumbnail only, never the original
+ok 96 - mediaThumbPath signs the thumbnail only, never the original
+  ---
+  duration_ms: 0.125708
+  ...
+# Subtest: formatBytes scales and never prints a negative or NaN
+ok 97 - formatBytes scales and never prints a negative or NaN
+  ---
+  duration_ms: 0.102583
+  ...
+# Subtest: parseTags normalises case, spacing and duplicates
+ok 98 - parseTags normalises case, spacing and duplicates
+  ---
+  duration_ms: 0.453042
+  ...
+# Subtest: parseTags rejects what the platform would reject
+ok 99 - parseTags rejects what the platform would reject
+  ---
+  duration_ms: 0.089459
+  ...
+# Subtest: parseTags caps at 50 tags and reports the overflow
+ok 100 - parseTags caps at 50 tags and reports the overflow
+  ---
+  duration_ms: 0.105458
+  ...
+# Subtest: collectTags counts and orders by usage then name
+ok 101 - collectTags counts and orders by usage then name
+  ---
+  duration_ms: 15.302709
+  ...
+# Subtest: search covers title, filename and tags, case-insensitively
+ok 102 - search covers title, filename and tags, case-insensitively
+  ---
+  duration_ms: 0.131583
+  ...
+# Subtest: filterMedia applies search and tag together
+ok 103 - filterMedia applies search and tag together
+  ---
+  duration_ms: 0.72
+  ...
+# Subtest: validateSetName trims and bounds
+ok 104 - validateSetName trims and bounds
+  ---
+  duration_ms: 1.500041
+  ...
+# Subtest: parseIds keeps only well-formed unique uuids and caps at the RPC limit
+ok 105 - parseIds keeps only well-formed unique uuids and caps at the RPC limit
+  ---
+  duration_ms: 1.934125
+  ...
+# Subtest: egressLine renders the label and gates downloads
+ok 106 - egressLine renders the label and gates downloads
+  ---
+  duration_ms: 0.112833
+  ...
+# Subtest: fileExtension mirrors the platform's path check
+ok 107 - fileExtension mirrors the platform's path check
+  ---
+  duration_ms: 0.103875
+  ...
+# Subtest: storagePath matches <client>/orig/<uuid>.<ext>
+ok 108 - storagePath matches <client>/orig/<uuid>.<ext>
+  ---
+  duration_ms: 3.427667
+  ...
+# Subtest: groupSetItems buckets by set, newest addition first
+ok 109 - groupSetItems buckets by set, newest addition first
+  ---
+  duration_ms: 0.122125
+  ...
+# Subtest: setCoverPath uses the view's cover, else the newest member with a thumb
+ok 110 - setCoverPath uses the view's cover, else the newest member with a thumb
+  ---
+  duration_ms: 0.133959
+  ...
+# Subtest: fileCountLabel singularises
+ok 111 - fileCountLabel singularises
+  ---
+  duration_ms: 5.455709
+  ...
+# Subtest: firstParam survives a repeated search parameter
+ok 112 - firstParam survives a repeated search parameter
+  ---
+  duration_ms: 0.477
+  ...
+# Subtest: lookupMessage never reaches Object.prototype
+ok 113 - lookupMessage never reaches Object.prototype
+  ---
+  duration_ms: 0.184083
+  ...
+# Subtest: uploadStatus names the failure on a partial batch
+ok 114 - uploadStatus names the failure on a partial batch
+  ---
+  duration_ms: 0.184417
+  ...
+# Subtest: todayInTimezone: formats as YYYY-MM-DD for a fixed instant
+ok 115 - todayInTimezone: formats as YYYY-MM-DD for a fixed instant
+  ---
+  duration_ms: 226.818125
+  ...
+# Subtest: parseRange: valid range with span <= 366 passes through, prev period matches length
+ok 116 - parseRange: valid range with span <= 366 passes through, prev period matches length
+  ---
+  duration_ms: 3.805709
+  ...
+# Subtest: parseRange: invalid YMD falls back to last 7 days ending today
+ok 117 - parseRange: invalid YMD falls back to last 7 days ending today
+  ---
+  duration_ms: 0.100042
+  ...
+# Subtest: parseRange: reversed range (from > to) falls back to default
+ok 118 - parseRange: reversed range (from > to) falls back to default
+  ---
+  duration_ms: 0.087
+  ...
+# Subtest: parseRange: span over 366 days falls back to default
+ok 119 - parseRange: span over 366 days falls back to default
+  ---
+  duration_ms: 0.062042
+  ...
+# Subtest: parseRange: missing params falls back to default
+ok 120 - parseRange: missing params falls back to default
+  ---
+  duration_ms: 0.049417
+  ...
+# Subtest: pctDeltaOrNull: null when previous is 0 or absent
+ok 121 - pctDeltaOrNull: null when previous is 0 or absent
+  ---
+  duration_ms: 0.061959
+  ...
+# Subtest: splitPeriods: buckets rows by day into current vs previous windows
+ok 122 - splitPeriods: buckets rows by day into current vs previous windows
+  ---
+  duration_ms: 0.070291
+  ...
+# Subtest: computeOverviewMetrics: AOV/ROAS/conversion are null with zero denominators
+ok 123 - computeOverviewMetrics: AOV/ROAS/conversion are null with zero denominators
+  ---
+  duration_ms: 0.332542
+  ...
+# Subtest: computeOverviewMetrics: inventory uses the latest day in range, not a sum
+ok 124 - computeOverviewMetrics: inventory uses the latest day in range, not a sum
+  ---
+  duration_ms: 0.83825
+  ...
+# Subtest: computeOverviewMetrics: no rows -> null values, hasData false
+ok 125 - computeOverviewMetrics: no rows -> null values, hasData false
+  ---
+  duration_ms: 0.0615
+  ...
+# Subtest: computeOverviewMetrics: revenue/orders delta vs previous period
+ok 126 - computeOverviewMetrics: revenue/orders delta vs previous period
+  ---
+  duration_ms: 0.057042
+  ...
+# Subtest: formatMoney: USD uses 2 fraction digits (cents)
+ok 127 - formatMoney: USD uses 2 fraction digits (cents)
+  ---
+  duration_ms: 3.206333
+  ...
+# Subtest: formatMoney: JPY has 0 fraction digits — minor units ARE full units
+ok 128 - formatMoney: JPY has 0 fraction digits — minor units ARE full units
+  ---
+  duration_ms: 0.091083
+  ...
+# Subtest: formatMoney: null -> em dash
+ok 129 - formatMoney: null -> em dash
+  ---
+  duration_ms: 0.032709
+  ...
+# Subtest: aggregateCampaigns: sums spend/purchase value per campaign, sorts top 5 by spend
+ok 130 - aggregateCampaigns: sums spend/purchase value per campaign, sorts top 5 by spend
+  ---
+  duration_ms: 0.136708
+  ...
+# Subtest: aggregateCampaigns: zero spend -> roas null, not Infinity/NaN
+ok 131 - aggregateCampaigns: zero spend -> roas null, not Infinity/NaN
+  ---
+  duration_ms: 0.041208
+  ...
+# Subtest: bestCreative: picks highest ROAS among ads with spend > 0
+ok 132 - bestCreative: picks highest ROAS among ads with spend > 0
+  ---
+  duration_ms: 0.091292
+  ...
+# Subtest: bestCreative: no ads with spend > 0 -> null
+ok 133 - bestCreative: no ads with spend > 0 -> null
+  ---
+  duration_ms: 0.035292
+  ...
+# Subtest: isSafeHttpsUrl: accepts https, rejects javascript/http/relative/garbage
+ok 134 - isSafeHttpsUrl: accepts https, rejects javascript/http/relative/garbage
+  ---
+  duration_ms: 0.089958
+  ...
+# Subtest: formatRelativeTime: recent past renders as '... ago'
+ok 135 - formatRelativeTime: recent past renders as '... ago'
+  ---
+  duration_ms: 7.266
+  ...
+# Subtest: parseRange: rolled-over calendar date (2024-02-30) falls back to default
+ok 136 - parseRange: rolled-over calendar date (2024-02-30) falls back to default
+  ---
+  duration_ms: 0.181709
+  ...
+# Subtest: formatMoney: malformed currency code returns — instead of throwing
+ok 137 - formatMoney: malformed currency code returns — instead of throwing
+  ---
+  duration_ms: 0.166708
+  ...
+# Subtest: formatRelativeTime: unparsable timestamp returns — instead of throwing
+ok 138 - formatRelativeTime: unparsable timestamp returns — instead of throwing
+  ---
+  duration_ms: 0.087
+  ...
+# Subtest: formatRangeLabel: collapses a shared month, keeps both months, keeps both years
+ok 139 - formatRangeLabel: collapses a shared month, keeps both months, keeps both years
+  ---
+  duration_ms: 0.220375
+  ...
+# Subtest: formatDayLabel: accepts a plain day or an ISO timestamp, em dash on junk
+ok 140 - formatDayLabel: accepts a plain day or an ISO timestamp, em dash on junk
+  ---
+  duration_ms: 0.133542
+  ...
+# Subtest: rangePresets: 7d/30d are inclusive of today, month starts on the 1st
+ok 141 - rangePresets: 7d/30d are inclusive of today, month starts on the 1st
+  ---
+  duration_ms: 0.843958
+  ...
+# Subtest: rangePresets: the 7d preset matches what parseRange defaults to
+ok 142 - rangePresets: the 7d preset matches what parseRange defaults to
+  ---
+  duration_ms: 0.224833
+  ...
+# Subtest: rangeQuery: the querystring every header link carries
+ok 143 - rangeQuery: the querystring every header link carries
+  ---
+  duration_ms: 0.083166
+  ...
+# Subtest: formatters: whole money, counts, compact, roas
+ok 144 - formatters: whole money, counts, compact, roas
+  ---
+  duration_ms: 1.845
+  ...
+# Subtest: formatDeltaArrow / deltaTone: arrows and colours track the sign
+ok 145 - formatDeltaArrow / deltaTone: arrows and colours track the sign
+  ---
+  duration_ms: 0.129583
+  ...
+# Subtest: computeMetaMetrics: rates come from period totals, not per-day averages
+ok 146 - computeMetaMetrics: rates come from period totals, not per-day averages
+  ---
+  duration_ms: 0.156334
+  ...
+# Subtest: computeMetaMetrics: no rows reads as no data, not as zeros
+ok 147 - computeMetaMetrics: no rows reads as no data, not as zeros
+  ---
+  duration_ms: 0.053042
+  ...
+# Subtest: healthFor: finds a row, null for an absent source
+ok 148 - healthFor: finds a row, null for an absent source
+  ---
+  duration_ms: 0.443917
+  ...
+# Subtest: isConnected: needs every source present, false on an empty source list
+ok 149 - isConnected: needs every source present, false on an empty source list
+  ---
+  duration_ms: 0.111625
+  ...
+# Subtest: panelState: the three DESIGN.md states
+ok 150 - panelState: the three DESIGN.md states
+  ---
+  duration_ms: 0.054083
+  ...
+# Subtest: integrationRow: not connected when no row exists
+ok 151 - integrationRow: not connected when no row exists
+  ---
+  duration_ms: 0.05825
+  ...
+# Subtest: integrationRow: maps status to label and tone, carries the error
+ok 152 - integrationRow: maps status to label and tone, carries the error
+  ---
+  duration_ms: 0.317625
+  ...
+# Subtest: integrationRow: an unknown status falls through as its own label
+ok 153 - integrationRow: an unknown status falls through as its own label
+  ---
+  duration_ms: 0.047042
+  ...
+# Subtest: integrationRows: one row per expected source, in order, on empty health
+ok 154 - integrationRows: one row per expected source, in order, on empty health
+  ---
+  duration_ms: 0.09475
+  ...
+# Subtest: taskBadge: done wins, in-progress is detected, blank falls back to To Do
+ok 155 - taskBadge: done wins, in-progress is detected, blank falls back to To Do
+  ---
+  duration_ms: 0.197917
+  ...
+# Subtest: sortPriorityTasks: open before done, then soonest due, undated last
+ok 156 - sortPriorityTasks: open before done, then soonest due, undated last
+  ---
+  duration_ms: 7.797916
+  ...
+# Subtest: sortPriorityTasks: default cap is 5, from a server-shaped batch of 50
+ok 157 - sortPriorityTasks: default cap is 5, from a server-shaped batch of 50
+  ---
+  duration_ms: 0.797291
+  ...
+# Subtest: noteExcerpt: collapses whitespace, cuts on a word boundary
+ok 158 - noteExcerpt: collapses whitespace, cuts on a word boundary
+  ---
+  duration_ms: 0.2745
+  ...
+# Subtest: sortRecentNotes: newest first, undated last, limited
+ok 159 - sortRecentNotes: newest first, undated last, limited
+  ---
+  duration_ms: 0.110792
+  ...
+# Subtest: sortRecentNotes: default cap is 3, from a server-shaped batch of 50
+ok 160 - sortRecentNotes: default cap is 3, from a server-shaped batch of 50
+  ---
+  duration_ms: 0.08425
+  ...
+# Subtest: month boundary at UTC+14 (Kiritimati): a run 1 minute before local midnight is last month
+ok 161 - month boundary at UTC+14 (Kiritimati): a run 1 minute before local midnight is last month
+  ---
+  duration_ms: 6.206791
+  ...
+# Subtest: month boundary at UTC-12 (Etc/GMT+12): same UTC date, previous local month excluded
+ok 162 - month boundary at UTC-12 (Etc/GMT+12): same UTC date, previous local month excluded
+  ---
+  duration_ms: 0.287667
+  ...
+# Subtest: full flow at UTC+14: a run local-dated last month doesn't count against the cap
+ok 163 - full flow at UTC+14: a run local-dated last month doesn't count against the cap
+  ---
+  duration_ms: 1.8995
+  ...
+# Subtest: a future occurred_at (clock skew) still reads as within the rate-limit window
+ok 164 - a future occurred_at (clock skew) still reads as within the rate-limit window
+  ---
+  duration_ms: 0.071167
+  ...
+# Subtest: a future occurred_at in the current local month still counts toward spend
+ok 165 - a future occurred_at in the current local month still counts toward spend
+  ---
+  duration_ms: 1.161042
+  ...
+# Subtest: runUsd holds a large recorded cost without precision loss
+ok 166 - runUsd holds a large recorded cost without precision loss
+  ---
+  duration_ms: 0.067083
+  ...
+# Subtest: tokensToUsd doesn't overflow or go non-finite on very large token counts
+ok 167 - tokensToUsd doesn't overflow or go non-finite on very large token counts
+  ---
+  duration_ms: 0.133041
+  ...
+# Subtest: capReached with a spend total built from float-drift-prone runs still compares correctly
+ok 168 - capReached with a spend total built from float-drift-prone runs still compares correctly
+  ---
+  duration_ms: 0.066417
+  ...
+# Subtest: buildPayload at UTC+14: a job updated 1 minute before local midnight is excluded, at local midnight is included
+ok 169 - buildPayload at UTC+14: a job updated 1 minute before local midnight is excluded, at local midnight is included
+  ---
+  duration_ms: 0.648667
+  ...
+# Subtest: buildPayload drops campaign rows for a neighboring day even if present in the fetched rows
+ok 170 - buildPayload drops campaign rows for a neighboring day even if present in the fetched rows
+  ---
+  duration_ms: 0.376042
+  ...
+# Subtest: capReached and isRateLimited use strict boundary semantics (>= and <, not > and <=)
+ok 171 - capReached and isRateLimited use strict boundary semantics (>= and <, not > and <=)
+  ---
+  duration_ms: 0.052833
+  ...
+# Subtest: an invalid IANA timezone is rejected so the shell falls back to the default
+ok 172 - an invalid IANA timezone is rejected so the shell falls back to the default
+  ---
+  duration_ms: 6.45875
+  ...
+# Subtest: yesterday is correct at the +14 and -11 extremes of the IANA offset range
+ok 173 - yesterday is correct at the +14 and -11 extremes of the IANA offset range
+  ---
+  duration_ms: 0.874083
+  ...
+# Subtest: yesterday is correct across a DST fall-back transition
+ok 174 - yesterday is correct across a DST fall-back transition
+  ---
+  duration_ms: 0.157542
+  ...
+# Subtest: non-USD currency (0-decimal JPY) formats correctly through the daily lines
+ok 175 - non-USD currency (0-decimal JPY) formats correctly through the daily lines
+  ---
+  duration_ms: 1.161916
+  ...
+# Subtest: a malformed currency code from a row degrades every money line to '—' instead of throwing
+ok 176 - a malformed currency code from a row degrades every money line to '—' instead of throwing
+  ---
+  duration_ms: 0.328083
+  ...
+# Subtest: null/NaN/string numeric fields are treated as 0, not NaN or a thrown error
+ok 177 - null/NaN/string numeric fields are treated as 0, not NaN or a thrown error
+  ---
+  duration_ms: 0.081375
+  ...
+# Subtest: a financial entry with a non-finite amount_cents is dropped, not summed as NaN
+ok 178 - a financial entry with a non-finite amount_cents is dropped, not summed as NaN
+  ---
+  duration_ms: 0.242667
+  ...
+# Subtest: entries dated other days returned by a wider query never leak into the day's totals
+ok 179 - entries dated other days returned by a wider query never leak into the day's totals
+  ---
+  duration_ms: 0.071708
+  ...
+# Subtest: all three source reads failing yields 'No data yet' and all three named, not a throw
+ok 180 - all three source reads failing yields 'No data yet' and all three named, not a throw
+  ---
+  duration_ms: 0.676875
+  ...
+# Subtest: a rejected promise (thrown network error), not just an {error} result, still counts as no rows
+ok 181 - a rejected promise (thrown network error), not just an {error} result, still counts as no rows
+  ---
+  duration_ms: 8.136875
+  ...
+# Subtest: parseAmountToCents: rejects unicode digits, -0, and embedded whitespace
+ok 182 - parseAmountToCents: rejects unicode digits, -0, and embedded whitespace
+  ---
+  duration_ms: 2.048
+  ...
+# Subtest: parseAmountToCents: leading/trailing whitespace around an otherwise-valid amount is trimmed
+ok 183 - parseAmountToCents: leading/trailing whitespace around an otherwise-valid amount is trimmed
+  ---
+  duration_ms: 0.310333
+  ...
+# Subtest: parseAmountToCents: no float drift summing classic 0.1+0.2 style inputs
+ok 184 - parseAmountToCents: no float drift summing classic 0.1+0.2 style inputs
+  ---
+  duration_ms: 0.105375
+  ...
+# Subtest: computeDailyRows: income and expense entries on the same day both land in that day's row
+ok 185 - computeDailyRows: income and expense entries on the same day both land in that day's row
+  ---
+  duration_ms: 1.247667
+  ...
+# Subtest: computeDailyRows: an entry exactly on the range boundary is included, one day past it is excluded
+ok 186 - computeDailyRows: an entry exactly on the range boundary is included, one day past it is excluded
+  ---
+  duration_ms: 0.884333
+  ...
+# Subtest: computeFinancialTiles: previous period entirely empty yields no deltas
+ok 187 - computeFinancialTiles: previous period entirely empty yields no deltas
+  ---
+  duration_ms: 0.45925
+  ...
+# Subtest: computeFinancialTiles: previous revenue of exactly zero yields no delta (would be a division by zero)
+ok 188 - computeFinancialTiles: previous revenue of exactly zero yields no delta (would be a division by zero)
+  ---
+  duration_ms: 1.105417
+  ...
+# Subtest: financialRecordsQuery: filters by kind + source, range, newest-first order, and the row cap
+ok 189 - financialRecordsQuery: filters by kind + source, range, newest-first order, and the row cap
+  ---
+  duration_ms: 0.68425
+  ...
+# Subtest: deleteFinancialEntry re-reads records_v1 filtered by kind + source before delete_record (ownership gate)
+ok 190 - deleteFinancialEntry re-reads records_v1 filtered by kind + source before delete_record (ownership gate)
+  ---
+  duration_ms: 3.960083
+  ...
+# Subtest: env: getConfig returns safe defaults when no keys are set (no throw)
+ok 191 - env: getConfig returns safe defaults when no keys are set (no throw)
+  ---
+  duration_ms: 1.080084
+  ...
+# Subtest: env: empty/whitespace values are treated as unset
+ok 192 - env: empty/whitespace values are treated as unset
+  ---
+  duration_ms: 0.173125
+  ...
+# Subtest: AI control case: flag ON + key present invokes the injected factory once
+ok 193 - AI control case: flag ON + key present invokes the injected factory once
+  ---
+  duration_ms: 0.393292
+  ...
+# Subtest: parseTags: valid tags normalise to lower-case, trimmed, deduped
+ok 194 - parseTags: valid tags normalise to lower-case, trimmed, deduped
+  ---
+  duration_ms: 0.825333
+  ...
+# Subtest: parseTags: empty and whitespace-only entries are silently dropped, not counted invalid
+ok 195 - parseTags: empty and whitespace-only entries are silently dropped, not counted invalid
+  ---
+  duration_ms: 0.115541
+  ...
+# Subtest: parseTags: duplicate tags (case/space-insensitive) collapse to one
+ok 196 - parseTags: duplicate tags (case/space-insensitive) collapse to one
+  ---
+  duration_ms: 0.107
+  ...
+# Subtest: parseTags: a tag over 40 chars is rejected as invalid, not silently truncated
+ok 197 - parseTags: a tag over 40 chars is rejected as invalid, not silently truncated
+  ---
+  duration_ms: 0.063166
+  ...
+# Subtest: parseTags: illegal characters (emoji, punctuation outside _- ) are rejected
+ok 198 - parseTags: illegal characters (emoji, punctuation outside _- ) are rejected
+  ---
+  duration_ms: 0.193875
+  ...
+# Subtest: parseTags: over MAX_TAGS unique tags truncates the list and flags the overflow
+ok 199 - parseTags: over MAX_TAGS unique tags truncates the list and flags the overflow
+  ---
+  duration_ms: 0.109833
+  ...
+# Subtest: parseTags: null/undefined input is empty, not a throw
+ok 200 - parseTags: null/undefined input is empty, not a throw
+  ---
+  duration_ms: 0.13225
+  ...
+# Subtest: matchesQuery: matches title, filename, or any tag, case-insensitively
+ok 201 - matchesQuery: matches title, filename, or any tag, case-insensitively
+  ---
+  duration_ms: 0.060875
+  ...
+# Subtest: matchesQuery: empty/whitespace query matches everything
+ok 202 - matchesQuery: empty/whitespace query matches everything
+  ---
+  duration_ms: 0.143334
+  ...
+# Subtest: filterMedia: search and tag filter combine with AND, not OR
+ok 203 - filterMedia: search and tag filter combine with AND, not OR
+  ---
+  duration_ms: 0.298583
+  ...
+# Subtest: filterMedia: no-match query returns an empty array (drives the no-match copy)
+ok 204 - filterMedia: no-match query returns an empty array (drives the no-match copy)
+  ---
+  duration_ms: 0.066708
+  ...
+# Subtest: filterMedia: with neither q nor tag, every row passes through
+ok 205 - filterMedia: with neither q nor tag, every row passes through
+  ---
+  duration_ms: 0.036375
+  ...
+# Subtest: formatBytes: adversarial inputs never print negative or NaN
+ok 206 - formatBytes: adversarial inputs never print negative or NaN
+  ---
+  duration_ms: 0.053291
+  ...
+# Subtest: formatBytes: unit boundaries
+ok 207 - formatBytes: unit boundaries
+  ---
+  duration_ms: 0.038916
+  ...
+# Subtest: parseIds: rejects non-UUID strings outright
+ok 208 - parseIds: rejects non-UUID strings outright
+  ---
+  duration_ms: 0.105292
+  ...
+# Subtest: parseIds: deduplicates repeated ids
+ok 209 - parseIds: deduplicates repeated ids
+  ---
+  duration_ms: 0.034458
+  ...
+# Subtest: parseIds: caps at MAX_BULK_IDS (501 ids -> 500 kept)
+ok 210 - parseIds: caps at MAX_BULK_IDS (501 ids -> 500 kept)
+  ---
+  duration_ms: 2.962625
+  ...
+# Subtest: parseIdList: parses the ?dl= comma-separated tray, dropping malformed entries
+ok 211 - parseIdList: parses the ?dl= comma-separated tray, dropping malformed entries
+  ---
+  duration_ms: 0.057417
+  ...
+# Subtest: egressLine: exceeded flag disables downloads regardless of numbers
+ok 212 - egressLine: exceeded flag disables downloads regardless of numbers
+  ---
+  duration_ms: 0.052125
+  ...
+# Subtest: egressLine: used >= quota also counts as exceeded even if the flag is false/missing
+ok 213 - egressLine: used >= quota also counts as exceeded even if the flag is false/missing
+  ---
+  duration_ms: 2.392083
+  ...
+# Subtest: egressLine: unreadable row (null) fails open -- no label, not exceeded
+ok 214 - egressLine: unreadable row (null) fails open -- no label, not exceeded
+  ---
+  duration_ms: 0.142292
+  ...
+# Subtest: egressLine: label renders as byte sizes ('X of Y'), matching the platform's byte-metered egress
+ok 215 - egressLine: label renders as byte sizes ('X of Y'), matching the platform's byte-metered egress
+  ---
+  duration_ms: 0.111584
+  ...
+# Subtest: storagePath: matches <client_id>/orig/<uuid>.<ext> exactly
+ok 216 - storagePath: matches <client_id>/orig/<uuid>.<ext> exactly
+  ---
+  duration_ms: 0.292208
+  ...
+# Subtest: storagePath: falls back to mime subtype, then 'bin', when the filename has no usable extension
+ok 217 - storagePath: falls back to mime subtype, then 'bin', when the filename has no usable extension
+  ---
+  duration_ms: 0.132459
+  ...
+# Subtest: groupSetItems: groups by set_id, newest added_at first, drops rows missing ids
+ok 218 - groupSetItems: groups by set_id, newest added_at first, drops rows missing ids
+  ---
+  duration_ms: 7.846792
+  ...
+# Subtest: setCoverPath: prefers the view's own cover_thumb_path
+ok 219 - setCoverPath: prefers the view's own cover_thumb_path
+  ---
+  duration_ms: 0.080209
+  ...
+# Subtest: setCoverPath: falls back to the newest member with a thumbnail, else null
+ok 220 - setCoverPath: falls back to the newest member with a thumbnail, else null
+  ---
+  duration_ms: 0.04925
+  ...
+# Subtest: fileCountLabel: singular/plural
+ok 221 - fileCountLabel: singular/plural
+  ---
+  duration_ms: 0.041583
+  ...
+# Subtest: page copy: /library empty state matches DESIGN.md exactly
+ok 222 - page copy: /library empty state matches DESIGN.md exactly
+  ---
+  duration_ms: 5.036833
+  ...
+# Subtest: page copy: home Content Library panel uses the same empty-state copy
+ok 223 - page copy: home Content Library panel uses the same empty-state copy
+  ---
+  duration_ms: 0.141666
+  ...
+# Subtest: page copy: /library no-match state has its own distinct copy
+ok 224 - page copy: /library no-match state has its own distinct copy
+  ---
+  duration_ms: 0.095584
+  ...
+# Subtest: taskBadge: mixed-case 'In PROGRESS' is still detected as progress
+ok 225 - taskBadge: mixed-case 'In PROGRESS' is still detected as progress
+  ---
+  duration_ms: 0.74875
+  ...
+# Subtest: taskBadge: all-done batch every row tones 'done'
+ok 226 - taskBadge: all-done batch every row tones 'done'
+  ---
+  duration_ms: 0.122625
+  ...
+# Subtest: sortPriorityTasks: duplicate due_on breaks the tie by title, stable and deterministic
+ok 227 - sortPriorityTasks: duplicate due_on breaks the tie by title, stable and deterministic
+  ---
+  duration_ms: 7.186708
+  ...
+# Subtest: sortPriorityTasks: >5 tasks caps at 5 and keeps priority order
+ok 228 - sortPriorityTasks: >5 tasks caps at 5 and keeps priority order
+  ---
+  duration_ms: 0.1625
+  ...
+# Subtest: noteExcerpt: multi-line body with leading/trailing whitespace collapses to one line, trimmed
+ok 229 - noteExcerpt: multi-line body with leading/trailing whitespace collapses to one line, trimmed
+  ---
+  duration_ms: 0.107916
+  ...
+# Subtest: sortRecentNotes: occurred_at ties keep both, stable relative order; >3 notes caps at 3
+ok 230 - sortRecentNotes: occurred_at ties keep both, stable relative order; >3 notes caps at 3
+  ---
+  duration_ms: 0.11525
+  ...
+# Subtest: panelState: rows present but no health row still reads not_connected (connection = health presence, not data presence)
+ok 231 - panelState: rows present but no health row still reads not_connected (connection = health presence, not data presence)
+  ---
+  duration_ms: 0.151708
+  ...
+# Subtest: panelState: health row present but zero rows reads empty, not not_connected
+ok 232 - panelState: health row present but zero rows reads empty, not not_connected
+  ---
+  duration_ms: 0.047208
+  ...
+# Subtest: app/page.tsx: jobs_v1/messages_v1 reads sit inside the Promise.allSettled and degrade via unwrap, never throw into the page
+ok 233 - app/page.tsx: jobs_v1/messages_v1 reads sit inside the Promise.allSettled and degrade via unwrap, never throw into the page
+  ---
+  duration_ms: 4.291917
+  ...
+# Subtest: app/page.tsx: mondayState/meetState derive from health-row presence (isConnected), not row presence, matching lib/panels.ts panelState contract
+ok 234 - app/page.tsx: mondayState/meetState derive from health-row presence (isConnected), not row presence, matching lib/panels.ts panelState contract
+  ---
+  duration_ms: 0.358125
+  ...
+# Subtest: app/layout.tsx has no sidebar/nav and no Ask/agent strip
+ok 235 - app/layout.tsx has no sidebar/nav and no Ask/agent strip
+  ---
+  duration_ms: 2.197041
+  ...
+# Subtest: app/integrations/page.tsx is gone (route deleted, popup replaces it)
+ok 236 - app/integrations/page.tsx is gone (route deleted, popup replaces it)
+  ---
+  duration_ms: 0.403875
+  ...
+# Subtest: parsePopup: only 'integrations' and 'settings' open a popup on arrival
+ok 237 - parsePopup: only 'integrations' and 'settings' open a popup on arrival
+  ---
+  duration_ms: 0.133041
+  ...
+# Subtest: SERVICE_LINKS: every outbound target is a real https URL, not a placeholder
+ok 238 - SERVICE_LINKS: every outbound target is a real https URL, not a placeholder
+  ---
+  duration_ms: 0.273208
+  ...
+# Subtest: EXTERNAL_LINK_PROPS: carries target=_blank and rel=noopener noreferrer
+ok 239 - EXTERNAL_LINK_PROPS: carries target=_blank and rel=noopener noreferrer
+  ---
+  duration_ms: 0.124917
+  ...
+# Subtest: rls: anon key cannot read arbitrary tables without a policy
+ok 240 - rls: anon key cannot read arbitrary tables without a policy # SKIP Supabase env not configured — live RLS probe skipped
+  ---
+  duration_ms: 0.351958
+  ...
+# [health] shared platform probe failed: boom
+# Subtest: config: dataSource defaults to own, 'shared' (any case) opts in
+ok 241 - config: dataSource defaults to own, 'shared' (any case) opts in
+  ---
+  duration_ms: 0.518042
+  ...
+# Subtest: build gate: shared mode + service key fails
+ok 242 - build gate: shared mode + service key fails
+  ---
+  duration_ms: 199.979583
+  ...
+# Subtest: build gate: service key in .env.local is caught too
+ok 243 - build gate: service key in .env.local is caught too
+  ---
+  duration_ms: 1075.201959
+  ...
+# Subtest: build gate: shared without key, and own mode with key, both pass
+ok 244 - build gate: shared without key, and own mode with key, both pass
+  ---
+  duration_ms: 664.804375
+  ...
+# Subtest: health: keyless shared run is ok/unconfigured and never probes
+ok 245 - health: keyless shared run is ok/unconfigured and never probes
+  ---
+  duration_ms: 0.718084
+  ...
+# Subtest: health: platform configured but no probe login is a failure
+ok 246 - health: platform configured but no probe login is a failure
+  ---
+  duration_ms: 0.08
+  ...
+# Subtest: health: service key present fails even if the probe would pass
+ok 247 - health: service key present fails even if the probe would pass
+  ---
+  duration_ms: 0.120625
+  ...
+# Subtest: health: probe passes -> connected; probe throws -> probe_failed
+ok 248 - health: probe passes -> connected; probe throws -> probe_failed
+  ---
+  duration_ms: 0.778958
+  ...
+1..248
+# tests 248
+# suites 0
+# pass 247
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 4109.344709
+
+===================================================================
+# $ corepack pnpm test   (no env vars set at all — workflow's
+#   shared-mode step sets none itself; DATA_SOURCE is a GH Actions
+#   'vars.' condition, not exported into the step's env)
+===================================================================
+# $ corepack pnpm test  (no env set)
+[43m[33m[[39m[49m[43m[30mWARN[39m[49m[43m[33m][39m[49m Ignored project-level auth setting "//npm.pkg.github.com/:_authToken" in "/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-client-sb/.npmrc": environment variables are not expanded in registry credentials that come from a project .npmrc, because that file is committed to the repository and could leak the secret to an attacker-controlled registry. Move this credential to a trusted source that pnpm still expands — put the line in your user-level ~/.npmrc, or set it with pnpm config set (for example, run: pnpm config set "//npm.pkg.github.com/:_authToken" <value>). See https://pnpm.io/npmrc
+[2m$ tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs tests/overview.test.mjs tests/panels.test.mjs tests/financials.test.mjs tests/qa-shell-home.test.mjs tests/library.test.mjs tests/qa-library.test.mjs tests/qa-financials.test.mjs tests/qa-monday-meet.test.mjs tests/daily-report.test.mjs tests/qa-daily-report.test.mjs tests/briefing.test.mjs tests/qa-briefing.test.mjs[22m
+TAP version 13
+# Subtest: agent: calls read_view once via runTool and returns the final text
+ok 1 - agent: calls read_view once via runTool and returns the final text
+  ---
+  duration_ms: 1.865417
+  ...
+# Subtest: agent: a tool error becomes an is_error tool_result, loop continues
+ok 2 - agent: a tool error becomes an is_error tool_result, loop continues
+  ---
+  duration_ms: 0.383791
+  ...
+# Subtest: agent: running out of maxTurns throws instead of returning empty text
+ok 3 - agent: running out of maxTurns throws instead of returning empty text
+  ---
+  duration_ms: 0.851541
+  ...
+# Subtest: flag OFF: createAnthropicClient is never called
+ok 4 - flag OFF: createAnthropicClient is never called
+  ---
+  duration_ms: 0.463041
+  ...
+# Subtest: flag OFF with key present: still no invocation
+ok 5 - flag OFF with key present: still no invocation
+  ---
+  duration_ms: 0.079875
+  ...
+# Subtest: flag ON but no key: factory not called, returns null
+ok 6 - flag ON but no key: factory not called, returns null
+  ---
+  duration_ms: 0.056
+  ...
+# Subtest: flag ON with key: factory IS called once (control case)
+ok 7 - flag ON with key: factory IS called once (control case)
+  ---
+  duration_ms: 0.435625
+  ...
+# Subtest: isAiEnabled reflects the flag
+ok 8 - isAiEnabled reflects the flag
+  ---
+  duration_ms: 0.06125
+  ...
+# briefing: briefing_run read failed { message: [32m'boom'[39m }
+# Subtest: AI off: no model call, nothing saved
+ok 9 - AI off: no model call, nothing saved
+  ---
+  duration_ms: 5.150334
+  ...
+# Subtest: key missing: no model call, nothing saved
+ok 10 - key missing: no model call, nothing saved
+  ---
+  duration_ms: 0.582667
+  ...
+# Subtest: cap unset: no model call even with AI on and a key
+ok 11 - cap unset: no model call even with AI on and a key
+  ---
+  duration_ms: 0.296666
+  ...
+# Subtest: the gates are checked in order: off, then key, then cap
+ok 12 - the gates are checked in order: off, then key, then cap
+  ---
+  duration_ms: 0.124083
+  ...
+# Subtest: cap reached: spend exactly at the cap stops the call
+ok 13 - cap reached: spend exactly at the cap stops the call
+  ---
+  duration_ms: 1.290334
+  ...
+# Subtest: cap not reached: spend just under the cap still calls
+ok 14 - cap not reached: spend just under the cap still calls
+  ---
+  duration_ms: 4.30375
+  ...
+# Subtest: capReached is spent >= cap
+ok 15 - capReached is spent >= cap
+  ---
+  duration_ms: 0.154041
+  ...
+# Subtest: last month's runs don't count toward this month's cap
+ok 16 - last month's runs don't count toward this month's cap
+  ---
+  duration_ms: 1.646125
+  ...
+# Subtest: the month is the client's local month
+ok 17 - the month is the client's local month
+  ---
+  duration_ms: 2.289084
+  ...
+# Subtest: a malformed run body counts as $0, not NaN
+ok 18 - a malformed run body counts as $0, not NaN
+  ---
+  duration_ms: 0.330375
+  ...
+# Subtest: spend unknown (run read fails): no model call
+ok 19 - spend unknown (run read fails): no model call
+  ---
+  duration_ms: 0.657
+  ...
+# Subtest: a full page of runs reads as spend unknown rather than an undercount
+ok 20 - a full page of runs reads as spend unknown rather than an undercount
+  ---
+  duration_ms: 0.379375
+  ...
+# Subtest: a model without a known price is refused
+ok 21 - a model without a known price is refused
+  ---
+  duration_ms: 0.179792
+  ...
+# Subtest: on demand: a run 10 minutes ago is rate limited
+ok 22 - on demand: a run 10 minutes ago is rate limited
+  ---
+  duration_ms: 0.2575
+  ...
+# Subtest: on demand: exactly 15 minutes later is allowed
+ok 23 - on demand: exactly 15 minutes later is allowed
+  ---
+  duration_ms: 0.619542
+  ...
+# Subtest: the cron run is not rate limited
+ok 24 - the cron run is not rate limited
+  ---
+  duration_ms: 0.527167
+  ...
+# Subtest: the rate limit reads the latest run, which the query orders first
+ok 25 - the rate limit reads the latest run, which the query orders first
+  ---
+  duration_ms: 0.941125
+  ...
+# Subtest: token → usd at Haiku 4.5 prices ($1 in / $5 out per MTok)
+ok 26 - token → usd at Haiku 4.5 prices ($1 in / $5 out per MTok)
+  ---
+  duration_ms: 0.140583
+  ...
+# Subtest: a call reserves the worst case, overwrites it with tokens + usd, then saves the briefing
+ok 27 - a call reserves the worst case, overwrites it with tokens + usd, then saves the briefing
+  ---
+  duration_ms: 1.57175
+  ...
+# Subtest: each call gets its own briefing_run id
+ok 28 - each call gets its own briefing_run id
+  ---
+  duration_ms: 1.601084
+  ...
+# Subtest: the cost is recorded even when the summary save fails
+ok 29 - the cost is recorded even when the summary save fails
+  ---
+  duration_ms: 0.708458
+  ...
+# Subtest: a failed model call keeps the worst-case reservation and saves no briefing
+ok 30 - a failed model call keeps the worst-case reservation and saves no briefing
+  ---
+  duration_ms: 0.443
+  ...
+# Subtest: an empty reply records the cost but saves no briefing
+ok 31 - an empty reply records the cost but saves no briefing
+  ---
+  duration_ms: 0.408833
+  ...
+# Subtest: missing usage keeps the worst case as the recorded cost
+ok 32 - missing usage keeps the worst case as the recorded cost
+  ---
+  duration_ms: 4.472958
+  ...
+# Subtest: the call runs with no SDK retries and a timeout
+ok 33 - the call runs with no SDK retries and a timeout
+  ---
+  duration_ms: 1.210583
+  ...
+# Subtest: no tenant (reservation save fails): the model is never called
+ok 34 - no tenant (reservation save fails): the model is never called
+  ---
+  duration_ms: 0.791458
+  ...
+# Subtest: a reservation the re-read can't see: no model call, released
+ok 35 - a reservation the re-read can't see: no model call, released
+  ---
+  duration_ms: 1.196625
+  ...
+# Subtest: the worst case must fit: $4.999 spent of $5 is cap reached, nothing saved
+ok 36 - the worst case must fit: $4.999 spent of $5 is cap reached, nothing saved
+  ---
+  duration_ms: 0.739541
+  ...
+# Subtest: concurrent on-demand: an earlier reservation in the window wins, this one is released
+ok 37 - concurrent on-demand: an earlier reservation in the window wins, this one is released
+  ---
+  duration_ms: 1.477875
+  ...
+# Subtest: concurrent on-demand: a reservation stamped later still blocks (save order, not stamp order, decides)
+ok 38 - concurrent on-demand: a reservation stamped later still blocks (save order, not stamp order, decides)
+  ---
+  duration_ms: 0.502709
+  ...
+# Subtest: concurrent cron: another reservation doesn't rate-limit the cron run
+ok 39 - concurrent cron: another reservation doesn't rate-limit the cron run
+  ---
+  duration_ms: 0.439708
+  ...
+# Subtest: the worst case counts one input token per character (bounds CJK/emoji)
+ok 40 - the worst case counts one input token per character (bounds CJK/emoji)
+  ---
+  duration_ms: 0.045791
+  ...
+# Subtest: concurrent reservations that together pass the cap: released, no call
+ok 41 - concurrent reservations that together pass the cap: released, no call
+  ---
+  duration_ms: 0.517375
+  ...
+# Subtest: released and far-future runs don't trip the rate limit
+ok 42 - released and far-future runs don't trip the rate limit
+  ---
+  duration_ms: 0.569875
+  ...
+# Subtest: empty data: one call, no tools, payload says '—' and empty lists
+ok 43 - empty data: one call, no tools, payload says '—' and empty lists
+  ---
+  duration_ms: 0.387166
+  ...
+# Subtest: payload carries yesterday's rows and no ids or PII
+ok 44 - payload carries yesterday's rows and no ids or PII
+  ---
+  duration_ms: 1.304458
+  ...
+# Subtest: the reads never select id, owner, participant, body, detail or url columns
+ok 45 - the reads never select id, owner, participant, body, detail or url columns
+  ---
+  duration_ms: 1.544041
+  ...
+# Subtest: yesterday's local day bounds the timestamped reads
+ok 46 - yesterday's local day bounds the timestamped reads
+  ---
+  duration_ms: 1.014708
+  ...
+# Subtest: the stored briefing renders from records, and a blank one reads as none
+ok 47 - the stored briefing renders from records, and a blank one reads as none
+  ---
+  duration_ms: 0.313
+  ...
+# Subtest: flash codes map to fixed copy; anything else renders nothing
+ok 48 - flash codes map to fixed copy; anything else renders nothing
+  ---
+  duration_ms: 0.126375
+  ...
+# Subtest: AI_MONTHLY_BUDGET_USD: a positive number, anything else is unset
+ok 49 - AI_MONTHLY_BUDGET_USD: a positive number, anything else is unset
+  ---
+  duration_ms: 0.587416
+  ...
+# Subtest: yesterday follows the client's timezone, not UTC
+ok 50 - yesterday follows the client's timezone, not UTC
+  ---
+  duration_ms: 9.868833
+  ...
+# Subtest: yesterday crosses month and leap-year boundaries
+ok 51 - yesterday crosses month and leap-year boundaries
+  ---
+  duration_ms: 1.588959
+  ...
+# Subtest: merges the day's revenue, orders, AOV, ad spend and manual entries
+ok 52 - merges the day's revenue, orders, AOV, ad spend and manual entries
+  ---
+  duration_ms: 2.349667
+  ...
+# Subtest: empty day is 'No data yet', never a fake $0
+ok 53 - empty day is 'No data yet', never a fake $0
+  ---
+  duration_ms: 0.353792
+  ...
+# Subtest: rows only for other days still count as no data
+ok 54 - rows only for other days still count as no data
+  ---
+  duration_ms: 0.186042
+  ...
+# Subtest: manual entries alone are data; missing sources stay null
+ok 55 - manual entries alone are data; missing sources stay null
+  ---
+  duration_ms: 0.214333
+  ...
+# Subtest: zero orders gives no AOV instead of dividing by zero
+ok 56 - zero orders gives no AOV instead of dividing by zero
+  ---
+  duration_ms: 0.494916
+  ...
+# Subtest: lines are the seven figures in tile order, '—' where absent
+ok 57 - lines are the seven figures in tile order, '—' where absent
+  ---
+  duration_ms: 2.859375
+  ...
+# Subtest: loadDailyReport reads exactly the one day from each source
+ok 58 - loadDailyReport reads exactly the one day from each source
+  ---
+  duration_ms: 1.366417
+  ...
+# Subtest: a failed read is named and treated as no rows, others still count
+ok 59 - a failed read is named and treated as no rows, others still count
+  ---
+  duration_ms: 0.402666
+  ...
+# Subtest: every source empty → No data yet with no errors
+ok 60 - every source empty → No data yet with no errors
+  ---
+  duration_ms: 0.163709
+  ...
+# Subtest: parseAmountToCents: accepts a positive amount with at most 2 decimals
+ok 61 - parseAmountToCents: accepts a positive amount with at most 2 decimals
+  ---
+  duration_ms: 1.473041
+  ...
+# Subtest: parseAmountToCents: rejects everything else
+ok 62 - parseAmountToCents: rejects everything else
+  ---
+  duration_ms: 0.24025
+  ...
+# Subtest: parseAmountToCents: no float drift on cent boundaries
+ok 63 - parseAmountToCents: no float drift on cent boundaries
+  ---
+  duration_ms: 0.094875
+  ...
+# Subtest: parseEntryInput: a valid entry becomes the exact save_record attributes
+ok 64 - parseEntryInput: a valid entry becomes the exact save_record attributes
+  ---
+  duration_ms: 1.932
+  ...
+# Subtest: parseEntryInput: an omitted note is null, not an empty string
+ok 65 - parseEntryInput: an omitted note is null, not an empty string
+  ---
+  duration_ms: 0.139208
+  ...
+# Subtest: parseEntryInput: rejects a bad date
+ok 66 - parseEntryInput: rejects a bad date
+  ---
+  duration_ms: 0.250166
+  ...
+# Subtest: parseEntryInput: rejects a type outside income|expense
+ok 67 - parseEntryInput: rejects a type outside income|expense
+  ---
+  duration_ms: 0.078417
+  ...
+# Subtest: parseEntryInput: rejects an empty or over-length category
+ok 68 - parseEntryInput: rejects an empty or over-length category
+  ---
+  duration_ms: 0.121
+  ...
+# Subtest: parseEntryInput: rejects a bad amount
+ok 69 - parseEntryInput: rejects a bad amount
+  ---
+  duration_ms: 0.40175
+  ...
+# Subtest: parseEntryInput: rejects a note over 500 characters
+ok 70 - parseEntryInput: rejects a note over 500 characters
+  ---
+  duration_ms: 0.72675
+  ...
+# Subtest: entryErrorMessage: known codes render, unknown text does not
+ok 71 - entryErrorMessage: known codes render, unknown text does not
+  ---
+  duration_ms: 0.310333
+  ...
+# Subtest: toFinancialEntry: reads a well-formed records_v1 row
+ok 72 - toFinancialEntry: reads a well-formed records_v1 row
+  ---
+  duration_ms: 0.229208
+  ...
+# Subtest: toFinancialEntry: drops rows that are not usable entries
+ok 73 - toFinancialEntry: drops rows that are not usable entries
+  ---
+  duration_ms: 0.138542
+  ...
+# Subtest: toFinancialEntry: falls back to the row title, but never to occurred_at
+ok 74 - toFinancialEntry: falls back to the row title, but never to occurred_at
+  ---
+  duration_ms: 0.109209
+  ...
+# Subtest: toFinancialEntry: rejects amounts the form could never have produced
+ok 75 - toFinancialEntry: rejects amounts the form could never have produced
+  ---
+  duration_ms: 0.162792
+  ...
+# Subtest: computeFinancialTiles: a loss that shrank is a rise, not a fall
+ok 76 - computeFinancialTiles: a loss that shrank is a rise, not a fall
+  ---
+  duration_ms: 0.426416
+  ...
+# Subtest: shapeEntries: keeps the range, newest first, stable on ties
+ok 77 - shapeEntries: keeps the range, newest first, stable on ties
+  ---
+  duration_ms: 1.614417
+  ...
+# Subtest: sumEntries: splits income from expenses
+ok 78 - sumEntries: splits income from expenses
+  ---
+  duration_ms: 0.199209
+  ...
+# Subtest: computeProfit: DESIGN.md identity revenue + income - spend - expenses
+ok 79 - computeProfit: DESIGN.md identity revenue + income - spend - expenses
+  ---
+  duration_ms: 0.167959
+  ...
+# Subtest: computeFinancialTotals: per-source nulls when a source has no rows
+ok 80 - computeFinancialTotals: per-source nulls when a source has no rows
+  ---
+  duration_ms: 0.159583
+  ...
+# Subtest: computeFinancialTotals: sums each source and derives AOV and profit
+ok 81 - computeFinancialTotals: sums each source and derives AOV and profit
+  ---
+  duration_ms: 0.17675
+  ...
+# Subtest: computeFinancialTotals: manual entries alone still yield a profit
+ok 82 - computeFinancialTotals: manual entries alone still yield a profit
+  ---
+  duration_ms: 0.106458
+  ...
+# Subtest: computeFinancialTiles: the seven DESIGN.md tiles, in order, with deltas
+ok 83 - computeFinancialTiles: the seven DESIGN.md tiles, in order, with deltas
+  ---
+  duration_ms: 0.244125
+  ...
+# Subtest: computeFinancialTiles: an untouched account has no values and no deltas
+ok 84 - computeFinancialTiles: an untouched account has no values and no deltas
+  ---
+  duration_ms: 0.115958
+  ...
+# Subtest: computeDailyRows: one row per day with something, newest first
+ok 85 - computeDailyRows: one row per day with something, newest first
+  ---
+  duration_ms: 0.347417
+  ...
+# Subtest: computeDailyRows: days outside the range are dropped and same-day rows merge
+ok 86 - computeDailyRows: days outside the range are dropped and same-day rows merge
+  ---
+  duration_ms: 0.153042
+  ...
+# Subtest: computeDailyRows: nothing anywhere means no rows at all
+ok 87 - computeDailyRows: nothing anywhere means no rows at all
+  ---
+  duration_ms: 0.091375
+  ...
+# Subtest: pickCurrency: first reported currency wins, else USD
+ok 88 - pickCurrency: first reported currency wins, else USD
+  ---
+  duration_ms: 0.146791
+  ...
+# Subtest: computeFinancialRows: four rows in DESIGN.md order with labels
+ok 89 - computeFinancialRows: four rows in DESIGN.md order with labels
+  ---
+  duration_ms: 0.220708
+  ...
+# Subtest: computeFinancialRows: Expenses is manual expenses alone, never ad spend
+ok 90 - computeFinancialRows: Expenses is manual expenses alone, never ad spend
+  ---
+  duration_ms: 0.300208
+  ...
+# Subtest: computeFinancialRows: deltas compare against the previous period
+ok 91 - computeFinancialRows: deltas compare against the previous period
+  ---
+  duration_ms: 0.117291
+  ...
+# Subtest: computeFinancialRows: an empty account stays null rather than showing 0
+ok 92 - computeFinancialRows: an empty account stays null rather than showing 0
+  ---
+  duration_ms: 0.098291
+  ...
+# Subtest: computeFinancialRows: manual entries alone render without a connector
+ok 93 - computeFinancialRows: manual entries alone render without a connector
+  ---
+  duration_ms: 0.092208
+  ...
+# Subtest: computeFinancialRows: negative profit when spend exceeds revenue
+ok 94 - computeFinancialRows: negative profit when spend exceeds revenue
+  ---
+  duration_ms: 0.07875
+  ...
+# Subtest: mediaLabel prefers the title, falls back to filename then Untitled
+ok 95 - mediaLabel prefers the title, falls back to filename then Untitled
+  ---
+  duration_ms: 2.874542
+  ...
+# Subtest: mediaThumbPath signs the thumbnail only, never the original
+ok 96 - mediaThumbPath signs the thumbnail only, never the original
+  ---
+  duration_ms: 0.142542
+  ...
+# Subtest: formatBytes scales and never prints a negative or NaN
+ok 97 - formatBytes scales and never prints a negative or NaN
+  ---
+  duration_ms: 1.744666
+  ...
+# Subtest: parseTags normalises case, spacing and duplicates
+ok 98 - parseTags normalises case, spacing and duplicates
+  ---
+  duration_ms: 1.069791
+  ...
+# Subtest: parseTags rejects what the platform would reject
+ok 99 - parseTags rejects what the platform would reject
+  ---
+  duration_ms: 0.214667
+  ...
+# Subtest: parseTags caps at 50 tags and reports the overflow
+ok 100 - parseTags caps at 50 tags and reports the overflow
+  ---
+  duration_ms: 0.312709
+  ...
+# Subtest: collectTags counts and orders by usage then name
+ok 101 - collectTags counts and orders by usage then name
+  ---
+  duration_ms: 13.313375
+  ...
+# Subtest: search covers title, filename and tags, case-insensitively
+ok 102 - search covers title, filename and tags, case-insensitively
+  ---
+  duration_ms: 0.193708
+  ...
+# Subtest: filterMedia applies search and tag together
+ok 103 - filterMedia applies search and tag together
+  ---
+  duration_ms: 0.621209
+  ...
+# Subtest: validateSetName trims and bounds
+ok 104 - validateSetName trims and bounds
+  ---
+  duration_ms: 0.672958
+  ...
+# Subtest: parseIds keeps only well-formed unique uuids and caps at the RPC limit
+ok 105 - parseIds keeps only well-formed unique uuids and caps at the RPC limit
+  ---
+  duration_ms: 1.201667
+  ...
+# Subtest: egressLine renders the label and gates downloads
+ok 106 - egressLine renders the label and gates downloads
+  ---
+  duration_ms: 0.134125
+  ...
+# Subtest: fileExtension mirrors the platform's path check
+ok 107 - fileExtension mirrors the platform's path check
+  ---
+  duration_ms: 0.193583
+  ...
+# Subtest: storagePath matches <client>/orig/<uuid>.<ext>
+ok 108 - storagePath matches <client>/orig/<uuid>.<ext>
+  ---
+  duration_ms: 0.241
+  ...
+# Subtest: groupSetItems buckets by set, newest addition first
+ok 109 - groupSetItems buckets by set, newest addition first
+  ---
+  duration_ms: 0.112292
+  ...
+# Subtest: setCoverPath uses the view's cover, else the newest member with a thumb
+ok 110 - setCoverPath uses the view's cover, else the newest member with a thumb
+  ---
+  duration_ms: 0.066416
+  ...
+# Subtest: fileCountLabel singularises
+ok 111 - fileCountLabel singularises
+  ---
+  duration_ms: 0.041375
+  ...
+# Subtest: firstParam survives a repeated search parameter
+ok 112 - firstParam survives a repeated search parameter
+  ---
+  duration_ms: 0.047792
+  ...
+# Subtest: lookupMessage never reaches Object.prototype
+ok 113 - lookupMessage never reaches Object.prototype
+  ---
+  duration_ms: 0.064292
+  ...
+# Subtest: uploadStatus names the failure on a partial batch
+ok 114 - uploadStatus names the failure on a partial batch
+  ---
+  duration_ms: 0.070584
+  ...
+# Subtest: todayInTimezone: formats as YYYY-MM-DD for a fixed instant
+ok 115 - todayInTimezone: formats as YYYY-MM-DD for a fixed instant
+  ---
+  duration_ms: 23.818208
+  ...
+# Subtest: parseRange: valid range with span <= 366 passes through, prev period matches length
+ok 116 - parseRange: valid range with span <= 366 passes through, prev period matches length
+  ---
+  duration_ms: 0.552375
+  ...
+# Subtest: parseRange: invalid YMD falls back to last 7 days ending today
+ok 117 - parseRange: invalid YMD falls back to last 7 days ending today
+  ---
+  duration_ms: 0.072334
+  ...
+# Subtest: parseRange: reversed range (from > to) falls back to default
+ok 118 - parseRange: reversed range (from > to) falls back to default
+  ---
+  duration_ms: 0.137375
+  ...
+# Subtest: parseRange: span over 366 days falls back to default
+ok 119 - parseRange: span over 366 days falls back to default
+  ---
+  duration_ms: 0.061708
+  ...
+# Subtest: parseRange: missing params falls back to default
+ok 120 - parseRange: missing params falls back to default
+  ---
+  duration_ms: 0.048167
+  ...
+# Subtest: pctDeltaOrNull: null when previous is 0 or absent
+ok 121 - pctDeltaOrNull: null when previous is 0 or absent
+  ---
+  duration_ms: 0.107167
+  ...
+# Subtest: splitPeriods: buckets rows by day into current vs previous windows
+ok 122 - splitPeriods: buckets rows by day into current vs previous windows
+  ---
+  duration_ms: 0.070583
+  ...
+# Subtest: computeOverviewMetrics: AOV/ROAS/conversion are null with zero denominators
+ok 123 - computeOverviewMetrics: AOV/ROAS/conversion are null with zero denominators
+  ---
+  duration_ms: 0.350291
+  ...
+# Subtest: computeOverviewMetrics: inventory uses the latest day in range, not a sum
+ok 124 - computeOverviewMetrics: inventory uses the latest day in range, not a sum
+  ---
+  duration_ms: 1.114375
+  ...
+# Subtest: computeOverviewMetrics: no rows -> null values, hasData false
+ok 125 - computeOverviewMetrics: no rows -> null values, hasData false
+  ---
+  duration_ms: 0.108916
+  ...
+# Subtest: computeOverviewMetrics: revenue/orders delta vs previous period
+ok 126 - computeOverviewMetrics: revenue/orders delta vs previous period
+  ---
+  duration_ms: 0.082584
+  ...
+# Subtest: formatMoney: USD uses 2 fraction digits (cents)
+ok 127 - formatMoney: USD uses 2 fraction digits (cents)
+  ---
+  duration_ms: 4.317166
+  ...
+# Subtest: formatMoney: JPY has 0 fraction digits — minor units ARE full units
+ok 128 - formatMoney: JPY has 0 fraction digits — minor units ARE full units
+  ---
+  duration_ms: 0.118917
+  ...
+# Subtest: formatMoney: null -> em dash
+ok 129 - formatMoney: null -> em dash
+  ---
+  duration_ms: 0.03375
+  ...
+# Subtest: aggregateCampaigns: sums spend/purchase value per campaign, sorts top 5 by spend
+ok 130 - aggregateCampaigns: sums spend/purchase value per campaign, sorts top 5 by spend
+  ---
+  duration_ms: 0.301125
+  ...
+# Subtest: aggregateCampaigns: zero spend -> roas null, not Infinity/NaN
+ok 131 - aggregateCampaigns: zero spend -> roas null, not Infinity/NaN
+  ---
+  duration_ms: 0.137834
+  ...
+# Subtest: bestCreative: picks highest ROAS among ads with spend > 0
+ok 132 - bestCreative: picks highest ROAS among ads with spend > 0
+  ---
+  duration_ms: 0.235583
+  ...
+# Subtest: bestCreative: no ads with spend > 0 -> null
+ok 133 - bestCreative: no ads with spend > 0 -> null
+  ---
+  duration_ms: 0.106625
+  ...
+# Subtest: isSafeHttpsUrl: accepts https, rejects javascript/http/relative/garbage
+ok 134 - isSafeHttpsUrl: accepts https, rejects javascript/http/relative/garbage
+  ---
+  duration_ms: 0.178625
+  ...
+# Subtest: formatRelativeTime: recent past renders as '... ago'
+ok 135 - formatRelativeTime: recent past renders as '... ago'
+  ---
+  duration_ms: 2.664584
+  ...
+# Subtest: parseRange: rolled-over calendar date (2024-02-30) falls back to default
+ok 136 - parseRange: rolled-over calendar date (2024-02-30) falls back to default
+  ---
+  duration_ms: 0.958084
+  ...
+# Subtest: formatMoney: malformed currency code returns — instead of throwing
+ok 137 - formatMoney: malformed currency code returns — instead of throwing
+  ---
+  duration_ms: 0.20675
+  ...
+# Subtest: formatRelativeTime: unparsable timestamp returns — instead of throwing
+ok 138 - formatRelativeTime: unparsable timestamp returns — instead of throwing
+  ---
+  duration_ms: 0.083417
+  ...
+# Subtest: formatRangeLabel: collapses a shared month, keeps both months, keeps both years
+ok 139 - formatRangeLabel: collapses a shared month, keeps both months, keeps both years
+  ---
+  duration_ms: 0.186208
+  ...
+# Subtest: formatDayLabel: accepts a plain day or an ISO timestamp, em dash on junk
+ok 140 - formatDayLabel: accepts a plain day or an ISO timestamp, em dash on junk
+  ---
+  duration_ms: 0.0745
+  ...
+# Subtest: rangePresets: 7d/30d are inclusive of today, month starts on the 1st
+ok 141 - rangePresets: 7d/30d are inclusive of today, month starts on the 1st
+  ---
+  duration_ms: 0.3935
+  ...
+# Subtest: rangePresets: the 7d preset matches what parseRange defaults to
+ok 142 - rangePresets: the 7d preset matches what parseRange defaults to
+  ---
+  duration_ms: 0.121042
+  ...
+# Subtest: rangeQuery: the querystring every header link carries
+ok 143 - rangeQuery: the querystring every header link carries
+  ---
+  duration_ms: 0.055667
+  ...
+# Subtest: formatters: whole money, counts, compact, roas
+ok 144 - formatters: whole money, counts, compact, roas
+  ---
+  duration_ms: 0.635209
+  ...
+# Subtest: formatDeltaArrow / deltaTone: arrows and colours track the sign
+ok 145 - formatDeltaArrow / deltaTone: arrows and colours track the sign
+  ---
+  duration_ms: 0.096667
+  ...
+# Subtest: computeMetaMetrics: rates come from period totals, not per-day averages
+ok 146 - computeMetaMetrics: rates come from period totals, not per-day averages
+  ---
+  duration_ms: 0.132167
+  ...
+# Subtest: computeMetaMetrics: no rows reads as no data, not as zeros
+ok 147 - computeMetaMetrics: no rows reads as no data, not as zeros
+  ---
+  duration_ms: 0.048625
+  ...
+# Subtest: healthFor: finds a row, null for an absent source
+ok 148 - healthFor: finds a row, null for an absent source
+  ---
+  duration_ms: 1.53075
+  ...
+# Subtest: isConnected: needs every source present, false on an empty source list
+ok 149 - isConnected: needs every source present, false on an empty source list
+  ---
+  duration_ms: 0.303833
+  ...
+# Subtest: panelState: the three DESIGN.md states
+ok 150 - panelState: the three DESIGN.md states
+  ---
+  duration_ms: 0.071959
+  ...
+# Subtest: integrationRow: not connected when no row exists
+ok 151 - integrationRow: not connected when no row exists
+  ---
+  duration_ms: 0.134708
+  ...
+# Subtest: integrationRow: maps status to label and tone, carries the error
+ok 152 - integrationRow: maps status to label and tone, carries the error
+  ---
+  duration_ms: 0.403167
+  ...
+# Subtest: integrationRow: an unknown status falls through as its own label
+ok 153 - integrationRow: an unknown status falls through as its own label
+  ---
+  duration_ms: 0.061084
+  ...
+# Subtest: integrationRows: one row per expected source, in order, on empty health
+ok 154 - integrationRows: one row per expected source, in order, on empty health
+  ---
+  duration_ms: 0.166791
+  ...
+# Subtest: taskBadge: done wins, in-progress is detected, blank falls back to To Do
+ok 155 - taskBadge: done wins, in-progress is detected, blank falls back to To Do
+  ---
+  duration_ms: 0.143667
+  ...
+# Subtest: sortPriorityTasks: open before done, then soonest due, undated last
+ok 156 - sortPriorityTasks: open before done, then soonest due, undated last
+  ---
+  duration_ms: 11.332417
+  ...
+# Subtest: sortPriorityTasks: default cap is 5, from a server-shaped batch of 50
+ok 157 - sortPriorityTasks: default cap is 5, from a server-shaped batch of 50
+  ---
+  duration_ms: 0.907917
+  ...
+# Subtest: noteExcerpt: collapses whitespace, cuts on a word boundary
+ok 158 - noteExcerpt: collapses whitespace, cuts on a word boundary
+  ---
+  duration_ms: 0.29275
+  ...
+# Subtest: sortRecentNotes: newest first, undated last, limited
+ok 159 - sortRecentNotes: newest first, undated last, limited
+  ---
+  duration_ms: 0.193541
+  ...
+# Subtest: sortRecentNotes: default cap is 3, from a server-shaped batch of 50
+ok 160 - sortRecentNotes: default cap is 3, from a server-shaped batch of 50
+  ---
+  duration_ms: 0.196875
+  ...
+# Subtest: month boundary at UTC+14 (Kiritimati): a run 1 minute before local midnight is last month
+ok 161 - month boundary at UTC+14 (Kiritimati): a run 1 minute before local midnight is last month
+  ---
+  duration_ms: 5.557625
+  ...
+# Subtest: month boundary at UTC-12 (Etc/GMT+12): same UTC date, previous local month excluded
+ok 162 - month boundary at UTC-12 (Etc/GMT+12): same UTC date, previous local month excluded
+  ---
+  duration_ms: 0.605
+  ...
+# Subtest: full flow at UTC+14: a run local-dated last month doesn't count against the cap
+ok 163 - full flow at UTC+14: a run local-dated last month doesn't count against the cap
+  ---
+  duration_ms: 3.189375
+  ...
+# Subtest: a future occurred_at (clock skew) still reads as within the rate-limit window
+ok 164 - a future occurred_at (clock skew) still reads as within the rate-limit window
+  ---
+  duration_ms: 0.070583
+  ...
+# Subtest: a future occurred_at in the current local month still counts toward spend
+ok 165 - a future occurred_at in the current local month still counts toward spend
+  ---
+  duration_ms: 0.148625
+  ...
+# Subtest: runUsd holds a large recorded cost without precision loss
+ok 166 - runUsd holds a large recorded cost without precision loss
+  ---
+  duration_ms: 0.042333
+  ...
+# Subtest: tokensToUsd doesn't overflow or go non-finite on very large token counts
+ok 167 - tokensToUsd doesn't overflow or go non-finite on very large token counts
+  ---
+  duration_ms: 0.035333
+  ...
+# Subtest: capReached with a spend total built from float-drift-prone runs still compares correctly
+ok 168 - capReached with a spend total built from float-drift-prone runs still compares correctly
+  ---
+  duration_ms: 0.104375
+  ...
+# Subtest: buildPayload at UTC+14: a job updated 1 minute before local midnight is excluded, at local midnight is included
+ok 169 - buildPayload at UTC+14: a job updated 1 minute before local midnight is excluded, at local midnight is included
+  ---
+  duration_ms: 0.632583
+  ...
+# Subtest: buildPayload drops campaign rows for a neighboring day even if present in the fetched rows
+ok 170 - buildPayload drops campaign rows for a neighboring day even if present in the fetched rows
+  ---
+  duration_ms: 0.326292
+  ...
+# Subtest: capReached and isRateLimited use strict boundary semantics (>= and <, not > and <=)
+ok 171 - capReached and isRateLimited use strict boundary semantics (>= and <, not > and <=)
+  ---
+  duration_ms: 0.047917
+  ...
+# Subtest: an invalid IANA timezone is rejected so the shell falls back to the default
+ok 172 - an invalid IANA timezone is rejected so the shell falls back to the default
+  ---
+  duration_ms: 9.694834
+  ...
+# Subtest: yesterday is correct at the +14 and -11 extremes of the IANA offset range
+ok 173 - yesterday is correct at the +14 and -11 extremes of the IANA offset range
+  ---
+  duration_ms: 0.668125
+  ...
+# Subtest: yesterday is correct across a DST fall-back transition
+ok 174 - yesterday is correct across a DST fall-back transition
+  ---
+  duration_ms: 0.420041
+  ...
+# Subtest: non-USD currency (0-decimal JPY) formats correctly through the daily lines
+ok 175 - non-USD currency (0-decimal JPY) formats correctly through the daily lines
+  ---
+  duration_ms: 1.287084
+  ...
+# Subtest: a malformed currency code from a row degrades every money line to '—' instead of throwing
+ok 176 - a malformed currency code from a row degrades every money line to '—' instead of throwing
+  ---
+  duration_ms: 0.62375
+  ...
+# Subtest: null/NaN/string numeric fields are treated as 0, not NaN or a thrown error
+ok 177 - null/NaN/string numeric fields are treated as 0, not NaN or a thrown error
+  ---
+  duration_ms: 0.18025
+  ...
+# Subtest: a financial entry with a non-finite amount_cents is dropped, not summed as NaN
+ok 178 - a financial entry with a non-finite amount_cents is dropped, not summed as NaN
+  ---
+  duration_ms: 0.462917
+  ...
+# Subtest: entries dated other days returned by a wider query never leak into the day's totals
+ok 179 - entries dated other days returned by a wider query never leak into the day's totals
+  ---
+  duration_ms: 0.109625
+  ...
+# Subtest: all three source reads failing yields 'No data yet' and all three named, not a throw
+ok 180 - all three source reads failing yields 'No data yet' and all three named, not a throw
+  ---
+  duration_ms: 1.587833
+  ...
+# Subtest: a rejected promise (thrown network error), not just an {error} result, still counts as no rows
+ok 181 - a rejected promise (thrown network error), not just an {error} result, still counts as no rows
+  ---
+  duration_ms: 1.213209
+  ...
+# Subtest: parseAmountToCents: rejects unicode digits, -0, and embedded whitespace
+ok 182 - parseAmountToCents: rejects unicode digits, -0, and embedded whitespace
+  ---
+  duration_ms: 1.56925
+  ...
+# Subtest: parseAmountToCents: leading/trailing whitespace around an otherwise-valid amount is trimmed
+ok 183 - parseAmountToCents: leading/trailing whitespace around an otherwise-valid amount is trimmed
+  ---
+  duration_ms: 1.137041
+  ...
+# Subtest: parseAmountToCents: no float drift summing classic 0.1+0.2 style inputs
+ok 184 - parseAmountToCents: no float drift summing classic 0.1+0.2 style inputs
+  ---
+  duration_ms: 0.832917
+  ...
+# Subtest: computeDailyRows: income and expense entries on the same day both land in that day's row
+ok 185 - computeDailyRows: income and expense entries on the same day both land in that day's row
+  ---
+  duration_ms: 0.249542
+  ...
+# Subtest: computeDailyRows: an entry exactly on the range boundary is included, one day past it is excluded
+ok 186 - computeDailyRows: an entry exactly on the range boundary is included, one day past it is excluded
+  ---
+  duration_ms: 0.425167
+  ...
+# Subtest: computeFinancialTiles: previous period entirely empty yields no deltas
+ok 187 - computeFinancialTiles: previous period entirely empty yields no deltas
+  ---
+  duration_ms: 0.196958
+  ...
+# Subtest: computeFinancialTiles: previous revenue of exactly zero yields no delta (would be a division by zero)
+ok 188 - computeFinancialTiles: previous revenue of exactly zero yields no delta (would be a division by zero)
+  ---
+  duration_ms: 0.191792
+  ...
+# Subtest: financialRecordsQuery: filters by kind + source, range, newest-first order, and the row cap
+ok 189 - financialRecordsQuery: filters by kind + source, range, newest-first order, and the row cap
+  ---
+  duration_ms: 0.299
+  ...
+# Subtest: deleteFinancialEntry re-reads records_v1 filtered by kind + source before delete_record (ownership gate)
+ok 190 - deleteFinancialEntry re-reads records_v1 filtered by kind + source before delete_record (ownership gate)
+  ---
+  duration_ms: 0.838667
+  ...
+# Subtest: env: getConfig returns safe defaults when no keys are set (no throw)
+ok 191 - env: getConfig returns safe defaults when no keys are set (no throw)
+  ---
+  duration_ms: 0.478417
+  ...
+# Subtest: env: empty/whitespace values are treated as unset
+ok 192 - env: empty/whitespace values are treated as unset
+  ---
+  duration_ms: 0.119791
+  ...
+# Subtest: AI control case: flag ON + key present invokes the injected factory once
+ok 193 - AI control case: flag ON + key present invokes the injected factory once
+  ---
+  duration_ms: 0.626166
+  ...
+# Subtest: parseTags: valid tags normalise to lower-case, trimmed, deduped
+ok 194 - parseTags: valid tags normalise to lower-case, trimmed, deduped
+  ---
+  duration_ms: 1.887292
+  ...
+# Subtest: parseTags: empty and whitespace-only entries are silently dropped, not counted invalid
+ok 195 - parseTags: empty and whitespace-only entries are silently dropped, not counted invalid
+  ---
+  duration_ms: 0.146792
+  ...
+# Subtest: parseTags: duplicate tags (case/space-insensitive) collapse to one
+ok 196 - parseTags: duplicate tags (case/space-insensitive) collapse to one
+  ---
+  duration_ms: 0.1245
+  ...
+# Subtest: parseTags: a tag over 40 chars is rejected as invalid, not silently truncated
+ok 197 - parseTags: a tag over 40 chars is rejected as invalid, not silently truncated
+  ---
+  duration_ms: 0.072833
+  ...
+# Subtest: parseTags: illegal characters (emoji, punctuation outside _- ) are rejected
+ok 198 - parseTags: illegal characters (emoji, punctuation outside _- ) are rejected
+  ---
+  duration_ms: 0.18625
+  ...
+# Subtest: parseTags: over MAX_TAGS unique tags truncates the list and flags the overflow
+ok 199 - parseTags: over MAX_TAGS unique tags truncates the list and flags the overflow
+  ---
+  duration_ms: 0.128625
+  ...
+# Subtest: parseTags: null/undefined input is empty, not a throw
+ok 200 - parseTags: null/undefined input is empty, not a throw
+  ---
+  duration_ms: 0.147541
+  ...
+# Subtest: matchesQuery: matches title, filename, or any tag, case-insensitively
+ok 201 - matchesQuery: matches title, filename, or any tag, case-insensitively
+  ---
+  duration_ms: 0.0665
+  ...
+# Subtest: matchesQuery: empty/whitespace query matches everything
+ok 202 - matchesQuery: empty/whitespace query matches everything
+  ---
+  duration_ms: 0.261459
+  ...
+# Subtest: filterMedia: search and tag filter combine with AND, not OR
+ok 203 - filterMedia: search and tag filter combine with AND, not OR
+  ---
+  duration_ms: 1.148375
+  ...
+# Subtest: filterMedia: no-match query returns an empty array (drives the no-match copy)
+ok 204 - filterMedia: no-match query returns an empty array (drives the no-match copy)
+  ---
+  duration_ms: 0.126875
+  ...
+# Subtest: filterMedia: with neither q nor tag, every row passes through
+ok 205 - filterMedia: with neither q nor tag, every row passes through
+  ---
+  duration_ms: 0.054625
+  ...
+# Subtest: formatBytes: adversarial inputs never print negative or NaN
+ok 206 - formatBytes: adversarial inputs never print negative or NaN
+  ---
+  duration_ms: 0.063
+  ...
+# Subtest: formatBytes: unit boundaries
+ok 207 - formatBytes: unit boundaries
+  ---
+  duration_ms: 0.204459
+  ...
+# Subtest: parseIds: rejects non-UUID strings outright
+ok 208 - parseIds: rejects non-UUID strings outright
+  ---
+  duration_ms: 0.734125
+  ...
+# Subtest: parseIds: deduplicates repeated ids
+ok 209 - parseIds: deduplicates repeated ids
+  ---
+  duration_ms: 0.045833
+  ...
+# Subtest: parseIds: caps at MAX_BULK_IDS (501 ids -> 500 kept)
+ok 210 - parseIds: caps at MAX_BULK_IDS (501 ids -> 500 kept)
+  ---
+  duration_ms: 3.236333
+  ...
+# Subtest: parseIdList: parses the ?dl= comma-separated tray, dropping malformed entries
+ok 211 - parseIdList: parses the ?dl= comma-separated tray, dropping malformed entries
+  ---
+  duration_ms: 0.088291
+  ...
+# Subtest: egressLine: exceeded flag disables downloads regardless of numbers
+ok 212 - egressLine: exceeded flag disables downloads regardless of numbers
+  ---
+  duration_ms: 0.072042
+  ...
+# Subtest: egressLine: used >= quota also counts as exceeded even if the flag is false/missing
+ok 213 - egressLine: used >= quota also counts as exceeded even if the flag is false/missing
+  ---
+  duration_ms: 0.03675
+  ...
+# Subtest: egressLine: unreadable row (null) fails open -- no label, not exceeded
+ok 214 - egressLine: unreadable row (null) fails open -- no label, not exceeded
+  ---
+  duration_ms: 2.69725
+  ...
+# Subtest: egressLine: label renders as byte sizes ('X of Y'), matching the platform's byte-metered egress
+ok 215 - egressLine: label renders as byte sizes ('X of Y'), matching the platform's byte-metered egress
+  ---
+  duration_ms: 0.06825
+  ...
+# Subtest: storagePath: matches <client_id>/orig/<uuid>.<ext> exactly
+ok 216 - storagePath: matches <client_id>/orig/<uuid>.<ext> exactly
+  ---
+  duration_ms: 0.145834
+  ...
+# Subtest: storagePath: falls back to mime subtype, then 'bin', when the filename has no usable extension
+ok 217 - storagePath: falls back to mime subtype, then 'bin', when the filename has no usable extension
+  ---
+  duration_ms: 0.067
+  ...
+# Subtest: groupSetItems: groups by set_id, newest added_at first, drops rows missing ids
+ok 218 - groupSetItems: groups by set_id, newest added_at first, drops rows missing ids
+  ---
+  duration_ms: 7.183666
+  ...
+# Subtest: setCoverPath: prefers the view's own cover_thumb_path
+ok 219 - setCoverPath: prefers the view's own cover_thumb_path
+  ---
+  duration_ms: 0.06025
+  ...
+# Subtest: setCoverPath: falls back to the newest member with a thumbnail, else null
+ok 220 - setCoverPath: falls back to the newest member with a thumbnail, else null
+  ---
+  duration_ms: 0.042333
+  ...
+# Subtest: fileCountLabel: singular/plural
+ok 221 - fileCountLabel: singular/plural
+  ---
+  duration_ms: 0.036792
+  ...
+# Subtest: page copy: /library empty state matches DESIGN.md exactly
+ok 222 - page copy: /library empty state matches DESIGN.md exactly
+  ---
+  duration_ms: 0.474708
+  ...
+# Subtest: page copy: home Content Library panel uses the same empty-state copy
+ok 223 - page copy: home Content Library panel uses the same empty-state copy
+  ---
+  duration_ms: 0.25375
+  ...
+# Subtest: page copy: /library no-match state has its own distinct copy
+ok 224 - page copy: /library no-match state has its own distinct copy
+  ---
+  duration_ms: 0.104916
+  ...
+# Subtest: taskBadge: mixed-case 'In PROGRESS' is still detected as progress
+ok 225 - taskBadge: mixed-case 'In PROGRESS' is still detected as progress
+  ---
+  duration_ms: 0.751625
+  ...
+# Subtest: taskBadge: all-done batch every row tones 'done'
+ok 226 - taskBadge: all-done batch every row tones 'done'
+  ---
+  duration_ms: 0.121709
+  ...
+# Subtest: sortPriorityTasks: duplicate due_on breaks the tie by title, stable and deterministic
+ok 227 - sortPriorityTasks: duplicate due_on breaks the tie by title, stable and deterministic
+  ---
+  duration_ms: 7.199875
+  ...
+# Subtest: sortPriorityTasks: >5 tasks caps at 5 and keeps priority order
+ok 228 - sortPriorityTasks: >5 tasks caps at 5 and keeps priority order
+  ---
+  duration_ms: 0.149791
+  ...
+# Subtest: noteExcerpt: multi-line body with leading/trailing whitespace collapses to one line, trimmed
+ok 229 - noteExcerpt: multi-line body with leading/trailing whitespace collapses to one line, trimmed
+  ---
+  duration_ms: 0.104875
+  ...
+# Subtest: sortRecentNotes: occurred_at ties keep both, stable relative order; >3 notes caps at 3
+ok 230 - sortRecentNotes: occurred_at ties keep both, stable relative order; >3 notes caps at 3
+  ---
+  duration_ms: 0.1095
+  ...
+# Subtest: panelState: rows present but no health row still reads not_connected (connection = health presence, not data presence)
+ok 231 - panelState: rows present but no health row still reads not_connected (connection = health presence, not data presence)
+  ---
+  duration_ms: 0.128792
+  ...
+# Subtest: panelState: health row present but zero rows reads empty, not not_connected
+ok 232 - panelState: health row present but zero rows reads empty, not not_connected
+  ---
+  duration_ms: 0.04325
+  ...
+# Subtest: app/page.tsx: jobs_v1/messages_v1 reads sit inside the Promise.allSettled and degrade via unwrap, never throw into the page
+ok 233 - app/page.tsx: jobs_v1/messages_v1 reads sit inside the Promise.allSettled and degrade via unwrap, never throw into the page
+  ---
+  duration_ms: 0.474458
+  ...
+# Subtest: app/page.tsx: mondayState/meetState derive from health-row presence (isConnected), not row presence, matching lib/panels.ts panelState contract
+ok 234 - app/page.tsx: mondayState/meetState derive from health-row presence (isConnected), not row presence, matching lib/panels.ts panelState contract
+  ---
+  duration_ms: 0.753042
+  ...
+# Subtest: app/layout.tsx has no sidebar/nav and no Ask/agent strip
+ok 235 - app/layout.tsx has no sidebar/nav and no Ask/agent strip
+  ---
+  duration_ms: 0.632208
+  ...
+# Subtest: app/integrations/page.tsx is gone (route deleted, popup replaces it)
+ok 236 - app/integrations/page.tsx is gone (route deleted, popup replaces it)
+  ---
+  duration_ms: 0.177625
+  ...
+# Subtest: parsePopup: only 'integrations' and 'settings' open a popup on arrival
+ok 237 - parsePopup: only 'integrations' and 'settings' open a popup on arrival
+  ---
+  duration_ms: 3.647834
+  ...
+# Subtest: SERVICE_LINKS: every outbound target is a real https URL, not a placeholder
+ok 238 - SERVICE_LINKS: every outbound target is a real https URL, not a placeholder
+  ---
+  duration_ms: 0.183625
+  ...
+# Subtest: EXTERNAL_LINK_PROPS: carries target=_blank and rel=noopener noreferrer
+ok 239 - EXTERNAL_LINK_PROPS: carries target=_blank and rel=noopener noreferrer
+  ---
+  duration_ms: 0.11
+  ...
+# Subtest: rls: anon key cannot read arbitrary tables without a policy
+ok 240 - rls: anon key cannot read arbitrary tables without a policy # SKIP Supabase env not configured — live RLS probe skipped
+  ---
+  duration_ms: 0.355959
+  ...
+# [health] shared platform probe failed: boom
+# Subtest: config: dataSource defaults to own, 'shared' (any case) opts in
+ok 241 - config: dataSource defaults to own, 'shared' (any case) opts in
+  ---
+  duration_ms: 0.539666
+  ...
+# Subtest: build gate: shared mode + service key fails
+ok 242 - build gate: shared mode + service key fails
+  ---
+  duration_ms: 173.782125
+  ...
+# Subtest: build gate: service key in .env.local is caught too
+ok 243 - build gate: service key in .env.local is caught too
+  ---
+  duration_ms: 169.694167
+  ...
+# Subtest: build gate: shared without key, and own mode with key, both pass
+ok 244 - build gate: shared without key, and own mode with key, both pass
+  ---
+  duration_ms: 649.129042
+  ...
+# Subtest: health: keyless shared run is ok/unconfigured and never probes
+ok 245 - health: keyless shared run is ok/unconfigured and never probes
+  ---
+  duration_ms: 1.059667
+  ...
+# Subtest: health: platform configured but no probe login is a failure
+ok 246 - health: platform configured but no probe login is a failure
+  ---
+  duration_ms: 0.098166
+  ...
+# Subtest: health: service key present fails even if the probe would pass
+ok 247 - health: service key present fails even if the probe would pass
+  ---
+  duration_ms: 0.142125
+  ...
+# Subtest: health: probe passes -> connected; probe throws -> probe_failed
+ok 248 - health: probe passes -> connected; probe throws -> probe_failed
+  ---
+  duration_ms: 0.778708
+  ...
+1..248
+# tests 248
+# suites 0
+# pass 247
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 2059.063417

@@ -1,0 +1,41 @@
+9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
+3ec5a9fe7fd377b175110431318f94d5  /etc/nginx/sites-enabled/00-default
+20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
+dd2a55091119f5fca9b6d92a2effef25  /etc/ssl/cloudflare/origin.pem
+MainPID=513731
+ActiveState=active
+Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] OpenSSH                    ALLOW IN    Anywhere                  
+[ 2] 80,443/tcp                 ALLOW IN    173.245.48.0/20           
+[ 3] 80,443/tcp                 ALLOW IN    103.21.244.0/22           
+[ 4] 80,443/tcp                 ALLOW IN    103.22.200.0/22           
+[ 5] 80,443/tcp                 ALLOW IN    103.31.4.0/22             
+[ 6] 80,443/tcp                 ALLOW IN    141.101.64.0/18           
+[ 7] 80,443/tcp                 ALLOW IN    108.162.192.0/18          
+[ 8] 80,443/tcp                 ALLOW IN    190.93.240.0/20           
+[ 9] 80,443/tcp                 ALLOW IN    188.114.96.0/20           
+[10] 80,443/tcp                 ALLOW IN    197.234.240.0/22          
+[11] 80,443/tcp                 ALLOW IN    198.41.128.0/17           
+[12] 80,443/tcp                 ALLOW IN    162.158.0.0/15            
+[13] 80,443/tcp                 ALLOW IN    104.16.0.0/13             
+[14] 80,443/tcp                 ALLOW IN    104.24.0.0/14             
+[15] 80,443/tcp                 ALLOW IN    172.64.0.0/13             
+[16] 80,443/tcp                 ALLOW IN    131.0.72.0/22             
+[17] 80,443/tcp                 ALLOW IN    Anywhere                   # temp: pre-Cloudflare launch, remove when CF fronts origin
+[18] OpenSSH (v6)               ALLOW IN    Anywhere (v6)             
+[19] 80,443/tcp                 ALLOW IN    2400:cb00::/32            
+[20] 80,443/tcp                 ALLOW IN    2606:4700::/32            
+[21] 80,443/tcp                 ALLOW IN    2803:f800::/32            
+[22] 80,443/tcp                 ALLOW IN    2405:b500::/32            
+[23] 80,443/tcp                 ALLOW IN    2405:8100::/32            
+[24] 80,443/tcp                 ALLOW IN    2a06:98c0::/29            
+[25] 80,443/tcp                 ALLOW IN    2c0f:f248::/32            
+[26] 80,443/tcp (v6)            ALLOW IN    Anywhere (v6)              # temp: pre-Cloudflare launch, remove when CF fronts origin
+
+l2detailz
+README
+l2details.com
+certbot 2.9.0

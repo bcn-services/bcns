@@ -1,0 +1,42 @@
+# $ corepack pnpm test  (counts extracted from test.txt; test:docs/test:infra never ran in this
+# invocation because `turbo run test && pnpm test:docs && pnpm test:infra` short-circuited on
+# the apps/web test failure below. Standalone re-runs of those two commands are included for
+# reference and were NOT part of the gated `pnpm test` result.)
+
+## apps/web (@bcn-services/web) — node --test __tests__/*.mjs
+# tests 82
+# suites 0
+# pass 81
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 515.749917
+Failing test: __tests__/a2-fix-verification.test.mjs
+  Results: 12 passed, 1 failed
+  FAIL: about-founder.tsx passes description to SectionHeading — description not wired to SectionHeading
+
+## packages/app-core (@bcn-services/app-core) — tsx tests/*.test.mjs
+Test files run: 7
+  tests/pricing.test.mjs
+  tests/subscription.test.mjs
+  tests/anthropic.test.mjs
+  tests/health.test.mjs
+  tests/webhooks.test.mjs
+  tests/qa-app-core.test.mjs
+  tests/fix-app-core.test.mjs
+Task result: all files exited 0 (no reported failures)
+
+## turbo run test — overall
+Tasks: 2 successful, 3 total (app-core:test ok, web:test FAILED; a 3rd task attempted, gated by web failure)
+Overall pnpm test exit code: 1
+
+## test:docs (node --test docs/architecture/__tests__/*.mjs) — standalone re-run, not reached by gated `pnpm test`
+# tests 21
+# pass 21
+# fail 0
+Exit code: 0
+
+## test:infra (bash infra/__tests__/infra.check.sh) — standalone re-run, not reached by gated `pnpm test`
+18 passed, 0 failed
+Exit code: 0

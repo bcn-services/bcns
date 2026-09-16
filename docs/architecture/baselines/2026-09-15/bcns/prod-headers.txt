@@ -1,0 +1,171 @@
+=== https://bcn-services.com/ ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 274266
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:54 GMT
+etag: "f6a4f4bdedcbc86de1f3816d17acb135"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /
+x-vercel-cache: HIT
+x-vercel-id: sfo1::cs5pc-1789536114736-f63906df7165
+content-length: 60822
+
+
+=== https://bcn-services.com/about ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268148
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:55 GMT
+etag: "054d1fb3df48add4ef955fa9c519fabb"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /about
+x-vercel-cache: HIT
+x-vercel-id: sfo1::l8bb7-1789536114968-9a48d8e417d7
+content-length: 42517
+
+
+=== https://bcn-services.com/pricing ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268154
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:55 GMT
+etag: "f7c0bd9e7a09f527bddb98dbb3df0448"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /pricing
+x-vercel-cache: HIT
+x-vercel-id: sfo1::p55w4-1789536115203-be128c7d94cb
+content-length: 55785
+
+
+=== https://bcn-services.com/services ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268145
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:55 GMT
+etag: "931afef445da8808ec2ac0ef162312b4"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /services
+x-vercel-cache: HIT
+x-vercel-id: sfo1::rkzs8-1789536115448-c445c35aabeb
+content-length: 71936
+
+
+=== https://bcn-services.com/work ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268154
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:55 GMT
+etag: "4746cb1661daa307a353a9dfb27c6f07"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /work
+x-vercel-cache: HIT
+x-vercel-id: sfo1::7b6pz-1789536115703-b2157b3cfe3b
+content-length: 43986
+
+
+=== https://bcn-services.com/privacy ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268145
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:56 GMT
+etag: "70b31315e3cc02080cff380911b4ed02"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /privacy
+x-vercel-cache: HIT
+x-vercel-id: sfo1::4r4tt-1789536115964-638f78d9b5c4
+content-length: 10381
+
+
+=== https://bcn-services.com/terms ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268149
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Wed, 16 Sep 2026 05:21:56 GMT
+etag: "6b9a55926a2c08297988e87c7a347c5f"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /terms
+x-vercel-cache: HIT
+x-vercel-id: sfo1::6dl82-1789536116222-88f2d6277bab
+content-length: 10389
+
+
+=== https://bcn-services.com/sitemap.xml ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 264076
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: application/xml
+date: Wed, 16 Sep 2026 05:21:56 GMT
+etag: "6a680c51f452fa48c3e7b9ac95f083ed"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /sitemap.xml
+x-vercel-cache: HIT
+x-vercel-id: sfo1::7hbms-1789536116439-00a35fa29ce9
+content-length: 1205
+
+
+=== https://bcn-services.com/robots.txt ===
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 268935
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/plain
+date: Wed, 16 Sep 2026 05:21:56 GMT
+etag: "c19cb6c2e1c6a4aa839bcdaaff540c9a"
+server: Vercel
+strict-transport-security: max-age=63072000
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
+x-matched-path: /robots.txt
+x-vercel-cache: HIT
+x-vercel-id: sfo1::qqgvq-1789536116518-2011e7d05a6c
+content-length: 70
+
+

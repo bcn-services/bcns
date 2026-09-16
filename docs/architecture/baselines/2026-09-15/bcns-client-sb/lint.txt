@@ -1,0 +1,3 @@
+# $ corepack pnpm lint
+[43m[33m[[39m[49m[43m[30mWARN[39m[49m[43m[33m][39m[49m Ignored project-level auth setting "//npm.pkg.github.com/:_authToken" in "/Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-client-sb/.npmrc": environment variables are not expanded in registry credentials that come from a project .npmrc, because that file is committed to the repository and could leak the secret to an attacker-controlled registry. Move this credential to a trusted source that pnpm still expands — put the line in your user-level ~/.npmrc, or set it with pnpm config set (for example, run: pnpm config set "//npm.pkg.github.com/:_authToken" <value>). See https://pnpm.io/npmrc
+[2m$ eslint .[22m
