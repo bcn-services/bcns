@@ -1,0 +1,86 @@
+# Gate (h): scripts/new-app.sh hello 3199 + R39 smoke — pv1/3-tenant @ ea54fdc, 2026-09-16
+# Local Supabase stack supabase_*_bcns-data; seed user acme-smoke@example.com; acme client a0000000-0000-4000-8000-000000000001.
+
+## scripts/new-app.sh hello 3199
+created apps/hello (@bcn-services/hello), port 3199
+next steps:
+  1. corepack pnpm install
+  2. fill in apps/hello/CLIENT.md open questions
+  3. corepack pnpm --filter @bcn-services/hello dev
+  4. infra/onboard-client.sh hello 3199 <domain> — provisions the droplet
+  5. add 'hello' to .github/workflows/deploy-app.yml: on.push.paths (apps/hello/**)
+     AND strategy.matrix.slug — a push deploys nothing for hello until you do
+  6. set EXPECTED_CLIENT_ID in /srv/hello/env from clients.id in the platform
+     project — this script does NOT set it, and the app denies every request
+     until it is set (see apps/hello/DEPLOY.md)
+git status --short:
+ M infra/ports.txt
+?? apps/hello/
+
+## turbo build --filter=@bcn-services/hello (standalone)
+ Tasks:    3 successful, 3 total
+  Time:    59.101s 
+
+## standalone server, NEXT_PUBLIC_SUPABASE_URL set, EXPECTED_CLIENT_ID unset (fail-closed)
+=== unpinned
+GET /api/health
+{"ok":false,"platform":"error","reason":"tenant_pin_missing"}
+HTTP_STATUS:503
+GET /
+HTTP/1.1 307 Temporary Redirect
+location: http://localhost:3199/login?error=misconfigured
+
+## standalone server, EXPECTED_CLIENT_ID=acme
+=== pinned acme
+GET /api/health
+{"ok":true,"platform":"connected"}
+HTTP_STATUS:200
+GET /
+HTTP/1.1 307 Temporary Redirect
+location: http://localhost:3199/login
+
+## R39: tsx --test tests/rls-forbidden-read.test.mjs, EXPECTED_CLIENT_ID=acme
+ok 1 - rls: anon key cannot read arbitrary tables without a policy
+ok 2 - rls (R39): the signed-in smoke user reads only its own client's rows via memberships_v1
+# tests 2
+# pass 2
+# fail 0
+# skipped 0
+
+## R39 mutation: EXPECTED_CLIENT_ID=beta, same acme smoke user (must fail)
+ok 1 - rls: anon key cannot read arbitrary tables without a policy
+not ok 2 - rls (R39): the signed-in smoke user reads only its own client's rows via memberships_v1
+  expected: 'b0000000-0000-4000-8000-000000000001'
+  actual: 'a0000000-0000-4000-8000-000000000001'
+# pass 1
+# fail 1
+
+## Cross-tenant REST as acme-smoke: GET /rest/v1/memberships_v1?select=client_id (Accept-Profile: api) — dt-qa run on e17fa4b
+---REST query result (client_ids only)---
+[{"client_id":"a0000000-0000-4000-8000-000000000001"}, 
+ {"client_id":"a0000000-0000-4000-8000-000000000001"}, 
+ {"client_id":"a0000000-0000-4000-8000-000000000001"}]
+
+## Suites on ea54fdc
+@bcn-services/tenant:test: # tests 31
+@bcn-services/tenant:test: # pass 31
+@bcn-services/tenant:test: # fail 0
+@bcn-services/tenant:test: # skipped 0
+@bcn-services/_template:test: # tests 27
+@bcn-services/_template:test: # pass 25
+@bcn-services/_template:test: # fail 0
+@bcn-services/_template:test: # skipped 2
+apps/web isolation:
+# tests 4
+# pass 4
+# fail 0
+scripts/__tests__/new-app.check.sh: 32 passed, 0 failed
+infra/__tests__/infra.check.sh: 45 passed, 0 failed
+
+## apps/sb on e17fa4b (apps/sb unchanged in ea54fdc: git diff --stat e17fa4b..ea54fdc -- apps/sb = empty) vs gate-b-sb-summary.txt
+@bcn-services/sb:test: # tests 248
+@bcn-services/sb:test: # pass 247
+@bcn-services/sb:test: # fail 0
+@bcn-services/sb:test: # skipped 1
+
+## Scope: git diff --stat 163723e..ea54fdc -- apps/web infra platform = empty (0 lines)
