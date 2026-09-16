@@ -78,21 +78,18 @@ if [ ! -s /etc/ssl/cloudflare/origin.pem ] || [ ! -s /etc/ssl/cloudflare/origin.
 fi
 
 rm -f /etc/nginx/sites-enabled/default
+# platform-v1: :80 is a default_server too. certbot-mode vhosts listen on 80;
+# without this nginx would promote the alphabetically-first `listen 80` vhost
+# and unknown-Host requests on :80 would 301 to that client instead of dropping.
+# Matches the live droplet file (md5 3ec5a9fe7fd377b175110431318f94d5).
 cat > /etc/nginx/sites-available/00-default <<'EOF'
 server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
-    return 444;
-}
-# platform-v1: certbot-mode vhosts listen on 80. Without this block nginx would
-# promote the alphabetically-first `listen 80` vhost to default_server and
-# unknown-Host requests on :80 would 301 to that client instead of dropping.
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
     return 444;
 }
 EOF
