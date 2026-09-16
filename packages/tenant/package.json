@@ -1,0 +1,53 @@
+{
+  "name": "@bcn-services/tenant",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js",
+      "default": "./dist/middleware.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bcn-services/bcns.git",
+    "directory": "packages/tenant"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/cookies.test.mjs tests/membership.test.mjs tests/middleware.test.mjs",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "next": ">=14"
+  },
+  "devDependencies": {
+    "@bcn-services/config": "workspace:*",
+    "@supabase/supabase-js": "^2.116.0",
+    "@types/node": "^22.9.0",
+    "eslint": "^9.15.0",
+    "next": "14.2.18",
+    "tsx": "^4.23.1",
+    "typescript": "^5.6.3"
+  }
+}

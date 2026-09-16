@@ -16,6 +16,7 @@
   "dependencies": {
     "@bcn-services/app-core": "workspace:*",
     "@bcn-services/data-client": "workspace:*",
+    "@bcn-services/tenant": "workspace:*",
     "@bcn-services/ui": "workspace:*",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
