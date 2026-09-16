@@ -12,3 +12,8 @@
 1518:# pass 21
 1519:# fail 0
 1521:# skipped 0
+
+## data-client dist/index.d.ts vs baseline (Opus 5 reviewer re-ran; appended 2026-09-16)
+$ diff packages/data-client/dist/index.d.ts docs/architecture/baselines/2026-09-15/bcns-data/data-client-index.d.ts; echo exit=$?
+exit=0
+  603537 packages/data-client/dist/index.d.ts

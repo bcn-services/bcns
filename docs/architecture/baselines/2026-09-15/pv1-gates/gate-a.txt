@@ -166,3 +166,19 @@ Files bcns-data/packages/data-client/tsconfig.json and packages/data-client/tsco
      "@types/node": "^22.9.0",
      "@types/react": "^18.3.12",
      "@types/react-dom": "^18.3.1",
+
+## Re-run after merge a61f811 (78cdda9 carried Nate's DESIGN.md/REQUIREMENTS.md edits) — 2026-09-16
+$ diff -rq -x node_modules -x .git -x dist -x .next -x .temp -x .turbo -x tsconfig.tsbuildinfo /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data platform
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/.github/workflows: ci.yml
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/.github/workflows: deploy-worker.yml
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/DESIGN.md and platform/DESIGN.md differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/REQUIREMENTS.md and platform/REQUIREMENTS.md differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/package.json and platform/package.json differ
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data: packages
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data: pnpm-lock.yaml
+Only in /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data: pnpm-workspace.yaml
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/test/data-client.test.ts and platform/test/data-client.test.ts differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/test/scripts.test.ts and platform/test/scripts.test.ts differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/tsconfig.json and platform/tsconfig.json differ
+Files /Users/nateseluga/.claude/jobs/d6dffe8b/tmp/clean/bcns-data/worker/Dockerfile and platform/worker/Dockerfile differ
+(DESIGN.md / REQUIREMENTS.md: prose only — §8 supersede note, platform-shape bullets + R40–R45; see 78cdda9)

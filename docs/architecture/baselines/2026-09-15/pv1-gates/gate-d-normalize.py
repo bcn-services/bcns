@@ -8,13 +8,15 @@ R=[(r'/_next/static/[A-Za-z0-9_-]{16,}/', '/_next/static/BUILD/'),
    (r'(/_next/static/media/[\w-]+)\.[0-9a-f]{6,12}(\.\w+)', r'\1.HASH\2'),
    (r'(/_next/static/css/)[0-9a-f]{8,20}(\.css)', r'\1HASH\2'),
    (r'<lastmod>[^<]*</lastmod>', '<lastmod>X</lastmod>'),
-   (r'\$L[0-9a-f]+', '$Lx'), (r'"\$[0-9a-f]+"', '"$x"'),
+   (r'\$L[0-9a-f]+', '$Lx'), (r'"\$[0-9a-f]+"', '"$x"'),  # known hole: also matches a literal "$200" price string in the RSC payload; body copy is compared literally
    (r'\\"[0-9a-f]{20,}\\"', '\\"HEX\\"')]
 def norm(s):
     for a,b in R: s=re.sub(a,b,s)
     return s
-ok=0; names=sorted(p.name for p in now.glob('*.html'))
+ok=0; names=sorted({p.name for p in base.glob('*.html')} | {p.name for p in now.glob('*.html')})
 for n in names:
+    if not (base/n).exists() or not (now/n).exists():
+        print(f"{n}: MISSING on {'baseline' if not (base/n).exists() else 'new'} side"); continue
     a=norm((base/n).read_text(errors='replace')); b=norm((now/n).read_text(errors='replace'))
     if a==b: print(f"{n}: IDENTICAL after normalization ({len(b)} bytes)"); ok+=1; continue
     ta=a.split('><'); tb=b.split('><')
