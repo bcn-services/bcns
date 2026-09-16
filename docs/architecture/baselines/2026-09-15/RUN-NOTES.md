@@ -9,3 +9,5 @@ One line per decision or correction. Repo/git history is not restated.
 - Certbot bootstrap order in onboard-client.sh: http vhost → reload → certonly --webroot → https vhost → reload (a vhost citing a missing cert fails nginx -t).
 - No Resend key exists; hub degrades to mailto. GH_PACKAGES_TOKEN missing from bcns secrets. Both = morning steps.
 - Per-chunk PRs target platform-v1 and are merged onto it locally (`git merge --no-ff` + push) once their verifier passes; only platform-v1 → main is Nate's.
+- Chunk 2: Opus 5 infra review of 7dec700 = SAFE TO RUN + 6 should-fix; all applied in 864c132/57bba92 (idempotent useradd, env/vhost guards, renewal deploy hook, comment-safe registry). Live 00-default already had the :80 default_server 444 block; repo heredoc realigned (md5 3ec5a9fe…). l2details.com renewal is webroot, not standalone.
+- Chunk 2 droplet: sb/connect/mcp onboarded with Let's Encrypt certs (expire 2026-12-15); deploy key logs in as all three slugs; connect.env appended to /srv/connect/env (never printed). l2detailz vhost/unit/00-default md5 identical before/after. Gate (g) TLS half proven pre-deploy (502 until chunk 4 deploys apps).
