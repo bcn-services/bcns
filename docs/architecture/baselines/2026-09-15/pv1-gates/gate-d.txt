@@ -1,67 +1,12 @@
-# gate (d): local `next start` HTML of the 9 marketing routes, chunk 0 (main @6188584, baselines/2026-09-15/bcns/local-html/) vs platform-v1 worktree build, both normalized with the same regexes (build id, chunk/css/font hashes, sitemap lastmod, RSC flight ids)
-__.html: DIFFERS in 36 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - '' -> 'd8e62'
-   - '1f09735f2f8' -> ''
-   - '1' -> 'd25e842'
-   - 'f9' -> 'ea'
-about.html: DIFFERS in 38 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - '' -> 'dd5a0e08'
-   - 'b9a7326d' -> ''
-   - '5' -> ''
-   - 'bb68' -> 'f1e0c'
-pricing.html: DIFFERS in 48 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - '9' -> 'bb0'
-   - '40' -> '1c'
-   - '' -> '67'
-   - '' -> 'b'
-privacy.html: DIFFERS in 18 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - 'f9' -> 'ea'
-   - '3fd8217' -> ''
-   - '' -> '0'
-   - '' -> 'c787209'
+# gate (d): local `next start` HTML of the 9 marketing routes, chunk 0 (main @6188584, baselines/2026-09-15/bcns/local-html/) vs pv1/1-merge worktree build (job tmp web-now/), both normalized with the same regexes (build id dir, chunk/main-app/page/layout hashes, escaped buildId, media/css hashes, sitemap lastmod, RSC flight ids). Normalizer: pv1-gates/gate-d-normalize.py
+# $ python3 gate-d-normalize.py baselines/2026-09-15/bcns/local-html job-tmp/web-now
+__.html: IDENTICAL after normalization (60350 bytes)
+about.html: IDENTICAL after normalization (42163 bytes)
+pricing.html: IDENTICAL after normalization (55431 bytes)
+privacy.html: IDENTICAL after normalization (10213 bytes)
 robots.txt.html: IDENTICAL after normalization (67 bytes)
-services.html: DIFFERS in 26 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - '' -> '17aed9af6066c'
-   - '70c6d8b1ec8b7b2' -> 'ff'
-   - 'f9' -> 'ea'
-   - '3fd8217' -> ''
+services.html: IDENTICAL after normalization (71666 bytes)
 sitemap.xml.html: IDENTICAL after normalization (1023 bytes)
-terms.html: DIFFERS in 18 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - 'f9' -> 'ea'
-   - '3fd8217' -> ''
-   - '' -> '0'
-   - '' -> 'c787209'
-work.html: DIFFERS in 43 span(s):
-   - '' -> '37482ce081'
-   - '5c' -> 'd'
-   - 'f7b67f8b' -> ''
-   - 'ddf' -> '40'
-   - '' -> 'b'
-   - '0' -> '6e16'
-   - '' -> '98e126'
-   - 'a303a0e3' -> 'd'
-RESULT: CHECK
+terms.html: IDENTICAL after normalization (10221 bytes)
+work.html: IDENTICAL after normalization (43616 bytes)
+RESULT: PASS (9/9 identical)
