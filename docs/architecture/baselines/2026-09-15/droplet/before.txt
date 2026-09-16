@@ -1,9 +1,21 @@
+# droplet 146.190.138.141 read-only state capture, 2026-09-15 (before any platform-v1 change). Sections are labeled with the command that produced them. env file line-count only; contents never read.
+# $ md5sum /etc/nginx/sites-available/l2detailz /etc/nginx/sites-available/00-default /etc/systemd/system/bcns-app@.service /etc/ssl/cloudflare/origin.pem
 9177c4718a01d039bebbb0bc5b9cb790  /etc/nginx/sites-available/l2detailz
-3ec5a9fe7fd377b175110431318f94d5  /etc/nginx/sites-enabled/00-default
+3ec5a9fe7fd377b175110431318f94d5  /etc/nginx/sites-available/00-default
 20bfad516f730a24b1ff29c4f6504462  /etc/systemd/system/bcns-app@.service
 dd2a55091119f5fca9b6d92a2effef25  /etc/ssl/cloudflare/origin.pem
+
+# $ ls -l /etc/nginx/sites-enabled
+total 0
+lrwxrwxrwx 1 root root 37 Aug  1 00:23 00-default -> /etc/nginx/sites-available/00-default
+lrwxrwxrwx 1 root root 36 Aug  1 00:23 l2detailz -> /etc/nginx/sites-available/l2detailz
+
+# $ systemctl show bcns-app@l2detailz -p MainPID -p ActiveState -p ExecMainStartTimestamp
 MainPID=513731
+ExecMainStartTimestamp=Fri 2026-09-11 06:08:18 UTC
 ActiveState=active
+
+# $ ufw status numbered
 Status: active
 
      To                         Action      From
@@ -35,7 +47,20 @@ Status: active
 [25] 80,443/tcp                 ALLOW IN    2c0f:f248::/32            
 [26] 80,443/tcp (v6)            ALLOW IN    Anywhere (v6)              # temp: pre-Cloudflare launch, remove when CF fronts origin
 
+
+# $ ls /srv
 l2detailz
+
+# $ ls /etc/letsencrypt/live
 README
 l2details.com
+
+# $ ls /etc/letsencrypt/renewal 2>/dev/null
+l2details.com.conf
+
+# $ certbot --version
 certbot 2.9.0
+
+# $ cat /srv/l2detailz/env | grep -c .
+10
+
