@@ -4,7 +4,7 @@ Project-level guidance for Claude Code agents working in this repo.
 
 ## What this repo is
 
-bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the droplet provisioning scripts. Client apps do **not** live here; each gets its own repo (see [Adding a client app later](#adding-a-client-app-later) and `docs/architecture/hosted-web-model.md`). Contents:
+bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the droplet provisioning scripts. **Direction as of 2026-09-15:** the bcns Connect platform (`bcns-data`) and the Deluxe client apps (first `apps/sb`) move into this repo, with a hub at `connect.bcn-services.com` and an MCP server — see `docs/architecture/platform-v1.md` for the layout, chunks and verification gates. Until that merge PR lands, the layout below is current. Contents:
 - `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
 - `packages/ui/` — shared React component library (`@bcn-services/ui`)
 - `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@bcn-services/config`)
@@ -70,7 +70,7 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 
 ## Adding a client app later
 
-Client apps are **not** added to this monorepo. Each new client business gets **its own repo**. See `docs/architecture/hosted-web-model.md` for the decision and rationale.
+Superseded 2026-09-15: client apps become `apps/<slug>` in this repo, stamped by `scripts/new-app.sh` from `apps/_template` (plan: `docs/architecture/platform-v1.md`). `docs/architecture/hosted-web-model.md` records the earlier decision. Legacy one-off builds (Technology Associates, l2detailz) keep their own repos.
 
 1. Create the new repo and wire it against the shared packages by hand. **There is no starter template today** — `templates/hosted-web/` was deleted once its logic moved into `app-core@0.2.0`, and its replacement (a standalone GitHub Template Repository) does not exist yet.
 2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@bcn-services/ui`, `@bcn-services/config`, and `@bcn-services/app-core`.
