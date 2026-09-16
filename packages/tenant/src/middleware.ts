@@ -54,8 +54,21 @@ export function tenantMiddleware(
     // queued. NextResponse.redirect() starts with empty headers, so copy them
     // across — otherwise the session change is silently dropped and the next
     // request arrives with the stale cookie, looping forever.
+    //
+    // Behind nginx (bcns-app@<slug>), request.url is the *internal* origin —
+    // https://localhost:3101 — so a redirect built from it sends the browser to
+    // localhost. The Host header is the public name: onboard-client.sh's vhost
+    // sets `Host $host`, overriding anything the client sent, and the catch-all
+    // vhost drops unknown hosts, so it is not attacker-controlled. Only Host is
+    // used (never X-Forwarded-Host, which nginx passes through untouched).
+    const publicOrigin = (): string => {
+      const host = request.headers.get("host");
+      if (!host) return request.url;
+      const proto = request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(/:$/, "");
+      return `${proto}://${host}`;
+    };
     const redirectTo = (target: string): NextResponse => {
-      const redirect = NextResponse.redirect(new URL(target, request.url));
+      const redirect = NextResponse.redirect(new URL(target, publicOrigin()));
       for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
       return redirect;
     };
