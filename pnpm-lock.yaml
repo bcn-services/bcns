@@ -18,6 +18,58 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  apps/_template:
+    dependencies:
+      '@bcn-services/app-core':
+        specifier: workspace:*
+        version: link:../../packages/app-core
+      '@bcn-services/data-client':
+        specifier: workspace:*
+        version: link:../../packages/data-client
+      '@bcn-services/tenant':
+        specifier: workspace:*
+        version: link:../../packages/tenant
+      '@bcn-services/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@supabase/ssr':
+        specifier: ^0.12.7
+        version: 0.12.7(@supabase/supabase-js@2.116.0)
+      '@supabase/supabase-js':
+        specifier: ^2.116.0
+        version: 2.116.0
+      next:
+        specifier: 14.2.18
+        version: 14.2.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@bcn-services/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+      eslint:
+        specifier: ^9.15.0
+        version: 9.39.4(jiti@2.7.0)
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   apps/sb:
     dependencies:
       '@bcn-services/app-core':
@@ -26,6 +78,9 @@ importers:
       '@bcn-services/data-client':
         specifier: workspace:*
         version: link:../../packages/data-client
+      '@bcn-services/tenant':
+        specifier: workspace:*
+        version: link:../../packages/tenant
       '@bcn-services/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -190,6 +245,34 @@ importers:
       '@types/node':
         specifier: ^22.9.0
         version: 22.20.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/tenant:
+    dependencies:
+      '@supabase/ssr':
+        specifier: ^0.12.7
+        version: 0.12.7(@supabase/supabase-js@2.116.0)
+    devDependencies:
+      '@bcn-services/config':
+        specifier: workspace:*
+        version: link:../config
+      '@supabase/supabase-js':
+        specifier: ^2.116.0
+        version: 2.116.0
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.1
+      eslint:
+        specifier: ^9.15.0
+        version: 9.39.4(jiti@2.7.0)
+      next:
+        specifier: 14.2.18
+        version: 14.2.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
