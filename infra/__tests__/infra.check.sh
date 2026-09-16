@@ -66,6 +66,7 @@ check "rejects non-numeric port"    "$(try good abcd ex.com)"               "1"
 check "rejects privileged port"     "$(try good 80 ex.com)"                 "1"
 check "rejects uppercase slug"      "$(try BAD 3000 ex.com)"                "1"
 check "rejects wrong arg count"     "$(bash "$here/onboard-client.sh" only-one >/dev/null 2>&1; echo $?)" "1"
+check "rejects five args"           "$(bash "$here/onboard-client.sh" a 3000 ex.com certbot extra >/dev/null 2>&1; echo $?)" "1"
 
 # The vhost heredoc needs root to emit, so assert on the template text instead.
 # 00-default is a `return 444` catch-all: drop the www block and every www
@@ -81,6 +82,48 @@ case "$vhost" in
   *'return 301 https://$domain\$request_uri;'*) ok "www redirects to apex, preserving the path" ;;
   *) bad "www block does not 301 to the apex with \$request_uri" ;;
 esac
+
+echo "onboard-client.sh ports registry (infra/ports.txt)"
+
+reg="$work/ports.txt"
+printf 'l2detailz 3100\nsb 3101\n' > "$reg"
+tryp() { BCNS_PORTS_FILE="$reg" BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" "$@" >/dev/null 2>&1; echo $?; }
+check "refuses a slug missing from the registry"       "$(tryp ghost 3105 ghost.bcn-services.com)"   "1"
+check "refuses a slug on a port other than registered" "$(tryp sb 3102 sb.bcn-services.com)"          "1"
+check "refuses a port registered to another slug"      "$(tryp l2detailz 3101 l2details.com)"         "1"
+check "accepts a registered slug/port pair"            "$(tryp sb 3101 sb.bcn-services.com)"          "0"
+check "refuses when the registry file is missing"      "$(BCNS_PORTS_FILE=$work/none BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" sb 3101 sb.bcn-services.com >/dev/null 2>&1; echo $?)" "1"
+check "refuses an unknown cert mode"                   "$(tryp sb 3101 sb.bcn-services.com bogus)"    "1"
+check "refuses a relative cert dir"                    "$(tryp sb 3101 sb.bcn-services.com certs/x)"  "1"
+
+# The committed registry itself: unique slugs, unique ports, every port in range.
+regs=$(grep -v '^#' "$here/ports.txt" | grep -c .)
+check "ports.txt slugs are unique" "$(grep -v '^#' "$here/ports.txt" | awk '{print $1}' | sort -u | wc -l | tr -d ' ')" "$regs"
+check "ports.txt ports are unique" "$(grep -v '^#' "$here/ports.txt" | awk '{print $2}' | sort -u | wc -l | tr -d ' ')" "$regs"
+check "ports.txt ports are 1024-65535" "$(grep -v '^#' "$here/ports.txt" | awk '$2<1024||$2>65535' | wc -l | tr -d ' ')" "0"
+check "ports.txt pins l2detailz to 3100 (the live unit)" "$(awk '$1=="l2detailz"{print $2}' "$here/ports.txt")" "3100"
+
+echo "onboard-client.sh cert modes"
+
+render() { BCNS_PORTS_FILE="$reg" BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" "$@" 2>/dev/null; }
+# cloudflare mode must emit exactly the pre-platform-v1 template (fixture rendered
+# from the heredoc that shipped before the cert-mode argument existed).
+check "cloudflare render == pre-platform-v1 template (l2detailz fixture)" \
+  "$(render l2detailz 3100 l2details.com cloudflare | diff -q - "$here/__tests__/fixtures/l2detailz.vhost" >/dev/null && echo same || echo differs)" "same"
+check "non-bcn-services domain defaults to cloudflare" \
+  "$(render l2detailz 3100 l2details.com | diff -q - "$here/__tests__/fixtures/l2detailz.vhost" >/dev/null && echo same || echo differs)" "same"
+sbv=$(render sb 3101 sb.bcn-services.com)
+case "$sbv" in *'/etc/letsencrypt/live/sb.bcn-services.com/fullchain.pem'*) ok "bcn-services subdomain defaults to certbot live paths" ;; *) bad "certbot live cert path missing" ;; esac
+case "$sbv" in *'location /.well-known/acme-challenge/'*) ok "certbot vhost serves the ACME webroot on :80" ;; *) bad "ACME location missing" ;; esac
+case "$sbv" in *'listen 80;'*) ok "certbot vhost listens on 80" ;; *) bad "no :80 listener" ;; esac
+case "$sbv" in *'return 301 https://sb.bcn-services.com$request_uri;'*) ok "certbot vhost 301s http -> https" ;; *) bad "http->https redirect missing" ;; esac
+case "$sbv" in *'server_name www.'*) bad "certbot vhost must not add a www block for a subdomain" ;; *) ok "certbot vhost has no www block" ;; esac
+case "$sbv" in *'/etc/ssl/cloudflare/'*) bad "certbot vhost must not reference the Cloudflare origin cert" ;; *) ok "certbot vhost never touches the Cloudflare cert" ;; esac
+case "$sbv" in *'proxy_pass http://127.0.0.1:3101;'*) ok "certbot vhost proxies to the registered port" ;; *) bad "proxy_pass port wrong" ;; esac
+case "$sbv" in *'proxy_buffer_size        16k;'*) ok "certbot vhost keeps the Supabase cookie buffers" ;; *) bad "proxy buffers missing" ;; esac
+cdv=$(render sb 3101 sb.bcn-services.com /etc/ssl/custom)
+case "$cdv" in *'ssl_certificate     /etc/ssl/custom/fullchain.pem;'*) ok "cert-dir mode uses <dir>/fullchain.pem" ;; *) bad "cert-dir path wrong" ;; esac
+case "$(cat "$here/onboard-client.sh")" in *'certbot certonly --webroot'*) ok "certbot runs webroot HTTP-01 (no nginx plugin rewriting vhosts)" ;; *) bad "certbot invocation not webroot" ;; esac
 
 echo "syntax"
 for f in "$here"/*.sh; do

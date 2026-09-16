@@ -1,0 +1,7 @@
+# slug port — one line per app on the shared droplet. Source of truth for
+# onboard-client.sh (refuses unregistered slugs and port collisions) and
+# scripts/new-app.sh (appends here). Keep sorted by port.
+l2detailz 3100
+sb 3101
+connect 3102
+mcp 3103

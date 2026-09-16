@@ -8,7 +8,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ufw fail2ban unattended-upgrades rsync curl gnupg \
+apt-get install -y ufw fail2ban unattended-upgrades rsync curl gnupg certbot \
   nginx s3cmd openssl
 
 # postgresql-client matching Supabase's Postgres major (17) — Ubuntu's default
@@ -36,6 +36,11 @@ echo "PasswordAuthentication no" > /etc/ssh/sshd_config.d/00-bcns.conf
 systemctl reload ssh
 
 # Firewall: SSH open; web only from Cloudflare (the WAF is decoration otherwise)
+# platform-v1 (2026-09-15): hosts under bcn-services.com resolve straight to the
+# droplet (no Cloudflare) and get Let's Encrypt certs over HTTP-01, so the live
+# droplet ALSO carries `ufw allow 80,443/tcp` from Anywhere (rule present since
+# the pre-Cloudflare launch; see docs/architecture/baselines/2026-09-15/droplet).
+# A fresh droplet built from this script needs that rule added by hand.
 ipv4=$(curl -fsS https://www.cloudflare.com/ips-v4) || { echo "CF ipv4 fetch failed" >&2; exit 1; }
 ipv6=$(curl -fsS https://www.cloudflare.com/ips-v6) || { echo "CF ipv6 fetch failed" >&2; exit 1; }
 ufw default deny incoming
@@ -49,6 +54,8 @@ ufw --force enable
 # nginx: TLS termination with a Cloudflare Origin CA cert; per-client vhosts
 # are dropped in by onboard-client.sh. Default server rejects unknown hosts.
 install -d -m 700 /etc/ssl/cloudflare
+# ACME HTTP-01 webroot for onboard-client.sh's certbot mode.
+install -d -m 755 /var/www/acme
 
 # Every vhost below references these cert paths, so nginx cannot even load its
 # config until they exist -- and the real Cloudflare Origin CA cert is a manual
