@@ -92,7 +92,10 @@ Done when Nate signs in as the SB smoke user and sees 0 sources, health, team, a
 
 Added 2026-09-17. Was in "Deferred, with triggers"; promoted to its own chunk because the direction
 is decided, it is small, and it depends on nothing in 5–8. Runs after 4, in parallel with 5. Scope is
-exactly the files below — no new schema, no new RPC, no OAuth, no UX pass (that stays in 9).
+exactly the items below — one view migration, no new table, no new RPC, no OAuth, no UX pass (9).
+- One migration, views only: `api.media_v1` gains `attributes` (it exposes `source` already but not
+  `attributes`, so `web_view_link` is unreachable from an app today); `api.activity_v1`'s creative
+  branch drops `where source = 'upload'` so Drive files reach the feed.
 - `apps/sb/app/library/`: delete `UploadForm.tsx`'s browser-PUT-to-Storage flow and the
   `registerUpload` server action. Replace the affordance with a line pointing at the client's
   connected Drive folder.
