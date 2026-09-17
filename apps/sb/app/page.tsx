@@ -267,7 +267,7 @@ export default async function HomePage({
               })}
             </div>
           ) : (
-            <p className="state-note">No files yet. Upload your first creative.</p>
+            <p className="state-note">No files yet. Add your first creative to the connected Google Drive folder.</p>
           )}
         </Panel>
 

@@ -27,6 +27,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface MediaLike {
   id?: string | null;
+  /** `data.source`. 'upload' rows live in Storage; 'drive' rows live in the client's Drive folder. */
+  source?: string | null;
+  /** Drive rows carry `web_view_link` here. api.media_v1 exposes it as of 20260917000100. */
+  attributes?: Record<string, unknown> | null;
   title?: string | null;
   filename?: string | null;
   tags?: string[] | null;
@@ -75,6 +79,18 @@ export function mediaLabel(row: MediaLike): string {
  */
 export function mediaThumbPath(row: MediaLike): string | null {
   return row.thumb_path ?? null;
+}
+
+/**
+ * Where a Drive-sourced row opens. Drive keeps the bytes, so there is nothing to
+ * sign and no egress to meter — the row's own `web_view_link` is the download.
+ * Null for every other source, which is what tells the page to render the
+ * egress-metered `download_url` button instead.
+ */
+export function driveLink(row: MediaLike): string | null {
+  if (row.source !== "drive") return null;
+  const link = (row.attributes as { web_view_link?: unknown } | null | undefined)?.web_view_link;
+  return typeof link === "string" && link ? link : null;
 }
 
 /** Human byte size: "812 B", "9.4 KB", "24 MB", "1.5 GB". */

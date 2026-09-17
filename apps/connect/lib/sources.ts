@@ -12,7 +12,7 @@
  */
 
 /** `data.source` minus 'platform', which is bookkeeping rather than a connector. */
-export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "upload", "dashboard"] as const;
+export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive", "upload", "dashboard"] as const;
 
 export type HubSource = (typeof HUB_SOURCES)[number];
 
@@ -48,6 +48,7 @@ const TITLES: Record<HubSource, string> = {
   meta: "Meta Ads",
   monday: "Monday.com",
   meet: "Google Meet",
+  drive: "Google Drive",
   upload: "Uploads",
   dashboard: "Dashboard",
 };

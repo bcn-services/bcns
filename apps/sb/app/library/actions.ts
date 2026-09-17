@@ -5,10 +5,9 @@
  * Creative Folder" section, each one a named RPC through lib/data.ts as the
  * signed-in user. No direct table writes and no service-role key.
  *
- * Uploaded bytes never reach here: the browser PUTs the object straight to
- * Supabase Storage on its own cookie session and posts only the resulting path
- * to `registerUpload` below, which calls `register_upload`. See the engineer
- * report for why `client.media.upload()` can't run in the browser bundle.
+ * Nothing here writes source='upload': files arrive through the Drive connector
+ * (platform-v1 §4b). `api.register_upload` still exists for the service-role
+ * `scripts/import-media` path, but no app code calls it.
  *
  * Actions don't return errors (a server component can't read one); they
  * redirect back with `?error=<code>`, which page.tsx renders as an alert.
@@ -17,7 +16,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDataClient } from "@/lib/data";
-import { MAX_UPLOAD_BYTES, parseIds, parseTags, validateSetName } from "@/lib/library";
+import { parseIds, parseTags, validateSetName } from "@/lib/library";
 
 /** Ids the ?dl= tray carries; more would push the redirect past Node's 16 KB header limit. */
 const DL_TRAY_MAX = 50;
@@ -218,34 +217,4 @@ export async function setAction(form: FormData): Promise<void> {
     redirect(target);
   }
   backTo(back, error);
-}
-
-/**
- * Second half of an upload: the browser has already PUT the object, this
- * registers it. Called imperatively from UploadForm, so unlike the form actions
- * above it returns a result instead of redirecting — the client refreshes once,
- * after the last file.
- */
-export async function registerUpload(input: { path: string; title?: string; tags?: string[]; bytes?: number }): Promise<{ ok: boolean; error?: string }> {
-  const client = await getDataClient();
-  if (!client) return { ok: false, error: "Not connected to the data platform." };
-  if (typeof input?.path !== "string" || !input.path) return { ok: false, error: "Missing upload path." };
-  if (Number(input.bytes ?? 0) > MAX_UPLOAD_BYTES) return { ok: false, error: "File is larger than 100 MB." };
-
-  const { tags, invalid } = parseTags((input.tags ?? []).join(","));
-  if (invalid.length) return { ok: false, error: `Not a valid tag: ${invalid[0]}` };
-
-  try {
-    await client.rpc.register_upload({
-      path: input.path,
-      ...(input.title ? { title: input.title.slice(0, 200) } : {}),
-      ...(tags.length ? { tags } : {}),
-    });
-  } catch (err) {
-    const message = String((err as { message?: string })?.message ?? err);
-    console.error("library: register_upload failed", message);
-    return { ok: false, error: message === "too_large" ? "File is larger than 100 MB." : "Upload could not be registered." };
-  }
-  revalidatePath("/library");
-  return { ok: true };
 }

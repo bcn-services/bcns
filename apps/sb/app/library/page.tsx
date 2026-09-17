@@ -1,11 +1,17 @@
 /**
  * /library — Content Library + Creative Folder, per DESIGN.md.
  *
- * Toolbar (search / tag filter / Upload / New set) → media grid with checkbox
- * selection and a bulk bar → item view → the Creative Folder sidebar of sets.
- * Everything except the upload is server-rendered: the grid is one <form> of
- * checkboxes whose submit buttons are the bulk operations, so selection needs
- * no client JavaScript (the bar reveals itself with CSS `:has()`).
+ * Toolbar (search / tag filter / New set) → media grid with checkbox selection
+ * and a bulk bar → item view → the Creative Folder sidebar of sets. The whole
+ * page is server-rendered: the grid is one <form> of checkboxes whose submit
+ * buttons are the bulk operations, so selection needs no client JavaScript (the
+ * bar reveals itself with CSS `:has()`).
+ *
+ * Files arrive through the Drive connector, not an upload form (platform-v1
+ * §4b), so the page needs no client bundle at all. Two kinds of row land here:
+ * 'upload' rows from the pre-4b flow and `scripts/import-media`, whose bytes are
+ * in Storage and whose download is egress-metered, and 'drive' rows, whose bytes
+ * stay in Drive and open through their own `web_view_link`.
  *
  * The library is dashboard-sourced, so this page has no not-connected state —
  * only "empty" and "data".
@@ -13,11 +19,11 @@
 
 import Link from "next/link";
 import { getDataClient } from "@/lib/data";
-import { getConfig } from "@/lib/env";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { parseRange, todayInTimezone } from "@/lib/overview";
 import {
   collectTags,
+  driveLink,
   egressLine,
   fileCountLabel,
   filterMedia,
@@ -37,7 +43,6 @@ import { AppHeader, parsePopup } from "@/app/_components/AppHeader";
 import { Panel, PanelHead, Unconfigured } from "@/app/_components/Panel";
 import { LibraryIcon } from "@/app/_components/icons";
 import { bulkAction, downloadMedia, saveMedia, setAction, type LibraryError } from "./actions";
-import { UploadForm } from "./UploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -106,19 +111,19 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
 
   const [mediaR, setsR, itemsR, egressR] = await Promise.allSettled([
     client.views
-      .media_v1("id,client_id,title,filename,tags,bytes,kind,mime,storage_path,thumb_path,created_at")
+      .media_v1("id,client_id,source,attributes,title,filename,tags,bytes,kind,mime,storage_path,thumb_path,created_at")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(MEDIA_LIMIT),
     client.views.media_sets_v1("id,name,description,file_count,cover_thumb_path,created_at").order("created_at", { ascending: false }).limit(SET_LIMIT),
     client.views.media_set_items_v1("set_id,media_id,added_at").limit(SET_ITEM_LIMIT),
-    client.views.egress_status_v1("client_id,bytes_used,quota_bytes,exceeded").single(),
+    client.views.egress_status_v1("bytes_used,quota_bytes,exceeded").single(),
   ]);
 
   const allMedia = (unwrap(mediaR, "media_v1").data ?? []) as MediaLike[];
   const sets = (unwrap(setsR, "media_sets_v1").data ?? []) as MediaSetLike[];
   const setItems = (unwrap(itemsR, "media_set_items_v1").data ?? []) as { set_id?: string | null; media_id?: string | null; added_at?: string | null }[];
-  const egressRow = unwrap(egressR, "egress_status_v1").data as { client_id?: string | null; bytes_used?: number | null; quota_bytes?: number | null; exceeded?: boolean | null } | null;
+  const egressRow = unwrap(egressR, "egress_status_v1").data as { bytes_used?: number | null; quota_bytes?: number | null; exceeded?: boolean | null } | null;
 
   const egress = egressLine(egressRow);
   const byId = new Map<string, MediaLike>(allMedia.filter((m) => m.id).map((m) => [m.id as string, m]));
@@ -166,10 +171,6 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
     }
     return `/library?${next.toString()}`;
   };
-
-  const { supabaseUrl, supabaseAnonKey } = getConfig();
-  const clientId = egressRow?.client_id ?? (allMedia[0] as { client_id?: string | null } | undefined)?.client_id ?? null;
-  const canUpload = Boolean(supabaseUrl && supabaseAnonKey && clientId);
 
   return (
     <>
@@ -220,17 +221,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
           ) : null}
         </form>
 
-        <details className="popup lib-menu">
-          <summary className="page-btn">Upload</summary>
-          <div className="popup-panel popup-panel--wide">
-            <div className="popup-panel__title">Upload creatives</div>
-            {canUpload ? (
-              <UploadForm supabaseUrl={supabaseUrl as string} anonKey={supabaseAnonKey as string} clientId={clientId as string} />
-            ) : (
-              <p className="state-note">Uploads are unavailable until the workspace finishes connecting.</p>
-            )}
-          </div>
-        </details>
+        <p className="state-note">Add files to your connected Google Drive folder — they appear here on the next sync.</p>
 
         <details className="popup lib-menu">
           <summary className="page-btn">New set</summary>
@@ -280,19 +271,13 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
                   </Link>
                 }
               />
-              <p className="state-note">Each file is minted full-quality when you click it, so nothing is charged until you do.</p>
+              <p className="state-note">Each Storage file is minted full-quality when you click it, so nothing is charged until you do. Drive files open in Drive and are never charged.</p>
               <div className="rows">
                 {trayRows.map((row) => (
                   <div className="row" key={row.id}>
                     <span className="row__label">{mediaLabel(row)}</span>
                     <span className="row__value">{formatBytes(row.bytes)}</span>
-                    <form action={downloadMedia}>
-                      <input type="hidden" name="back" value={back} />
-                      <input type="hidden" name="media_id" value={row.id ?? ""} />
-                      <button className="btn-plain btn-plain--inline" type="submit" disabled={egress.exceeded}>
-                        Download
-                      </button>
-                    </form>
+                    <DownloadControl row={row} back={back} exceeded={egress.exceeded} label="Download" />
                   </div>
                 ))}
               </div>
@@ -308,7 +293,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
             />
 
             {allMedia.length === 0 ? (
-              <p className="state-note">No files yet. Upload your first creative.</p>
+              <p className="state-note">No files yet. Add your first creative to the connected Google Drive folder.</p>
             ) : rows.length === 0 ? (
               <p className="state-note">No files match this search.</p>
             ) : (
@@ -527,13 +512,7 @@ function ItemView({
           </form>
 
           <div className="lib-item__actions">
-            <form action={downloadMedia}>
-              <input type="hidden" name="back" value={back} />
-              <input type="hidden" name="media_id" value={item.id ?? ""} />
-              <button className="btn-plain btn-plain--inline" type="submit" disabled={exceeded}>
-                Download full quality
-              </button>
-            </form>
+            <DownloadControl row={item} back={back} exceeded={exceeded} label="Download full quality" />
             <form action={bulkAction}>
               <input type="hidden" name="back" value={back} />
               <input type="hidden" name="op" value="delete" />
@@ -546,5 +525,31 @@ function ItemView({
         </div>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * The one download affordance, so the two callers (the `?dl=` tray and the item
+ * view) can never drift apart. A Drive row has no Storage object to sign, so it
+ * gets a plain link to Drive and is never gated on egress; everything else goes
+ * through `downloadMedia`, which mints through `api.download_url` and is metered.
+ */
+function DownloadControl({ row, back, exceeded, label }: { row: MediaLike; back: string; exceeded: boolean; label: string }) {
+  const link = driveLink(row);
+  if (link) {
+    return (
+      <a className="btn-plain btn-plain--inline" href={link} target="_blank" rel="noopener noreferrer">
+        Open in Drive
+      </a>
+    );
+  }
+  return (
+    <form action={downloadMedia}>
+      <input type="hidden" name="back" value={back} />
+      <input type="hidden" name="media_id" value={row.id ?? ""} />
+      <button className="btn-plain btn-plain--inline" type="submit" disabled={exceeded}>
+        {label}
+      </button>
+    </form>
   );
 }
