@@ -233,12 +233,12 @@ test("fileCountLabel: singular/plural", () => {
 
 test("page copy: /library empty state matches DESIGN.md exactly", () => {
   const src = readFileSync(new URL("../app/library/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /No files yet\. Upload your first creative\./);
+  assert.match(src, /No files yet\. Add your first creative to the connected Google Drive folder\./);
 });
 
 test("page copy: home Content Library panel uses the same empty-state copy", () => {
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /No files yet\. Upload your first creative\./);
+  assert.match(src, /No files yet\. Add your first creative to the connected Google Drive folder\./);
 });
 
 test("page copy: /library no-match state has its own distinct copy", () => {

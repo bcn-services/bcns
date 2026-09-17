@@ -104,8 +104,8 @@ columns.
 ## Global rules
 
 - Next.js 14 App Router, server components by default; client components only
-  where a browser interaction needs them (upload, selection, popups if
-  `<details>` can't do it).
+  where a browser interaction needs them (selection, popups if `<details>`
+  can't do it). As of platform-v1 §4b /library has no client component at all.
 - Data only through `lib/data.ts` (`api.*_v1` views, RPCs) as the signed-in
   user. No env reads outside `lib/env.ts`. Nothing at build time. No
   service-role key. No new dependencies without asking.
@@ -259,8 +259,8 @@ Header (with its button active) + a page title row, then:
 
 Header (with its button active) + a page title row, then:
 
-- Toolbar: search (title, filename, tags), tag filter, **Upload** (multi-
-  file), **New set**.
+- Toolbar: search (title, filename, tags), tag filter, a line pointing at the
+  connected Google Drive folder, **New set**.
 - Media grid: `media_v1` not deleted, newest first; thumb (`thumbUrls`),
   title/filename, tags, byte size. Checkbox select → bulk bar: **Add tags**
   (`bulk_tag`), **Add to set** (`set_media_set_items`), **Download** (each
@@ -271,16 +271,15 @@ Header (with its button active) + a page title row, then:
   description, file count); open a set → its items (`media_set_items_v1`)
   with remove / reorder; rename / delete set (`update_media_set`,
   `delete_media_set`).
-- Upload: `client.media.upload(file, {title, tags})`. Files are full-quality
-  creatives (tens of MB): the upload must not go through a Next server action
-  body (1 MB default). Use the browser session (`@supabase/ssr` browser
-  client) to build the data client client-side for the upload step only, or
-  raise `serverActions.bodySizeLimit`; document the choice in the PR. Hosted
-  probe as smoke+sb (2026-09-13) passed: upload → `media_v1` row →
-  `downloadUrl` 200 → `delete_media` soft-deletes (`deleted_at` set).
+- Adding files: there is no upload form. Files arrive through the Drive
+  connector (platform-v1 §4b, 2026-09-17) — the client drops them in the
+  connected Google Drive folder and the next sync indexes them into
+  `data.media` as `source='drive'`. The toolbar says so instead of offering an
+  upload. `api.register_upload` still exists for the service-role
+  `scripts/import-media` path, but no app code calls it.
 - Egress: show "Downloads this period: X of Y" from `egress_status_v1` and
   disable downloads when exhausted.
-- Empty → "No files yet. Upload your first creative."
+- Empty → "No files yet. Add your first creative to the connected Google Drive folder."
 
 **Platform limits as built (2026-09-13, decided; lift only with a bcns-data
 change)**:
@@ -291,11 +290,12 @@ change)**:
   while a download ticket exists, so the original is not a thumbnail source.
 - Egress is metered in bytes (`bytes_used` / `quota_bytes`), so the line
   reads "Downloads this period: 364 B of 20 GB", not a download count.
-- Upload path: browser `@supabase/ssr` client PUTs the bytes to storage, then
-  a `register_upload` server action records the path. `client.media.upload()`
-  cannot run in the browser under Next 14 (its `base64url` decode throws in
-  the bundled Buffer polyfill). Bulk download is a tray of per-file buttons
-  that mint on click, never on render, so a refresh does not spend egress.
+- Two download routes, one control (`DownloadControl` in `app/library/page.tsx`)
+  so the tray and the item view cannot drift: a `source='drive'` row opens its
+  own `attributes.web_view_link` (Drive holds the bytes — nothing to sign, no
+  egress), anything else posts to `downloadMedia` → `api.download_url`, which is
+  metered. Bulk download is a tray of per-file controls that mint on click,
+  never on render, so a refresh does not spend egress.
 
 ## Out of scope (this build)
 
