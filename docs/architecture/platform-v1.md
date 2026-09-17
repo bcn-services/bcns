@@ -88,6 +88,27 @@ Until a source's OAuth app is approved its button is "Request connection": one R
 Brand from `packages/ui`. Marketing header gets a plain "Sign in" anchor to the hub.
 Done when Nate signs in as the SB smoke user and sees 0 sources, health, team, access, and the SB link.
 
+### 4b. Uploads repointed at Drive (targeted fix, no new surface)
+
+Added 2026-09-17. Was in "Deferred, with triggers"; promoted to its own chunk because the direction
+is decided, it is small, and it depends on nothing in 5–8. Runs after 4, in parallel with 5. Scope is
+exactly the files below — no new schema, no new RPC, no OAuth, no UX pass (that stays in 9).
+- `apps/sb/app/library/`: delete `UploadForm.tsx`'s browser-PUT-to-Storage flow and the
+  `registerUpload` server action. Replace the affordance with a line pointing at the client's
+  connected Drive folder.
+- `apps/sb/app/library/page.tsx`: the `media_v1` select adds `source` and `attributes`, so Drive rows
+  render. Download link branches: `api.download_url` for `source='upload'` (existing rows keep
+  working), `attributes.web_view_link` for `source='drive'`.
+- `apps/connect/lib/sources.ts`: add `drive` to `HUB_SOURCES` (lists 6 of 7 `data.source` values today).
+- Leave in place: the `media` bucket and its policies (the Drive connector writes thumbs there),
+  `api.register_upload` and `data.register_media` (still the service-role import path for
+  `scripts/import-media`), `egress_quota_bytes`/`egress_ledger`/`download_tickets` (download
+  accounting, not upload-specific). Nothing to reclaim — Storage bills actual bytes, not reservations.
+Precondition: SB has a `sources` row for `drive` with a `folder_id`, or SB loses its only way to add
+files. Check before merging; if absent, the PR states it and waits.
+Done when `/library` lists Drive-sourced rows with a working link, no code path writes
+`source='upload'`, the hub shows a Drive card, and `pnpm lint && pnpm typecheck && pnpm build` pass.
+
 ### 5. OAuth apps and connect flows (start day 1, calendar-bound)
 - Shopify: Partner app to public-unlisted (or a new app); `/oauth/shopify/start` + `/callback` in the hub with state + HMAC; token written to the existing token row for that client; the three GDPR webhooks with HMAC verify; privacy/terms URLs (exist on the site); dev-store pass; submit for review.
 - Meta: app with Facebook Login for Business, `ads_read`, long-lived token exchange → token row; data-deletion callback URL; business verification; app review submission.
@@ -117,13 +138,12 @@ no plan, no gate, waits on 0–8 finishing and on real client usage to react to.
 fold in when this starts:
 - Dashboard's source card doesn't belong grouped with real connectors (Shopify/Meta/monday/Meet/Drive) — give it its own spot on the page.
 - Source card sorting/ordering.
-- Uploads and Dashboard aren't connectors — they're the client's own manual data channels (a browser upload, a record typed into the app) and can never leave the "Not connected / Request connection" state that pattern implies. Needs its own treatment. (The Uploads storage-path fix itself is decided already — see "Deferred, with triggers" below, not waiting on this pass.)
-- `drive` has no hub card at all: `HUB_SOURCES` in `apps/connect/lib/sources.ts` lists 6 of the 7 `data.source` values, missing `drive` even though the worker's drive connector is built and writes health rows.
+- Uploads and Dashboard aren't connectors — they're the client's own manual data channels (a browser upload, a record typed into the app) and can never leave the "Not connected / Request connection" state that pattern implies. Needs its own treatment. (The Uploads storage-path fix itself is chunk 4b, not waiting on this pass.)
 - General UX/visual pass on the hub once it has real traffic to learn from.
 
 ## Order and parallelism
 
-0 → 1 serial and verification-heavy. 3 starts once 1's layout exists; 4 and 6 after 3. 2 is Nate steps plus script edits, in parallel with 1. 5's partner-dashboard steps start day 1 (Nate); its code follows 4's skeleton. 7 after 2 and 4. 8 last. 9 waits on all of 0–8 and is not scheduled. A first orchestrate session realistically lands 0, 1, 3 and the hub skeleton, with every hosted step queued as a wizard.
+0 → 1 serial and verification-heavy. 3 starts once 1's layout exists; 4 and 6 after 3. 2 is Nate steps plus script edits, in parallel with 1. 4b after 4, in parallel with 5, and blocks nothing. 5's partner-dashboard steps start day 1 (Nate); its code follows 4's skeleton. 7 after 2 and 4. 8 last. 9 waits on all of 0–8 and is not scheduled. A first orchestrate session realistically lands 0, 1, 3 and the hub skeleton, with every hosted step queued as a wizard.
 
 ## Calendar constraints
 
@@ -150,7 +170,6 @@ Vercel ignored-build step and build command · GCP WIF re-scope run · GitHub se
 
 ## Deferred, with triggers
 
-- Deprecate `register_upload`'s Supabase Storage path (`source='upload'` in `data.media`) and repoint the hub's Uploads affordance at Drive — decided 2026-09-16 (Nate): storage stays on Drive, the dashboard only browses/searches what's there through the Drive connector already built in chunk 0. Trigger: before any client uploads a real file through it, or the next time `apps/connect`/`register_upload` is touched, whichever comes first — not gated on chunk 9 or on real client usage, since the direction is already decided.
 - Own REST facade with API keys and metering — usage-based billing or leaving Supabase.
 - OAuth 2.1 on the MCP server — an agent product that cannot pass a bearer token.
 - Google OAuth app with restricted-scope verification — second client on Drive/Meet.
