@@ -4,7 +4,8 @@
  * Covers the parts a wrong answer would quietly corrupt: tag normalising and
  * rejection (the platform raises otherwise), search/tag filtering, the egress
  * gate that disables every download control, id validation on the bulk RPC
- * boundary, and the storage path `data.register_media` regex-checks.
+ * boundary, the storage path `data.register_media` regex-checks, and which of
+ * the two download routes a row takes.
  */
 
 import { test } from "node:test";
@@ -15,6 +16,7 @@ import {
   uploadStatus,
   MAX_BULK_IDS,
   collectTags,
+  driveLink,
   egressLine,
   fileCountLabel,
   fileExtension,
@@ -205,4 +207,17 @@ test("uploadStatus names the failure on a partial batch", () => {
   });
   // Nothing uploaded at all still reports the error, never a success line.
   assert.equal(uploadStatus(0, 2, "a.png: denied").bad, true);
+});
+
+test("driveLink routes a row to Drive only when it really is a Drive row", () => {
+  const link = "https://drive.google.com/file/d/abc/view";
+  assert.equal(driveLink({ source: "drive", attributes: { web_view_link: link } }), link);
+  // An upload row must never skip the metered download_url path, whatever it carries.
+  assert.equal(driveLink({ source: "upload", attributes: { web_view_link: link } }), null);
+  assert.equal(driveLink({ source: "upload", storage_path: "c/orig/x.png" }), null);
+  // A Drive row the connector could not read a link for falls back to the button, not a broken href.
+  assert.equal(driveLink({ source: "drive", attributes: { web_view_link: null } }), null);
+  assert.equal(driveLink({ source: "drive", attributes: {} }), null);
+  assert.equal(driveLink({ source: "drive" }), null);
+  assert.equal(driveLink({}), null);
 });
