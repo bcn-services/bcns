@@ -89,6 +89,28 @@ export async function requestConnection(
     return { sent: false, mailto: mailtoLink(request) };
   }
 
+  if (await sendMail(email, describe(request), { apiKey, fetchImpl, log })) return { sent: true };
+  // A send that fails still has to leave the member a way through.
+  return { sent: false, mailto: mailtoLink(request) };
+}
+
+/**
+ * POST one email to Resend, or report false. Shared with the Shopify GDPR
+ * webhooks, which have the same "a missing key must not look like a failure"
+ * requirement — Shopify retries a non-2xx and eventually flags the app.
+ *
+ * `label` is what the log line says the email was about; the body never is.
+ */
+export async function sendMail(
+  email: ResendEmail,
+  label: string,
+  deps: RequestDeps = {}
+): Promise<boolean> {
+  const { apiKey, fetchImpl = fetch, log = console.log } = deps;
+  if (!apiKey) {
+    log(`[connect] email not sent (no RESEND_API_KEY): ${label}`);
+    return false;
+  }
   try {
     const response = await fetchImpl(RESEND_ENDPOINT, {
       method: "POST",
@@ -99,11 +121,10 @@ export async function requestConnection(
       body: JSON.stringify(email),
       signal: AbortSignal.timeout(10_000),
     });
-    if (response.ok) return { sent: true };
-    log(`[connect] resend rejected the request (${response.status}): ${describe(request)}`);
+    if (response.ok) return true;
+    log(`[connect] resend rejected the request (${response.status}): ${label}`);
   } catch (error) {
-    log(`[connect] resend unreachable (${String(error)}): ${describe(request)}`);
+    log(`[connect] resend unreachable (${String(error)}): ${label}`);
   }
-  // A send that fails still has to leave the member a way through.
-  return { sent: false, mailto: mailtoLink(request) };
+  return false;
 }

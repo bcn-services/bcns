@@ -122,6 +122,10 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   report_dashboard_version: { args: { app_version: '0', api_version: 'v1' }, expect: 'none' },
   remove_member: { args: { target_user_id: USERS.betaMember.id }, expect: 'BCNS4' },
   add_member: { args: { target_user_id: USERS.betaMember.id }, expect: 'BCNS3' }, // beta's user belongs to another client → other_client
+  // Empty secret fails validation before any write, so the scoped-write probe never
+  // rotates a real token row. The tenant itself is never an argument: connect_source
+  // takes it from data.tenant_or_raise(), so there is nothing cross-tenant to pass.
+  connect_source: { args: { p_source: 'shopify', p_kind: 'shopify_admin', p_secret: '', p_config: {}, p_interval: '1 hour', p_backfill_depth: '13 months' }, expect: 'BCNS3' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
