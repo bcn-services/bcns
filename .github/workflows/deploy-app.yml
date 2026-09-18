@@ -49,12 +49,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Test
-        run: pnpm --filter "@bcn-services/$SLUG" test
+        # No "..." filter: turbo's test task depends on build->^build, so
+        # workspace deps (e.g. tenant, data-client) still get built first,
+        # but only $SLUG's own test script runs — not deps' test suites too.
+        run: pnpm exec turbo run test --filter="@bcn-services/$SLUG"
       - name: Build (Next standalone)
         # No DATA_SOURCE: shared-platform is the only mode now, and
         # scripts/check-env.ts gates on SUPABASE_SERVICE_ROLE_KEY, not on this.
+        # turbo (not pnpm --filter) so workspace deps like @bcn-services/tenant
+        # build (tsc -> dist/) before the app — same pattern as the Vercel
+        # build command in CLAUDE.md.
         run: |
-          pnpm --filter "@bcn-services/$SLUG" build
+          pnpm exec turbo run build --filter="@bcn-services/$SLUG..."
           # In a workspace, standalone nests the app under its repo path; server.js lives there.
           app="apps/$SLUG"
           cp -r "$app/.next/static" "$app/.next/standalone/$app/.next/static"
