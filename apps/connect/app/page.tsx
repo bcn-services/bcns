@@ -12,6 +12,8 @@ import {
 import { requestConnectionAction } from "./actions";
 import { loadClient, requireHub } from "@/lib/session";
 import { mailtoLink } from "@/lib/request-connection";
+import { getConfig } from "@/lib/env";
+import { connectPath } from "@/lib/oauth-config";
 import {
   composeSources,
   dashboardUrl,
@@ -40,10 +42,11 @@ function when(iso: string | null): string {
 export default async function SourcesPage({
   searchParams,
 }: {
-  searchParams: { requested?: string; email?: string; error?: string };
+  searchParams: { requested?: string; email?: string; error?: string; connected?: string };
 }) {
   const { api, membership } = await requireHub();
   const client = await loadClient();
+  const config = getConfig();
 
   const [health, egress] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
@@ -101,11 +104,20 @@ export default async function SourcesPage({
           and we&apos;ll set up {pending}.
         </p>
       ) : null}
+      {searchParams.connected ? (
+        <p className="rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
+          {searchParams.connected} is connected. The first pull starts within the hour.
+        </p>
+      ) : null}
       {searchParams.error ? (
         <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {searchParams.error === "forbidden"
             ? "That action is owner-only."
-            : "Something went wrong. Try again."}
+            : searchParams.error === "invalid-shop"
+              ? "That does not look like a Shopify store domain. Use your-store.myshopify.com."
+              : searchParams.error === "connect-failed"
+                ? "The connection could not be completed. Start again, or use Request connection."
+                : "Something went wrong. Try again."}
         </p>
       ) : null}
 
@@ -125,7 +137,29 @@ export default async function SourcesPage({
                   {card.lastError}
                 </p>
               ) : null}
-              {card.connected ? null : (
+              {card.connected ? null : connectPath(config, card.source) && membership.role === "owner" ? (
+                /**
+                 * Self-serve: the source's app is approved and configured. GET,
+                 * not a server action, because the handshake ends in a redirect
+                 * to Shopify and the merchant has to supply their own store.
+                 * Owners only — api.connect_source is owner-gated in the
+                 * database, so a member would consent and then be refused.
+                 */
+                <form action={connectPath(config, card.source)!} method="GET" className="flex gap-2">
+                  <input
+                    type="text"
+                    name="shop"
+                    required
+                    placeholder="your-store.myshopify.com"
+                    aria-label={`Your ${card.title} store domain`}
+                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
+                  />
+                  <Button type="submit" variant="outline" size="sm">
+                    Connect
+                  </Button>
+                </form>
+              ) : (
+                /* Unapproved, unconfigured, or a non-owner: chunk 4 behaviour, unchanged. */
                 <form action={requestConnectionAction}>
                   <input type="hidden" name="source" value={card.source} />
                   <Button type="submit" variant="outline" size="sm">

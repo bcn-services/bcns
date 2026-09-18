@@ -71,18 +71,14 @@ export async function attachSource(db: ReturnType<typeof pgClient>, clientId: st
   for (const w of warnings) console.warn(`warning ${w}`)
   const { access_token, expires_in, ...cfg } = config
   const conn = connectors[source]
+  // One upsert path, shared with api.connect_source (the self-serve OAuth callback in
+  // apps/connect) via 20260918000100_attach_source_rpc.sql. The SQL used to be inline here;
+  // it moved into data.attach_source so the CLI and the browser flow cannot drift apart.
   await db.query(
-    `insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, expires_at, attributes)
-         values ($1, $2, $3, $4, $5, $6, $7)
-         on conflict (client_id, source) do update set kind = excluded.kind, secret = excluded.secret, refresh_secret = excluded.refresh_secret,
-           expires_at = excluded.expires_at, attributes = excluded.attributes, status = 'active', status_detail = null`,
+    `select data.attach_source($1, $2, $3, $4, $5, $6, $7, $8, $9::interval, ${backfillFrom(conn.defaults.backfillDepth)})`,
     [clientId, source, conn.tokenKind, (access_token as string) || creds.secret, creds.refresh_secret ?? null,
-     access_token ? new Date(Date.now() + Number(expires_in) * 1000) : null, creds.attributes ?? {}])
-  await db.query(
-    `insert into data.connector_schedule (client_id, source, interval, backfill_from, backfill_cursor, config, next_run_at)
-         values ($1, $2, $3::interval, ${backfillFrom(conn.defaults.backfillDepth)}, '{}'::jsonb, $4, now())
-         on conflict (client_id, source) do update set config = excluded.config`,
-    [clientId, source, conn.defaults.interval, { ...creds.config, ...cfg }])
+     access_token ? new Date(Date.now() + Number(expires_in) * 1000) : null, creds.attributes ?? {},
+     { ...creds.config, ...cfg }, conn.defaults.interval])
 }
 
 if (isMain(import.meta.url)) runMain(main)

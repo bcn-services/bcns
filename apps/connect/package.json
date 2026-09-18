@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/sources.test.mjs tests/request-connection.test.mjs tests/health.test.mjs",
+    "test": "tsx --test tests/sources.test.mjs tests/request-connection.test.mjs tests/health.test.mjs tests/shopify-oauth.test.mjs",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
