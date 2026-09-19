@@ -103,6 +103,7 @@ exactly the items below — one view migration, no new table, no new RPC, no OAu
   render. Download link branches: `api.download_url` for `source='upload'` (existing rows keep
   working), `attributes.web_view_link` for `source='drive'`.
 - `apps/connect/lib/sources.ts`: add `drive` to `HUB_SOURCES` (lists 6 of 7 `data.source` values today).
+  (Superseded 2026-09-19: `HUB_SOURCES` is now the five connectors only — see §9.)
 - Leave in place: the `media` bucket and its policies (the Drive connector writes thumbs there),
   `api.register_upload` and `data.register_media` (still the service-role import path for
   `scripts/import-media`), `egress_quota_bytes`/`egress_ledger`/`download_tickets` (download
@@ -139,9 +140,22 @@ If Declan sends credentials before chunk 1 lands: deploy the frozen `bcns-client
 Flagged 2026-09-16 (Nate), after chunks 0–4 landed. Not a chunk in the build-order sense —
 no plan, no gate, waits on 0–8 finishing and on real client usage to react to. Known items to
 fold in when this starts:
-- Dashboard's source card doesn't belong grouped with real connectors (Shopify/Meta/monday/Meet/Drive) — give it its own spot on the page.
-- Source card sorting/ordering.
-- Uploads and Dashboard aren't connectors — they're the client's own manual data channels (a browser upload, a record typed into the app) and can never leave the "Not connected / Request connection" state that pattern implies. Needs its own treatment. (The Uploads storage-path fix itself is chunk 4b, not waiting on this pass.)
+- ~~Uploads and Dashboard aren't connectors — they're the client's own manual data channels
+  and can never leave the "Not connected / Request connection" state that pattern implies.~~
+  **DONE 2026-09-19** (`chore/drop-upload-source-card`). Not a UX treatment in the end — a
+  deletion. Both cards were dead: `platform/worker/src/connectors/index.ts` types `Source` as
+  exactly the five real connectors, `data.connector_health` rows are only ever derived from a
+  `data.connector_schedule` row, and `platform/scripts/add-source.ts` gates on that same
+  registry — so neither source could ever get a health row. Chunk 4b then removed the last app
+  path writing `source='upload'`, which is what made the note above stale the day after it was
+  written. `HUB_SOURCES` in `apps/connect/lib/sources.ts` is now the five connectors only;
+  that file carries the reasoning so it is not re-added. **Do not re-add either card.**
+  `data.source` keeps both enum values — existing `source='upload'` media rows and
+  `scripts/import-media` still rely on them; only the hub cards are gone.
+- ~~Dashboard's source card doesn't belong grouped with real connectors — give it its own spot.~~
+  **DONE 2026-09-19**, by the same deletion. "Open your dashboard" already had its own spot:
+  `dashboardUrl()` + `apps/connect/app/page.tsx`, which never depended on `HUB_SOURCES`.
+- Source card sorting/ordering. Now five cards, so this may no longer be worth doing.
 - General UX/visual pass on the hub once it has real traffic to learn from.
 
 ## Order and parallelism

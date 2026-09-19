@@ -11,8 +11,17 @@
  * signal a member is allowed to see.
  */
 
-/** `data.source` minus 'platform', which is bookkeeping rather than a connector. */
-export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive", "upload", "dashboard"] as const;
+/**
+ * The five sources a connector actually runs for — `platform/worker/src/connectors`
+ * exports exactly these, and `data.connector_health` rows only ever exist for a
+ * `data.connector_schedule` row, which `add-source` gates on that same registry.
+ *
+ * `data.source` also holds 'upload', 'dashboard' and 'platform'. None of them is a
+ * connector: 'platform' is bookkeeping, and the other two are the client's own manual
+ * channels. A card for them could never leave "Not connected / Request connection",
+ * so they are deliberately not listed here (platform-v1 §9, dropped 2026-09-19).
+ */
+export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive"] as const;
 
 export type HubSource = (typeof HUB_SOURCES)[number];
 
@@ -49,8 +58,6 @@ const TITLES: Record<HubSource, string> = {
   monday: "Monday.com",
   meet: "Google Meet",
   drive: "Google Drive",
-  upload: "Uploads",
-  dashboard: "Dashboard",
 };
 
 const STATES: Record<HealthStatus | "none", { label: string; tone: Tone }> = {

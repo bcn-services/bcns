@@ -303,8 +303,8 @@ test("a source is self-serve only when approved AND configured", () => {
 });
 
 test("sources with no flow built are never self-serve, however they are listed", () => {
-  const listed = { ...CONFIGURED, approvedOAuthSources: ["shopify", "meta", "monday", "drive", "upload"] };
-  for (const source of ["meta", "monday", "meet", "drive", "upload", "dashboard"]) {
+  const listed = { ...CONFIGURED, approvedOAuthSources: ["shopify", "meta", "monday", "drive"] };
+  for (const source of ["meta", "monday", "meet", "drive"]) {
     assert.equal(oauthEnabled(listed, source), false, `${source} must not be self-serve in W2`);
     assert.equal(connectPath(listed, source), null);
   }
