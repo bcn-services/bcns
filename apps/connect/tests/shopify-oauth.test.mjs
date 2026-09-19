@@ -204,11 +204,23 @@ test("all three mandatory topics are handled", () => {
 
 const GRANTED = SHOPIFY_SCOPES.join(",");
 
-test("a good token response yields the token and its scopes", () => {
-  const result = handleTokenResponse(200, { access_token: "shpat_abc", scope: GRANTED });
+test("a good token response yields the token, its scopes and its lifetime", () => {
+  const result = handleTokenResponse(200, {
+    access_token: "shpat_abc", scope: GRANTED, expires_in: 3600,
+    refresh_token: "shprt_xyz", refresh_token_expires_in: 7776000,
+  });
   assert.equal(result.ok, true);
   assert.equal(result.token.accessToken, "shpat_abc");
   assert.deepEqual(result.token.scopes, [...SHOPIFY_SCOPES]);
+  assert.equal(result.token.expiresIn, 3600);
+  assert.equal(result.token.refreshToken, "shprt_xyz");
+});
+
+test("a token with no expires_in is refused: it is the non-expiring kind the Admin API 403s", () => {
+  // Real failure, 2026-09-19: the install wrote a row, then every worker run
+  // came back "[API] Non-expiring access tokens are no longer accepted".
+  const result = handleTokenResponse(200, { access_token: "shpat_abc", scope: GRANTED });
+  assert.deepEqual(result, { ok: false, reason: "not_expiring", detail: "no expires_in" });
 });
 
 test("a non-2xx token response is an http_error, not a token", () => {
@@ -231,8 +243,16 @@ test("a token granted fewer scopes than we asked for is refused, and says which"
 });
 
 test("extra scopes beyond the seven are fine", () => {
-  const result = handleTokenResponse(200, { access_token: "t", scope: `${GRANTED},read_locations` });
+  const result = handleTokenResponse(200, { access_token: "t", scope: `${GRANTED},read_locations`, expires_in: 3600 });
   assert.equal(result.ok, true);
+});
+
+test("the callback asks Shopify for an expiring token", () => {
+  // handleTokenResponse refuses a non-expiring token, so forgetting `expiring`
+  // on the POST body would fail every install rather than fail it late. The
+  // parameter goes in the token-exchange body, never on the authorize redirect.
+  const route = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
+  assert.match(route, /expiring:\s*"1"/);
 });
 
 /* -------------------------------------------------------------- assembly */
