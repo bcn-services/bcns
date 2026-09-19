@@ -9,7 +9,10 @@ export interface Creds {
 export interface Verdict { config: Record<string, unknown>; warnings: string[] }
 type Fetch = typeof globalThis.fetch
 
-const SHOPIFY_SCOPES = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_payouts', 'read_reports', 'read_customers']
+// read_shopify_payments_accounts opens the shopifyPaymentsAccount root field Q_PAYOUTS queries;
+// read_shopify_payments_payouts alone does not (ACCESS_DENIED, W3 2026-09-19). Keep in sync with
+// SHOPIFY_SCOPES in apps/connect/lib/shopify-oauth.ts.
+const SHOPIFY_SCOPES = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_accounts', 'read_shopify_payments_payouts', 'read_reports', 'read_customers']
 
 async function gql(fetch: Fetch, url: string, headers: Record<string, string>, query: string, variables?: Record<string, unknown>): Promise<any> {
   const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ query, variables }) })

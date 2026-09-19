@@ -242,9 +242,17 @@ test("a token granted fewer scopes than we asked for is refused, and says which"
   assert.deepEqual(result, { ok: false, reason: "missing_scopes", detail: "read_all_orders" });
 });
 
-test("extra scopes beyond the seven are fine", () => {
+test("extra scopes beyond the eight are fine", () => {
   const result = handleTokenResponse(200, { access_token: "t", scope: `${GRANTED},read_locations`, expires_in: 3600 });
   assert.equal(result.ok, true);
+});
+
+test("the scope list opens every field the worker actually queries", () => {
+  // read_shopify_payments_payouts does NOT open the shopifyPaymentsAccount root
+  // field Q_PAYOUTS selects; Shopify grants it anyway, so the gap only appeared
+  // on the first real install (ACCESS_DENIED, 2026-09-19). The accounts scope is
+  // what opens it, and nothing in the handshake can detect its absence.
+  assert.ok(SHOPIFY_SCOPES.includes("read_shopify_payments_accounts"));
 });
 
 test("the callback asks Shopify for an expiring token", () => {

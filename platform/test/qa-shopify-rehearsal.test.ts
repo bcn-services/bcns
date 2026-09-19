@@ -5,7 +5,7 @@ import { redact } from '../worker/src/connectors/index.js' // connectors registr
 import { checklist } from '../scripts/checklist.js'
 import { shopify } from '../worker/src/connectors/shopify.js'
 
-const ALL_SCOPES = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_payouts', 'read_reports', 'read_customers']
+const ALL_SCOPES = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_accounts', 'read_shopify_payments_payouts', 'read_reports', 'read_customers']
 const SCOPES = { data: { currentAppInstallation: { accessScopes: ALL_SCOPES.map((handle) => ({ handle })) }, shop: { ianaTimezone: 'UTC', currencyCode: 'USD' } } }
 const DENIED = { errors: [{ message: 'Access denied for field.', extensions: { code: 'ACCESS_DENIED' } }] }
 
