@@ -34,12 +34,22 @@ import { oauthEnabled } from "@/lib/oauth-config";
 
 export const dynamic = "force-dynamic";
 
-/** Exchange the one-time code for a permanent Admin API token. */
+/**
+ * Exchange the one-time code for an Admin API token.
+ *
+ * `expiring: "1"` is load-bearing. Without it Shopify mints a non-expiring
+ * token, and the Admin API rejects those: a real install on 2026-09-19 stored
+ * an `shpat_` token that came back HTTP 403 "[API] Non-expiring access tokens
+ * are no longer accepted for the Admin API" on the worker's first request.
+ * The parameter belongs in THIS body, not on the authorize redirect, and it
+ * works under use_legacy_install_flow — there is no dashboard toggle for it.
+ * What comes back lasts an hour and carries a 90-day refresh_token.
+ */
 async function exchange(shop: string, clientId: string, clientSecret: string, code: string) {
   const response = await fetch(`https://${shop}${SHOPIFY_TOKEN_PATH}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, expiring: "1" }),
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
   });

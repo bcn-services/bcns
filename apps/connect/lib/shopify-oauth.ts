@@ -187,11 +187,21 @@ export interface TokenExchange {
   accessToken: string;
   /** Shopify echoes what it actually granted, which can be narrower than we asked. */
   scopes: string[];
+  /** Seconds the access token is valid for. Shopify sends 3600. */
+  expiresIn: number;
+  /**
+   * The 90-day refresh token that comes with every expiring access token.
+   * Parsed but NOT stored yet: api.connect_source takes no p_refresh_secret /
+   * p_expires_at (20260918000100_attach_source_rpc.sql), even though the
+   * data.attach_source it wraps has both. Until that migration lands the row
+   * holds an access token that dies in an hour and cannot be renewed.
+   */
+  refreshToken: string;
 }
 
 export type ExchangeResult =
   | { ok: true; token: TokenExchange }
-  | { ok: false; reason: "http_error" | "malformed" | "missing_scopes"; detail?: string };
+  | { ok: false; reason: "http_error" | "malformed" | "missing_scopes" | "not_expiring"; detail?: string };
 
 /**
  * Turn Shopify's token response into either a token or a refusal.
@@ -205,7 +215,9 @@ export type ExchangeResult =
 export function handleTokenResponse(status: number, body: unknown): ExchangeResult {
   if (status < 200 || status >= 300) return { ok: false, reason: "http_error", detail: `HTTP ${status}` };
 
-  const payload = body as { access_token?: unknown; scope?: unknown } | null;
+  const payload = body as {
+    access_token?: unknown; scope?: unknown; expires_in?: unknown; refresh_token?: unknown;
+  } | null;
   const accessToken = typeof payload?.access_token === "string" ? payload.access_token.trim() : "";
   if (!accessToken) return { ok: false, reason: "malformed" };
 
@@ -213,7 +225,20 @@ export function handleTokenResponse(status: number, body: unknown): ExchangeResu
   const missing = SHOPIFY_SCOPES.filter((s) => !scopes.includes(s));
   if (missing.length) return { ok: false, reason: "missing_scopes", detail: missing.join(",") };
 
-  return { ok: true, token: { accessToken, scopes } };
+  /**
+   * An expiring token is not optional any more. Shopify answered the Admin API
+   * with HTTP 403 "Non-expiring access tokens are no longer accepted" on
+   * 2026-09-19, and public apps must be off them entirely by 2027-01-01.
+   * `expiring: "1"` on the exchange (callback/route.ts) is what asks for one,
+   * and `expires_in` is the only proof Shopify honoured it. Refuse here rather
+   * than store a token that installs cleanly and 403s on the first worker run —
+   * that failure reads as a connector bug and costs a debugging session.
+   */
+  const expiresIn = typeof payload?.expires_in === "number" ? payload.expires_in : 0;
+  const refreshToken = typeof payload?.refresh_token === "string" ? payload.refresh_token.trim() : "";
+  if (expiresIn <= 0) return { ok: false, reason: "not_expiring", detail: "no expires_in" };
+
+  return { ok: true, token: { accessToken, scopes, expiresIn, refreshToken } };
 }
 
 /**
