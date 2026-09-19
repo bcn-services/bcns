@@ -25,7 +25,7 @@ let clientId: string
 const archiveDir = mkdtempSync(join(tmpdir(), 'bcns-archive-'))
 
 // A Shopify scope query that grants every §4.2 scope. `scopes: []` drops them all (S2 failure).
-const shopifyScopes = (scopes = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory',
+const shopifyScopes = (scopes = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_accounts',
   'read_shopify_payments_payouts', 'read_reports', 'read_customers']) => ({
   data: { currentAppInstallation: { accessScopes: scopes.map((handle) => ({ handle })) },
     shop: { ianaTimezone: 'UTC', currencyCode: 'USD' } },

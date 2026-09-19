@@ -16,7 +16,7 @@ const scopesResponse = (scopes: string[]) => ({
     shop: { ianaTimezone: 'UTC', currencyCode: 'USD' },
   },
 })
-const ALL_SCOPES = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_payouts', 'read_reports', 'read_customers']
+const ALL_SCOPES = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_accounts', 'read_shopify_payments_payouts', 'read_reports', 'read_customers']
 const json = (body: unknown) => async () => new Response(JSON.stringify(body), { status: 200 })
 
 describe('checklist S1/S2 without the shpat_ prefix', () => {

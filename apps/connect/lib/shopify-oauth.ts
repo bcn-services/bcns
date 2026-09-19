@@ -23,17 +23,29 @@ export const SHOPIFY_INSTALL_PATH = "/admin/oauth/authorize";
 export const SHOPIFY_TOKEN_PATH = "/admin/oauth/access_token";
 
 /**
- * The seven scopes the app requests, identical to SHOPIFY_SCOPES in
+ * The eight scopes the app requests, identical to SHOPIFY_SCOPES in
  * platform/scripts/checklist.ts. The checklist REFUSES a token missing any of
  * them, so a token minted here with a shorter list would onboard and then fail
- * the §9 check. chunk5-dashboard-steps.md §"Action for W1" keeps all seven,
- * including read_inventory, until W3 proves it unnecessary against a real store.
+ * the §9 check. chunk5-dashboard-steps.md §"Action for W1" keeps read_inventory
+ * until a narrowed install proves it unnecessary against a real store.
+ *
+ * read_shopify_payments_accounts is load-bearing and was missing until W3. The
+ * first install that authenticated far enough to run Q_PAYOUTS
+ * (worker/src/connectors/shopify.ts) came back ACCESS_DENIED on 2026-09-19:
+ * "Access denied for shopifyPaymentsAccount field. Required access: the
+ * `read_shopify_payments` or the `read_shopify_payments_accounts` access
+ * scope." read_shopify_payments_payouts does NOT open that root field —
+ * Shopify grants it without complaint, which is why the gap survived review.
+ * Both are kept: the accounts scope opens shopifyPaymentsAccount, and the
+ * payouts scope is the documented one for the payouts connection under it. An
+ * install with one of them dropped would settle which is strictly required.
  */
 export const SHOPIFY_SCOPES = [
   "read_orders",
   "read_all_orders",
   "read_products",
   "read_inventory",
+  "read_shopify_payments_accounts",
   "read_shopify_payments_payouts",
   "read_reports",
   "read_customers",
