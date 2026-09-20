@@ -3,7 +3,7 @@
 // so every such failure was recorded as the literal 'graphql error' and the real cause was
 // lost — it is never persisted, only e.message reaches connector_runs/source_tokens.
 import { describe, expect, it } from 'vitest'
-import { SourceError, reason } from '../worker/src/connectors/index.js'
+import { SourceError, classify, reason } from '../worker/src/connectors/index.js'
 
 describe('reason', () => {
   it('reads a bare-string errors body, the shape that produced "graphql error"', () => {
@@ -39,5 +39,31 @@ describe('reason', () => {
   it('keeps the reason readable through SourceError', () => {
     const e = new SourceError('shopify', reason({ errors: 'bad token' }, 401), 401, { errors: 'bad token' })
     expect(e.message).toBe('HTTP 401: bad token')
+  })
+})
+
+describe('classify — a plain 401 is auth for every source', () => {
+  // Before the hoist only shopify and meet/drive checked the status. Monday and
+  // meta matched body text alone, so a revoked token returning a bare 401 was
+  // classified 'error': source_tokens stayed 'active', the card read "Error"
+  // instead of "Reconnect needed", and refresh never ran.
+  for (const source of ['shopify', 'monday', 'meta', 'meet', 'drive'] as const) {
+    it(`${source}: 401 with an unrecognised body`, () => {
+      expect(classify(new SourceError(source, 'HTTP 401: nope', 401, { errors: 'nope' }))).toBe('auth')
+    })
+  }
+
+  it('leaves each provider-specific signal working', () => {
+    expect(classify(new SourceError('shopify', 'x', 200, { errors: [{ extensions: { code: 'ACCESS_DENIED' } }] }))).toBe('auth')
+    expect(classify(new SourceError('monday', 'x', 200, { errors: [{ message: 'USER_UNAUTHORIZED' }] }))).toBe('auth')
+    expect(classify(new SourceError('meta', 'x', 400, { error: { code: 190 } }))).toBe('auth')
+    expect(classify(new SourceError('drive', 'x', 400, { error: { error_description: 'invalid_grant' } }))).toBe('auth')
+  })
+
+  it('does not turn a throttle or an ordinary failure into auth', () => {
+    expect(classify(new SourceError('shopify', 'x', 429, {}))).toBe('throttle')
+    expect(classify(new SourceError('shopify', 'x', 200, { errors: [{ extensions: { code: 'THROTTLED' } }] }))).toBe('throttle')
+    expect(classify(new SourceError('drive', 'x', 403, { error: { message: 'userRateLimitExceeded' } }))).toBe('throttle')
+    expect(classify(new SourceError('monday', 'x', 500, { errors: 'boom' }))).toBe('error')
   })
 })

@@ -155,9 +155,14 @@ export function classify(e: unknown): ErrorClass {
   const { status, body, source } = e
   const text = JSON.stringify(body ?? '') + ' ' + e.message
   if (status === 429) return 'throttle'
+  // 401 is an auth failure by definition, for every provider. This was duplicated
+  // into the shopify and meet/drive branches and simply absent from monday and
+  // meta — so a plain 401 from either of those classified as 'error', the row
+  // never reached auth_failed, and its token was never queued for refresh.
+  if (status === 401) return 'auth'
   if (source === 'shopify') {
     if (/"THROTTLED"/.test(text)) return 'throttle'
-    if (status === 401 || /"ACCESS_DENIED"/.test(text)) return 'auth'
+    if (/"ACCESS_DENIED"/.test(text)) return 'auth'
   }
   if (source === 'meta') {
     const err = body?.error ?? {}
@@ -171,7 +176,7 @@ export function classify(e: unknown): ErrorClass {
   }
   if (source === 'meet' || source === 'drive') {
     if (status === 403 && /(userR|r)ateLimitExceeded/.test(text)) return 'throttle'
-    if (status === 401 || /invalid_grant/.test(text)) return 'auth'
+    if (/invalid_grant/.test(text)) return 'auth'
   }
   return 'error'
 }
