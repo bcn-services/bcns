@@ -128,6 +128,25 @@ export function redact(message: string): string {
     .slice(0, 300)
 }
 
+/**
+ * The readable reason out of a provider's error body, whatever shape it took.
+ *
+ * Providers do not keep to one shape. A GraphQL failure is an array of objects
+ * carrying `message`, but an auth rejection from Shopify or Monday is a bare
+ * string, and Google uses `error_description`. Reading `body.errors[0].message`
+ * on a string yields a character, whose `.message` is undefined — which is how
+ * a real reason turned into the literal 'graphql error' and the cause of an
+ * auth_failed row became unreadable. The status always leads, so the line is
+ * never empty even when nothing matches.
+ */
+export function reason(body: Json, status: number): string {
+  const raw = body?.errors ?? body?.error
+  const first = Array.isArray(raw) ? raw[0] : raw
+  const message = typeof first === 'string' ? first : (first?.message ?? first?.error_description)
+  if (message) return `HTTP ${status}: ${String(message)}`
+  return raw === undefined || raw === null ? `HTTP ${status}` : `HTTP ${status}: ${JSON.stringify(raw).slice(0, 200)}`
+}
+
 export type ErrorClass = 'throttle' | 'auth' | 'error'
 
 /** §5.3 step 5: source error body first, HTTP status second. */

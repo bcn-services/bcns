@@ -4,7 +4,7 @@ import { z } from 'zod'
 import {
   type CanonicalWrites, type Connector, type Json, type MediaRow, type MetricRow, type Page,
   type RawRow, type RecordRow, type RunContext,
-  SourceError, minor, sleep,
+  SourceError, reason, minor, sleep,
 } from './index.js'
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
@@ -26,7 +26,7 @@ async function graph(ctx: RunContext, path: string, params: Record<string, strin
   url.searchParams.set('access_token', ctx.token.secret)
   const r = await ctx.fetch(url.toString(), init)
   const body = await r.json().catch(() => ({}))
-  if (body?.error) throw new SourceError('meta', String(body.error.message ?? 'graph error'), r.status, body)
+  if (body?.error) throw new SourceError('meta', reason(body, r.status), r.status, body)
   if (!r.ok) throw new SourceError('meta', `HTTP ${r.status}`, r.status, body)
   const util = Number(r.headers.get('x-fb-ads-insights-throttle') ? JSON.parse(r.headers.get('x-fb-ads-insights-throttle')!).acc_id_util_pct : 0)
   if (util > 75) await sleep(60_000)
