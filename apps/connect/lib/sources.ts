@@ -99,7 +99,10 @@ export function composeSources(rows: readonly HealthRow[] | null | undefined): S
       source,
       title: TITLES[source],
       // never_ran is a row that exists but has never pulled: still "not connected".
-      connected: status !== "none" && status !== "never_ran",
+      // auth_failed is "connected but broken": the card's own label says Reconnect
+      // needed, and the page hides the Connect form on any connected card — so
+      // counting it as connected leaves that card with no control at all.
+      connected: status !== "none" && status !== "never_ran" && status !== "auth_failed",
       status,
       label,
       tone,

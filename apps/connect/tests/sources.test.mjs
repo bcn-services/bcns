@@ -40,6 +40,17 @@ test("never_ran is a row that exists but has not pulled: still Not connected", (
   assert.equal(meta.label, "Not connected");
 });
 
+test("auth_failed is not connected, so the card keeps its Connect form", () => {
+  const cards = composeSources([
+    { source: "shopify", status: "auth_failed", last_success_at: null, last_error: null },
+  ]);
+  const shopify = cards.find((c) => c.source === "shopify");
+  assert.equal(shopify.label, "Reconnect needed");
+  // page.tsx renders the Connect form only when connected is false. A card that
+  // says "Reconnect needed" and reports connected:true has no way to reconnect.
+  assert.equal(shopify.connected, false);
+});
+
 test("ok is connected and carries last success through", () => {
   const cards = composeSources([
     { source: "shopify", status: "ok", last_success_at: "2026-09-16T04:00:00Z", last_error: null },
