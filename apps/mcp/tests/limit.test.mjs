@@ -39,3 +39,19 @@ test('defaults are 60 a minute, and the env override only takes a positive integ
   assert.equal(limitFromEnv({ MCP_RATE_LIMIT_PER_MIN: '0' }), 60)
   assert.equal(limitFromEnv({ MCP_RATE_LIMIT_PER_MIN: '-5' }), 60)
 })
+
+test('the window map is bounded — a flood of fresh tokens evicts instead of growing', async () => {
+  const { MAX_KEYS } = await import('../dist/limit.js')
+  const limiter = createRateLimiter(1, 60_000)
+  const now = 9_000_000
+
+  assert.equal(limiter.allow('victim', now), true)
+  assert.equal(limiter.allow('victim', now), false, 'budget spent')
+
+  // Same window throughout: nothing expires, so only a bounded map can stay bounded.
+  for (let i = 0; i < MAX_KEYS; i += 1) limiter.allow(`flood-${i}`, now)
+
+  // ponytail: this is the documented ceiling, not a bug — eviction is fail-open, so the flood
+  // costs the victim a fresh budget rather than costing the process its memory.
+  assert.equal(limiter.allow('victim', now), true, 'the oldest window was evicted')
+})

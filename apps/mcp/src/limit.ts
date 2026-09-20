@@ -14,9 +14,14 @@ export interface RateLimiter {
   allow(token: string, now?: number): boolean
 }
 
+/** Hard ceiling on tracked windows. The limit is checked before the token is verified — it has
+ *  to be, or verification itself is the unmetered call — so any sender can mint fresh keys. */
+export const MAX_KEYS = 10_000
+
 // ponytail: in-memory, single process. A second process serving /mcp doubles the effective
 // limit and a restart forgets every counter. Move the window to Postgres or Redis the day
-// there is more than one process.
+// there is more than one process. Eviction trades fairness for bounded memory: a flood of
+// unique tokens can push a legitimate caller's counter out and hand it a fresh budget.
 export function createRateLimiter(limit = DEFAULT_LIMIT, windowMs = WINDOW_MS): RateLimiter {
   const windows = new Map<string, { start: number; count: number }>()
 
@@ -25,9 +30,13 @@ export function createRateLimiter(limit = DEFAULT_LIMIT, windowMs = WINDOW_MS): 
       const k = key(token)
       const seen = windows.get(k)
       if (!seen || now - seen.start >= windowMs) {
-        // An unverified token still gets an entry, so prune expired windows before growing.
-        if (windows.size > 10_000) {
-          for (const [other, w] of windows) if (now - w.start >= windowMs) windows.delete(other)
+        // delete-then-set so Map insertion order tracks window start: the oldest entry is
+        // always the stalest window, which makes the eviction below O(1) and not merely FIFO.
+        if (seen) windows.delete(k)
+        while (windows.size >= MAX_KEYS) {
+          const oldest = windows.keys().next()
+          if (oldest.done) break
+          windows.delete(oldest.value)
         }
         windows.set(k, { start: now, count: 1 })
         return true

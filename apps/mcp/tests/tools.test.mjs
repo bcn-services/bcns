@@ -58,3 +58,27 @@ test('anything else is generic — no message, no stack, no internals', () => {
   assert.ok(!result.content[0].text.includes('10.0.0.7'))
   assert.equal(toolError('a bare string').content[0].text, 'tool call failed')
 })
+
+test('an unmapped sqlstate is generic — the raw Postgres text is not an enumeration oracle', () => {
+  // code === 'unknown' means the message is whatever PostgREST said, not the data-client's own
+  // vocabulary. `42703` names a column the caller guessed; `PGRST202` names a function that
+  // exists or does not. Both answer a question the caller is not entitled to ask.
+  const cases = [
+    { message: 'column clients.secret_notes does not exist', code: '42703' },
+    { message: 'Could not find the function api.internal_sweep in the schema cache', code: 'PGRST202' },
+    { message: 'TypeError: fetch failed', code: '' },
+  ]
+  for (const { message, code } of cases) {
+    const err = new DataClientError({ message, code, details: 'd', hint: 'h' })
+    assert.equal(err.code, 'unknown', `${code} should not be a mapped code`)
+    assert.equal(toolError(err).content[0].text, 'tool call failed')
+  }
+})
+
+test('every mapped sqlstate still carries its message', () => {
+  for (const code of ['BCNS0', 'BCNS1', 'BCNS2', 'BCNS3', 'BCNS4', 'BCNS5']) {
+    const err = new DataClientError({ message: `msg-${code}`, code, details: 'd', hint: 'h' })
+    assert.notEqual(err.code, 'unknown')
+    assert.equal(toolError(err).content[0].text, `msg-${code}`)
+  }
+})

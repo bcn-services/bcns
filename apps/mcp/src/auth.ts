@@ -1,7 +1,7 @@
 // Bearer-only auth for the MCP endpoint. There is no privileged credential here on purpose:
 // the caller's own Supabase JWT is forwarded to Postgres and RLS is the only authorization.
 // Deliberate deviation from the OAuth 2.1 norm for v1 — see docs/architecture/chunk6-mcp-window.md.
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createDataClient, type DataClient } from '@bcn-services/data-client'
 
 /** Same shape as platform/supabase/functions/_shared/guard.ts:44. */
@@ -48,10 +48,28 @@ export function supabaseEnv(env: NodeJS.ProcessEnv = process.env): SupabaseEnv {
   return { url, anonKey }
 }
 
+// One client for the process, not one per request. getUser(jwt) takes the token as an argument
+// and never touches the session store, so there is nothing per-caller to keep apart.
+// autoRefreshToken must stay false: outside a browser auth-js arms a 30s setInterval on construct
+// (GoTrueClient _handleVisibilityChange) that nothing here would ever clear.
+let cached: { key: string; client: SupabaseClient } | null = null
+
+function authClient(env: SupabaseEnv): SupabaseClient {
+  const key = `${env.url}\u0000${env.anonKey}`
+  if (cached?.key !== key) {
+    cached = {
+      key,
+      client: createClient(env.url, env.anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      }),
+    }
+  }
+  return cached.client
+}
+
 /** Verify a token the way deps.ts:68 does. Returns the user id, or null. */
 export async function verifyToken(token: string, env: SupabaseEnv): Promise<string | null> {
-  const auth = createClient(env.url, env.anonKey, { auth: { persistSession: false } })
-  const { data, error } = await auth.auth.getUser(token)
+  const { data, error } = await authClient(env).auth.getUser(token)
   if (error) return null
   return data.user?.id ?? null
 }

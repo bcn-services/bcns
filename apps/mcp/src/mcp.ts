@@ -41,10 +41,13 @@ export type ToolErrorResult = {
   isError: true
 }
 
-/** Data-client errors are the caller's own and carry their message. Nothing else does:
- *  no stack, no internals, no upstream detail. */
+/** Only the data-client's own vocabulary reaches the caller: a ToolInputError, or a
+ *  DataClientError whose sqlstate it deliberately maps. `code === 'unknown'` means the message
+ *  is raw PostgREST/Postgres text — `42703 column "x" does not exist` is a schema-enumeration
+ *  oracle, and `fetch failed` is upstream detail — so those degrade with everything else. */
 export function toolError(err: unknown): ToolErrorResult {
-  const known = err instanceof ToolInputError || err instanceof DataClientError
+  const known =
+    err instanceof ToolInputError || (err instanceof DataClientError && err.code !== 'unknown')
   const text = known ? (err as Error).message : 'tool call failed'
   return { content: [{ type: 'text', text }], isError: true }
 }
@@ -74,10 +77,11 @@ export async function handleMcpPost(
 ): Promise<void> {
   const server = buildServer(client)
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
+  await server.connect(transport)
+  // After connect: a close firing mid-connect would tear down a transport that is still wiring up.
   res.on('close', () => {
     void transport.close()
     void server.close()
   })
-  await server.connect(transport)
   await transport.handleRequest(req, res)
 }
