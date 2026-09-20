@@ -203,10 +203,9 @@ export interface TokenExchange {
   expiresIn: number;
   /**
    * The 90-day refresh token that comes with every expiring access token.
-   * Parsed but NOT stored yet: api.connect_source takes no p_refresh_secret /
-   * p_expires_at (20260918000100_attach_source_rpc.sql), even though the
-   * data.attach_source it wraps has both. Until that migration lands the row
-   * holds an access token that dies in an hour and cannot be renewed.
+   * Stored as p_refresh_secret (20260919000100_connect_source_refresh.sql); the
+   * worker's shopify connector trades it for a new hour of access every tick.
+   * Shopify rotates it on every refresh, so the row's copy is replaced too.
    */
   refreshToken: string;
 }

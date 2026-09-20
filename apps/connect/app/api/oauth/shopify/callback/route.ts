@@ -105,8 +105,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const exchanged = await exchange(shop, config.shopifyClientId!, secret, code);
   if (!exchanged.ok) return fail(`exchange_${exchanged.reason}`, exchanged.detail);
 
-  // 7. The same two rows `add-source --source shopify` writes, through the same
-  // data.attach_source function (20260918000100_attach_source_rpc.sql).
+  // 7. The token + schedule rows, through data.attach_source
+  // (20260918000100_attach_source_rpc.sql). This is now the ONLY way a Shopify
+  // connection is made: `add-source --source shopify` refuses and sends the
+  // operator here, because the refresh token below only exists after a
+  // round-trip and nothing hand-typed survives the hour.
+  //
+  // p_refresh_secret and p_expires_at are what make the connection renewable.
+  // Without them the worker stores an access token that dies in an hour with no
+  // way back (20260919000100_connect_source_refresh.sql added the parameters).
   const { error } = await session.api.rpc("connect_source", {
     p_source: "shopify",
     p_kind: SHOPIFY_TOKEN_KIND,
@@ -114,6 +121,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     p_config: scheduleConfig(shop),
     p_interval: SHOPIFY_DEFAULTS.interval,
     p_backfill_depth: SHOPIFY_DEFAULTS.backfillDepth,
+    p_refresh_secret: exchanged.token.refreshToken,
+    p_expires_at: new Date(Date.now() + exchanged.token.expiresIn * 1000).toISOString(),
   });
   // `error.message` can echo a parameter value, and one of them is the token.
   if (error) return fail("write_failed", error.code ?? "rpc");

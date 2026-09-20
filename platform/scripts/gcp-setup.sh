@@ -68,7 +68,9 @@ SCHEDULER_JOB=bcns-data-tick
 # Must match deploy-worker.yml's --tasks/--parallelism, because tick() shards claims by
 # hashtext(client_id) % TASK_COUNT against CLOUD_RUN_TASK_INDEX (DESIGN §5.1).
 TASK_COUNT="${TASK_COUNT:-2}"
-SECRET_ENV=(DATABASE_URL SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY)
+# SHOPIFY_CLIENT_SECRET is the one Shopify app secret behind every merchant: the worker
+# refreshes each store's one-hour Admin token with it (connectors/shopify.ts refreshToken).
+SECRET_ENV=(DATABASE_URL SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY SHOPIFY_CLIENT_SECRET)
 
 # PROJECT_NUMBER is only knowable from gcloud, so the printed commands show it as a
 # placeholder and it is looked up after you answer y.
@@ -222,8 +224,8 @@ fi
 
 # ---------------------------------------------------------------- 6. Cloud Run Job
 step "6. Cloud Run Job ${JOB}"
-job_env="SUPABASE_URL=${SUPABASE_URL:-<export SUPABASE_URL>},BCNS_ALERT_EMAIL=${BCNS_ALERT_EMAIL:-<export BCNS_ALERT_EMAIL>},BCNS_ALERT_FROM=${ALERT_FROM},TASK_COUNT=${TASK_COUNT}"
-job_secrets="DATABASE_URL=DATABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest"
+job_env="SUPABASE_URL=${SUPABASE_URL:-<export SUPABASE_URL>},BCNS_ALERT_EMAIL=${BCNS_ALERT_EMAIL:-<export BCNS_ALERT_EMAIL>},BCNS_ALERT_FROM=${ALERT_FROM},TASK_COUNT=${TASK_COUNT},SHOPIFY_CLIENT_ID=${SHOPIFY_CLIENT_ID:-<export SHOPIFY_CLIENT_ID>}"
+job_secrets="DATABASE_URL=DATABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest,SHOPIFY_CLIENT_SECRET=SHOPIFY_CLIENT_SECRET:latest"
 create_job=(gcloud run jobs create "$JOB" --project "$PROJECT" --region "$REGION"
   --image us-docker.pkg.dev/cloudrun/container/job
   --service-account "$RUNTIME"
