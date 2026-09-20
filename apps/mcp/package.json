@@ -1,0 +1,30 @@
+{
+  "name": "@bcn-services/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//files": "the deployed release root — `pnpm deploy` copies exactly these plus package.json",
+  "files": [
+    "dist",
+    "server.js"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node server.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --test tests/*.test.mjs",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@bcn-services/data-client": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@supabase/supabase-js": "^2.116.0"
+  },
+  "devDependencies": {
+    "@bcn-services/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "eslint": "^9.15.0",
+    "typescript": "^5.6.3"
+  }
+}
