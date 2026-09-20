@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { getConfig } from "./env";
 import { sendMail } from "./request-connection";
-import { handleGdprWebhook, type GdprTopic } from "./shopify-webhooks";
+import { handleGdprWebhook, isFreshTriggeredAt, type GdprTopic } from "./shopify-webhooks";
 
 export async function gdprRoute(request: Request, topic: GdprTopic): Promise<NextResponse> {
   const config = getConfig();
@@ -18,13 +18,23 @@ export async function gdprRoute(request: Request, topic: GdprTopic): Promise<Nex
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // Freshness, independent of the HMAC. Missing or unparseable is a reject.
+  if (!isFreshTriggeredAt(request.headers.get("X-Shopify-Triggered-At"))) {
+    console.warn(`[connect] shopify webhook ${topic} rejected: stale or missing X-Shopify-Triggered-At`);
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   // .text(), never .json(): the signature is over these exact bytes.
   const raw = await request.text();
   const result = handleGdprWebhook(
     topic,
     raw,
     request.headers.get("X-Shopify-Hmac-Sha256"),
-    config.shopifyClientSecret
+    config.shopifyClientSecret,
+    {
+      shopDomain: request.headers.get("X-Shopify-Shop-Domain"),
+      webhookId: request.headers.get("X-Shopify-Webhook-Id"),
+    }
   );
   if (result.status === 401) return NextResponse.json(result.body, { status: 401 });
 
