@@ -105,6 +105,40 @@ test("a missing or shapeless state is malformed, never accepted", () => {
   }
 });
 
+/**
+ * W5a finding 1. All three signatures in shopify-oauth.ts use the SAME key —
+ * Shopify signs the callback query and the webhooks with the client secret, so
+ * we do not get to pick a different one. Encoding is not a boundary: hex and
+ * base64 are the same digest bytes rendered two ways.
+ *
+ * Before the `state:` prefix, this test FAILED: /start hands any owner a state,
+ * and its hex signature re-encoded to base64 was a valid X-Shopify-Hmac-Sha256
+ * for the state body — a forged shop/redact telling the operator to erase a
+ * client's data inside 48 hours. Every other signature test here is
+ * single-domain, which is exactly why nothing caught it.
+ */
+test("a state signature is not a webhook signature for the same key", () => {
+  const [body, hexSig] = signState({ shop: SHOP, clientId: CLIENT }, SECRET).split(".");
+  // The attacker's whole move: same digest, re-rendered in the encoding the
+  // webhook verifier reads.
+  const reencoded = Buffer.from(hexSig, "hex").toString("base64");
+  assert.equal(
+    verifyWebhookHmac(body, reencoded, SECRET),
+    false,
+    "state signature must not verify as a webhook signature"
+  );
+  // The state itself still works — the prefix must not have broken its own domain.
+  assert.equal(verifyState(`${body}.${hexSig}`, SECRET, SHOP).ok, true);
+});
+
+test("a webhook signature is not a state signature for the same key", () => {
+  // The reverse direction, for completeness: base64 webhook digest -> hex.
+  const body = Buffer.from(JSON.stringify({ shop: SHOP, clientId: CLIENT, exp: Date.now() + 60000, nonce: "n" }), "utf8").toString("base64url");
+  const asWebhook = createHmac("sha256", SECRET).update(body, "utf8").digest("base64");
+  const asHex = Buffer.from(asWebhook, "base64").toString("hex");
+  assert.deepEqual(verifyState(`${body}.${asHex}`, SECRET, SHOP), { ok: false, reason: "bad_signature" });
+});
+
 test("two states minted back to back differ", () => {
   // A fixed state would be replayable for the whole TTL.
   const a = signState({ shop: SHOP, clientId: CLIENT }, SECRET);
