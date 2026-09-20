@@ -1,17 +1,26 @@
 # Chunk 5 — work windows
 
-Seven windows to get the Shopify, Meta and Monday OAuth flows built and the three
+Twelve windows to get the Shopify, Meta and Monday OAuth flows built and the three
 apps submitted for review. Source of truth is `docs/architecture/platform-v1.md` §5;
 this file is only the running order.
 
-Three of the windows are yours and cannot be delegated — they carry your identity
-or your login. Four are Claude sessions. Nothing here costs money: Shopify Partner,
-Meta app creation, Meta business verification and Monday's OAuth app are all free.
-The cost is calendar.
+Four are yours alone and cannot be delegated — they carry your identity or your
+login (W1, W6a, W6b, W6c). Seven are Claude sessions (W0, W0b, W2, W3.5, W4, W5a,
+W5b). One is supervised, you and Claude together (W3). Nothing here costs money:
+Shopify Partner, Meta app creation, Meta business verification and Monday's OAuth
+app are all free. The cost is calendar.
 
-**Order matters in one place only.** W1 starts Meta business verification, which
-takes one to three weeks and blocks nothing else. Start it before anything, then
-let the rest run.
+**Order matters in two places.** W1 starts Meta business verification, which takes
+one to three weeks and blocks nothing else — start it before anything. And the
+Shopify track is deliberately un-gated from the Meta and Monday track: W5a reviews
+the merged Shopify code alone and needs nothing from W4, which lets W6a submit the
+Shopify app about a week earlier than the old single W5/W6 pair allowed. Shopify
+review is the longest external clock in the build and the one we least control.
+
+**Two windows live in their own files**, because they outgrew a slot here:
+`chunk5-w35-token-refresh.md` (W3.5 — making Shopify tokens renewable, shipped as
+#41/#42) and `chunk6-mcp-window.md` (chunk 6's MCP server — not a chunk 5 window,
+but launched from the same shelf and un-gated from all of this).
 
 **Guardrails — paste into every Claude window below.**
 
@@ -295,6 +304,14 @@ contradiction between two docs.
 
 ---
 
+## W3.5 — Make Shopify tokens renewable · Claude · Opus · plan mode · needs W3
+
+**Lives in its own file:** `docs/architecture/chunk5-w35-token-refresh.md`. It
+outgrew a slot here — it carries settled research and a ten-step runbook. Shipped
+as #41/#42. Listed here only so the running order is complete.
+
+---
+
 ## W4 — Meta and Monday flows · Claude · Sonnet · unattended · needs W2 merged
 
 **What this is.** The same two routes, twice more, against a shape that's already
@@ -345,36 +362,70 @@ contradiction between two docs.
 
 ---
 
-## W5 — Security review · Claude · Opus · read-only · needs W2 and W4
+## W5a — Shopify security review · Claude · Opus · unattended, report-only · needs nothing
 
-**What this is.** An independent pass over all three route pairs before they go live.
-These routes are the point where an outsider's request turns into a stored
-credential, so a missed check is a real vulnerability rather than a bug. Same reason
-we review infra config before a first deploy: the failure only shows up in
-production.
+**What this is.** The Shopify half of the old W5, pulled out and un-gated. W5 waited
+on W4 only because it reviewed all three route pairs at once. Shopify's pair is
+merged and proven against a real dev store, so reviewing it alone needs nothing from
+W4 — and doing it now starts the longest external clock we control about a week
+early. These routes are where an outsider's request turns into a stored credential,
+so a missed check is a real vulnerability rather than a bug.
 
-**Model: Opus, read-only, adversarial.** Review is where reasoning depth actually
-pays, and an agent that can edit will fix what it finds instead of reporting it,
-which defeats the purpose.
+**Model: Opus, adversarial, report-only.** `playbooks.md` puts *security audit →
+Opus: needs careful, thorough analysis*. A cheaper model returns a checklist; this
+needs findings. Report-only because an agent that can edit will fix what it finds
+instead of reporting it, which defeats the purpose.
 
 **Prompt:**
 
 ```
-Adversarial security review. No edits, no branch — report only.
+Adversarial security review of the merged Shopify OAuth and webhook code. You write one report
+file and nothing else. No code edits, no fixes.
 
-Review every file under apps/connect/app/api/oauth/ and the webhook handlers.
-Assume an attacker who can send arbitrary requests to these endpoints.
+Start by creating a git worktree. Another unattended session is working in the main checkout
+tonight and you will collide with it otherwise.
 
-Check specifically: state generation, storage and verification (can it be replayed,
-omitted, or forged?); HMAC verification on Shopify's callback and all three GDPR
-webhooks (is it constant-time? does a missing signature fail closed?); whether any
-handler writes a token row before all verification passes; whether a client id or
-secret can reach a log line or an error response; and whether one client's callback
-can write another client's row.
+Read these eight files in full, in this order. They are the entire surface — do not go looking
+for more:
+- apps/connect/lib/shopify-oauth.ts          (278 lines; ALL the crypto is here, the routes are thin)
+- apps/connect/app/api/oauth/shopify/start/route.ts
+- apps/connect/app/api/oauth/shopify/callback/route.ts
+- apps/connect/lib/shopify-webhooks.ts
+- apps/connect/lib/shopify-webhook-route.ts
+- apps/connect/app/api/webhooks/shopify/customers-data-request/route.ts
+- apps/connect/app/api/webhooks/shopify/customers-redact/route.ts
+- apps/connect/app/api/webhooks/shopify/shop-redact/route.ts
 
-For each finding give the file, the line, the concrete request that exploits it, and
-the smallest fix. Rank by severity. If a check is correct, say so — I want to know
-what was verified, not only what failed.
+Then read apps/connect/tests/shopify-oauth.test.mjs (393 lines, 37 cases) so you do not report
+something a passing test already guards. Say in the report which of your findings the tests
+already cover.
+
+Attack it in this order, hardest first:
+1. The state parameter. Can a forged or replayed callback bind a shop to the wrong tenant, or
+   bind an attacker's shop to a real tenant?
+2. HMAC. Is the comparison constant-time? Is the RAW body used rather than a reparse? Is the
+   shop domain validated before it reaches a redirect or an outbound fetch?
+3. The token write. api.connect_source() is the only write door into the locked schema. Can
+   anything reach it carrying a value the callback did not just verify?
+4. The GDPR handlers. Do they act on an unverified body? Do they leak whether a shop exists?
+5. Redirects and errors. Open redirect via the shop parameter; tenant or token material in an
+   error message, a log line or a URL.
+
+KNOWN AND PRE-EXISTING — do not report this as a finding. packages/tenant/tests/matcher.test.mjs
+fails on main because apps/connect deliberately adds api/webhooks/ to its middleware matcher
+exclusion while TENANT_MATCHER does not. That exception is correct: Shopify must reach the
+webhook routes unauthenticated. Record it in the report as accepted, with one line on why.
+
+Write exactly one file: docs/architecture/chunk5-w5a-shopify-review.md. Every finding carries a
+severity, the file and line, the concrete attack (inputs, then what the attacker gets), and the
+smallest fix. Rank by severity. Anything you could not confirm by reading the code goes in a
+separate "Unconfirmed" section rather than inflating the ranked list. If a check is correct, say
+so — I want to know what was verified, not only what failed.
+
+Do not run pnpm build, pnpm lint or pnpm typecheck. You change no code, and a build here would
+collide with the other session.
+
+One PR on branch chunk5-w5a-review, not merged. The PR body is the ranked finding list.
 
 GUARDRAILS
 Nothing merges, pushes to prod or db-pushes except through a wizard confirm I answer. I merge
@@ -390,19 +441,54 @@ into the PR body as a morning wizard step, not run. Stop only for a missing acce
 contradiction between two docs.
 ```
 
-**You get:** a ranked findings list. Fix the confirmed ones in a follow-up PR before W6.
+**You get:** `chunk5-w5a-shopify-review.md`, a ranked findings file to act on, and
+the input W6a needs before the Shopify app is submitted. Fix confirmed findings in a
+follow-up PR before W6a.
 
 ---
 
-## W6 — Submit · You · ~45 min · no Claude · needs W5 clean
+## W5b — Meta and Monday security review · Claude · Opus · unattended, report-only · needs W4 merged
 
-**What you're doing.** Putting bcns's name on three app listings. This is the part
-that can't be delegated at all.
+**What this is.** The other half of the old W5, over the two route pairs W4 builds.
 
-1. Shopify: submit for review. Days to weeks.
-2. Meta: submit for `ads_read` app review. Business verification from W1 should be
-   done or close by now; the review needs it.
-3. Monday: submit the OAuth app listing. Days.
+**Its prompt is written after W4 merges, on purpose.** W5a can enumerate its eight
+files because they exist. W4's files do not exist yet, so writing this prompt now
+would mean inventing paths — which is exactly the spec drift this round of edits is
+correcting. When W4 merges, clone W5a's prompt against the real file list and add
+the two differences worth attacking: Meta's long-lived token exchange (does the
+short-lived token ever reach a row or a log?) and Monday's missing HMAC step (what
+replaces it, and does anything fail open?).
+
+**You get:** the second half of the review, and the gate for W6b and W6c.
+
+## W6a — Submit Shopify · You · ~15 min · no Claude · needs W5a clean
+
+**What you're doing.** Putting bcns's name on the Shopify app listing. This is the
+part that can't be delegated at all.
+
+Submit for review. Days to weeks — this is the longest external clock in the build,
+which is the whole reason W5a was un-gated from W4. Everything W5a confirmed should
+be fixed and merged before you submit; a rejection costs another full review cycle.
+
+---
+
+## W6b — Submit Meta · You · ~20 min · no Claude · needs W4 and W5b clean
+
+**What you're doing.** Submitting for `ads_read` app review. Business verification
+from W1 should be done or close by now; the review needs it. If verification is
+still pending, this window waits — see the Meta chain in `platform-v1.md`
+§Calendar constraints, which now bottoms out at a business bank account that does
+not exist yet.
+
+---
+
+## W6c — Submit Monday · You · ~10 min · no Claude · needs W4 and W5b clean
+
+**What you're doing.** Submitting the OAuth app listing. Light review, days.
+
+---
+
+## After the three submissions
 
 Then it's calendar. As each approval lands, that source's button on the hub flips
 from "Request connection" to "Connect", and from then on that source is self-serve
