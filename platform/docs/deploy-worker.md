@@ -26,9 +26,10 @@ everything runs nothing at all, which is a safe way to read what it would do.
    prompt — step 6 refuses to create the job while either is unset. The script also prompts once,
    up front, for `BCNS_ALERT_FROM` (default `bot@bcn-services.com`): it must be a sender already
    **verified in Resend**, because `worker/src/health.ts` otherwise falls back to the alert inbox
-   as the `from` address and Resend rejects every send. Step 5 asks for the three secret values at
+   as the `from` address and Resend rejects every send. Step 5 asks for the four secret values at
    a hidden prompt (`DATABASE_URL` — the Supabase **transaction**-mode pooler URL,
-   `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`) and pipes each straight into Secret Manager;
+   `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `SHOPIFY_CLIENT_SECRET`) and pipes each
+   straight into Secret Manager;
    none is echoed or written to disk. Step 7 creates the Scheduler job as the `bcns-data-tick`
    service account, so the principal running the script needs `iam.serviceAccounts.actAs` on it —
    project Owner already has it.
@@ -46,8 +47,8 @@ everything runs nothing at all, which is a safe way to read what it would do.
 
 | | |
 |---|---|
-| `--set-env-vars` | `SUPABASE_URL`, `BCNS_ALERT_EMAIL`, `BCNS_ALERT_FROM`, `TASK_COUNT` (2 — must match the workflow's `--tasks`, because `tick()` shards claims by `hashtext(client_id) % TASK_COUNT` against `CLOUD_RUN_TASK_INDEX`) |
-| `--set-secrets` | `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, each `<name>:latest` |
+| `--set-env-vars` | `SUPABASE_URL`, `BCNS_ALERT_EMAIL`, `BCNS_ALERT_FROM`, `SHOPIFY_CLIENT_ID` (public half of the Shopify app; the worker refreshes every merchant's one-hour Admin token with it), `TASK_COUNT` (2 — must match the workflow's `--tasks`, because `tick()` shards claims by `hashtext(client_id) % TASK_COUNT` against `CLOUD_RUN_TASK_INDEX`) |
+| `--set-secrets` | `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `SHOPIFY_CLIENT_SECRET`, each `<name>:latest` |
 | unset on purpose | `RUN_BUDGET_MS`, `CLAIM_LIMIT`, `EGRESS_ALLOWANCE_BYTES`, `RENORMALIZE_BUDGET_MS` — the worker's own defaults in `worker/src` are the intended production values. `.env.example` carries the same four, but it is a local-dev file and not authoritative (its `TASK_COUNT=1` is deliberately not the job's 2). Set one with `gcloud run jobs update` if it ever needs to differ. |
 | set by Cloud Run | `CLOUD_RUN_TASK_INDEX` |
 

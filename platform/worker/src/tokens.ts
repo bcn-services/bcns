@@ -5,11 +5,21 @@ import { type RunContext, type Source, connectors, redact } from './connectors/i
 import { contextFor, refreshOne } from './run.js'
 import { shopifyEndpoint } from './connectors/shopify-url.js'
 
-/** Only google_oauth_refresh has an expires_at, so the predicate skips the other kinds by itself. */
+/**
+ * A null expires_at skips the row by itself, which is what keeps the never-expiring
+ * kinds out. google_oauth_refresh and shopify_admin both carry one.
+ *
+ * auth_failed rows are retried too, hourly. refreshOne marks a row auth_failed on ANY
+ * throw — a transient 5xx included — and probeAuthFailed cannot rescue a Shopify row,
+ * because it probes with the one-hour access token that is already dead. Without this
+ * clause one bad network moment bricked a merchant permanently. The hourly cadence
+ * matches probeAuthFailed's, so a genuinely revoked token is not retried every tick.
+ */
 export async function refreshTokens(t: Tick): Promise<number> {
   const due = await sql<{ client_id: string; source: Source }>(
     `select client_id, source from data.source_tokens
-     where status = 'active' and expires_at is not null and expires_at < now() + interval '10 minutes'`)
+     where (status = 'active' or (status = 'auth_failed' and updated_at < now() - interval '1 hour'))
+       and expires_at is not null and expires_at < now() + interval '10 minutes'`)
   let n = 0
   for (const row of due.rows) {
     const conn = connectors[row.source]

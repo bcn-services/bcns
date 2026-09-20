@@ -305,7 +305,10 @@ describe('scripts', () => {
       const real = globalThis.fetch
       vi.stubGlobal('fetch', (url: RequestInfo | URL, init?: RequestInit) => {
         const u = String(url)
-        if (u.includes('api.monday.com')) return Promise.resolve(new Response(JSON.stringify(MONDAY_COLS)))
+        // board 999 is the "no Status column" fixture the D1 failure case needs; every other
+        // board answers normally. checklist.ts puts the id straight into the query body.
+        if (u.includes('api.monday.com')) return Promise.resolve(new Response(JSON.stringify(
+          String(init?.body).includes('ids: [999]') ? { data: { boards: [{ columns: [] }] } } : MONDAY_COLS)))
         if (u.includes('myshopify.com')) return Promise.resolve(new Response(JSON.stringify(
           String(init?.body).includes('shopifyqlQuery') ? { data: { shopifyqlQuery: { parseErrors: [], tableData: { rows: [] } } } }
           : (init?.headers as Record<string, string>)?.['X-Shopify-Access-Token'] === 'no-scopes' ? shopifyScopes([])
@@ -363,19 +366,24 @@ describe('scripts', () => {
       expect((await schedule('monday')).rows[0]).toMatchObject({ backfill_cursor: {}, incremental_cursor: {}, config: { board_id: '456' } })
     })
 
-    it('attaches shopify with the S3–S5 config from the checklist', async () => {
-      const out = await run(['--slug', SLUG3, '--source', 'shopify'], ['zz-test', 'https://admin.example', 'shpat_test'])
-      expect(out).not.toContain('shpat_test')
-      expect((await tokens('shopify')).rows[0]).toMatchObject({ kind: 'shopify_admin', secret: 'shpat_test', status: 'active' })
-      expect((await schedule('shopify')).rows[0].config).toEqual({
-        shop: 'zz-test', admin_url: 'https://admin.example', store_timezone: 'UTC', currency: 'USD', sessions_mode: 'shopifyql' })
+    // shopify cannot be attached from the CLI at all any more: its Admin token expires in an
+    // hour and only an OAuth round-trip produces the refresh token that renews it, so there is
+    // nothing an operator can paste. attachSource refuses before it prompts, which is also why
+    // the S2 (failed checklist) case below moved onto monday.
+    it('refuses shopify outright and prints the hub install link', async () => {
+      await expect(run(['--slug', SLUG3, '--source', 'shopify'], ['zz-test', 'https://admin.example', 'shpat_test']))
+        .rejects.toThrow(/connect\.bcn-services\.com\/api\/oauth\/shopify\/start/)
+      // Refused before the first prompt, so nothing was written and nothing was asked for.
+      expect((await tokens('shopify')).rowCount).toBe(0)
+      expect((await schedule('shopify')).rowCount).toBe(0)
     })
 
     it('refuses an unknown slug, an unknown source, a failed checklist, and a churned client', async () => {
       await expect(addSource(['--slug', 'zz-nope', '--source', 'monday'], async () => 'x')).rejects.toThrow(ScriptError)
       await expect(addSource(['--slug', SLUG3, '--source', 'upload'], async () => 'x')).rejects.toThrow(/unknown source/)
-      await expect(run(['--slug', SLUG3, '--source', 'shopify'], ['zz-test', 'https://admin.example', 'no-scopes'])).rejects.toThrow(/S2/)
-      expect((await tokens('shopify')).rows[0].secret).toBe('shpat_test') // failed checklist wrote nothing
+      // Board 999 answers with no columns, so the §9 checklist fails D1 after the prompts.
+      await expect(run(['--slug', SLUG3, '--source', 'monday', '--reset-cursors'], ['999', 'https://m.example', 'tok4'])).rejects.toThrow(/D1/)
+      expect((await tokens('monday')).rows[0].secret).toBe('tok3') // failed checklist wrote nothing
       await sql(`update data.clients set status = 'churned' where slug = $1`, [SLUG3])
       await expect(addSource(['--slug', SLUG3, '--source', 'meta'], async () => 'x')).rejects.toThrow(/churned/)
     })

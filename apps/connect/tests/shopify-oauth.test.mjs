@@ -263,6 +263,18 @@ test("the callback asks Shopify for an expiring token", () => {
   assert.match(route, /expiring:\s*"1"/);
 });
 
+test("the callback stores the refresh token and the expiry, not just the access token", () => {
+  // The access token dies in an hour. Without BOTH of these on the RPC call the row
+  // is unrenewable — the worker's refresh query skips a null expires_at, and there is
+  // no refresh_secret to spend even if it did not. This failed silently in W3: the
+  // install succeeded, the dashboard said connected, and the merchant was cut off by
+  // the afternoon. Nothing at runtime reports it, so the assertion lives here.
+  const route = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
+  assert.match(route, /p_refresh_secret:\s*exchanged\.token\.refreshToken/);
+  assert.match(route, /p_expires_at:/);
+  assert.match(route, /exchanged\.token\.expiresIn\s*\*\s*1000/);
+});
+
 /* -------------------------------------------------------------- assembly */
 
 test("the install url carries the app, the scopes, the redirect and the state", () => {

@@ -90,7 +90,12 @@ export interface Connector {
   tokenKind: TokenKind
   backfill(ctx: RunContext, from: Date, cursor: Json | null): AsyncIterable<Page>
   incremental(ctx: RunContext, cursors: Record<string, Json>): AsyncIterable<Page>
-  refreshToken?(ctx: RunContext): Promise<{ secret: string; expiresAt: Date }>
+  /**
+   * `refreshSecret` is for the sources that ROTATE their refresh token — Shopify
+   * returns a new one on every refresh and invalidates the old. Optional because
+   * Google does not: drive/meet return two fields and keep the stored one.
+   */
+  refreshToken?(ctx: RunContext): Promise<{ secret: string; expiresAt: Date; refreshSecret?: string }>
   normalize(ctx: RunContext, rows: RawRow[]): CanonicalWrites
 }
 

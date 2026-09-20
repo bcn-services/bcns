@@ -1,4 +1,5 @@
-// onboard --slug --name --timezone [--sources shopify,meta,monday,meet,drive]  (DESIGN.md §5.10, §9)
+// onboard --slug --name --timezone [--sources meta,monday,meet,drive]  (DESIGN.md §5.10, §9)
+// shopify is NOT attachable here — see shopifyRefusal() below.
 // Inserts the client + smoke user, then per source: prompts for credentials, runs the §9 checklist
 // (a failed item stops the script), writes source_tokens and connector_schedule from the connector's
 // own defaults. Smoke password is printed once (no password-manager integration in this build).
@@ -11,11 +12,34 @@ import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
 
 // What the operator is asked for, per source (§4.2–§4.6 config + token shapes).
 const PROMPTS: Record<Source, { config: string[]; secret: string; refresh?: string; attribute?: string }> = {
+  // Unreachable: attachSource refuses shopify before it prompts. Kept so the Record
+  // stays total over Source, and so the config field names stay next to the others.
   shopify: { config: ['shop', 'admin_url'], secret: 'Admin API token' },
   meta: { config: ['act_id', 'ads_manager_url'], secret: 'system user token' },
   monday: { config: ['board_id', 'board_url'], secret: 'personal token' },
   meet: { config: ['folder_id', 'oauth_client_id', 'notes_url'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
   drive: { config: ['folder_id', 'oauth_client_id'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
+}
+
+/**
+ * Shopify is connected in a browser, never here.
+ *
+ * Its Admin token expires in an hour and only a refresh token renews it, and both
+ * only ever come out of an OAuth round-trip — there is no value an operator can be
+ * handed to paste that survives the afternoon. (Non-expiring tokens are not a way
+ * out: the Admin API answers those 403 since 2026-09-19.) So the CLI refuses and
+ * points at the same self-serve flow the hub runs. Google's path is unaffected —
+ * its refresh token IS hand-pasteable and long-lived.
+ */
+const HUB_BASE_URL = (process.env.HUB_BASE_URL ?? 'https://connect.bcn-services.com').replace(/\/+$/, '')
+export function shopifyRefusal(): string {
+  return [
+    'shopify is connected in the browser, not here: its Admin token expires in an hour and only',
+    'an OAuth round-trip produces the refresh token that renews it.',
+    `  1. have the client's OWNER sign in at ${HUB_BASE_URL}/ and click Connect on the Shopify card`,
+    `  2. or go straight there: ${HUB_BASE_URL}/api/oauth/shopify/start?shop=<store>.myshopify.com`,
+    'The callback writes the same rows this script would, through data.attach_source.',
+  ].join('\n')
 }
 
 export function backfillFrom(depth: string): string {
@@ -27,9 +51,12 @@ export async function main(argv: string[], ask?: (q: string) => Promise<string>)
   const { values } = parseArgs({ args: argv, options: {
     slug: { type: 'string' }, name: { type: 'string' }, timezone: { type: 'string' }, sources: { type: 'string' } } })
   const { slug, name, timezone } = values
-  if (!slug || !name || !timezone) die('usage: onboard --slug <slug> --name <name> --timezone <tz> [--sources shopify,meta,monday,meet,drive]')
+  if (!slug || !name || !timezone) die('usage: onboard --slug <slug> --name <name> --timezone <tz> [--sources meta,monday,meet,drive]')
   const sources = (values.sources ?? '').split(',').map((s) => s.trim()).filter(Boolean) as Source[]
+  // Both checks before the client row is inserted: a refusal half way through the
+  // attach loop would leave an orphan client behind.
   for (const s of sources) if (!(s in connectors)) die(`unknown source: ${s}`)
+  if (sources.includes('shopify')) die(shopifyRefusal())
 
   const db = pgClient()
   const rl = ask ? null : createInterface({ input: process.stdin, output: process.stdout })
@@ -61,6 +88,8 @@ export async function main(argv: string[], ask?: (q: string) => Promise<string>)
 // Shared with add-source. Re-running rotates the token and resets its status; the schedule keeps its cursor.
 export async function attachSource(db: ReturnType<typeof pgClient>, clientId: string, timezone: string, source: Source,
   question: (q: string) => Promise<string>): Promise<void> {
+  // The one guard both CLI entry points route through, so add-source refuses too.
+  if (source === 'shopify') die(shopifyRefusal())
   const p = PROMPTS[source]
   const creds: Creds = { secret: '', config: {} }
   for (const k of p.config) creds.config[k] = await question(`${source} ${k}: `)

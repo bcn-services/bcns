@@ -1,4 +1,5 @@
-// add-source --slug <slug> --source shopify|meta|monday|meet|drive [--reset-cursors]  (DESIGN.md §5.10, §9)
+// add-source --slug <slug> --source meta|monday|meet|drive [--reset-cursors]  (DESIGN.md §5.10, §9)
+// shopify is refused and redirected to the hub's OAuth flow (onboard.ts shopifyRefusal).
 // Attaches one source to an existing client exactly as onboard does: same prompts, same §9 checklist
 // (a failed item stops before anything is written), same source_tokens + connector_schedule upserts.
 // Safe to re-run: rotates the token and resets its status; the schedule keeps its cursors. Refuses while
@@ -10,7 +11,7 @@ import { connectors, type Source } from '../worker/src/connectors/index.js'
 import { attachSource } from './onboard.js'
 import { die, pgClient, isMain, runMain } from './_lib.js'
 
-const USAGE = 'usage: add-source --slug <slug> --source shopify|meta|monday|meet|drive [--reset-cursors]'
+const USAGE = 'usage: add-source --slug <slug> --source meta|monday|meet|drive [--reset-cursors]'
 // The config field naming the vendor object the cursors point into.
 const TARGET: Record<Source, string> = { shopify: 'shop', meta: 'act_id', monday: 'board_id', meet: 'folder_id', drive: 'folder_id' }
 

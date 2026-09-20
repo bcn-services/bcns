@@ -1,11 +1,14 @@
-// §4.2 Shopify — Admin GraphQL 2026-07, custom-app token, never expires.
+// §4.2 Shopify — Admin GraphQL 2026-07. The token is an EXPIRING OAuth token: one hour,
+// renewed from a refresh token by refreshToken() below. Non-expiring tokens are not an
+// option any more — the Admin API answers them 403 (real install, 2026-09-19).
 import { z } from 'zod'
 import {
   type CanonicalWrites, type Connector, type Json, type MetricRow, type MoneyRow, type Page,
   type ProductRow, type RawRow, type RunContext, type CustomerRow,
   SourceError, localDay, minor, sleep,
 } from './index.js'
-import { Q_SHOPIFYQL, sessionsQuery, shopHandle, shopifyEndpoint } from './shopify-url.js'
+import { envStr } from '../db.js'
+import { Q_SHOPIFYQL, sessionsQuery, shopHandle, shopifyEndpoint, shopifyTokenUrl } from './shopify-url.js'
 
 const PAGE_ORDERS = 50
 const PAGE_PRODUCTS = 50
@@ -174,6 +177,43 @@ export const shopify: Connector = {
   incremental(ctx, cursors) {
     const since = (e: string) => (cursors?.[e]?.updated_at ? new Date(cursors[e].updated_at) : null)
     return drive(ctx, ['order', 'product', 'payout', 'inventory_snapshot', 'sessions_day'], since, null, null)
+  },
+
+  /**
+   * Trade the refresh token for another hour. Same endpoint the install code was
+   * exchanged at (apps/connect .../shopify/callback/route.ts), and the same JSON
+   * body shape: Shopify's docs show form encoding, but the JSON exchange is what
+   * is proven against a real shop, so this mirrors that rather than the docs.
+   *
+   * The app credentials come from the WORKER'S environment, not from ctx.config /
+   * ctx.token.attributes the way drive.ts reads Google's. There is one Shopify app
+   * behind every merchant, so one pair of env vars rotates in one place instead of
+   * fanning a shared secret across every merchant row.
+   */
+  async refreshToken(ctx): Promise<{ secret: string; expiresAt: Date; refreshSecret?: string }> {
+    const r = await ctx.fetch(shopifyTokenUrl(ctx.config.shop), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        client_id: envStr('SHOPIFY_CLIENT_ID'),
+        client_secret: envStr('SHOPIFY_CLIENT_SECRET'),
+        grant_type: 'refresh_token',
+        refresh_token: ctx.token.refresh_secret ?? '',
+      }),
+    })
+    const b: Json = await r.json().catch(() => ({}))
+    if (!r.ok || b.error) throw new SourceError('shopify', String(b.error_description ?? b.error ?? `HTTP ${r.status}`), r.status, b)
+    // Shopify rotates the refresh token on every refresh: the one we just used is
+    // spent, and the new one must replace it or the NEXT refresh fails.
+    // ponytail: b.refresh_token_expires_in (90 days, and refreshing can shorten it)
+    // is dropped. Harmless while the worker ticks every five minutes — each refresh
+    // issues a fresh one — but a connection disabled for 90+ days needs a reconnect.
+    // Store it in a column if we ever want to warn before that lapses.
+    return {
+      secret: String(b.access_token),
+      expiresAt: new Date(Date.now() + Number(b.expires_in ?? 3600) * 1000),
+      refreshSecret: typeof b.refresh_token === 'string' ? b.refresh_token : undefined,
+    }
   },
 
   normalize(ctx: RunContext, rows: RawRow[]): CanonicalWrites {

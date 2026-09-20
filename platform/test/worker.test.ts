@@ -292,8 +292,73 @@ describe('worker', () => {
     })
     await Promise.all([refreshTokens(mkTick(oauth)), refreshTokens(mkTick(oauth))])
     expect(calls).toBe(1)
-    const t = (await sql<{ secret: string }>(`select secret from data.source_tokens where client_id = $1`, [c])).rows[0]
+    const t = (await sql<{ secret: string; refresh_secret: string }>(
+      `select secret, refresh_secret from data.source_tokens where client_id = $1`, [c])).rows[0]
     expect(t.secret).toBe('fresh-token')
+    // Google does not rotate: meet's refreshToken returns no refreshSecret, so the stored
+    // one must survive refreshOne's UPDATE (`coalesce`). Overwrite it with null and the
+    // next refresh has nothing to spend — a one-hour source would be dead on the second tick.
+    expect(t.refresh_secret).toBe('refresh')
+  })
+
+  it('token_refresh_shopify_rotates', async () => {
+    const c = await mkClient([{ source: 'shopify' }])
+    await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = 'rt-old' where client_id = $1`, [c])
+    // The app credentials live on the worker, not on the row: one Shopify app behind every merchant.
+    process.env.SHOPIFY_CLIENT_ID = 'cid-1'
+    process.env.SHOPIFY_CLIENT_SECRET = 'csecret-1'
+
+    let seen = ''
+    const fetch = stub((url, body) => {
+      if (!url.endsWith('/admin/oauth/access_token')) return {}
+      seen = body
+      return json({ access_token: 'at-new', expires_in: 3600, refresh_token: 'rt-new', refresh_token_expires_in: 7776000 })
+    })
+    try {
+      await refreshTokens(mkTick(fetch))
+    } finally {
+      delete process.env.SHOPIFY_CLIENT_ID
+      delete process.env.SHOPIFY_CLIENT_SECRET
+    }
+
+    expect(JSON.parse(seen)).toMatchObject({
+      client_id: 'cid-1', client_secret: 'csecret-1', grant_type: 'refresh_token', refresh_token: 'rt-old' })
+    const t = (await sql<{ secret: string; refresh_secret: string; expires_at: Date }>(
+      `select secret, refresh_secret, expires_at from data.source_tokens where client_id = $1`, [c])).rows[0]
+    expect(t.secret).toBe('at-new')
+    // Shopify invalidates the refresh token it just spent. Keeping 'rt-old' here would
+    // pass this refresh and fail every one after it, an hour later, silently.
+    expect(t.refresh_secret).toBe('rt-new')
+    expect(t.expires_at.getTime()).toBeGreaterThan(Date.now() + 30 * 60_000)
+  })
+
+  it('token_refresh_revives_auth_failed', async () => {
+    const c = await mkClient([{ source: 'shopify' }])
+    // updated_at is set by the `touch` BEFORE UPDATE trigger, so an hour-old row can only
+    // be built on INSERT (same trick as qa-tokens-probe.test.ts).
+    await sql(`delete from data.source_tokens where client_id = $1`, [c])
+    await sql(`insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, expires_at, status, status_detail, updated_at)
+               values ($1, 'shopify', 'shopify_admin', 'dead', 'rt-old', now() - interval '5 minutes', 'auth_failed', 'HTTP 503', now() - interval '2 hours')`, [c])
+    process.env.SHOPIFY_CLIENT_ID = 'cid-1'
+    process.env.SHOPIFY_CLIENT_SECRET = 'csecret-1'
+
+    const fetch = stub(url => url.endsWith('/admin/oauth/access_token')
+      ? json({ access_token: 'at-revived', expires_in: 3600, refresh_token: 'rt-new' }) : {})
+    try {
+      await refreshTokens(mkTick(fetch))
+    } finally {
+      delete process.env.SHOPIFY_CLIENT_ID
+      delete process.env.SHOPIFY_CLIENT_SECRET
+    }
+
+    // One transient 5xx marks a row auth_failed, and probeAuthFailed cannot rescue a Shopify
+    // row because it probes with the one-hour access token that is already dead. Before this
+    // clause the merchant was bricked permanently with no reconnect button to click.
+    const t = (await sql<{ status: string; status_detail: string | null; secret: string }>(
+      `select status, status_detail, secret from data.source_tokens where client_id = $1`, [c])).rows[0]
+    expect(t.status).toBe('active')
+    expect(t.status_detail).toBeNull()
+    expect(t.secret).toBe('at-revived')
   })
 
   it('worker_isolation', async () => {
