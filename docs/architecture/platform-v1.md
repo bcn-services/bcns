@@ -20,6 +20,7 @@ https://claude.ai/code/artifact/3e05b987-dbf3-4173-8bc3-8fb3789cf59c
 | SB inside as `apps/sb` | Runtime links (cookie, RLS, app URL) are identical either way; inside removes the publish-and-bump tax. Frozen `bcns-client-sb` stays deployable as fallback until SB is live on the platform. |
 | Behaviour-preserving migration | Nothing in the three repos changes function during the merge. Every "unchanged" claim is backed by a baseline captured before the move. |
 | Marketing never depends on Connect | No build-time import, no runtime call, separate host, separate deploy trigger. Hub down ⇒ site up. |
+| Shopify's Connect button ships dark | Decided 2026-09-19. The OAuth flow merges and deploys before Shopify approves the app, but `OAUTH_APPROVED_SOURCES` is left **unset** in `/srv/connect/env` on the droplet — so every card stays on "Request connection" and nobody can start a handshake that would fail. The variable lives only on the droplet, never in the repo, so a deploy can never open the gate by accident. `w3-oauth-wizard.sh` carries both the check that it is closed and the one-line flip for when approval lands. |
 
 ## Target layout
 
@@ -118,12 +119,42 @@ Done when `/library` lists Drive-sourced rows with a working link, no code path 
 - Meta: app with Facebook Login for Business, `ads_read`, long-lived token exchange → token row; data-deletion callback URL; business verification; app review submission.
 - Monday: OAuth app (light review).
 - Google: later. Internal-app path stays. Restricted Drive scope verification is its own project.
-- Connector side: OAuth tokens use the existing `refreshToken` hook; pasted tokens unchanged; same `sources` row either way.
-Done (v1 = built + submitted): each flow passes on a test store/account/board; apps submitted; the hub flips a source's button from "Request" to "Connect" when its approval lands.
+- Connector side: **not** the existing `refreshToken` hook — that was the plan, and it was wrong.
+  Shopify's Admin API rejects non-expiring tokens outright (403), so `/callback` must request
+  `expiring: "1"` (#38) and gets back an access token good for 3600s plus a refresh token good for
+  7776000s (90 days). Shopify rotates the refresh token on **every** refresh, so both halves are
+  written back each time. None of that plumbing existed: `api.connect_source` had no
+  `p_refresh_secret` and no `p_expires_at`, a row with a NULL `expires_at` is invisible to the
+  refresh path in `platform/worker/src/tokens.ts`, and `connectors/shopify.ts` defined no
+  `refreshToken` at all. Building it took its own window — `chunk5-w35-token-refresh.md` (W3.5),
+  shipped as #41. Meta and Monday have no `refreshToken` hook and correctly never will: their
+  tokens do not expire. Pasted tokens unchanged; same `sources` row either way.
+Done (v1 = built + submitted) — stated per source, because they no longer share a state:
+- **Shopify: built.** Flow passes on a real dev store (W2, W3) and tokens are renewable (W3.5,
+  #38/#41). Remaining: W5a's confirmed findings fixed, then submit in W6a.
+- **Meta: not built.** Flow is W4. Submission (W6b) additionally waits on business verification —
+  see §Calendar constraints, which now bottoms out at a business bank account.
+- **Monday: not built.** Flow is W4, submission W6c, light review.
+The hub flips a source's button from "Request" to "Connect" when its approval lands — by setting
+`OAUTH_APPROVED_SOURCES` on the droplet, not by a deploy.
 
 ### 6. MCP server `apps/mcp`
-Streamable-HTTP MCP at `mcp.bcn-services.com`. Tools = data-client `agentTools()`; `runTool` executes; RLS is the only scope. Auth v1 = Bearer Supabase access token from an agent login or a user session; OAuth 2.1 via Supabase's auth server when a connector UX needs it. Stateless, one process, simple per-token rate limit. New dependency `@modelcontextprotocol/sdk` needs Nate's yes.
-Done when `claude mcp add` against it as the SB smoke user lists tools and reads SB's views, and `/access` shows the config.
+Streamable-HTTP MCP at `mcp.bcn-services.com`, port 3103. Tools = data-client `agentTools()`;
+`runTool` executes; RLS is the only scope. Auth v1 = Bearer Supabase access token from an agent
+login or a user session; OAuth 2.1 via Supabase's auth server when a connector UX needs it.
+Stateless, one process, simple per-token rate limit. `@modelcontextprotocol/sdk` **approved
+2026-09-20** — pin it exact.
+Three things are pre-decided so the build window does not re-litigate them: it is a **plain Node
+process, not a Next app** (the SDK's transport is written against Node `req`/`res`, and
+`infra/bcns-app@.service` already runs `node server.js` from `/srv/%i/current`); it is
+**hand-built**, because `scripts/new-app.sh:24` reserves and rejects the slug `mcp`; and the
+**service-role key never appears in `apps/mcp`** — the caller's own token is passed to Postgres,
+so RLS cannot be bypassed by the server even in principle. Full window, with the prompt:
+`docs/architecture/chunk6-mcp-window.md`. Not gated on chunk 5 (see §Order).
+Done when `claude mcp add` against it as the SB smoke user lists tools and reads SB's views, and
+`/access` shows the agent credentials **plus the sign-in snippet that turns them into a Bearer
+header**. (The original "shows the config" was not achievable: `mint-agent-login` returns an email
+and a password with no token and no TTL, and the JWT only exists after a later `signIn()`.)
 
 ### 7. SB on the platform
 `apps/sb` live at `sb.bcn-services.com` on 3101; `app_url` set; tenant pin; set reorder in `/library`; real store, ad account and board links. Connection when Declan grants access: CLI path (wizard + `add-source`) if before approval, OAuth if after. Number check against Shopify admin; team logins; $100/mo starts.
@@ -165,12 +196,28 @@ fold in when this starts:
 ## Calendar constraints
 
 - Private-repo Actions minutes: exhausted until 2026-10-01 (or raise the spending limit).
-- Shopify app review: days to weeks. Meta business verification + review: one to three weeks. Monday: days. Google restricted scopes: longer; not in v1.
-- Declan's access grant: unknown; nothing in v1 waits on it.
+- Shopify app review: days to weeks. This is the longest clock we control, which is why W5a and
+  W6a are deliberately un-gated from the Meta/Monday track.
+- Meta: the headline is "business verification + review, one to three weeks", but the real chain
+  is longer and starts somewhere unexpected. `ads_read` at Advanced Access requires business
+  verification; business verification requires a **business bank account**, which bcns does not
+  have yet. Opening that account is the true first step of the Meta track, and it gates W6b.
+- Monday: days. Google restricted scopes: longer; not in v1.
+- Declan's access grant: still unknown, and §7 **does** wait on it — chunk 7's connection is
+  explicitly "when Declan grants access". Nothing in chunks 0–6 waits on it, which is what the
+  earlier "nothing in v1 waits on it" meant and stated too broadly.
 
 ## Nate-only steps (collected)
 
-Vercel ignored-build step and build command · GCP WIF re-scope run · GitHub secrets/vars on `bcns` · Squarespace A records · Supabase redirect allowlist · Partner/Meta/Monday app creation and submissions · archive repos · Actions spending-limit decision · dependency approvals (`@modelcontextprotocol/sdk`, `@supabase/ssr` if not already present).
+Vercel ignored-build step and build command · GCP WIF re-scope run · GitHub secrets/vars on
+`bcns` · Squarespace A records · Supabase redirect allowlist · Partner/Meta/Monday app creation
+and submissions · **register the three Shopify GDPR webhooks** (`pnpm dlx @shopify/cli app deploy
+--path apps/connect`, from a real terminal — not a Claude shell) · **open a business bank
+account**, which gates Meta business verification and therefore W6b · **`mcp.bcn-services.com`
+hosting**: DNS A record, certbot, nginx site, `systemctl enable --now bcns-app@mcp` (scripted as
+the chunk 6 deploy wizard) · flip `OAUTH_APPROVED_SOURCES` on the droplet as each approval lands ·
+archive repos · Actions spending-limit decision · dependency approvals (`@supabase/ssr` if not
+already present; `@modelcontextprotocol/sdk` **approved 2026-09-20**, that one is spent).
 
 ## Guardrails (paste with every orchestrate prompt)
 
@@ -192,4 +239,4 @@ Vercel ignored-build step and build command · GCP WIF re-scope run · GitHub se
 - Google OAuth app with restricted-scope verification — second client on Drive/Meet.
 - Flatten `platform/` into root `supabase/` and `worker/` — when the nesting costs a session.
 - Extract a client app to its own repo — a client wants code ownership or a contractor needs isolated access.
-- Move marketing off Vercel — only if the Hobby plan's non-commercial rule becomes a problem. Then static export served by nginx on the droplet (already supported by `pnpm --filter @nseluga/web export`), not a Node process, or Vercel Pro. Never a reason to put the app on Vercel: schedules and long-running processes stay on the droplet and Cloud Run.
+- Move marketing off Vercel — only if the Hobby plan's non-commercial rule becomes a problem. Then static export served by nginx on the droplet (already supported by `pnpm --filter @bcn-services/web export`), not a Node process, or Vercel Pro. Never a reason to put the app on Vercel: schedules and long-running processes stay on the droplet and Cloud Run.
