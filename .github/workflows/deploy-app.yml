@@ -34,9 +34,12 @@ jobs:
       fail-fast: false
       matrix:
         # dispatch → the one slug; push → every deployable app.
-        slug: ${{ inputs.slug && fromJSON(format('["{0}"]', inputs.slug)) || fromJSON('["sb","connect"]') }}
+        slug: ${{ inputs.slug && fromJSON(format('["{0}"]', inputs.slug)) || fromJSON('["sb","connect","mcp"]') }}
     env:
       SLUG: ${{ matrix.slug }}
+      # Next writes its own release root; the mcp service gets one from `pnpm deploy`.
+      # Held here so the Ship step stays one step for every slug.
+      RELEASE_DIR: ${{ matrix.slug == 'mcp' && format('apps/{0}/.release', matrix.slug) || format('apps/{0}/.next/standalone', matrix.slug) }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4 # version from root packageManager
@@ -54,6 +57,7 @@ jobs:
         # but only $SLUG's own test script runs — not deps' test suites too.
         run: pnpm exec turbo run test --filter="@bcn-services/$SLUG"
       - name: Build (Next standalone)
+        if: matrix.slug != 'mcp'
         # No DATA_SOURCE: shared-platform is the only mode now, and
         # scripts/check-env.ts gates on SUPABASE_SERVICE_ROLE_KEY, not on this.
         # turbo (not pnpm --filter) so workspace deps like @bcn-services/tenant
@@ -68,6 +72,16 @@ jobs:
           # bcns-app@.service runs `node server.js` in /srv/<slug>/current (unit is shared with
           # l2detailz, unchanged). Shim at the release root; Next's server.js chdirs to its own dir.
           printf "require('./apps/%s/server.js');\n" "$SLUG" > "$app/.next/standalone/server.js"
+      - name: Build (Node service)
+        if: matrix.slug == 'mcp'
+        # apps/mcp is a plain node:http process, not a Next app, so there is no standalone
+        # trace to copy. `pnpm deploy --prod` writes a self-contained release root instead:
+        # package.json, the committed one-line server.js, dist/ and production node_modules.
+        # bcns-app@.service runs `node server.js` in /srv/mcp/current, which is that root.
+        run: |
+          pnpm exec turbo run build --filter="@bcn-services/$SLUG..."
+          rm -rf "$RELEASE_DIR"
+          pnpm --filter "@bcn-services/$SLUG" --prod deploy "$RELEASE_DIR"
       - name: Ship release
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
@@ -78,7 +92,7 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
           rsync -az --delete -e "ssh -i ~/.ssh/id_deploy" \
-            "apps/$SLUG/.next/standalone/" "$SLUG@$HOST:/srv/$SLUG/releases/$GITHUB_SHA/"
+            "$RELEASE_DIR/" "$SLUG@$HOST:/srv/$SLUG/releases/$GITHUB_SHA/"
       - name: Activate, health-check, prune (auto-rollback on failure)
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
