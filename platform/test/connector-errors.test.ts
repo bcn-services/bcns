@@ -67,3 +67,19 @@ describe('classify — a plain 401 is auth for every source', () => {
     expect(classify(new SourceError('monday', 'x', 500, { errors: 'boom' }))).toBe('error')
   })
 })
+
+describe('classify — shopify 403', () => {
+  it("treats 403 as auth: the Admin API's rejection for a non-expiring token", () => {
+    expect(classify(new SourceError('shopify', 'HTTP 403', 403, { errors: 'Invalid API key or access token' }))).toBe('auth')
+  })
+
+  it('stays shopify-only, so one forbidden resource elsewhere is not a dead credential', () => {
+    for (const source of ['monday', 'meta', 'meet', 'drive'] as const) {
+      expect(classify(new SourceError(source, 'HTTP 403', 403, { error: { message: 'forbidden' } }))).toBe('error')
+    }
+  })
+
+  it('does not shadow the drive/meet 403 throttle', () => {
+    expect(classify(new SourceError('drive', 'x', 403, { error: { message: 'userRateLimitExceeded' } }))).toBe('throttle')
+  })
+})

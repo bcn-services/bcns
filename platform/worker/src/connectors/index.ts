@@ -162,7 +162,11 @@ export function classify(e: unknown): ErrorClass {
   if (status === 401) return 'auth'
   if (source === 'shopify') {
     if (/"THROTTLED"/.test(text)) return 'throttle'
-    if (/"ACCESS_DENIED"/.test(text)) return 'auth'
+    // 403 is how the Admin API now rejects a non-expiring token (verified on a
+    // real install, 2026-09-19). Shopify-only: elsewhere a 403 routinely means
+    // one forbidden resource rather than a dead credential, and marking the row
+    // auth_failed there would send a merchant to reconnect for no reason.
+    if (status === 403 || /"ACCESS_DENIED"/.test(text)) return 'auth'
   }
   if (source === 'meta') {
     const err = body?.error ?? {}
