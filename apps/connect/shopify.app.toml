@@ -1,0 +1,42 @@
+# Shopify app configuration for "bcns Connect" (Partner org bcns, app 425274376193).
+#
+# This file exists because the Dev Dashboard's create-version form does not expose
+# the mandatory privacy/compliance webhooks — its own banner says to use
+# `shopify app config link` for "all configuration". Everything below mirrors the
+# released bcns-connect-4 version, plus the three compliance URLs and the eighth
+# access scope added after that release — so this file needs a new version deployed.
+#
+# Deploy with:  pnpm dlx @shopify/cli app deploy --path apps/connect
+# That cuts a new app version; release it from the Dev Dashboard if not auto-released.
+
+client_id = "a87d4fe4a4c2b0a57d370e24f28a12bf"
+name = "bcns Connect"
+application_url = "https://connect.bcn-services.com"
+
+# false since bcns-connect-4: the hub is a standalone Next.js app with no App
+# Bridge, so rendering it in the Shopify admin iframe would break.
+embedded = false
+
+[access_scopes]
+# The same eight as SHOPIFY_SCOPES in apps/connect/lib/shopify-oauth.ts and
+# platform/scripts/checklist.ts. The checklist refuses a token missing any.
+# read_shopify_payments_accounts was added by #40 (68a35ab, 2026-09-19): it opens the
+# shopifyPaymentsAccount root field Q_PAYOUTS queries, which read_shopify_payments_payouts
+# alone does not (ACCESS_DENIED). This file was a day stale and still declared seven.
+scopes = "read_all_orders,read_customers,read_inventory,read_orders,read_products,read_reports,read_shopify_payments_accounts,read_shopify_payments_payouts"
+# Required: the hub drives the OAuth authorization-code grant itself rather than
+# Shopify's managed install, because the merchant starts from connect.bcn-services.com.
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [ "https://connect.bcn-services.com/api/oauth/shopify/callback" ]
+
+[webhooks]
+api_version = "2026-07"
+
+  # Handled by apps/connect/lib/shopify-webhooks.ts — each verifies the base64
+  # X-Shopify-Hmac-Sha256 over the raw request bytes before doing anything.
+  [webhooks.privacy_compliance]
+  customer_data_request_url = "https://connect.bcn-services.com/api/webhooks/shopify/customers-data-request"
+  customer_deletion_url     = "https://connect.bcn-services.com/api/webhooks/shopify/customers-redact"
+  shop_deletion_url         = "https://connect.bcn-services.com/api/webhooks/shopify/shop-redact"
