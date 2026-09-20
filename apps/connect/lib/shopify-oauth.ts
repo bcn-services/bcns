@@ -104,6 +104,27 @@ export interface StatePayload {
 }
 
 /**
+ * Domain separation for OUR state signature.
+ *
+ * All three signatures in this file are HMAC-SHA256 under the SAME key — the
+ * app's client secret — because Shopify signs the callback query and the
+ * webhooks with it and we do not get to choose. Encoding is not a boundary:
+ * hex and base64 are the same digest bytes rendered two ways. Without this
+ * prefix, the hex state signature re-encoded to base64 is a VALID
+ * `X-Shopify-Hmac-Sha256` for the state body, and /start hands any owner one
+ * on request — so an owner could forge a `shop/redact` webhook and make the
+ * operator erase a client's data on a fake 48-hour notice (W5a finding 1).
+ *
+ * `state:` closes it because a `signState` caller controls only the base64url
+ * body, and a base64url string can never start with `state:` — the alphabet
+ * has no `:`. The state HMAC is the one of the three that is entirely ours,
+ * so it is the one that gets the tag.
+ */
+function stateSignature(body: string, secret: string): string {
+  return createHmac("sha256", secret).update(`state:${body}`).digest("hex");
+}
+
+/**
  * `<base64url(json)>.<hex hmac>`. Signed, not encrypted: none of the three
  * fields is a secret, and a reader who tampers invalidates the signature.
  */
@@ -115,7 +136,7 @@ export function signState(
 ): string {
   const full: StatePayload = { ...payload, exp: now + STATE_TTL_MS, nonce };
   const body = Buffer.from(JSON.stringify(full), "utf8").toString("base64url");
-  return `${body}.${createHmac("sha256", secret).update(body).digest("hex")}`;
+  return `${body}.${stateSignature(body, secret)}`;
 }
 
 export type StateResult =
@@ -137,7 +158,7 @@ export function verifyState(
   if (parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, reason: "malformed" };
   const [body, signature] = parts;
 
-  const expected = createHmac("sha256", secret).update(body).digest("hex");
+  const expected = stateSignature(body, secret);
   if (!safeEqual(signature, expected)) return { ok: false, reason: "bad_signature" };
 
   let payload: StatePayload;
