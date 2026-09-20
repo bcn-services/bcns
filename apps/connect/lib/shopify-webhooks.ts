@@ -44,6 +44,32 @@ const DEADLINE: Record<GdprTopic, string> = {
   "shop/redact": "48 hours from uninstall — erase the shop's data",
 };
 
+/**
+ * How old X-Shopify-Triggered-At may be. It is the EVENT time and does not change
+ * across retries. Shopify documents 8 retries over 4 hours and does not publish a
+ * separate schedule for compliance topics, while gdprRoute's own comment records
+ * "days" — so 72h clears both with margin and still bounds a replay.
+ * NOTE: the header is not covered by the HMAC, so this bounds accidental/stale
+ * replays, not an attacker who rewrites the header.
+ */
+export const MAX_WEBHOOK_AGE_MS = 72 * 60 * 60 * 1000;
+/** Tolerated clock skew for a timestamp slightly in the future. */
+const FUTURE_SKEW_MS = 60 * 60 * 1000;
+
+/** True only for a parseable RFC-3339 timestamp inside the window. Null/garbage is false. */
+export function isFreshTriggeredAt(header: string | null, now: number = Date.now()): boolean {
+  if (!header) return false;
+  const at = Date.parse(header);
+  if (Number.isNaN(at)) return false;
+  return at <= now + FUTURE_SKEW_MS && now - at <= MAX_WEBHOOK_AGE_MS;
+}
+
+/** Headers that let a human find the request in the Shopify admin. Never the body. */
+export type WebhookMeta = { shopDomain: string | null; webhookId: string | null };
+
+/** Unsigned header text going into an email body: one line, bounded. */
+const oneLine = (v: string | null): string => (v ? v.replace(/\s+/g, " ").slice(0, 200) : "(none)");
+
 export type WebhookResult =
   | { status: 401; body: { error: string } }
   | { status: 200; body: { ok: true }; notify: ResendEmail };
@@ -56,7 +82,8 @@ export function handleGdprWebhook(
   topic: GdprTopic,
   rawBody: string,
   hmacHeader: string | null,
-  secret: string
+  secret: string,
+  meta: WebhookMeta = { shopDomain: null, webhookId: null }
 ): WebhookResult {
   // Fails closed on a missing header, a wrong signature, and a missing secret:
   // verifyWebhookHmac compares against an HMAC of the empty key rather than
@@ -73,9 +100,11 @@ export function handleGdprWebhook(
       text: [
         `Topic: ${topic}`,
         `Deadline: ${DEADLINE[topic]}`,
+        `Shop: ${oneLine(meta.shopDomain)}`,
+        `Webhook id: ${oneLine(meta.webhookId)}`,
         "",
-        "Payload (verified, as received from Shopify):",
-        rawBody,
+        "Find the request in the Shopify admin by shop + webhook id. The payload is",
+        "deliberately not copied here: it carries the customer's identifiers.",
       ].join("\n"),
     },
   };

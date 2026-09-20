@@ -183,6 +183,10 @@ cat > "/srv/$slug/env" <<EOF
 PORT=$port
 HOSTNAME=127.0.0.1
 # DATABASE_URL=
+# Non-Next service (apps/mcp): SUPABASE_URL + SUPABASE_ANON_KEY, never a service-role key.
+# SUPABASE_URL=
+# SUPABASE_ANON_KEY=
+# Next app:
 # NEXT_PUBLIC_SUPABASE_URL=
 # NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # SUPABASE_SERVICE_ROLE_KEY=

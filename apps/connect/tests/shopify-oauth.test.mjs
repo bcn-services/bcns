@@ -23,6 +23,7 @@ import {
   verifyWebhookHmac,
 } from "../lib/shopify-oauth.ts";
 import { GDPR_TOPICS, handleGdprWebhook } from "../lib/shopify-webhooks.ts";
+import { gdprRoute } from "../lib/shopify-webhook-route.ts";
 import { connectPath, oauthEnabled, redirectUri } from "../lib/oauth-config.ts";
 
 const SECRET = "shpss_test_secret";
@@ -224,14 +225,81 @@ test("handleGdprWebhook 401s a bad signature and 200s a good one", () => {
   assert.equal(good.status, 200);
   assert.deepEqual(good.body, { ok: true });
   assert.match(good.notify.subject, /customers\/redact/);
-  // The verified payload has to reach a human; that is the whole handler.
-  assert.match(good.notify.text, /191167/);
+  // Finding 4: the notification must NOT copy the customer's identifiers.
+  assert.doesNotMatch(good.notify.text, /191167/);
 });
 
 test("all three mandatory topics are handled", () => {
   for (const topic of ["customers/data_request", "customers/redact", "shop/redact"]) {
     assert.equal(handleGdprWebhook(topic, BODY, sign(BODY), SECRET).status, 200);
   }
+});
+
+/* ------------------------------------------------- webhook freshness (route) */
+
+const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
+
+async function post(triggeredAt, signature = sign(BODY)) {
+  process.env.SHOPIFY_CLIENT_SECRET = SECRET;
+  delete process.env.RESEND_API_KEY; // sendMail logs and returns: no network
+  const headers = { "X-Shopify-Hmac-Sha256": signature };
+  if (triggeredAt !== undefined) headers["X-Shopify-Triggered-At"] = triggeredAt;
+  const res = await gdprRoute(new Request("http://x/api", { method: "POST", headers, body: BODY }), "customers/redact");
+  return res.status;
+}
+
+test("a fresh timestamp with a valid signature is accepted", async () => {
+  assert.equal(await post(hoursAgo(0)), 200);
+});
+
+test("a retry hours old is still accepted (event time survives retries)", async () => {
+  assert.equal(await post(hoursAgo(5)), 200);
+});
+
+test("a stale timestamp is rejected 401 even with a valid HMAC", async () => {
+  assert.equal(await post(hoursAgo(73)), 401);
+});
+
+test("a missing X-Shopify-Triggered-At is rejected 401", async () => {
+  assert.equal(await post(undefined), 401);
+});
+
+test("a malformed X-Shopify-Triggered-At is rejected 401", async () => {
+  assert.equal(await post("not-a-date"), 401);
+});
+
+test("a fresh timestamp does not rescue a bad signature", async () => {
+  assert.equal(await post(hoursAgo(0), sign(BODY, "wrong")), 401);
+});
+
+/* ------------------------------------------------------- notification PII */
+
+test("the notification carries topic, deadline, shop and webhook id, and no PII", () => {
+  const body = JSON.stringify({ shop_domain: SHOP, customer: { id: 191167, email: "a@b.example", phone: "+15550100" } });
+  const r = handleGdprWebhook("customers/redact", body, sign(body), SECRET, {
+    shopDomain: SHOP,
+    webhookId: "wh-1234",
+  });
+  assert.equal(r.status, 200);
+  const t = r.notify.text;
+  assert.match(t, /customers\/redact/);
+  assert.match(t, /Deadline: 30 days/);
+  assert.ok(t.includes(SHOP));
+  assert.ok(t.includes("wh-1234"));
+  assert.ok(!t.includes(body));
+  assert.ok(!t.includes("a@b.example"));
+  assert.ok(!t.includes("+15550100"));
+  assert.ok(!t.includes("191167"));
+});
+
+test("unsigned headers cannot inject lines or bloat the notification", () => {
+  const r = handleGdprWebhook("customers/redact", BODY, sign(BODY), SECRET, {
+    shopDomain: "x.myshopify.com\nDeadline: none",
+    webhookId: "a".repeat(5000),
+  });
+  const lines = r.notify.text.split("\n");
+  assert.equal(lines.filter((l) => l.startsWith("Deadline:")).length, 1);
+  assert.ok(r.notify.text.length < 1000);
 });
 
 /* -------------------------------------------------------- token exchange */
