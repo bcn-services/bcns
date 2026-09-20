@@ -128,6 +128,25 @@ export function redact(message: string): string {
     .slice(0, 300)
 }
 
+/**
+ * The readable reason out of a provider's error body, whatever shape it took.
+ *
+ * Providers do not keep to one shape. A GraphQL failure is an array of objects
+ * carrying `message`, but an auth rejection from Shopify or Monday is a bare
+ * string, and Google uses `error_description`. Reading `body.errors[0].message`
+ * on a string yields a character, whose `.message` is undefined — which is how
+ * a real reason turned into the literal 'graphql error' and the cause of an
+ * auth_failed row became unreadable. The status always leads, so the line is
+ * never empty even when nothing matches.
+ */
+export function reason(body: Json, status: number): string {
+  const raw = body?.errors ?? body?.error
+  const first = Array.isArray(raw) ? raw[0] : raw
+  const message = typeof first === 'string' ? first : (first?.message ?? first?.error_description)
+  if (message) return `HTTP ${status}: ${String(message)}`
+  return raw === undefined || raw === null ? `HTTP ${status}` : `HTTP ${status}: ${JSON.stringify(raw).slice(0, 200)}`
+}
+
 export type ErrorClass = 'throttle' | 'auth' | 'error'
 
 /** §5.3 step 5: source error body first, HTTP status second. */
@@ -136,9 +155,18 @@ export function classify(e: unknown): ErrorClass {
   const { status, body, source } = e
   const text = JSON.stringify(body ?? '') + ' ' + e.message
   if (status === 429) return 'throttle'
+  // 401 is an auth failure by definition, for every provider. This was duplicated
+  // into the shopify and meet/drive branches and simply absent from monday and
+  // meta — so a plain 401 from either of those classified as 'error', the row
+  // never reached auth_failed, and its token was never queued for refresh.
+  if (status === 401) return 'auth'
   if (source === 'shopify') {
     if (/"THROTTLED"/.test(text)) return 'throttle'
-    if (status === 401 || /"ACCESS_DENIED"/.test(text)) return 'auth'
+    // 403 is how the Admin API now rejects a non-expiring token (verified on a
+    // real install, 2026-09-19). Shopify-only: elsewhere a 403 routinely means
+    // one forbidden resource rather than a dead credential, and marking the row
+    // auth_failed there would send a merchant to reconnect for no reason.
+    if (status === 403 || /"ACCESS_DENIED"/.test(text)) return 'auth'
   }
   if (source === 'meta') {
     const err = body?.error ?? {}
@@ -152,7 +180,7 @@ export function classify(e: unknown): ErrorClass {
   }
   if (source === 'meet' || source === 'drive') {
     if (status === 403 && /(userR|r)ateLimitExceeded/.test(text)) return 'throttle'
-    if (status === 401 || /invalid_grant/.test(text)) return 'auth'
+    if (/invalid_grant/.test(text)) return 'auth'
   }
   return 'error'
 }

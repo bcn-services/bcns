@@ -5,7 +5,7 @@ import { z } from 'zod'
 import {
   type CanonicalWrites, type Connector, type Json, type MetricRow, type MoneyRow, type Page,
   type ProductRow, type RawRow, type RunContext, type CustomerRow,
-  SourceError, localDay, minor, sleep,
+  SourceError, reason, localDay, minor, sleep,
 } from './index.js'
 import { envStr } from '../db.js'
 import { Q_SHOPIFYQL, sessionsQuery, shopHandle, shopifyEndpoint, shopifyTokenUrl } from './shopify-url.js'
@@ -34,7 +34,7 @@ async function gql(ctx: RunContext, query: string, variables: Json = {}): Promis
     body: JSON.stringify({ query, variables }),
   })
   const body = await r.json().catch(() => ({}))
-  if (body?.errors?.length) throw new SourceError('shopify', String(body.errors[0]?.message ?? 'graphql error'), r.status, body)
+  if (body?.errors?.length) throw new SourceError('shopify', reason(body, r.status), r.status, body)
   if (!r.ok) throw new SourceError('shopify', `HTTP ${r.status}`, r.status, body)
   // Cost-aware throttle: sleep off the deficit before the next page.
   const ts = body?.extensions?.cost?.throttleStatus

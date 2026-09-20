@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import {
   type CanonicalWrites, type Connector, type Json, type JobRow, type Page, type RawRow, type RunContext,
-  SourceError,
+  SourceError, reason,
 } from './index.js'
 
 const API = 'https://api.monday.com/v2'
@@ -30,7 +30,7 @@ async function gql(ctx: RunContext, variables: Json): Promise<Json> {
     body: JSON.stringify({ query: QUERY, variables }),
   })
   const body = await r.json().catch(() => ({}))
-  if (body?.errors?.length) throw new SourceError('monday', String(body.errors[0]?.message ?? 'graphql error'), r.status, body)
+  if (body?.errors?.length) throw new SourceError('monday', reason(body, r.status), r.status, body)
   if (!r.ok) throw new SourceError('monday', `HTTP ${r.status}`, r.status, body)
   return body.data
 }
