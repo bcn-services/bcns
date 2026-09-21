@@ -276,6 +276,18 @@ dssh() { ssh -n -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$DROPLET_S
 dssh_stdin() { ssh -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$DROPLET_SSH" "$@"; }
 hub_pid() { dssh 'systemctl show -p MainPID --value bcns-app@connect' | tr -d '[:space:]'; }
 
+# Hub on bcns-data but worker not: an SB connect in that window mints a token the
+# worker cannot refresh. Any exit between stage 2 and the end of stage 3 says so.
+HUB_SET=0; WORKER_SET=0
+on_exit() {
+  (( HUB_SET == 1 && WORKER_SET == 0 )) || return 0
+  printf '\n%s⚠ THE HUB HAS THE ALT VARS BUT THE WORKER DOES NOT%s\n' "$RED" "$RESET"
+  printf '  Re-run this wizard, or roll the hub back before SB connects:\n\n'
+  printf '    ssh -i %s %s '\''sed -i "/^SHOPIFY_ALT_/d" /srv/connect/env && sudo -n systemctl restart bcns-app@connect'\''\n\n' \
+    "${SSH_KEY:-$HOME/.ssh/id_ed25519_bcns}" "${DROPLET_SSH:-<droplet>}"
+}
+trap on_exit EXIT
+
 [[ -f apps/connect/shopify.app.bcns-data.toml ]] || {
   warn "run this from ~/bcns (apps/connect/shopify.app.bcns-data.toml not found here)."; exit 1; }
 
@@ -328,6 +340,7 @@ say "hub pid before: ${PID_BEFORE:-none}"
 confirm "Write SHOPIFY_ALT_SHOP / _CLIENT_ID / _CLIENT_SECRET to /srv/connect/env and restart the hub?" \
   || { say "nothing changed."; exit 0; }
 # Idempotent: drop any earlier ALT lines, then append all three. The secret rides stdin.
+HUB_SET=1   # set before the write: a half-finished write still needs the rollback hint
 printf 'SHOPIFY_ALT_SHOP=%s\nSHOPIFY_ALT_CLIENT_ID=%s\nSHOPIFY_ALT_CLIENT_SECRET=%s\n' \
   "$ALT_SHOP" "$ALT_CLIENT_ID" "$ALT_SECRET" |
   dssh_stdin 'sed -i "/^SHOPIFY_ALT_/d" /srv/connect/env && cat >> /srv/connect/env \
@@ -368,6 +381,7 @@ gcloud run jobs update "$JOB" --project "$PROJECT" --region "$REGION" \
 note "read back from the live job:"
 gcloud run jobs describe "$JOB" --project "$PROJECT" --region "$REGION" --format=yaml |
   grep -i -A2 'SHOPIFY_ALT' || warn "no SHOPIFY_ALT entries came back — check the job by hand."
+WORKER_SET=1
 note "deploy-worker.yml only swaps the image, so these survive the next deploy."
 pause
 

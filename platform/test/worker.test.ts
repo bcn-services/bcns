@@ -360,6 +360,19 @@ describe('worker', () => {
     expect(b).toMatchObject({ client_id: 'alt-cid', client_secret: 'alt-secret' })
   })
 
+  it('sb_bridge_refresh_marker_on_other_shop_fails_closed', async () => {
+    const c = await mkClient([{ source: 'shopify', config: { shop: 'other-store.myshopify.com', app: 'bcns-data' } }])
+    await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = 'rt-forged' where client_id = $1`, [c])
+    Object.assign(process.env, { SHOPIFY_ALT_SHOP: 'saunaboy-2.myshopify.com', SHOPIFY_ALT_CLIENT_ID: 'alt-cid', SHOPIFY_ALT_CLIENT_SECRET: 'alt-secret' })
+    let sent = false
+    try {
+      await refreshTokens(mkTick(stub((url, body) => { if (body.includes('rt-forged')) sent = true; return {} })))
+    } finally {
+      for (const k of ['SHOPIFY_ALT_SHOP', 'SHOPIFY_ALT_CLIENT_ID', 'SHOPIFY_ALT_CLIENT_SECRET']) delete process.env[k]
+    }
+    expect(sent).toBe(false)
+  })
+
   it('sb_bridge_refresh_alt_shop_without_marker_uses_default_pair', async () => {
     // SB after it reconnects through bcns Connect: connect_source replaced config, no marker.
     const b = await refreshBody({ shop: 'saunaboy-2.myshopify.com' })

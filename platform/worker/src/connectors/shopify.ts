@@ -164,10 +164,14 @@ async function* drive(ctx: RunContext, entities: string[], sinceFor: (e: string)
 // The hub's callback writes config.app = 'bcns-data' when SB installed the bcns-data
 // custom app instead of bcns Connect. Refresh picks the pair by that marker, never by
 // shop: a reconnect through bcns Connect replaces config and drops the marker.
-function shopifyAppCreds(config: { app?: unknown }): { clientId: string; clientSecret: string } {
+// The shop must also be SHOPIFY_ALT_SHOP: an owner can write config through api.connect_source,
+// so a forged marker on another shop fails closed instead of sending it bcns-data's pair.
+function shopifyAppCreds(config: { app?: unknown; shop?: unknown }): { clientId: string; clientSecret: string } {
   if (config.app === 'bcns-data') {
     const clientId = envStr('SHOPIFY_ALT_CLIENT_ID'), clientSecret = envStr('SHOPIFY_ALT_CLIENT_SECRET')
-    if (!clientId || !clientSecret) throw new SourceError('shopify', 'bcns-data connection but SHOPIFY_ALT_CLIENT_ID/SECRET unset')
+    const altShop = shopHandle(envStr('SHOPIFY_ALT_SHOP')).toLowerCase()
+    if (!clientId || !clientSecret || !altShop) throw new SourceError('shopify', 'bcns-data connection but SHOPIFY_ALT_* unset')
+    if (shopHandle(config.shop).toLowerCase() !== altShop) throw new SourceError('shopify', 'bcns-data marker on a shop other than SHOPIFY_ALT_SHOP')
     return { clientId, clientSecret }
   }
   return { clientId: envStr('SHOPIFY_CLIENT_ID'), clientSecret: envStr('SHOPIFY_CLIENT_SECRET') }
