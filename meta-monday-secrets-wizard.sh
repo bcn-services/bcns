@@ -258,7 +258,7 @@ GH_REPO="bcn-services/bcns"
 
 HUB="https://connect.bcn-services.com"
 # Public client ids, read off each dashboard 2026-09-21. Enter keeps them.
-META_CLIENT_ID_DEFAULT="__META_APP_ID__"
+META_CLIENT_ID_DEFAULT="1766887401285394"
 MONDAY_CLIENT_ID_DEFAULT="642d6119be28135602d7e71a508c665d"   # monday app 12183965
 MONDAY_APP_URL="https://bcns-force.monday.com/apps/manage/12183965/app_versions/18044067/sections/appDetails"
 
