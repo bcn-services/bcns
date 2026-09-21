@@ -6,8 +6,8 @@
  *
  * Deletion itself: connect_source writes source_tokens.attributes = '{}', so no
  * row anywhere maps a Meta user id to a tenant. There is nothing to look up and
- * nothing this route can safely delete; it records the request (log + email to
- * bcns, user id in the email only) and a human matches it by hand. Same
+ * nothing this route can safely delete; it records the request (log line + email to
+ * bcns; the log is the durable copy if the email fails) and a human matches it by hand. Same
  * notify-a-human posture as the Shopify GDPR webhooks.
  *
  * GET: the status page the returned `url` points to.
@@ -36,7 +36,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const code = confirmationCode(result.userId, config.metaClientSecret);
-  console.log(`[connect] meta data-deletion request recorded (code ${code}); no schema mapping, manual follow-up`);
+  console.log(`[connect] meta data-deletion request recorded (meta user ${result.userId}, code ${code}); no schema mapping, manual follow-up`);
   await sendMail(
     {
       from: REQUEST_FROM,
