@@ -13,9 +13,10 @@ app are all free. The cost is calendar.
 **Order matters in two places.** W1 starts Meta business verification, which takes
 one to three weeks and blocks nothing else — start it before anything. And the
 Shopify track is deliberately un-gated from the Meta and Monday track: W5a reviews
-the merged Shopify code alone and needs nothing from W4, which lets W6a submit the
-Shopify app about a week earlier than the old single W5/W6 pair allowed. Shopify
-review is the longest external clock in the build and the one we least control.
+the merged Shopify code alone and needs nothing from W4, which lets W6a ship the
+Shopify app about a week earlier than the old single W5/W6 pair allowed. If W6a picks
+public distribution, Shopify review becomes the longest external clock in the build
+and the one we least control; custom distribution has no review at all.
 
 **Two windows live in their own files**, because they outgrew a slot here:
 `chunk5-w35-token-refresh.md` (W3.5 — making Shopify tokens renewable, shipped as
@@ -461,14 +462,28 @@ replaces it, and does anything fail open?).
 
 **You get:** the second half of the review, and the gate for W6b and W6c.
 
-## W6a — Submit Shopify · You · ~15 min · no Claude · needs W5a clean
+## W6a — Choose Shopify distribution · You · ~15 min · no Claude · needs W5a clean
 
-**What you're doing.** Putting bcns's name on the Shopify app listing. This is the
-part that can't be delegated at all.
+**What you're doing.** Choosing how the Shopify app reaches a merchant's store, and
+submitting it only if that choice needs review. Can't be delegated: it puts bcns's name
+on the app.
 
-Submit for review. Days to weeks — this is the longest external clock in the build,
-which is the whole reason W5a was un-gated from W4. Everything W5a confirmed should
-be fixed and merged before you submit; a rejection costs another full review cycle.
+**Where it stands.** The app (Dev Dashboard org 235106100, app 425274376193) has no
+distribution method selected. It is installed only on `bcns-data-dev`, a store inside
+the org. Whether a merchant store outside the org can install it as it stands is
+unproven.
+
+**Decided after the Declan call.** Two options, and the choice can't be undone:
+
+- **Custom distribution:** one merchant store, no review, permanent. There's no clock,
+  so SaunaBoy can connect the same day. The cost is that each later Shopify client needs
+  a separate app. The hub reads one `SHOPIFY_CLIENT_ID`, so a second app is a code change.
+- **Public (unlisted):** any store installs through a link, and the app never appears
+  on the App Store. The cost is Shopify's app review, which takes days to weeks and
+  becomes the longest external clock in the build. It's why W5a was un-gated from W4.
+
+**If public.** Everything W5a confirmed must be fixed and merged before you submit.
+A rejection costs another full review cycle.
 
 ---
 

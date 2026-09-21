@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, SectionHeading } from "@bcn-services/ui";
+import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
 import { MintForm } from "./MintForm";
 
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic";
 /** Owner-only: `requireOwner` bounces a member back to Sources with an error. */
 export default async function AccessPage() {
   await requireOwner("/");
+  // Both browser-safe (NEXT_PUBLIC_*): the sign-in snippet under a minted login needs them.
+  const { supabaseUrl, supabaseAnonKey } = getConfig();
 
   return (
     <>
@@ -31,20 +34,20 @@ export default async function AccessPage() {
             your workspace without anybody sharing a personal password. Minting again rotates the
             password; the old password stops working.
           </p>
-          <MintForm />
+          <MintForm supabaseUrl={supabaseUrl} anonKey={supabaseAnonKey} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>MCP server</CardTitle>
-          <CardDescription>Coming soon</CardDescription>
+          <CardDescription>Connect Claude Code to this workspace</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            The hosted MCP server at{" "}
-            <code className="font-mono">mcp.bcn-services.com</code> will let Claude and other agent
-            products connect to this workspace with the agent login above. It isn&apos;t live yet.
+            The hosted MCP server at <code className="font-mono">mcp.bcn-services.com</code> lets
+            Claude and other agent products read this workspace as the agent login above. Mint a
+            login, then follow the steps that appear under it.
           </p>
         </CardContent>
       </Card>
