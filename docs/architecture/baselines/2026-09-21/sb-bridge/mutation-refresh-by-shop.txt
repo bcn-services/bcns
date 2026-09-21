@@ -1,0 +1,54 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/Users/nateseluga/bcns/.claude/worktrees/sb-bridge/platform[39m
+
+ [31m❯[39m test/worker.test.ts [2m([22m[2m15 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 2670[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mraw_partitioned[32m 65[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mstale_no_false_alarm[32m 93[2mms[22m[39m
+   [32m✓[39m worker[2m > [22malert_retry[32m 17[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mworker_claim_no_double_process[32m 187[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mlease_lost_write_ignored[32m 10[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mhousekeeping_single_holder[32m 22[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mlease_reap[32m 31[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mtoken_refresh_once[32m 18[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mtoken_refresh_shopify_rotates[32m 17[2mms[22m[39m
+   [32m✓[39m worker[2m > [22msb_bridge_refresh_marker_uses_alt_pair[32m 11[2mms[22m[39m
+[31m   [31m×[31m worker[2m > [22msb_bridge_refresh_alt_shop_without_marker_uses_default_pair[39m[32m 18[2mms[22m[39m
+[31m     → expected { client_id: 'alt-cid', …(3) } to match object { client_id: 'cid-1', …(1) }
+(2 matching properties omitted from actual)[39m
+   [32m✓[39m worker[2m > [22mtoken_refresh_revives_auth_failed[32m 17[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mworker_isolation[32m 53[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mhealth_one_row[32m 12[2mms[22m[39m
+   [32m✓[39m worker[2m > [22mtimezone_renormalize_scoped[32m 59[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/worker.test.ts[2m > [22mworker[2m > [22msb_bridge_refresh_alt_shop_without_marker_uses_default_pair
+[31m[1mAssertionError[22m: expected { client_id: 'alt-cid', …(3) } to match object { client_id: 'cid-1', …(1) }
+(2 matching properties omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "client_id": "cid-1",[39m
+[32m-   "client_secret": "csecret-1",[39m
+[31m+   "client_id": "alt-cid",[39m
+[31m+   "client_secret": "alt-secret",[39m
+[2m  }[22m
+
+[36m [2m❯[22m test/worker.test.ts:[2m366:15[22m[39m
+    [90m364| [39m    // SB after it reconnects through bcns Connect: connect_source rep…
+    [90m365| [39m    [35mconst[39m b [33m=[39m [35mawait[39m [34mrefreshBody[39m({ shop[33m:[39m [32m'saunaboy-2.myshopify.com'[39m })
+    [90m366| [39m    expect(b).toMatchObject({ client_id: 'cid-1', client_secret: 'csec…
+    [90m   | [39m              [31m^[39m
+    [90m367| [39m  })
+    [90m368| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m14 passed[39m[22m[90m (15)[39m
+[2m   Start at [22m 15:00:08
+[2m   Duration [22m 3.15s[2m (transform 120ms, setup 0ms, collect 322ms, tests 2.67s, environment 0ms, prepare 53ms)[22m
+

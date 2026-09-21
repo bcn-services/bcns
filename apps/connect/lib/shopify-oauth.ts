@@ -17,6 +17,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import type { HubConfig } from "./env"; // sb-bridge: remove after SB migrates to bcns Connect
 
 /** Shopify's Admin API OAuth endpoints live on the shop's own domain. */
 export const SHOPIFY_INSTALL_PATH = "/admin/oauth/authorize";
@@ -280,8 +281,32 @@ export function handleTokenResponse(status: number, body: unknown): ExchangeResu
  * worker: the §9 checklist fills them from the shop object on the CLI path, and
  * shopify.ts's configSchema marks both optional.
  */
-export function scheduleConfig(shop: string): Record<string, string> {
-  return { shop, admin_url: `https://admin.shopify.com/store/${shop.split(".")[0]}` };
+export function scheduleConfig(shop: string, app?: string): Record<string, string> {
+  const config = { shop, admin_url: `https://admin.shopify.com/store/${shop.split(".")[0]}` };
+  return app ? { ...config, app } : config; // sb-bridge: remove after SB migrates to bcns Connect
+}
+
+// sb-bridge: remove after SB migrates to bcns Connect
+/** `config.app` on a connection the bcns-data app issued; the worker refreshes by it. */
+export const ALT_APP = "bcns-data"; // sb-bridge: remove after SB migrates to bcns Connect
+
+/**
+ * The credential pair for one shop. SB (SHOPIFY_ALT_SHOP) installs the
+ * bcns-data custom app until bcns Connect is approved; every other shop, and
+ * every shop when any ALT var is unset, gets the default pair. Callers gate on
+ * oauthEnabled first, so the default pair is set whenever this runs.
+ * sb-bridge: remove after SB migrates to bcns Connect
+ */
+export function shopifyAppFor(
+  config: HubConfig,
+  shop: string | null
+): { clientId: string; clientSecret: string; app?: string } {
+  const { shopifyAltShop: altShop, shopifyAltClientId: altId, shopifyAltClientSecret: altSecret } = config; // sb-bridge: remove after SB migrates to bcns Connect
+  if (altShop && altId && altSecret && shop !== null && shop === normalizeShop(altShop)) {
+    return { clientId: altId, clientSecret: altSecret, app: ALT_APP }; // sb-bridge: remove after SB migrates to bcns Connect
+  }
+  // Non-null: oauthEnabled(config, "shopify") requires both before any caller gets here.
+  return { clientId: config.shopifyClientId!, clientSecret: config.shopifyClientSecret! };
 }
 
 /**

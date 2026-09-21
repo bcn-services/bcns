@@ -47,17 +47,20 @@ secrets in `data.source_tokens`, owned by chunk 5. Nothing here reads them.
 
 ## Morning steps (not run by this branch)
 
-Both require an authenticated `supabase` CLI and are run by hand, from the repo
-root, once this branch merges:
+Both require an authenticated `supabase` CLI and are run by hand from `~/bcns`,
+once this branch merges. **Always pass `--workdir platform`:** the migrations
+live in `platform/supabase/`, and run from the repo root the CLI finds none and
+reports "Remote migration versions not found". That is a wrong working
+directory, not drift. Never answer it with `supabase migration repair`.
 
 ```bash
 # 1. Schema — two migrations in this chunk.
 #    20260916000100_clients_app_url.sql   adds data.clients.app_url + republishes api.client_v1
 #    20260916000200_add_member_rpc.sql    adds api.add_member (see note below)
-supabase db push --project-ref cnsxbglhredokjbvudfd
+supabase db push --workdir platform --project-ref cnsxbglhredokjbvudfd
 
 # 2. Edge Functions.
-supabase functions deploy invite-member mint-agent-login --project-ref cnsxbglhredokjbvudfd
+supabase functions deploy invite-member mint-agent-login --workdir platform --project-ref cnsxbglhredokjbvudfd
 ```
 
 Order matters: `mint-agent-login` reads `api.client_v1` and both functions call

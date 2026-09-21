@@ -1,0 +1,326 @@
+
+> bcns@0.0.0 lint /Users/nateseluga/bcns/.claude/worktrees/sb-bridge
+> turbo run lint
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/_template, @bcn-services/app-core, @bcn-services/config, @bcn-services/connect, @bcn-services/data-client, @bcn-services/mcp, @bcn-services/platform, @bcn-services/sb, @bcn-services/tenant, @bcn-services/ui, @bcn-services/web
+   • Running lint in 11 packages
+   • Remote caching disabled, using shared worktree cache
+
+[32m@bcn-services/ui:lint: [0mcache hit, replaying logs [2m25d3eca00ec23be7[0m
+[32m@bcn-services/ui:lint: [0m
+[32m@bcn-services/ui:lint: [0m> @bcn-services/ui@0.1.1 lint /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/packages/ui
+[32m@bcn-services/ui:lint: [0m> eslint .
+[32m@bcn-services/ui:lint: [0m
+[35m@bcn-services/tenant:lint: [0mcache hit, replaying logs [2mbaee2fd82cc42bae[0m
+[35m@bcn-services/tenant:lint: [0m
+[35m@bcn-services/tenant:lint: [0m> @bcn-services/tenant@0.1.0 lint /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/packages/tenant
+[35m@bcn-services/tenant:lint: [0m> eslint .
+[35m@bcn-services/tenant:lint: [0m
+[34m@bcn-services/app-core:lint: [0mcache hit, replaying logs [2m6cb1fd8b1a77c239[0m
+[34m@bcn-services/app-core:lint: [0m
+[34m@bcn-services/app-core:lint: [0m> @bcn-services/app-core@0.2.0 lint /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/packages/app-core
+[34m@bcn-services/app-core:lint: [0m> eslint .
+[34m@bcn-services/app-core:lint: [0m
+[36m@bcn-services/web:lint: [0mcache hit, replaying logs [2mdad7672ffb9d89dc[0m
+[36m@bcn-services/web:lint: [0m
+[36m@bcn-services/web:lint: [0m> @bcn-services/web@0.0.0 lint /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/apps/web
+[36m@bcn-services/web:lint: [0m> eslint .
+[36m@bcn-services/web:lint: [0m
+[33m@bcn-services/tenant:build: [0mcache hit, replaying logs [2m995186dfa7613ede[0m
+[33m@bcn-services/tenant:build: [0m
+[33m@bcn-services/tenant:build: [0m> @bcn-services/tenant@0.1.0 build /Users/nateseluga/bcns/packages/tenant
+[33m@bcn-services/tenant:build: [0m> tsc
+[33m@bcn-services/tenant:build: [0m
+[35m@bcn-services/connect:lint: [0mcache miss, executing [2m0f7117f22086528d[0m
+[36m@bcn-services/data-client:build: [0mcache hit, replaying logs [2ma240ddb13a8881a0[0m
+[36m@bcn-services/data-client:build: [0m
+[36m@bcn-services/data-client:build: [0m> @bcn-services/data-client@0.3.0 build /Users/nateseluga/bcns/packages/data-client
+[36m@bcn-services/data-client:build: [0m> tsc
+[36m@bcn-services/data-client:build: [0m
+[32m@bcn-services/mcp:lint: [0mcache hit, replaying logs [2m8456d1e47aea7659[0m
+[32m@bcn-services/mcp:lint: [0m
+[32m@bcn-services/mcp:lint: [0m> @bcn-services/mcp@0.0.0 lint /Users/nateseluga/bcns/apps/mcp
+[32m@bcn-services/mcp:lint: [0m> eslint .
+[32m@bcn-services/mcp:lint: [0m
+[33m@bcn-services/sb:lint: [0mcache hit, replaying logs [2m4f609fe580ce753e[0m
+[33m@bcn-services/sb:lint: [0m
+[33m@bcn-services/sb:lint: [0m> @bcn-services/sb@0.0.0 lint /Users/nateseluga/bcns/.claude/worktrees/cut-upload-card/apps/sb
+[33m@bcn-services/sb:lint: [0m> eslint .
+[33m@bcn-services/sb:lint: [0m
+[34m@bcn-services/_template:lint: [0mcache hit, replaying logs [2md9af291c4b09b70c[0m
+[34m@bcn-services/_template:lint: [0m
+[34m@bcn-services/_template:lint: [0m> @bcn-services/_template@0.0.0 lint /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/apps/_template
+[34m@bcn-services/_template:lint: [0m> eslint .
+[34m@bcn-services/_template:lint: [0m
+[35m@bcn-services/connect:lint: [0m
+[35m@bcn-services/connect:lint: [0m> @bcn-services/connect@0.0.0 lint /Users/nateseluga/bcns/.claude/worktrees/sb-bridge/apps/connect
+[35m@bcn-services/connect:lint: [0m> eslint .
+[35m@bcn-services/connect:lint: [0m
+
+[1m Tasks:    [32m[1m10 successful[0m, 10 total[0m
+[1mCached:    [1m9 cached[0m, 10 total[0m
+[1m  Time:    [1m4.183s[0m [0m
+
+
+> bcns@0.0.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/sb-bridge
+> turbo run typecheck
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/_template, @bcn-services/app-core, @bcn-services/config, @bcn-services/connect, @bcn-services/data-client, @bcn-services/mcp, @bcn-services/platform, @bcn-services/sb, @bcn-services/tenant, @bcn-services/ui, @bcn-services/web
+   • Running typecheck in 11 packages
+   • Remote caching disabled, using shared worktree cache
+
+[35m@bcn-services/platform:typecheck: [0mcache miss, executing [2m7781cf5c075c16f5[0m
+[36m@bcn-services/data-client:build: [0mcache hit, replaying logs [2ma240ddb13a8881a0[0m
+[36m@bcn-services/data-client:build: [0m
+[36m@bcn-services/data-client:build: [0m> @bcn-services/data-client@0.3.0 build /Users/nateseluga/bcns/packages/data-client
+[36m@bcn-services/data-client:build: [0m> tsc
+[36m@bcn-services/data-client:build: [0m
+[36m@bcn-services/tenant:build: [0mcache hit, replaying logs [2m995186dfa7613ede[0m
+[36m@bcn-services/tenant:build: [0m
+[36m@bcn-services/tenant:build: [0m> @bcn-services/tenant@0.1.0 build /Users/nateseluga/bcns/packages/tenant
+[36m@bcn-services/tenant:build: [0m> tsc
+[36m@bcn-services/tenant:build: [0m
+[34m@bcn-services/tenant:typecheck: [0mcache hit, replaying logs [2meb03e0e7e32f4d61[0m
+[34m@bcn-services/tenant:typecheck: [0m
+[34m@bcn-services/tenant:typecheck: [0m> @bcn-services/tenant@0.1.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/packages/tenant
+[34m@bcn-services/tenant:typecheck: [0m> tsc --noEmit
+[34m@bcn-services/tenant:typecheck: [0m
+[33m@bcn-services/connect:typecheck: [0mcache miss, executing [2m0b87d8f17dda9adc[0m
+[35m@bcn-services/web:typecheck: [0mcache hit, replaying logs [2mcec0959029dab151[0m
+[32m@bcn-services/app-core:typecheck: [0mcache hit, replaying logs [2maa7f4b1a88eab312[0m
+[32m@bcn-services/app-core:typecheck: [0m
+[32m@bcn-services/app-core:typecheck: [0m> @bcn-services/app-core@0.2.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/packages/app-core
+[32m@bcn-services/app-core:typecheck: [0m> tsc --noEmit
+[32m@bcn-services/app-core:typecheck: [0m
+[35m@bcn-services/web:typecheck: [0m
+[35m@bcn-services/web:typecheck: [0m> @bcn-services/web@0.0.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/apps/web
+[35m@bcn-services/web:typecheck: [0m> tsc --noEmit
+[35m@bcn-services/web:typecheck: [0m
+[33m@bcn-services/ui:typecheck: [0mcache hit, replaying logs [2m7ef989d83eef6e89[0m
+[33m@bcn-services/ui:typecheck: [0m
+[33m@bcn-services/ui:typecheck: [0m> @bcn-services/ui@0.1.1 typecheck /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/packages/ui
+[33m@bcn-services/ui:typecheck: [0m> tsc --noEmit
+[33m@bcn-services/ui:typecheck: [0m
+[32m@bcn-services/mcp:typecheck: [0mcache hit, replaying logs [2m73c1af0036c789b5[0m
+[32m@bcn-services/mcp:typecheck: [0m
+[32m@bcn-services/mcp:typecheck: [0m> @bcn-services/mcp@0.0.0 typecheck /Users/nateseluga/bcns/apps/mcp
+[32m@bcn-services/mcp:typecheck: [0m> tsc --noEmit
+[32m@bcn-services/mcp:typecheck: [0m
+[34m@bcn-services/_template:typecheck: [0mcache hit, replaying logs [2m922a88ac8ea7d9cf[0m
+[34m@bcn-services/_template:typecheck: [0m
+[34m@bcn-services/_template:typecheck: [0m> @bcn-services/_template@0.0.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/apps/_template
+[34m@bcn-services/_template:typecheck: [0m> tsc --noEmit
+[34m@bcn-services/_template:typecheck: [0m
+[36m@bcn-services/sb:typecheck: [0mcache hit, replaying logs [2m61257dcd247f8d54[0m
+[36m@bcn-services/sb:typecheck: [0m
+[36m@bcn-services/sb:typecheck: [0m> @bcn-services/sb@0.0.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/cut-upload-card/apps/sb
+[36m@bcn-services/sb:typecheck: [0m> tsc --noEmit
+[36m@bcn-services/sb:typecheck: [0m
+[33m@bcn-services/connect:typecheck: [0m
+[33m@bcn-services/connect:typecheck: [0m> @bcn-services/connect@0.0.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/sb-bridge/apps/connect
+[33m@bcn-services/connect:typecheck: [0m> tsc --noEmit
+[33m@bcn-services/connect:typecheck: [0m
+[35m@bcn-services/platform:typecheck: [0m
+[35m@bcn-services/platform:typecheck: [0m> @bcn-services/platform@0.1.0 typecheck /Users/nateseluga/bcns/.claude/worktrees/sb-bridge/platform
+[35m@bcn-services/platform:typecheck: [0m> tsc --noEmit -p tsconfig.json
+[35m@bcn-services/platform:typecheck: [0m
+
+[1m Tasks:    [32m[1m11 successful[0m, 11 total[0m
+[1mCached:    [1m9 cached[0m, 11 total[0m
+[1m  Time:    [1m37.138s[0m [0m
+
+
+> bcns@0.0.0 build /Users/nateseluga/bcns/.claude/worktrees/sb-bridge
+> turbo run build
+
+• turbo 2.10.4
+
+   • Packages in scope: @bcn-services/_template, @bcn-services/app-core, @bcn-services/config, @bcn-services/connect, @bcn-services/data-client, @bcn-services/mcp, @bcn-services/platform, @bcn-services/sb, @bcn-services/tenant, @bcn-services/ui, @bcn-services/web
+   • Running build in 11 packages
+   • Remote caching disabled, using shared worktree cache
+
+[36m@bcn-services/data-client:build: [0mcache hit, replaying logs [2ma240ddb13a8881a0[0m
+[35m@bcn-services/tenant:build: [0mcache hit, replaying logs [2m995186dfa7613ede[0m
+[36m@bcn-services/data-client:build: [0m
+[36m@bcn-services/data-client:build: [0m> @bcn-services/data-client@0.3.0 build /Users/nateseluga/bcns/packages/data-client
+[36m@bcn-services/data-client:build: [0m> tsc
+[36m@bcn-services/data-client:build: [0m
+[35m@bcn-services/tenant:build: [0m
+[35m@bcn-services/tenant:build: [0m> @bcn-services/tenant@0.1.0 build /Users/nateseluga/bcns/packages/tenant
+[35m@bcn-services/tenant:build: [0m> tsc
+[35m@bcn-services/tenant:build: [0m
+[34m@bcn-services/connect:build: [0mcache miss, executing [2m2d339c059bcb0bff[0m
+[33m@bcn-services/mcp:build: [0mcache hit, replaying logs [2m258e0273dd0f5163[0m
+[33m@bcn-services/mcp:build: [0m
+[33m@bcn-services/mcp:build: [0m> @bcn-services/mcp@0.0.0 build /Users/nateseluga/bcns/apps/mcp
+[33m@bcn-services/mcp:build: [0m> tsc
+[33m@bcn-services/mcp:build: [0m
+[32m@bcn-services/web:build: [0mcache hit, replaying logs [2mec34aa151e2099bd[0m
+[32m@bcn-services/web:build: [0m
+[32m@bcn-services/web:build: [0m> @bcn-services/web@0.0.0 build /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/apps/web
+[32m@bcn-services/web:build: [0m> next build
+[32m@bcn-services/web:build: [0m
+[32m@bcn-services/web:build: [0m  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+[32m@bcn-services/web:build: [0m
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Creating an optimized production build ...
+[32m@bcn-services/web:build: [0m [32m[1m✓[22m[39m Compiled successfully
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Linting and checking validity of types ...
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Collecting page data ...
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (0/15) ...
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (3/15) 
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (7/15) 
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Generating static pages (11/15) 
+[32m@bcn-services/web:build: [0m [32m[1m✓[22m[39m Generating static pages (15/15)
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Finalizing page optimization ...
+[32m@bcn-services/web:build: [0m [37m[1m [22m[39m Collecting build traces ...
+[32m@bcn-services/web:build: [0m
+[32m@bcn-services/web:build: [0m[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+[32m@bcn-services/web:build: [0m┌ ○ /                                    47.9 kB         [37m[1m158 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /_not-found                          870 B            [37m[1m88 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /about                               1.68 kB         [37m[1m109 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /icon.svg                            0 B                [37m[1m0 B[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /pricing                             1.12 kB         [37m[1m111 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /privacy                             142 B          [37m[1m87.3 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /robots.txt                          0 B                [37m[1m0 B[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /services                            1.67 kB         [37m[1m104 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /sitemap.xml                         0 B                [37m[1m0 B[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /terms                               142 B          [37m[1m87.3 kB[22m[39m
+[32m@bcn-services/web:build: [0m├ ○ /work                                2.2 kB          [37m[1m110 kB[22m[39m
+[32m@bcn-services/web:build: [0m└ ● /work/[slug]                         2.2 kB          [37m[1m110 kB[22m[39m
+[32m@bcn-services/web:build: [0m    ├ /work/delucas
+[32m@bcn-services/web:build: [0m    └ /work/l2detailz
+[32m@bcn-services/web:build: [0m+ First Load JS shared by all            [37m[1m87.2 kB[22m[39m
+[32m@bcn-services/web:build: [0m  ├ chunks/120-3e163a75275e0f89.js       31.6 kB
+[32m@bcn-services/web:build: [0m  ├ chunks/16b899b3-5d6c72f7b8646651.js  53.6 kB
+[32m@bcn-services/web:build: [0m  └ other shared chunks (total)          1.95 kB
+[32m@bcn-services/web:build: [0m
+[32m@bcn-services/web:build: [0m
+[32m@bcn-services/web:build: [0m○  (Static)  prerendered as static content
+[32m@bcn-services/web:build: [0m●  (SSG)     prerendered as static HTML (uses [36mgetStaticProps[39m)
+[32m@bcn-services/web:build: [0m
+[34m@bcn-services/connect:build: [0m
+[34m@bcn-services/connect:build: [0m> @bcn-services/connect@0.0.0 build /Users/nateseluga/bcns/.claude/worktrees/sb-bridge/apps/connect
+[34m@bcn-services/connect:build: [0m> next build
+[34m@bcn-services/connect:build: [0m
+[35m@bcn-services/sb:build: [0mcache hit, replaying logs [2m3fef6c0e14b4efe3[0m
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0m> @bcn-services/sb@0.0.0 build /Users/nateseluga/bcns/.claude/worktrees/cut-upload-card/apps/sb
+[35m@bcn-services/sb:build: [0m> tsx scripts/check-env.ts && next build
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0m  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Creating an optimized production build ...
+[35m@bcn-services/sb:build: [0m<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (113kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+[35m@bcn-services/sb:build: [0m<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (267kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+[35m@bcn-services/sb:build: [0m [32m[1m✓[22m[39m Compiled successfully
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Linting and checking validity of types ...
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Collecting page data ...
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Generating static pages (0/7) ...
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Generating static pages (1/7) 
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Generating static pages (3/7) 
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Generating static pages (5/7) 
+[35m@bcn-services/sb:build: [0m [32m[1m✓[22m[39m Generating static pages (7/7)
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Finalizing page optimization ...
+[35m@bcn-services/sb:build: [0m [37m[1m [22m[39m Collecting build traces ...
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0m[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+[35m@bcn-services/sb:build: [0m┌ ƒ /                                    181 B          [37m[1m94.1 kB[22m[39m
+[35m@bcn-services/sb:build: [0m├ ○ /_not-found                          870 B          [37m[1m87.9 kB[22m[39m
+[35m@bcn-services/sb:build: [0m├ ƒ /api/health                          0 B                [37m[1m0 B[22m[39m
+[35m@bcn-services/sb:build: [0m├ ƒ /financials                          181 B          [37m[1m94.1 kB[22m[39m
+[35m@bcn-services/sb:build: [0m├ ƒ /library                             181 B          [37m[1m94.1 kB[22m[39m
+[35m@bcn-services/sb:build: [0m└ ƒ /login                               138 B          [37m[1m87.2 kB[22m[39m
+[35m@bcn-services/sb:build: [0m+ First Load JS shared by all            [37m[1m87.1 kB[22m[39m
+[35m@bcn-services/sb:build: [0m  ├ chunks/120-3c6f06a8d14c2b75.js       31.6 kB
+[35m@bcn-services/sb:build: [0m  ├ chunks/16b899b3-8d615bc03191d9bb.js  53.6 kB
+[35m@bcn-services/sb:build: [0m  └ other shared chunks (total)          1.86 kB
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0mƒ Middleware                             [37m[1m88 kB[22m[39m
+[35m@bcn-services/sb:build: [0m
+[35m@bcn-services/sb:build: [0m○  (Static)   prerendered as static content
+[35m@bcn-services/sb:build: [0mƒ  (Dynamic)  server-rendered on demand
+[35m@bcn-services/sb:build: [0m
+[36m@bcn-services/_template:build: [0mcache hit, replaying logs [2m649d6d8985039038[0m
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0m> @bcn-services/_template@0.0.0 build /Users/nateseluga/bcns/.claude/worktrees/pv1-4-hub/apps/_template
+[36m@bcn-services/_template:build: [0m> tsx scripts/check-env.ts && next build
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0m  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Creating an optimized production build ...
+[36m@bcn-services/_template:build: [0m [32m[1m✓[22m[39m Compiled successfully
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Linting and checking validity of types ...
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Collecting page data ...
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Generating static pages (0/5) ...
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Generating static pages (1/5) 
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Generating static pages (2/5) 
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Generating static pages (3/5) 
+[36m@bcn-services/_template:build: [0m [32m[1m✓[22m[39m Generating static pages (5/5)
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Finalizing page optimization ...
+[36m@bcn-services/_template:build: [0m [37m[1m [22m[39m Collecting build traces ...
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0m[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+[36m@bcn-services/_template:build: [0m┌ ○ /                                    142 B          [37m[1m87.2 kB[22m[39m
+[36m@bcn-services/_template:build: [0m├ ○ /_not-found                          870 B            [37m[1m88 kB[22m[39m
+[36m@bcn-services/_template:build: [0m├ ƒ /api/health                          0 B                [37m[1m0 B[22m[39m
+[36m@bcn-services/_template:build: [0m└ ƒ /login                               142 B          [37m[1m87.2 kB[22m[39m
+[36m@bcn-services/_template:build: [0m+ First Load JS shared by all            [37m[1m87.1 kB[22m[39m
+[36m@bcn-services/_template:build: [0m  ├ chunks/120-3c6f06a8d14c2b75.js       31.6 kB
+[36m@bcn-services/_template:build: [0m  ├ chunks/16b899b3-8d615bc03191d9bb.js  53.6 kB
+[36m@bcn-services/_template:build: [0m  └ other shared chunks (total)          1.86 kB
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0mƒ Middleware                             [37m[1m87.8 kB[22m[39m
+[36m@bcn-services/_template:build: [0m
+[36m@bcn-services/_template:build: [0m○  (Static)   prerendered as static content
+[36m@bcn-services/_template:build: [0mƒ  (Dynamic)  server-rendered on demand
+[36m@bcn-services/_template:build: [0m
+[34m@bcn-services/connect:build: [0m  [1m[38;2;173;127;168m▲ Next.js 14.2.18[39m[22m
+[34m@bcn-services/connect:build: [0m
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Creating an optimized production build ...
+[34m@bcn-services/connect:build: [0m<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (113kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+[34m@bcn-services/connect:build: [0m<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (267kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+[34m@bcn-services/connect:build: [0m [32m[1m✓[22m[39m Compiled successfully
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Linting and checking validity of types ...
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Collecting page data ...
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Generating static pages (0/7) ...
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Generating static pages (1/7) 
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Generating static pages (3/7) 
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Generating static pages (5/7) 
+[34m@bcn-services/connect:build: [0m [32m[1m✓[22m[39m Generating static pages (7/7)
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Finalizing page optimization ...
+[34m@bcn-services/connect:build: [0m [37m[1m [22m[39m Collecting build traces ...
+[34m@bcn-services/connect:build: [0m
+[34m@bcn-services/connect:build: [0m[4mRoute (app)[24m                                       [4mSize[24m     [4mFirst Load JS[24m
+[34m@bcn-services/connect:build: [0m┌ ƒ /                                             146 B          [37m[1m87.2 kB[22m[39m
+[34m@bcn-services/connect:build: [0m├ ○ /_not-found                                   870 B            [37m[1m88 kB[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /access                                       9.45 kB        [37m[1m96.5 kB[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /api/health                                   0 B                [37m[1m0 B[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /api/oauth/shopify/callback                   0 B                [37m[1m0 B[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /api/oauth/shopify/start                      0 B                [37m[1m0 B[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /api/webhooks/shopify/customers-data-request  0 B                [37m[1m0 B[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /api/webhooks/shopify/customers-redact        0 B                [37m[1m0 B[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /api/webhooks/shopify/shop-redact             0 B                [37m[1m0 B[22m[39m
+[34m@bcn-services/connect:build: [0m├ ƒ /login                                        146 B          [37m[1m87.2 kB[22m[39m
+[34m@bcn-services/connect:build: [0m└ ƒ /team                                         146 B          [37m[1m87.2 kB[22m[39m
+[34m@bcn-services/connect:build: [0m+ First Load JS shared by all                     [37m[1m87.1 kB[22m[39m
+[34m@bcn-services/connect:build: [0m  ├ chunks/120-59bcc98ddf0c8a3d.js                31.6 kB
+[34m@bcn-services/connect:build: [0m  ├ chunks/16b899b3-799a50c099b70b2e.js           53.6 kB
+[34m@bcn-services/connect:build: [0m  └ other shared chunks (total)                   1.86 kB
+[34m@bcn-services/connect:build: [0m
+[34m@bcn-services/connect:build: [0m
+[34m@bcn-services/connect:build: [0mƒ Middleware                                      [37m[1m87.6 kB[22m[39m
+[34m@bcn-services/connect:build: [0m
+[34m@bcn-services/connect:build: [0m○  (Static)   prerendered as static content
+[34m@bcn-services/connect:build: [0mƒ  (Dynamic)  server-rendered on demand
+[34m@bcn-services/connect:build: [0m
+
+[1m Tasks:    [32m[1m7 successful[0m, 7 total[0m
+[1mCached:    [1m6 cached[0m, 7 total[0m
+[1m  Time:    [1m2m59.015s[0m [0m
+

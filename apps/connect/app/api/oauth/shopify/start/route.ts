@@ -14,7 +14,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
-import { installUrl, normalizeShop, signState } from "@/lib/shopify-oauth";
+import { installUrl, normalizeShop, shopifyAppFor, signState } from "@/lib/shopify-oauth";
 import { oauthEnabled, redirectUri } from "@/lib/oauth-config";
 
 /** A signed-in, per-request redirect: nothing here may be cached or prerendered. */
@@ -34,14 +34,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const shop = normalizeShop(request.nextUrl.searchParams.get("shop"));
   if (!shop) return back("invalid-shop");
+  const app = shopifyAppFor(config, shop); // sb-bridge: remove after SB migrates to bcns Connect
 
   const state = signState(
     { shop, clientId: session.membership.clientId },
-    config.shopifyClientSecret!
+    app.clientSecret
   );
 
   const response = NextResponse.redirect(
-    installUrl(shop, config.shopifyClientId!, redirectUri(config, "shopify"), state)
+    installUrl(shop, app.clientId, redirectUri(config, "shopify"), state)
   );
   // The state also rides in a cookie. The signature already proves the state is
   // ours and names the tenant, so the cookie is belt-and-braces against a
