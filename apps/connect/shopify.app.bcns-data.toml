@@ -3,9 +3,10 @@
 # Shopify app configuration for "bcns-data" (Dev Dashboard app 422420021249), the
 # custom-distribution app locked to saunaboy-2.myshopify.com. SB connects through it
 # until bcns Connect (shopify.app.toml) passes App Store review. Same scopes and
-# install flow as bcns Connect; the only redirect is the hub callback, and there is
-# no [webhooks] block (custom apps need no compliance webhooks, and the webhook
-# routes verify with bcns Connect's secret only).
+# install flow as bcns Connect; the only redirect is the hub callback, and [webhooks]
+# holds only api_version (CLI 4.8.0 requires the table): no subscriptions and no
+# compliance URLs, since custom apps need none and the webhook routes verify with
+# bcns Connect's secret only.
 #
 # Deploy from ~/bcns with (sb-shopify-bridge-wizard.sh stage 1):
 #   pnpm dlx @shopify/cli@4.8.0 app deploy --path apps/connect --config bcns-data
@@ -24,3 +25,6 @@ use_legacy_install_flow = true
 
 [auth]
 redirect_urls = [ "https://connect.bcn-services.com/api/oauth/shopify/callback" ]
+
+[webhooks]
+api_version = "2026-07"
