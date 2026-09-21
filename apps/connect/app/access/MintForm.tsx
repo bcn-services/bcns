@@ -91,7 +91,7 @@ export function MintForm({ supabaseUrl, anonKey }: { supabaseUrl?: string; anonK
             {signInSnippet(supabaseUrl, anonKey, result.email)}
           </pre>
           <p className="text-muted-foreground">
-            The token expires about an hour after sign-in (step 1 prints the exact time), and
+            The token expires 10 minutes after sign-in (step 1 prints the exact time), and
             Claude Code keeps the one you gave it. When the tools stop answering, run{" "}
             <code className="font-mono">claude mcp remove bcns</code> and both steps again.
           </p>
