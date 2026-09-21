@@ -146,14 +146,16 @@ export default async function SourcesPage({
                  * database, so a member would consent and then be refused.
                  */
                 <form action={connectPath(config, card.source)!} method="GET" className="flex gap-2">
-                  <input
-                    type="text"
-                    name="shop"
-                    required
-                    placeholder="your-store.myshopify.com"
-                    aria-label={`Your ${card.title} store domain`}
-                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
-                  />
+                  {card.source === "shopify" ? (
+                    <input
+                      type="text"
+                      name="shop"
+                      required
+                      placeholder="your-store.myshopify.com"
+                      aria-label={`Your ${card.title} store domain`}
+                      className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    />
+                  ) : null}
                   <Button type="submit" variant="outline" size="sm">
                     Connect
                   </Button>

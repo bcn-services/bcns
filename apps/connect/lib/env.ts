@@ -20,6 +20,11 @@ export interface HubConfig {
   shopifyClientId?: string;
   /** Shopify app client secret. Server-only: never reaches a client component. */
   shopifyClientSecret?: string;
+  /* Meta + Monday OAuth apps (chunk 5 W4). Ids are public; secrets are server-only. */
+  metaClientId?: string;
+  metaClientSecret?: string;
+  mondayClientId?: string;
+  mondayClientSecret?: string;
   /**
    * Sources whose OAuth app is approved and may show a "Connect" button.
    * Everything absent from this list keeps the chunk-4 "Request connection"
@@ -40,6 +45,10 @@ export function getConfig(): HubConfig {
     resendApiKey: readEnv("RESEND_API_KEY"),
     shopifyClientId: readEnv("SHOPIFY_CLIENT_ID"),
     shopifyClientSecret: readEnv("SHOPIFY_CLIENT_SECRET"),
+    metaClientId: readEnv("META_CLIENT_ID"),
+    metaClientSecret: readEnv("META_CLIENT_SECRET"),
+    mondayClientId: readEnv("MONDAY_CLIENT_ID"),
+    mondayClientSecret: readEnv("MONDAY_CLIENT_SECRET"),
     approvedOAuthSources: (readEnv("OAUTH_APPROVED_SOURCES") ?? "")
       .split(",")
       .map((s) => s.trim().toLowerCase())
