@@ -84,6 +84,11 @@ No write scope anywhere — the connector never mutates a board.
 
 ## (a) Shopify — Partner app, unlisted distribution
 
+**Historical, superseded 2026-09-21.** These are the steps that created bcns Connect
+(app 425274376193). Two things below are wrong today: public distribution is
+selected, not custom, and custom apps need no protected-data review. The current
+steps are in `chunk5-windows.md` §W6a.
+
 1. **partners.shopify.com** → sign in as bcns (or create the Partner organization
    for bcn-services.com if it doesn't exist yet).
 2. Left nav **Apps** → **Create app** → **Create app manually** (not the CLI path —

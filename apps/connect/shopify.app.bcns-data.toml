@@ -1,0 +1,26 @@
+# sb-bridge: remove after SB migrates to bcns Connect
+#
+# Shopify app configuration for "bcns-data" (Dev Dashboard app 422420021249), the
+# custom-distribution app locked to saunaboy-2.myshopify.com. SB connects through it
+# until bcns Connect (shopify.app.toml) passes App Store review. Same scopes and
+# install flow as bcns Connect; the only redirect is the hub callback, and there is
+# no [webhooks] block (custom apps need no compliance webhooks, and the webhook
+# routes verify with bcns Connect's secret only).
+#
+# Deploy from ~/bcns with (sb-shopify-bridge-wizard.sh stage 1):
+#   pnpm dlx @shopify/cli@4.8.0 app deploy --path apps/connect --config bcns-data
+# --config takes the name between "shopify.app." and ".toml".
+
+client_id = "e93f9b329725e3aa357f936b871da139"
+name = "bcns-data"
+application_url = "https://connect.bcn-services.com"
+embedded = false
+
+[access_scopes]
+# The same eight as shopify.app.toml and SHOPIFY_SCOPES. bcns-data-4 has seven
+# (no read_shopify_payments_accounts); deploying this adds it.
+scopes = "read_all_orders,read_customers,read_inventory,read_orders,read_products,read_reports,read_shopify_payments_accounts,read_shopify_payments_payouts"
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [ "https://connect.bcn-services.com/api/oauth/shopify/callback" ]

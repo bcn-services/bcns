@@ -1,0 +1,369 @@
+
+> @bcn-services/connect@0.0.0 test /Users/nateseluga/bcns/.claude/worktrees/sb-bridge/apps/connect
+> tsx --test tests/sources.test.mjs tests/request-connection.test.mjs tests/health.test.mjs tests/shopify-oauth.test.mjs
+
+TAP version 13
+# Subtest: no NEXT_PUBLIC_SUPABASE_URL is 200 unconfigured, and never calls out
+ok 1 - no NEXT_PUBLIC_SUPABASE_URL is 200 unconfigured, and never calls out
+  ---
+  duration_ms: 0.687666
+  ...
+# Subtest: a reachable GoTrue is 200 connected, probed with the anon key
+ok 2 - a reachable GoTrue is 200 connected, probed with the anon key
+  ---
+  duration_ms: 16.367625
+  ...
+# Subtest: a trailing slash on the project URL does not double up
+ok 3 - a trailing slash on the project URL does not double up
+  ---
+  duration_ms: 0.17275
+  ...
+# Subtest: a bad status is 503 unreachable
+ok 4 - a bad status is 503 unreachable
+  ---
+  duration_ms: 0.178125
+  ...
+# Subtest: a thrown fetch is the same answer, not an unhandled rejection
+ok 5 - a thrown fetch is the same answer, not an unhandled rejection
+  ---
+  duration_ms: 0.091334
+  ...
+# Subtest: no RESEND_API_KEY: nothing is sent, a mailto is offered, the payload is logged
+ok 6 - no RESEND_API_KEY: nothing is sent, a mailto is offered, the payload is logged
+  ---
+  duration_ms: 16.848834
+  ...
+# Subtest: with a key: one POST to Resend carrying client, slug, source and requester
+ok 7 - with a key: one POST to Resend carrying client, slug, source and requester
+  ---
+  duration_ms: 0.783791
+  ...
+# Subtest: a Resend rejection still leaves the member a way through
+ok 8 - a Resend rejection still leaves the member a way through
+  ---
+  duration_ms: 0.258292
+  ...
+# Subtest: a network failure is not an error the member sees
+ok 9 - a network failure is not an error the member sees
+  ---
+  duration_ms: 0.129833
+  ...
+# Subtest: an anonymous requester is allowed and carries no reply_to
+ok 10 - an anonymous requester is allowed and carries no reply_to
+  ---
+  duration_ms: 0.182334
+  ...
+# [connect] email not sent (no RESEND_API_KEY): customers/redact
+# [connect] email not sent (no RESEND_API_KEY): customers/redact
+# [connect] shopify webhook customers/redact rejected: stale or missing X-Shopify-Triggered-At
+# [connect] shopify webhook customers/redact rejected: stale or missing X-Shopify-Triggered-At
+# [connect] shopify webhook customers/redact rejected: stale or missing X-Shopify-Triggered-At
+# Subtest: normalizeShop accepts the forms a merchant might type
+ok 11 - normalizeShop accepts the forms a merchant might type
+  ---
+  duration_ms: 0.58725
+  ...
+# Subtest: normalizeShop refuses anything that is not a myshopify host
+ok 12 - normalizeShop refuses anything that is not a myshopify host
+  ---
+  duration_ms: 0.116208
+  ...
+# Subtest: a freshly signed state verifies for its own shop
+ok 13 - a freshly signed state verifies for its own shop
+  ---
+  duration_ms: 0.318375
+  ...
+# Subtest: a tampered state payload is rejected
+ok 14 - a tampered state payload is rejected
+  ---
+  duration_ms: 0.332417
+  ...
+# Subtest: a state signed with a different secret is rejected
+ok 15 - a state signed with a different secret is rejected
+  ---
+  duration_ms: 0.182459
+  ...
+# Subtest: an expired state is rejected
+ok 16 - an expired state is rejected
+  ---
+  duration_ms: 0.096083
+  ...
+# Subtest: a state minted for one shop cannot complete another shop's callback
+ok 17 - a state minted for one shop cannot complete another shop's callback
+  ---
+  duration_ms: 0.11375
+  ...
+# Subtest: a missing or shapeless state is malformed, never accepted
+ok 18 - a missing or shapeless state is malformed, never accepted
+  ---
+  duration_ms: 0.042292
+  ...
+# Subtest: a state signature is not a webhook signature for the same key
+ok 19 - a state signature is not a webhook signature for the same key
+  ---
+  duration_ms: 0.197958
+  ...
+# Subtest: a webhook signature is not a state signature for the same key
+ok 20 - a webhook signature is not a state signature for the same key
+  ---
+  duration_ms: 0.319792
+  ...
+# Subtest: two states minted back to back differ
+ok 21 - two states minted back to back differ
+  ---
+  duration_ms: 0.072959
+  ...
+# Subtest: a genuine Shopify callback query verifies
+ok 22 - a genuine Shopify callback query verifies
+  ---
+  duration_ms: 0.145375
+  ...
+# Subtest: a tampered callback query is rejected
+ok 23 - a tampered callback query is rejected
+  ---
+  duration_ms: 0.057125
+  ...
+# Subtest: a callback query with no hmac at all fails closed
+ok 24 - a callback query with no hmac at all fails closed
+  ---
+  duration_ms: 0.031833
+  ...
+# Subtest: the query hmac is checked against our secret, not any secret
+ok 25 - the query hmac is checked against our secret, not any secret
+  ---
+  duration_ms: 0.101333
+  ...
+# Subtest: a genuine webhook signature verifies (base64, over the raw body)
+ok 26 - a genuine webhook signature verifies (base64, over the raw body)
+  ---
+  duration_ms: 0.04225
+  ...
+# Subtest: a tampered webhook payload is rejected
+ok 27 - a tampered webhook payload is rejected
+  ---
+  duration_ms: 0.0455
+  ...
+# Subtest: a webhook with a missing or empty signature fails closed
+ok 28 - a webhook with a missing or empty signature fails closed
+  ---
+  duration_ms: 0.025417
+  ...
+# Subtest: a hex-encoded webhook signature is not accepted for a base64 header
+ok 29 - a hex-encoded webhook signature is not accepted for a base64 header
+  ---
+  duration_ms: 0.036917
+  ...
+# Subtest: handleGdprWebhook 401s a bad signature and 200s a good one
+ok 30 - handleGdprWebhook 401s a bad signature and 200s a good one
+  ---
+  duration_ms: 0.195708
+  ...
+# Subtest: all three mandatory topics are handled
+ok 31 - all three mandatory topics are handled
+  ---
+  duration_ms: 0.074375
+  ...
+# Subtest: a fresh timestamp with a valid signature is accepted
+ok 32 - a fresh timestamp with a valid signature is accepted
+  ---
+  duration_ms: 6.910042
+  ...
+# Subtest: a retry hours old is still accepted (event time survives retries)
+ok 33 - a retry hours old is still accepted (event time survives retries)
+  ---
+  duration_ms: 0.422958
+  ...
+# Subtest: a stale timestamp is rejected 401 even with a valid HMAC
+ok 34 - a stale timestamp is rejected 401 even with a valid HMAC
+  ---
+  duration_ms: 0.451042
+  ...
+# Subtest: a missing X-Shopify-Triggered-At is rejected 401
+ok 35 - a missing X-Shopify-Triggered-At is rejected 401
+  ---
+  duration_ms: 0.190625
+  ...
+# Subtest: a malformed X-Shopify-Triggered-At is rejected 401
+ok 36 - a malformed X-Shopify-Triggered-At is rejected 401
+  ---
+  duration_ms: 0.47025
+  ...
+# Subtest: a fresh timestamp does not rescue a bad signature
+ok 37 - a fresh timestamp does not rescue a bad signature
+  ---
+  duration_ms: 0.232917
+  ...
+# Subtest: the notification carries topic, deadline, shop and webhook id, and no PII
+ok 38 - the notification carries topic, deadline, shop and webhook id, and no PII
+  ---
+  duration_ms: 0.143125
+  ...
+# Subtest: unsigned headers cannot inject lines or bloat the notification
+ok 39 - unsigned headers cannot inject lines or bloat the notification
+  ---
+  duration_ms: 0.071833
+  ...
+# Subtest: a good token response yields the token, its scopes and its lifetime
+ok 40 - a good token response yields the token, its scopes and its lifetime
+  ---
+  duration_ms: 0.087292
+  ...
+# Subtest: a token with no expires_in is refused: it is the non-expiring kind the Admin API 403s
+ok 41 - a token with no expires_in is refused: it is the non-expiring kind the Admin API 403s
+  ---
+  duration_ms: 0.044333
+  ...
+# Subtest: a non-2xx token response is an http_error, not a token
+ok 42 - a non-2xx token response is an http_error, not a token
+  ---
+  duration_ms: 0.07175
+  ...
+# Subtest: a 200 with no access_token is malformed
+ok 43 - a 200 with no access_token is malformed
+  ---
+  duration_ms: 0.093584
+  ...
+# Subtest: a token granted fewer scopes than we asked for is refused, and says which
+ok 44 - a token granted fewer scopes than we asked for is refused, and says which
+  ---
+  duration_ms: 0.041917
+  ...
+# Subtest: extra scopes beyond the eight are fine
+ok 45 - extra scopes beyond the eight are fine
+  ---
+  duration_ms: 0.034833
+  ...
+# Subtest: the scope list opens every field the worker actually queries
+ok 46 - the scope list opens every field the worker actually queries
+  ---
+  duration_ms: 0.029917
+  ...
+# Subtest: the callback asks Shopify for an expiring token
+ok 47 - the callback asks Shopify for an expiring token
+  ---
+  duration_ms: 0.335167
+  ...
+# Subtest: the callback stores the refresh token and the expiry, not just the access token
+ok 48 - the callback stores the refresh token and the expiry, not just the access token
+  ---
+  duration_ms: 0.115042
+  ...
+# Subtest: the install url carries the app, the scopes, the redirect and the state
+ok 49 - the install url carries the app, the scopes, the redirect and the state
+  ---
+  duration_ms: 0.18825
+  ...
+# Subtest: scheduleConfig writes the same keys add-source prompts for
+ok 50 - scheduleConfig writes the same keys add-source prompts for
+  ---
+  duration_ms: 0.040667
+  ...
+# Subtest: safeEqual is correct on equal, different and different-length inputs
+ok 51 - safeEqual is correct on equal, different and different-length inputs
+  ---
+  duration_ms: 0.069375
+  ...
+# Subtest: a source is self-serve only when approved AND configured
+ok 52 - a source is self-serve only when approved AND configured
+  ---
+  duration_ms: 0.049959
+  ...
+# Subtest: sources with no flow built are never self-serve, however they are listed
+ok 53 - sources with no flow built are never self-serve, however they are listed
+  ---
+  duration_ms: 0.046
+  ...
+# Subtest: the redirect uri matches the one registered in the partner dashboard
+ok 54 - the redirect uri matches the one registered in the partner dashboard
+  ---
+  duration_ms: 0.032
+  ...
+# Subtest: SHOPIFY_DEFAULTS still match shopify.defaults in the connector
+ok 55 - SHOPIFY_DEFAULTS still match shopify.defaults in the connector
+  ---
+  duration_ms: 0.33725
+  ...
+# Subtest: SHOPIFY_SCOPES still match the scopes the §9 checklist demands
+ok 56 - SHOPIFY_SCOPES still match the scopes the §9 checklist demands
+  ---
+  duration_ms: 0.285
+  ...
+# Subtest: the auth middleware leaves the webhooks open and keeps the oauth routes gated
+ok 57 - the auth middleware leaves the webhooks open and keeps the oauth routes gated
+  ---
+  duration_ms: 0.272541
+  ...
+# Subtest: every GDPR topic has a route directory named after it
+ok 58 - every GDPR topic has a route directory named after it
+  ---
+  duration_ms: 0.783625
+  ...
+# Subtest: one card per hub source, in order, and never 'platform'
+ok 59 - one card per hub source, in order, and never 'platform'
+  ---
+  duration_ms: 0.918083
+  ...
+# Subtest: a source with no health row reads as Not connected
+ok 60 - a source with no health row reads as Not connected
+  ---
+  duration_ms: 0.418667
+  ...
+# Subtest: never_ran is a row that exists but has not pulled: still Not connected
+ok 61 - never_ran is a row that exists but has not pulled: still Not connected
+  ---
+  duration_ms: 0.194042
+  ...
+# Subtest: auth_failed is not connected, so the card keeps its Connect form
+ok 62 - auth_failed is not connected, so the card keeps its Connect form
+  ---
+  duration_ms: 0.1315
+  ...
+# Subtest: ok is connected and carries last success through
+ok 63 - ok is connected and carries last success through
+  ---
+  duration_ms: 0.188583
+  ...
+# Subtest: every health_status maps to a label, and an unknown one degrades to error
+ok 64 - every health_status maps to a label, and an unknown one degrades to error
+  ---
+  duration_ms: 0.166792
+  ...
+# Subtest: last_error is flattened and truncated
+ok 65 - last_error is flattened and truncated
+  ---
+  duration_ms: 0.404459
+  ...
+# Subtest: app_url wins over the subdomain convention
+ok 66 - app_url wins over the subdomain convention
+  ---
+  duration_ms: 0.076708
+  ...
+# Subtest: a row with no app_url column at all falls back to the convention
+ok 67 - a row with no app_url column at all falls back to the convention
+  ---
+  duration_ms: 0.218541
+  ...
+# Subtest: no client row and no slug means no dashboard link
+ok 68 - no client row and no slug means no dashboard link
+  ---
+  duration_ms: 0.272
+  ...
+# Subtest: formatBytes climbs units and never prints a negative
+ok 69 - formatBytes climbs units and never prints a negative
+  ---
+  duration_ms: 0.090666
+  ...
+# Subtest: egressLine reads as usage, and says so when the quota is blown
+ok 70 - egressLine reads as usage, and says so when the quota is blown
+  ---
+  duration_ms: 0.066542
+  ...
+1..70
+# tests 70
+# suites 0
+# pass 70
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 801.173625

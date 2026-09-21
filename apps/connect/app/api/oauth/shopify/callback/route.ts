@@ -27,6 +27,7 @@ import {
   normalizeShop,
   safeEqual,
   scheduleConfig,
+  shopifyAppFor,
   verifyQueryHmac,
   verifyState,
 } from "@/lib/shopify-oauth";
@@ -74,8 +75,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   };
 
   if (!oauthEnabled(config, "shopify")) return fail("unavailable");
-  const secret = config.shopifyClientSecret!;
   const params = request.nextUrl.searchParams;
+  // The raw shop only CHOOSES which secret to try; it is trusted after the HMAC below.
+  const { clientId, clientSecret: secret, app } = shopifyAppFor(config, normalizeShop(params.get("shop"))); // sb-bridge: remove after SB migrates to bcns Connect
 
   // 2. Shopify's signature over the whole query string, before a single value
   // from it is read for anything. A tampered `shop`, `code` or `state` dies here.
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (session.membership.clientId !== state.payload.clientId) return fail("tenant_mismatch");
 
   // 6. Only now does the code leave this process.
-  const exchanged = await exchange(shop, config.shopifyClientId!, secret, code);
+  const exchanged = await exchange(shop, clientId, secret, code);
   if (!exchanged.ok) return fail(`exchange_${exchanged.reason}`, exchanged.detail);
 
   // 7. The token + schedule rows, through data.attach_source
@@ -118,7 +120,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     p_source: "shopify",
     p_kind: SHOPIFY_TOKEN_KIND,
     p_secret: exchanged.token.accessToken,
-    p_config: scheduleConfig(shop),
+    p_config: scheduleConfig(shop, app), // sb-bridge: remove after SB migrates to bcns Connect
     p_interval: SHOPIFY_DEFAULTS.interval,
     p_backfill_depth: SHOPIFY_DEFAULTS.backfillDepth,
     p_refresh_secret: exchanged.token.refreshToken,

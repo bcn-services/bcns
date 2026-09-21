@@ -28,6 +28,12 @@ export interface HubConfig {
   approvedOAuthSources: string[];
   /** Where Shopify sends the browser back. Overridable for a local dev-store install. */
   hubBaseUrl: string;
+
+  // sb-bridge: remove after SB migrates to bcns Connect
+  /** The one store (full *.myshopify.com) that installs the bcns-data app instead. */
+  shopifyAltShop?: string; // sb-bridge: remove after SB migrates to bcns Connect
+  shopifyAltClientId?: string; // sb-bridge: remove after SB migrates to bcns Connect
+  shopifyAltClientSecret?: string; // sb-bridge: remove after SB migrates to bcns Connect
 }
 
 /** The hub's own origin in production; matches the redirect URL registered with Shopify. */
@@ -45,5 +51,10 @@ export function getConfig(): HubConfig {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
     hubBaseUrl: (readEnv("HUB_BASE_URL") ?? HUB_BASE_URL).replace(/\/+$/, ""),
+
+    // sb-bridge: remove after SB migrates to bcns Connect
+    shopifyAltShop: readEnv("SHOPIFY_ALT_SHOP"), // sb-bridge: remove after SB migrates to bcns Connect
+    shopifyAltClientId: readEnv("SHOPIFY_ALT_CLIENT_ID"), // sb-bridge: remove after SB migrates to bcns Connect
+    shopifyAltClientSecret: readEnv("SHOPIFY_ALT_CLIENT_SECRET"), // sb-bridge: remove after SB migrates to bcns Connect
   };
 }

@@ -332,6 +332,53 @@ describe('worker', () => {
     expect(t.expires_at.getTime()).toBeGreaterThan(Date.now() + 30 * 60_000)
   })
 
+  // sb-bridge: remove after SB migrates to bcns Connect
+  // Refresh picks the app pair by config.app (written by the hub's callback), never by shop.
+  async function refreshBody(config: Record<string, string>): Promise<Record<string, string>> {
+    const c = await mkClient([{ source: 'shopify', config }])
+    const rt = `rt-${c.slice(0, 8)}`
+    await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = $2 where client_id = $1`, [c, rt])
+    const env = { SHOPIFY_CLIENT_ID: 'cid-1', SHOPIFY_CLIENT_SECRET: 'csecret-1',
+      SHOPIFY_ALT_SHOP: 'saunaboy-2.myshopify.com', SHOPIFY_ALT_CLIENT_ID: 'alt-cid', SHOPIFY_ALT_CLIENT_SECRET: 'alt-secret' }
+    Object.assign(process.env, env)
+    const seen: Record<string, string> = {}
+    const fetch = stub((url, body) => {
+      if (!url.endsWith('/admin/oauth/access_token')) return {}
+      seen[JSON.parse(body).refresh_token] = body
+      return json({ access_token: 'at-new', expires_in: 3600, refresh_token: 'rt-new' })
+    })
+    try {
+      await refreshTokens(mkTick(fetch))
+    } finally {
+      for (const k of Object.keys(env)) delete process.env[k]
+    }
+    return JSON.parse(seen[rt])
+  }
+
+  it('sb_bridge_refresh_marker_uses_alt_pair', async () => {
+    const b = await refreshBody({ shop: 'saunaboy-2.myshopify.com', app: 'bcns-data' })
+    expect(b).toMatchObject({ client_id: 'alt-cid', client_secret: 'alt-secret' })
+  })
+
+  it('sb_bridge_refresh_marker_on_other_shop_fails_closed', async () => {
+    const c = await mkClient([{ source: 'shopify', config: { shop: 'other-store.myshopify.com', app: 'bcns-data' } }])
+    await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = 'rt-forged' where client_id = $1`, [c])
+    Object.assign(process.env, { SHOPIFY_ALT_SHOP: 'saunaboy-2.myshopify.com', SHOPIFY_ALT_CLIENT_ID: 'alt-cid', SHOPIFY_ALT_CLIENT_SECRET: 'alt-secret' })
+    let sent = false
+    try {
+      await refreshTokens(mkTick(stub((url, body) => { if (body.includes('rt-forged')) sent = true; return {} })))
+    } finally {
+      for (const k of ['SHOPIFY_ALT_SHOP', 'SHOPIFY_ALT_CLIENT_ID', 'SHOPIFY_ALT_CLIENT_SECRET']) delete process.env[k]
+    }
+    expect(sent).toBe(false)
+  })
+
+  it('sb_bridge_refresh_alt_shop_without_marker_uses_default_pair', async () => {
+    // SB after it reconnects through bcns Connect: connect_source replaced config, no marker.
+    const b = await refreshBody({ shop: 'saunaboy-2.myshopify.com' })
+    expect(b).toMatchObject({ client_id: 'cid-1', client_secret: 'csecret-1' })
+  })
+
   it('token_refresh_revives_auth_failed', async () => {
     const c = await mkClient([{ source: 'shopify' }])
     // updated_at is set by the `touch` BEFORE UPDATE trigger, so an hour-old row can only

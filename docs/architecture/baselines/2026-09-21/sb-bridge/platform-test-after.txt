@@ -1,0 +1,14 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/Users/nateseluga/bcns/.claude/worktrees/sb-bridge/platform[39m
+
+ [32m✓[39m test/worker.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 3396[2mms[22m[39m
+   [33m[2m✓[22m[39m worker[2m > [22mstale_no_false_alarm [33m 344[2mms[22m[39m
+   [33m[2m✓[22m[39m worker[2m > [22mworker_claim_no_double_process [33m 354[2mms[22m[39m
+ [32m✓[39m test/connectors.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 322[2mms[22m[39m
+ [32m✓[39m test/connector-errors.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m37 passed[39m[22m[2m | [22m[90m1 todo[39m[90m (38)[39m
+[2m   Start at [22m 15:00:27
+[2m   Duration [22m 5.27s[2m (transform 175ms, setup 0ms, collect 690ms, tests 3.72s, environment 0ms, prepare 275ms)[22m
+

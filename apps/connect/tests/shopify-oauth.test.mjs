@@ -17,6 +17,7 @@ import {
   normalizeShop,
   safeEqual,
   scheduleConfig,
+  shopifyAppFor,
   signState,
   verifyQueryHmac,
   verifyState,
@@ -492,4 +493,81 @@ test("every GDPR topic has a route directory named after it", () => {
     const route = new URL(`../app/api/webhooks/shopify/${segment}/route.ts`, import.meta.url);
     assert.ok(readFileSync(route, "utf8").includes("gdprRoute"), `${segment} route missing`);
   }
+});
+
+/* ------------------------------------------- sb-bridge: remove after SB migrates to bcns Connect */
+
+const ALT_SHOP = "saunaboy-2.myshopify.com";
+const ALT_SECRET = "shpss_alt_secret";
+const BRIDGED = {
+  ...CONFIGURED,
+  shopifyClientSecret: SECRET,
+  shopifyAltShop: ALT_SHOP,
+  shopifyAltClientId: "alt-cid",
+  shopifyAltClientSecret: ALT_SECRET,
+};
+const DEFAULT_PAIR = { clientId: "cid", clientSecret: SECRET };
+
+test("sb-bridge: all three ALT vars set -> the alt shop gets the alt pair and the marker", () => {
+  assert.deepEqual(shopifyAppFor(BRIDGED, ALT_SHOP), { clientId: "alt-cid", clientSecret: ALT_SECRET, app: "bcns-data" });
+  // Exact match after normalizeShop, on both sides.
+  assert.deepEqual(shopifyAppFor({ ...BRIDGED, shopifyAltShop: "SaunaBoy-2" }, ALT_SHOP).app, "bcns-data");
+  // Every other shop, and a missing shop, keeps the default pair.
+  assert.deepEqual(shopifyAppFor(BRIDGED, SHOP), DEFAULT_PAIR);
+  assert.deepEqual(shopifyAppFor(BRIDGED, "saunaboy-2x.myshopify.com"), DEFAULT_PAIR);
+  assert.deepEqual(shopifyAppFor(BRIDGED, null), DEFAULT_PAIR);
+});
+
+test("sb-bridge: ALT vars unset or partially set -> the default pair, exactly as before", () => {
+  const unset = { ...BRIDGED, shopifyAltShop: undefined, shopifyAltClientId: undefined, shopifyAltClientSecret: undefined };
+  assert.deepEqual(shopifyAppFor(unset, ALT_SHOP), DEFAULT_PAIR);
+  for (const k of ["shopifyAltShop", "shopifyAltClientId", "shopifyAltClientSecret"]) {
+    assert.deepEqual(shopifyAppFor({ ...BRIDGED, [k]: undefined }, ALT_SHOP), DEFAULT_PAIR, `${k} unset`);
+  }
+});
+
+/** The callback's steps 2-3, in the route's order: choose by raw shop, then verify with that one pair. */
+function callbackAccepts(config, params) {
+  const shop = normalizeShop(params.get("shop"));
+  const { clientSecret } = shopifyAppFor(config, shop);
+  if (!verifyQueryHmac(params, clientSecret)) return false;
+  return verifyState(params.get("state"), clientSecret, shop).ok;
+}
+
+function callbackQuery(shop, secret) {
+  const state = signState({ shop, clientId: CLIENT }, secret);
+  return signQuery(new URLSearchParams({ code: "abc123", shop, state, timestamp: "1700000000" }), secret);
+}
+
+test("sb-bridge: each app's callback verifies only under its own secret", () => {
+  assert.equal(callbackAccepts(BRIDGED, callbackQuery(ALT_SHOP, ALT_SECRET)), true);
+  assert.equal(callbackAccepts(BRIDGED, callbackQuery(SHOP, SECRET)), true);
+});
+
+test("sb-bridge: shop=saunaboy-2 signed with bcns Connect's secret is rejected", () => {
+  assert.equal(callbackAccepts(BRIDGED, callbackQuery(ALT_SHOP, SECRET)), false);
+});
+
+test("sb-bridge: any other shop signed with bcns-data's secret is rejected", () => {
+  assert.equal(callbackAccepts(BRIDGED, callbackQuery(SHOP, ALT_SECRET)), false);
+});
+
+test("sb-bridge: the callback route picks the pair before the query HMAC and uses only that pair", () => {
+  const route = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
+  const pick = route.indexOf("shopifyAppFor(config, normalizeShop(params.get(\"shop\")))");
+  assert.ok(pick > 0, "callback does not choose its pair with shopifyAppFor");
+  assert.ok(pick < route.indexOf("verifyQueryHmac(params, secret)"), "pair chosen after the query HMAC");
+  assert.doesNotMatch(route, /config\.shopifyClient(Id|Secret)/, "callback reads the default pair directly");
+  assert.match(route, /exchange\(shop, clientId, secret, code\)/);
+  assert.match(route, /p_config:\s*scheduleConfig\(shop, app\)/);
+});
+
+test("sb-bridge: the marker is written only for the alt pair", () => {
+  assert.deepEqual(scheduleConfig(ALT_SHOP, shopifyAppFor(BRIDGED, ALT_SHOP).app), {
+    shop: ALT_SHOP,
+    admin_url: "https://admin.shopify.com/store/saunaboy-2",
+    app: "bcns-data",
+  });
+  assert.equal("app" in scheduleConfig(SHOP, shopifyAppFor(BRIDGED, SHOP).app), false);
+  assert.equal("app" in scheduleConfig(ALT_SHOP, shopifyAppFor({ ...BRIDGED, shopifyAltClientSecret: undefined }, ALT_SHOP).app), false);
 });

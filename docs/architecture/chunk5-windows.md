@@ -462,28 +462,32 @@ replaces it, and does anything fail open?).
 
 **You get:** the second half of the review, and the gate for W6b and W6c.
 
-## W6a — Choose Shopify distribution · You · ~15 min · no Claude · needs W5a clean
+## W6a — Submit bcns Connect for review · You · ~30 min · no Claude · needs W5a clean
 
-**What you're doing.** Choosing how the Shopify app reaches a merchant's store, and
-submitting it only if that choice needs review. Can't be delegated: it puts bcns's name
+**What you're doing.** Submitting bcns Connect (Dev Dashboard org 235106100, app
+425274376193) for Shopify App Store review. Can't be delegated: it puts bcns's name
 on the app.
 
-**Where it stands.** The app (Dev Dashboard org 235106100, app 425274376193) has no
-distribution method selected. It is installed only on `bcns-data-dev`, a store inside
-the org. Whether a merchant store outside the org can install it as it stands is
-unproven.
+**Where it stands (checked 2026-09-21).** Public distribution is already selected:
+Partners (org 5179321) lists bcns Connect as "Public app", with the App Store listing
+in Draft and "Manage submission" on the Distribution page. It has not been submitted.
+The earlier "no distribution method selected" was wrong. The choice is made and can't
+be undone, so custom distribution for bcns Connect is off the table.
 
-**Decided after the Declan call.** Two options, and the choice can't be undone:
+**Until approval, SB connects through bcns-data.** bcns-data (app 422420021249) is a
+custom app locked to saunaboy-2. The hub picks its credentials for that one shop when
+the `SHOPIFY_ALT_*` vars are set (the SB bridge, `platform-v1.md` §Decisions). Run
+`sb-shopify-bridge-wizard.sh` from `~/bcns` to deploy its config and connect SB. Once
+bcns Connect is approved, retire the bridge in the order the bridge PR lists.
 
-- **Custom distribution:** one merchant store, no review, permanent. There's no clock,
-  so SaunaBoy can connect the same day. The cost is that each later Shopify client needs
-  a separate app. The hub reads one `SHOPIFY_CLIENT_ID`, so a second app is a code change.
-- **Public (unlisted):** any store installs through a link, and the app never appears
-  on the App Store. The cost is Shopify's app review, which takes days to weeks and
-  becomes the longest external clock in the build. It's why W5a was un-gated from W4.
+**Protected customer data.** The request is a Draft (last updated Sep 18). Ask for
+name and email only (Level 2 basics); the orders query reads `customer { email
+displayName }`. If Declan wants ShopifyQL sessions, add phone and address too:
+without them the §9 checklist sets `sessions_mode` to `none`
+(`platform/scripts/checklist.ts:50`). `read_all_orders` was granted 9/18.
 
-**If public.** Everything W5a confirmed must be fixed and merged before you submit.
-A rejection costs another full review cycle.
+**Before you submit.** Everything W5a confirmed must be fixed and merged. A rejection
+costs another full review cycle.
 
 ---
 
