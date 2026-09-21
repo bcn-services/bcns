@@ -196,8 +196,10 @@ fold in when this starts:
 ## Calendar constraints
 
 - Private-repo Actions minutes: exhausted until 2026-10-01 (or raise the spending limit).
-- Shopify app review: days to weeks. This is the longest clock we control, which is why W5a and
-  W6a are deliberately un-gated from the Meta/Monday track.
+- Shopify: depends on the distribution choice made after the Declan call (`chunk5-windows.md`
+  W6a). Custom distribution is one store with no review, so it adds no clock. Public (unlisted)
+  adds app review, days to weeks, which would be the longest clock we control. That's why W5a
+  and W6a are deliberately un-gated from the Meta/Monday track.
 - Meta: the headline is "business verification + review, one to three weeks", but the real chain
   is longer and starts somewhere unexpected. `ads_read` at Advanced Access requires business
   verification; business verification requires a **business bank account**, which bcns does not
