@@ -128,6 +128,9 @@ if printf '%s\n' "$nextenv" | grep -qx '# SUPABASE_URL='; then bad "next kind mu
 defenv=$(renderenv sb 3101 sb.bcn-services.com certbot)
 if printf '%s\n' "$defenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "kind defaults to next when the 5th arg is omitted"; else bad "kind default is not next"; fi
 
+emptyenv=$(renderenv sb 3101 sb.bcn-services.com certbot "")
+if printf '%s\n' "$emptyenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "kind defaults to next when the 5th arg is an explicit empty string"; else bad "kind default is not next for an explicit empty string"; fi
+
 echo "onboard-client.sh cert modes"
 
 render() { BCNS_PORTS_FILE="$reg" BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" "$@" 2>/dev/null; }

@@ -53,8 +53,7 @@ the `add-source` prompt below need is the permanent `<random>.myshopify.com` dom
 either:
 - decoding the custom-distribution install link's `signature` query param: base64-decode the JSON
   before the `--`, and read its `permanent_domain` field; or
-- Shopify Admin → Settings → Domains, which lists it under "Domains not connected to Shopify" /
-  the store's default domain.
+- Shopify Admin → Settings → Domains, which lists the store's `.myshopify.com` domain.
 
 Example: SaunaBoy's handle is `saunaboy-2`; its permanent domain is `fa8a00-11.myshopify.com`.
 

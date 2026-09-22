@@ -26,6 +26,7 @@ import {
   PENDING_COOKIE,
   PENDING_TTL_MS,
   SHOPIFY_TOKEN_PATH,
+  type ExchangeResult,
   handleTokenResponse,
   normalizeShop,
   safeEqual,
@@ -67,6 +68,22 @@ async function exchange(shop: string, clientId: string, clientSecret: string, co
   }
   const body = await response.json().catch(() => null);
   return handleTokenResponse(response.status, body);
+}
+
+/**
+ * A safe, allowlisted diagnostic suffix for the reject log. Never the raw
+ * `detail` field wholesale — it can carry provider- or request-controlled
+ * text (missing-scope names, response bodies). Only an error name
+ * (network_error) or a bare numeric HTTP status (http_error) is let
+ * through; every other reason logs with no suffix at all.
+ */
+function exchangeDiagnostic(exchanged: Extract<ExchangeResult, { ok: false }>): string {
+  if (exchanged.reason === "network_error" && exchanged.detail) return `:${exchanged.detail}`;
+  if (exchanged.reason === "http_error") {
+    const status = exchanged.detail?.match(/^HTTP (\d+)$/)?.[1];
+    if (status) return `:${status}`;
+  }
+  return "";
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -124,7 +141,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // 6. Only now does the code leave this process.
   const exchanged = await exchange(shop, clientId, secret, code);
-  if (!exchanged.ok) return fail(`exchange_${exchanged.reason}`);
+  if (!exchanged.ok) return fail(`exchange_${exchanged.reason}${exchangeDiagnostic(exchanged)}`);
 
   // 7. /finish writes it. Sealed under the DEFAULT app's secret whichever app
   // issued the token: it is our key, and /finish has no shop to choose by.
