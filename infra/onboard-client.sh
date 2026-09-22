@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Add one client to the droplet:
-#   ./onboard-client.sh <slug> <port> <domain> [cloudflare|certbot|<cert-dir>]
+#   ./onboard-client.sh <slug> <port> <domain> [cloudflare|certbot|<cert-dir>] [next|mcp]
 # Creates the Unix user (kernel-enforced secret separation), dirs, env file,
 # a sudoers rule scoped to restarting only their own unit, the nginx vhost,
 # and enables the unit.
@@ -16,19 +16,34 @@
 #               because a vhost citing a cert that does not exist yet fails nginx -t.
 #   <cert-dir>  Absolute dir holding fullchain.pem + privkey.pem you manage yourself.
 # Default: certbot when the domain ends in .bcn-services.com, else cloudflare.
+#
+# App kind (5th arg) picks which Supabase env names the seeded /srv/<slug>/env
+# comments show, since apps read different names and a name meant for one app
+# left in another's env file just sits there unused while the app crash-loops
+# on the names it actually reads:
+#   next  (default) Next apps (apps/connect, apps/web, client apps): lib/env.ts
+#         style readers want NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY.
+#   mcp   Non-Next services (apps/mcp): auth.ts reads plain SUPABASE_URL /
+#         SUPABASE_ANON_KEY, no NEXT_PUBLIC prefix.
+# There is no registry mapping slug -> kind today (ports.txt is slug/port only),
+# so this is passed by hand per client, same as the cert mode.
 set -euo pipefail
 
 # Args are validated before the root check so an obvious typo fails fast (and so
 # infra/__tests__ can exercise the validation without root). All values are
 # interpolated into the nginx vhost or the env file, so all are checked --
 # an unvalidated ';' in port or domain injects nginx directives.
-[ $# -eq 3 ] || [ $# -eq 4 ] \
-  || { echo "usage: $0 <slug> <port> <domain> [cloudflare|certbot|<cert-dir>]" >&2; exit 1; }
-slug="$1"; port="$2"; domain="$3"; cert_mode="${4:-}"
+[ $# -ge 3 ] && [ $# -le 5 ] \
+  || { echo "usage: $0 <slug> <port> <domain> [cloudflare|certbot|<cert-dir>] [next|mcp]" >&2; exit 1; }
+slug="$1"; port="$2"; domain="$3"; cert_mode="${4:-}"; kind="${5:-next}"
 [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "slug must be [a-z0-9-] and not start with -" >&2; exit 1; }
 [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ] && [ "$port" -le 65535 ] \
   || { echo "port must be 1024-65535" >&2; exit 1; }
 [[ "$domain" =~ ^[a-zA-Z0-9.-]+$ ]] || { echo "domain must be [a-zA-Z0-9.-]" >&2; exit 1; }
+case "$kind" in
+  next|mcp) ;;
+  *) echo "app kind must be next or mcp" >&2; exit 1 ;;
+esac
 
 if [ -z "$cert_mode" ]; then
   case "$domain" in
@@ -159,7 +174,39 @@ server {
 EOF
 }
 
-# Test hook: print the final vhost and stop before anything needs root.
+# The env file this slug's app actually reads (see the app-kind comment up top).
+# Only PORT/HOSTNAME are live; the Supabase names are commented placeholders an
+# operator fills in by hand -- but they must be the RIGHT names for this kind,
+# not a mix of both, so the operator cannot fill in the wrong ones by mistake.
+render_env() {
+cat <<EOF
+PORT=$port
+HOSTNAME=127.0.0.1
+# DATABASE_URL=
+EOF
+if [ "$kind" = mcp ]; then
+cat <<EOF
+# Non-Next service (apps/mcp): SUPABASE_URL + SUPABASE_ANON_KEY, never a service-role key.
+# SUPABASE_URL=
+# SUPABASE_ANON_KEY=
+EOF
+else
+cat <<EOF
+# Next app: NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY.
+# NEXT_PUBLIC_SUPABASE_URL=
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# SUPABASE_SERVICE_ROLE_KEY=
+EOF
+fi
+}
+
+# Test hooks: print the would-be output and stop before anything needs root.
+# BCNS_RENDER_ONLY=env prints the env file this slug/kind would get, so
+# infra.check.sh can assert on both branches without root or a live /srv.
+if [ "${BCNS_RENDER_ONLY:-}" = "env" ]; then
+  render_env
+  exit 0
+fi
 if [ "${BCNS_RENDER_ONLY:-}" = "1" ]; then
   case "$cert_mode" in
     certbot) render_direct_vhost ;;
@@ -179,18 +226,7 @@ install -d -o "$slug" -g "$slug" "/srv/$slug/releases" "/srv/$slug/.ssh"
 # Env file: this client's secrets only, unreadable to every other client.
 # Never overwritten -- a re-run must not truncate a live secrets file.
 if [ ! -e "/srv/$slug/env" ]; then
-cat > "/srv/$slug/env" <<EOF
-PORT=$port
-HOSTNAME=127.0.0.1
-# DATABASE_URL=
-# Non-Next service (apps/mcp): SUPABASE_URL + SUPABASE_ANON_KEY, never a service-role key.
-# SUPABASE_URL=
-# SUPABASE_ANON_KEY=
-# Next app:
-# NEXT_PUBLIC_SUPABASE_URL=
-# NEXT_PUBLIC_SUPABASE_ANON_KEY=
-# SUPABASE_SERVICE_ROLE_KEY=
-EOF
+render_env > "/srv/$slug/env"
 chown "$slug:$slug" "/srv/$slug/env"
 chmod 600 "/srv/$slug/env"
 fi
