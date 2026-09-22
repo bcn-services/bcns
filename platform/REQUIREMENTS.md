@@ -244,8 +244,8 @@ Checkable statements. "Must" = platform fails acceptance without it.
 - R34. `clients.status = churned` stops all pulls and logins at the next tick.
 - R35. One script produces a client's full export (CSV per canonical table, raw JSONL, originals)
   from `client_id` alone.
-- R36. Hard delete is a bcns-run script that refuses to run within 90 days of churn and archives the
-  export to Spaces first.
+- R36. Hard delete is a bcns-run script that refuses to run within 30 days of churn, with no
+  pre-delete archive.
 
 **Dashboard template (shared-platform mode)**
 - R37. Template mode "shared platform" ships: login against the shared project, reads via

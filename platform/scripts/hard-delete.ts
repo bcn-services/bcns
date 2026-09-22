@@ -8,7 +8,7 @@
 // that. Export-on-request during the 30-day window is unaffected (scripts/export.ts).
 import { parseArgs } from 'node:util'
 import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
-import { rawPartitions, CANONICAL_TABLES } from './export.js'
+import { rawPartitions } from './export.js'
 
 // Reverse dependency order: items before sets, sets before media, everything before clients.
 const DATA_TABLES = [
