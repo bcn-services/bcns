@@ -4,7 +4,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    // content.ts imports site.ts with an explicit .ts extension because the
+    // __tests__ suite runs content.ts directly under `node
+    // --experimental-strip-types`, which requires it. noEmit is already on
+    // (nextjs.json), so this is safe here (same reasoning as platform/tsconfig.json).
+    "allowImportingTsExtensions": true
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]

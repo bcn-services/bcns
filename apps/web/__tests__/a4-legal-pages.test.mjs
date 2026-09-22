@@ -24,46 +24,124 @@ function assert(label, condition, detail = "") {
   }
 }
 
+const contentPath = resolve(root, "lib/content.ts");
+const contentSource = readFileSync(contentPath, "utf8");
+// Isolate the `legal: { ... }` block so assertions below can't accidentally
+// match unrelated copy elsewhere in the registry.
+const legalBlock = contentSource.slice(
+  contentSource.indexOf("legal: {"),
+  contentSource.indexOf("\n  navCards: {")
+);
+
+const FORBIDDEN_PHRASES = [
+  "bank-grade",
+  "military-grade",
+  "SOC 2",
+  "GDPR compliant",
+  "guaranteed uptime",
+];
+
+const REQUIRED_PRIVACY_HEADINGS = [
+  "Who we are",
+  "What we collect",
+  "How we use it",
+  "AI tools and MCP",
+  "Who we share it with",
+  "How long we keep it",
+  "Requesting deletion",
+  "Security",
+  "Your rights",
+  "Where your data is stored",
+  "Cookies and Do Not Track",
+  "Children",
+  "Contact us",
+];
+
+const REQUIRED_TERMS_HEADINGS = [
+  "Agreement and acceptance",
+  "Definitions",
+  "The services",
+  "Fees and billing",
+  "Limitation of liability",
+  "Governing law and venue",
+  "Contact us",
+];
+
 // ---------------------------------------------------------------------------
-// [1] Privacy page: file exists and contains labeled slot, no real legal text
+// [1] Privacy page: renders from content.ts, real section headings present,
+// no placeholder text left over
 // ---------------------------------------------------------------------------
 console.log("\n[1] Privacy page content");
 const privacyPath = resolve(root, "app/privacy/page.tsx");
 const privacySource = readFileSync(privacyPath, "utf8");
 assert("privacy/page.tsx exists", privacySource.length > 0);
 assert(
-  "privacy page contains labeled slot",
-  privacySource.includes("[PRIVACY POLICY BODY:")
+  "privacy page renders siteContent.legal.privacy",
+  privacySource.includes("siteContent.legal") && privacySource.includes("privacy")
 );
 assert(
-  "privacy page does not contain real legal prose",
-  !privacySource.toLowerCase().includes("governing law") &&
-    !privacySource.toLowerCase().includes("jurisdiction")
+  "privacy page has no leftover placeholder body",
+  !privacySource.includes("[PRIVACY POLICY BODY:")
 );
 assert(
   "privacy page exports default function",
   privacySource.includes("export default function")
 );
+for (const heading of REQUIRED_PRIVACY_HEADINGS) {
+  assert(`content.ts privacy has heading "${heading}"`, legalBlock.includes(`"${heading}"`));
+}
+assert(
+  "privacy retention text says 30 days",
+  legalBlock.includes("30 days")
+);
 
 // ---------------------------------------------------------------------------
-// [2] Terms page: file exists and contains labeled slot, no real legal text
+// [2] Terms page: renders from content.ts, real section headings present,
+// no placeholder text left over
 // ---------------------------------------------------------------------------
 console.log("\n[2] Terms page content");
 const termsPath = resolve(root, "app/terms/page.tsx");
 const termsSource = readFileSync(termsPath, "utf8");
 assert("terms/page.tsx exists", termsSource.length > 0);
 assert(
-  "terms page contains labeled slot",
-  termsSource.includes("[TERMS OF SERVICE BODY:")
+  "terms page renders siteContent.legal.terms",
+  termsSource.includes("siteContent.legal") && termsSource.includes("terms")
 );
 assert(
-  "terms page does not contain real legal prose",
-  !termsSource.toLowerCase().includes("governing law") &&
-    !termsSource.toLowerCase().includes("jurisdiction")
+  "terms page has no leftover placeholder body",
+  !termsSource.includes("[TERMS OF SERVICE BODY:")
 );
 assert(
   "terms page exports default function",
   termsSource.includes("export default function")
+);
+for (const heading of REQUIRED_TERMS_HEADINGS) {
+  assert(`content.ts terms has heading "${heading}"`, legalBlock.includes(`"${heading}"`));
+}
+
+// ---------------------------------------------------------------------------
+// [1b/2b] No forbidden statements anywhere in the legal copy
+// ---------------------------------------------------------------------------
+console.log("\n[1b] Forbidden phrases absent from legal copy");
+for (const phrase of FORBIDDEN_PHRASES) {
+  assert(
+    `legal copy does not contain "${phrase}"`,
+    !legalBlock.toLowerCase().includes(phrase.toLowerCase())
+  );
+}
+
+// ---------------------------------------------------------------------------
+// [2b] Every unresolved fact is a visible [TODO: ...], never a silent gap
+// ---------------------------------------------------------------------------
+console.log("\n[2b] TODO placeholders are visibly wrapped");
+const todoMatches = legalBlock.match(/\[TODO:[^\]]*\]/g) || [];
+assert("at least one [TODO: ...] placeholder exists", todoMatches.length > 0);
+// A bare "TODO" with no brackets would render as a naked, non-obvious gap.
+const bareTodo = legalBlock.match(/(?<!\[)TODO(?!:[^\]]*\])/g) || [];
+assert(
+  "no unbracketed TODO in legal copy",
+  bareTodo.length === 0,
+  `found: ${JSON.stringify(bareTodo)}`
 );
 
 // ---------------------------------------------------------------------------

@@ -1,20 +1,29 @@
 import type { Metadata } from "next";
-import { Container } from "@bcn-services/ui";
-import { siteConfig } from "@/lib/site";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
+import { PageHead } from "@/components/kit";
+import { LegalContent } from "@/components/legal-content";
+import { siteContent } from "@/lib/content";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy",
+  title: siteContent.legal.privacy.title,
+  description: siteContent.legal.privacy.description,
 };
 
 export default function PrivacyPage() {
+  const { privacy } = siteContent.legal;
   return (
-    <main className="py-24">
-      <Container>
-        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{siteConfig.name} Privacy Policy</h1>
-        <div className="mt-8 prose">
-          <p>[PRIVACY POLICY BODY: Replace with your actual privacy policy before launch.]</p>
-        </div>
-      </Container>
-    </main>
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader />
+      <main className="flex-1">
+        <PageHead
+          eyebrow={privacy.eyebrow}
+          title={privacy.title}
+          description={privacy.description}
+        />
+        <LegalContent content={privacy} />
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
