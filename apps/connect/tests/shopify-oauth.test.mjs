@@ -372,10 +372,13 @@ test("the callback stores the refresh token and the expiry, not just the access 
   // no refresh_secret to spend even if it did not. This failed silently in W3: the
   // install succeeded, the dashboard said connected, and the merchant was cut off by
   // the afternoon. Nothing at runtime reports it, so the assertion lives here.
+  // The callback seals both into the hand-off; /finish writes them.
   const route = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
-  assert.match(route, /p_refresh_secret:\s*exchanged\.token\.refreshToken/);
-  assert.match(route, /p_expires_at:/);
-  assert.match(route, /exchanged\.token\.expiresIn\s*\*\s*1000/);
+  assert.match(route, /refreshToken:\s*exchanged\.token\.refreshToken/);
+  assert.match(route, /expiresAt:[^\n]*exchanged\.token\.expiresIn\s*\*\s*1000/);
+  const finish = readFileSync(new URL("../app/api/oauth/shopify/finish/route.ts", import.meta.url), "utf8");
+  assert.match(finish, /p_refresh_secret:\s*pending\.refreshToken/);
+  assert.match(finish, /p_expires_at:\s*pending\.expiresAt/);
 });
 
 /* -------------------------------------------------------------- assembly */
@@ -468,7 +471,7 @@ test("SHOPIFY_SCOPES still match the scopes the §9 checklist demands", () => {
  * a failed webhook, and the app is rejected at review — with every unit test
  * above still green. Hence this one, which reads the real matcher.
  */
-test("the auth middleware leaves the webhooks open and keeps the oauth routes gated", () => {
+test("the auth middleware leaves the webhooks and the Shopify handshake open, and gates the hub", () => {
   const source = readFileSync(new URL("../middleware.ts", import.meta.url), "utf8");
   const matcher = source.match(/matcher:\s*\["([^"]+)"\]/);
   assert.ok(matcher, "no matcher found in middleware.ts");
@@ -479,10 +482,14 @@ test("the auth middleware leaves the webhooks open and keeps the oauth routes ga
     "/api/webhooks/shopify/customers-redact",
     "/api/webhooks/shopify/shop-redact",
     "/api/health",
+    // A Shopify-initiated install reaches these with no bcns session; each checks for itself.
+    "/api/oauth/shopify/start",
+    "/api/oauth/shopify/callback",
+    "/api/oauth/shopify/finish",
   ]) {
     assert.equal(gated.test(open), false, `${open} must not require a session`);
   }
-  for (const closed of ["/api/oauth/shopify/start", "/api/oauth/shopify/callback", "/", "/team"]) {
+  for (const closed of ["/api/oauth/meta/start", "/api/oauth/monday/callback", "/", "/team", "/access"]) {
     assert.equal(gated.test(closed), true, `${closed} must require a session`);
   }
 });
@@ -557,9 +564,14 @@ test("sb-bridge: the callback route picks the pair before the query HMAC and use
   const pick = route.indexOf("shopifyAppFor(config, normalizeShop(params.get(\"shop\")))");
   assert.ok(pick > 0, "callback does not choose its pair with shopifyAppFor");
   assert.ok(pick < route.indexOf("verifyQueryHmac(params, secret)"), "pair chosen after the query HMAC");
-  assert.doesNotMatch(route, /config\.shopifyClient(Id|Secret)/, "callback reads the default pair directly");
+  // The default secret appears once, as the key that seals the hand-off cookie.
+  assert.doesNotMatch(route, /config\.shopifyClientId/, "callback reads the default pair directly");
+  assert.equal(route.match(/config\.shopifyClientSecret/g)?.length, 1);
+  assert.match(route, /config\.shopifyClientSecret!\s*\);\s*const done/);
   assert.match(route, /exchange\(shop, clientId, secret, code\)/);
-  assert.match(route, /p_config:\s*scheduleConfig\(shop, app\)/);
+  assert.match(route, /^\s*app, \/\/ sb-bridge/m);
+  const finish = readFileSync(new URL("../app/api/oauth/shopify/finish/route.ts", import.meta.url), "utf8");
+  assert.match(finish, /p_config:\s*scheduleConfig\(pending\.shop, pending\.app\)/);
 });
 
 test("sb-bridge: the marker is written only for the alt pair", () => {

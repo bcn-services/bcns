@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@bcn-services/tenant";
+import { FINISH_PATH } from "@/lib/shopify-oauth";
 
 export async function signIn(form: FormData): Promise<void> {
   const supabase = createServerSupabase();
@@ -12,7 +13,10 @@ export async function signIn(form: FormData): Promise<void> {
   });
   // The middleware does the membership check on the next request, so a user
   // with a valid password but no membership still lands back here with a reason.
-  redirect(error ? "/login?error=invalid" : "/");
+  // `next` is an allowlist of one, never a URL we echo: anything else is an open redirect.
+  const next = form.get("next") === FINISH_PATH ? FINISH_PATH : null;
+  if (error) redirect(next ? `/login?error=invalid&next=${encodeURIComponent(next)}` : "/login?error=invalid");
+  redirect(next ?? "/");
 }
 
 export async function signOut(): Promise<void> {

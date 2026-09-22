@@ -9,24 +9,27 @@
  *   3. our state          — signature, then expiry, then shop binding
  *   4. the state cookie   — the browser that finished is the one that started
  *   5. the session        — owner, and the SAME tenant the state was minted for
+ *                           (skipped for an install-initiated state: no tenant yet)
  *   6. token exchange     — only now does anything leave this server
- *   7. the write          — api.connect_source, tenant from the JWT
+ *   7. the hand-off       — the token, sealed, to /finish, which does the write
  *
- * Nothing before step 6 touches the network and nothing before step 7 touches
- * the database, so a forged callback costs an HMAC comparison and a redirect.
+ * Nothing before step 6 touches the network and nothing here touches the
+ * database, so a forged callback costs an HMAC comparison and a redirect.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
 import {
-  SHOPIFY_DEFAULTS,
-  SHOPIFY_TOKEN_KIND,
+  FINISH_PATH,
+  INSTALL_CLIENT_ID,
+  PENDING_COOKIE,
+  PENDING_TTL_MS,
   SHOPIFY_TOKEN_PATH,
   handleTokenResponse,
   normalizeShop,
   safeEqual,
-  scheduleConfig,
+  sealPending,
   shopifyAppFor,
   verifyQueryHmac,
   verifyState,
@@ -70,7 +73,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const fail = (code: string, detail?: string) => {
     if (detail) console.warn(`[connect] shopify callback rejected (${code}): ${detail}`);
     const response = NextResponse.redirect(`${hub}/?error=connect-failed`);
-    response.cookies.delete("shopify_oauth_state");
+    response.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
     return response;
   };
 
@@ -97,39 +100,41 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const cookie = request.cookies.get("shopify_oauth_state")?.value;
   if (!cookie || !safeEqual(cookie, String(params.get("state")))) return fail("state_cookie");
 
-  // 5. requireOwner redirects on its own when there is no owner session.
-  const session = await requireOwner("/");
-  // The state names the tenant it was minted for. Signing back in as a different
-  // client mid-handshake must not write this token into that other client.
-  if (session.membership.clientId !== state.payload.clientId) return fail("tenant_mismatch");
+  // 5. A tenant-bound state needs its owner signed in NOW, before the code is
+  // spent. Signing back in as a different client mid-handshake must not write
+  // this token into that other client. An install-initiated state has no
+  // tenant; /finish makes the owner sign in before anything is written.
+  if (state.payload.clientId !== INSTALL_CLIENT_ID) {
+    // requireOwner redirects on its own when there is no owner session.
+    const session = await requireOwner("/");
+    if (session.membership.clientId !== state.payload.clientId) return fail("tenant_mismatch");
+  }
 
   // 6. Only now does the code leave this process.
   const exchanged = await exchange(shop, clientId, secret, code);
   if (!exchanged.ok) return fail(`exchange_${exchanged.reason}`, exchanged.detail);
 
-  // 7. The token + schedule rows, through data.attach_source
-  // (20260918000100_attach_source_rpc.sql). This is now the ONLY way a Shopify
-  // connection is made: `add-source --source shopify` refuses and sends the
-  // operator here, because the refresh token below only exists after a
-  // round-trip and nothing hand-typed survives the hour.
-  //
-  // p_refresh_secret and p_expires_at are what make the connection renewable.
-  // Without them the worker stores an access token that dies in an hour with no
-  // way back (20260919000100_connect_source_refresh.sql added the parameters).
-  const { error } = await session.api.rpc("connect_source", {
-    p_source: "shopify",
-    p_kind: SHOPIFY_TOKEN_KIND,
-    p_secret: exchanged.token.accessToken,
-    p_config: scheduleConfig(shop, app), // sb-bridge: remove after SB migrates to bcns Connect
-    p_interval: SHOPIFY_DEFAULTS.interval,
-    p_backfill_depth: SHOPIFY_DEFAULTS.backfillDepth,
-    p_refresh_secret: exchanged.token.refreshToken,
-    p_expires_at: new Date(Date.now() + exchanged.token.expiresIn * 1000).toISOString(),
+  // 7. /finish writes it. Sealed under the DEFAULT app's secret whichever app
+  // issued the token: it is our key, and /finish has no shop to choose by.
+  const sealed = sealPending(
+    {
+      clientId: state.payload.clientId,
+      shop,
+      app, // sb-bridge: remove after SB migrates to bcns Connect
+      accessToken: exchanged.token.accessToken,
+      refreshToken: exchanged.token.refreshToken,
+      expiresAt: new Date(Date.now() + exchanged.token.expiresIn * 1000).toISOString(),
+    },
+    config.shopifyClientSecret!
+  );
+  const done = NextResponse.redirect(`${hub}${FINISH_PATH}`);
+  done.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
+  done.cookies.set(PENDING_COOKIE, sealed, {
+    httpOnly: true,
+    secure: hub.startsWith("https://"),
+    sameSite: "lax",
+    path: "/api/oauth/shopify",
+    maxAge: PENDING_TTL_MS / 1000,
   });
-  // `error.message` can echo a parameter value, and one of them is the token.
-  if (error) return fail("write_failed", error.code ?? "rpc");
-
-  const done = NextResponse.redirect(`${hub}/?connected=shopify`);
-  done.cookies.delete("shopify_oauth_state");
   return done;
 }
