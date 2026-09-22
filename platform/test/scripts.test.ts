@@ -22,6 +22,8 @@ const SLUG2 = 'zz-script-test2'
 const SLUG3 = 'zz-script-test3'
 let clientId: string
 
+// retention-30d: hard-delete no longer archives an export anywhere. archiveDir stays as a directory
+// that must remain empty — the no-archive assertion below fails if the archive step is ever restored.
 const archiveDir = mkdtempSync(join(tmpdir(), 'bcns-archive-'))
 
 // A Shopify scope query that grants every §4.2 scope. `scopes: []` drops them all (S2 failure).
@@ -30,7 +32,6 @@ const shopifyScopes = (scopes = ['read_orders', 'read_all_orders', 'read_product
   data: { currentAppInstallation: { accessScopes: scopes.map((handle) => ({ handle })) },
     shop: { ianaTimezone: 'UTC', currencyCode: 'USD' } },
 })
-process.env.EXPORT_ARCHIVE_DIR = archiveDir
 
 afterAll(async () => {
   // Best-effort: remove the throwaway client even if an earlier assertion failed mid-suite.
@@ -238,16 +239,17 @@ describe('scripts', () => {
     }
   })
 
-  it('hard-delete refuses within 90 days of churn', async () => {
-    await expect(hardDelete(['--slug', SLUG, '--confirm', SLUG])).rejects.toThrow(/90 days/)
+  it('hard-delete refuses within 30 days of churn', async () => {
+    await expect(hardDelete(['--slug', SLUG, '--confirm', SLUG])).rejects.toThrow(/30 days/)
     expect((await sql('select 1 from data.clients where slug = $1', [SLUG])).rowCount).toBe(1)
   })
 
-  it('hard-delete archives the export, then removes the client, its rows, and its storage objects', async () => {
-    await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG])
+  it('hard-delete removes the client, its rows, and its storage objects, and archives nothing', async () => {
+    await sql(`update data.clients set churned_at = now() - interval '31 days' where slug = $1`, [SLUG])
     await hardDelete(['--slug', SLUG, '--confirm', SLUG])
-    expect(existsSync(join(archiveDir, SLUG))).toBe(true)
-    expect(readdirSync(join(archiveDir, SLUG))[0]).toMatch(/\.tar\.gz$/)
+    // No pre-delete archive any more (retention-30d): the export dir this suite points
+    // EXPORT_ARCHIVE_DIR at must stay empty, or a restored archive step goes uncaught.
+    expect(existsSync(join(archiveDir, SLUG))).toBe(false)
     expect((await sql('select 1 from data.raw where client_id = $1', [clientId])).rowCount).toBe(0)
     expect((await sql('select 1 from auth.users where email = $1', [`smoke+${SLUG}@bcn-services.com`])).rowCount).toBe(0)
 
@@ -259,6 +261,17 @@ describe('scripts', () => {
 
     const objects = await sql('select 1 from storage.objects where name like $1', [`${clientId}/%`])
     expect(objects.rowCount).toBe(0)
+  })
+
+  it('hard-delete pins the 30-day threshold: refuses at 29 days, allows at 31', async () => {
+    await onboard(['--slug', SLUG2 + '-pin', '--name', 'ZZ Pin', '--timezone', 'UTC'])
+    const pinned = (await sql<{ id: string }>('select id from data.clients where slug = $1', [SLUG2 + '-pin'])).rows[0].id
+    await sql(`update data.clients set status = 'churned' where id = $1`, [pinned])
+    await sql(`update data.clients set churned_at = now() - interval '29 days' where id = $1`, [pinned])
+    await expect(hardDelete(['--slug', SLUG2 + '-pin', '--confirm', SLUG2 + '-pin'])).rejects.toThrow(/30 days/)
+    await sql(`update data.clients set churned_at = now() - interval '31 days' where id = $1`, [pinned])
+    await hardDelete(['--slug', SLUG2 + '-pin', '--confirm', SLUG2 + '-pin'])
+    expect((await sql('select 1 from data.clients where id = $1', [pinned])).rowCount).toBe(0)
   })
 
   it('§9 checklist refuses a Meta USER token and a bcns Google client, accepts a system user', async () => {
