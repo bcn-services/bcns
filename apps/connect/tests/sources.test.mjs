@@ -31,13 +31,13 @@ test("a source with no health row reads as Not connected", () => {
   assert.equal(shopify.lastSuccessAt, null);
 });
 
-test("never_ran is a row that exists but has not pulled: still Not connected", () => {
+test("never_ran is a row that exists but has not pulled: not yet connected, labeled Awaiting first pull", () => {
   const cards = composeSources([
     { source: "meta", status: "never_ran", last_success_at: null, last_error: null },
   ]);
   const meta = cards.find((c) => c.source === "meta");
   assert.equal(meta.connected, false);
-  assert.equal(meta.label, "Not connected");
+  assert.equal(meta.label, "Awaiting first pull");
 });
 
 test("auth_failed is not connected, so the card keeps its Connect form", () => {

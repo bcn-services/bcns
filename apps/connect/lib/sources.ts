@@ -65,7 +65,7 @@ const STATES: Record<HealthStatus | "none", { label: string; tone: Tone }> = {
   stale: { label: "Stale", tone: "warn" },
   auth_failed: { label: "Reconnect needed", tone: "error" },
   error: { label: "Error", tone: "error" },
-  never_ran: { label: "Not connected", tone: "idle" },
+  never_ran: { label: "Awaiting first pull", tone: "idle" },
   none: { label: "Not connected", tone: "idle" },
 };
 
@@ -98,7 +98,9 @@ export function composeSources(rows: readonly HealthRow[] | null | undefined): S
     return {
       source,
       title: TITLES[source],
-      // never_ran is a row that exists but has never pulled: still "not connected".
+      // never_ran is a row that exists but has never pulled: the card says
+      // "Awaiting first pull", and `connected` below still counts it as not
+      // yet connected — there is no data flowing to show a control for.
       // auth_failed is "connected but broken": the card's own label says Reconnect
       // needed, and the page hides the Connect form on any connected card — so
       // counting it as connected leaves that card with no control at all.
