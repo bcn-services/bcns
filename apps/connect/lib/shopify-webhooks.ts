@@ -22,7 +22,10 @@
  *
  * ponytail: notify-a-human, not an automated redaction. Upgrade to a
  * data.privacy_requests table + a worker task if a client ever receives these at
- * a rate a person cannot service inside the 30-day window.
+ * a rate a person cannot service inside the 30-day window. For shop/redact
+ * specifically, that upgrade needs a way to bind the request to a real shop that a
+ * caller without this route's HMAC secret can't forge — see
+ * docs/architecture/retention-30d-shop-redact.md before building it.
  */
 
 import { BCNS_EMAIL, REQUEST_FROM, type ResendEmail } from "./request-connection";

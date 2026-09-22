@@ -1,18 +1,14 @@
 // hard-delete --slug --confirm <slug>  (DESIGN.md §5.10, R36)
-// Refuses unless status = churned and churned_at < now() − 90 days; exports to a temp dir, archives
-// the tar.gz to Spaces bcns-exports/<slug>/<date>.tar.gz (or EXPORT_ARCHIVE_DIR locally), then deletes
-// the Storage prefix (batches of 1,000), raw rows per partition in 50,000-row committed chunks, every
-// data row, memberships, auth users. Each step is idempotent, so a failed run can simply be re-run.
+// Refuses unless status = churned and churned_at < now() − 30 days; deletes the Storage prefix
+// (batches of 1,000), raw rows per partition in 50,000-row committed chunks, every data row,
+// memberships, auth users. Each step is idempotent, so a failed run can simply be re-run.
 // Canonical tables reference clients without ON DELETE CASCADE (§1.4 says nothing), hence the explicit
-// per-table deletes before the client row.
+// per-table deletes before the client row. No pre-delete archive: Shopify §6.2.3 and monday.com §7(e)
+// require every copy gone within 30 days of uninstall, so an indefinite export archive would violate
+// that. Export-on-request during the 30-day window is unaffected (scripts/export.ts).
 import { parseArgs } from 'node:util'
-import { execFileSync } from 'node:child_process'
-import { copyFileSync, createReadStream, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
-import { exportClient, rawPartitions, CANONICAL_TABLES } from './export.js'
+import { rawPartitions } from './export.js'
 
 // Reverse dependency order: items before sets, sets before media, everything before clients.
 const DATA_TABLES = [
@@ -20,24 +16,6 @@ const DATA_TABLES = [
   'jobs', 'customers', 'raw_latest', 'download_tickets', 'egress_ledger', 'notifications', 'connector_runs',
   'connector_health', 'connector_schedule', 'source_tokens', 'dashboard_versions',
 ] as const
-
-async function archive(slug: string, dir: string): Promise<string> {
-  const name = `${new Date().toISOString().slice(0, 10)}.tar.gz`
-  const tgz = join(tmpdir(), `${slug}-${name}`)
-  execFileSync('tar', ['-czf', tgz, '-C', dir, '.'])
-  const { SPACES_ENDPOINT, SPACES_KEY, SPACES_SECRET, SPACES_REGION, EXPORT_ARCHIVE_DIR } = process.env
-  if (EXPORT_ARCHIVE_DIR) {
-    mkdirSync(join(EXPORT_ARCHIVE_DIR, slug), { recursive: true })
-    const dest = join(EXPORT_ARCHIVE_DIR, slug, name)
-    copyFileSync(tgz, dest)
-    return dest
-  }
-  if (!SPACES_ENDPOINT || !SPACES_KEY || !SPACES_SECRET) die('refuses: set SPACES_ENDPOINT/KEY/SECRET (or EXPORT_ARCHIVE_DIR) — the export must be archived first')
-  const s3 = new S3Client({ endpoint: SPACES_ENDPOINT, region: SPACES_REGION ?? 'us-east-1',
-    credentials: { accessKeyId: SPACES_KEY, secretAccessKey: SPACES_SECRET } })
-  await s3.send(new PutObjectCommand({ Bucket: 'bcns-exports', Key: `${slug}/${name}`, Body: createReadStream(tgz) }))
-  return `spaces://bcns-exports/${slug}/${name}`
-}
 
 async function deleteStoragePrefix(admin: ReturnType<typeof serviceClient>, clientId: string): Promise<number> {
   const bucket = admin.storage.from('media')
@@ -65,18 +43,10 @@ export async function main(argv: string[]): Promise<void> {
   const db = pgClient()
   try {
     const found = await db.query<{ id: string; ok: boolean }>(
-      `select id, status = 'churned' and churned_at < now() - interval '90 days' as ok from data.clients where slug = $1`, [slug])
+      `select id, status = 'churned' and churned_at < now() - interval '30 days' as ok from data.clients where slug = $1`, [slug])
     if (found.rowCount === 0) die(`no client with slug ${slug}`)
     const { id: clientId, ok } = found.rows[0]
-    if (!ok) die(`refuses: ${slug} must be churned for 90 days`)
-
-    const tmp = mkdtempSync(join(tmpdir(), `bcns-export-${slug}-`))
-    try {
-      await exportClient(db, clientId, tmp)
-      console.log(`archived export to ${await archive(slug, tmp)}`)
-    } finally {
-      rmSync(tmp, { recursive: true, force: true })
-    }
+    if (!ok) die(`refuses: ${slug} must be churned for 30 days`)
 
     const admin = serviceClient()
     const objects = await deleteStoragePrefix(admin, clientId)

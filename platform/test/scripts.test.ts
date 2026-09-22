@@ -1,7 +1,7 @@
 // Exercises the bcns-run operator scripts (DESIGN.md §5.10) end to end against the local stack.
 // Uses a throwaway client (never acme/beta/gamma) created by onboard and removed by hard-delete.
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { localKeys, sql, pool, SUPABASE_URL, PNG_1x1 } from './helpers.js'
@@ -22,15 +22,12 @@ const SLUG2 = 'zz-script-test2'
 const SLUG3 = 'zz-script-test3'
 let clientId: string
 
-const archiveDir = mkdtempSync(join(tmpdir(), 'bcns-archive-'))
-
 // A Shopify scope query that grants every §4.2 scope. `scopes: []` drops them all (S2 failure).
 const shopifyScopes = (scopes = ['read_orders', 'read_all_orders', 'read_products', 'read_inventory', 'read_shopify_payments_accounts',
   'read_shopify_payments_payouts', 'read_reports', 'read_customers']) => ({
   data: { currentAppInstallation: { accessScopes: scopes.map((handle) => ({ handle })) },
     shop: { ianaTimezone: 'UTC', currencyCode: 'USD' } },
 })
-process.env.EXPORT_ARCHIVE_DIR = archiveDir
 
 afterAll(async () => {
   // Best-effort: remove the throwaway client even if an earlier assertion failed mid-suite.
@@ -52,7 +49,6 @@ afterAll(async () => {
     await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG3])
     await hardDelete(['--slug', SLUG3, '--confirm', SLUG3])
   } catch (e) { console.error('cleanup', SLUG3, String(e)) }
-  rmSync(archiveDir, { recursive: true, force: true })
 })
 
 describe('scripts', () => {
@@ -238,16 +234,14 @@ describe('scripts', () => {
     }
   })
 
-  it('hard-delete refuses within 90 days of churn', async () => {
-    await expect(hardDelete(['--slug', SLUG, '--confirm', SLUG])).rejects.toThrow(/90 days/)
+  it('hard-delete refuses within 30 days of churn', async () => {
+    await expect(hardDelete(['--slug', SLUG, '--confirm', SLUG])).rejects.toThrow(/30 days/)
     expect((await sql('select 1 from data.clients where slug = $1', [SLUG])).rowCount).toBe(1)
   })
 
-  it('hard-delete archives the export, then removes the client, its rows, and its storage objects', async () => {
-    await sql(`update data.clients set churned_at = now() - interval '91 days' where slug = $1`, [SLUG])
+  it('hard-delete removes the client, its rows, and its storage objects', async () => {
+    await sql(`update data.clients set churned_at = now() - interval '31 days' where slug = $1`, [SLUG])
     await hardDelete(['--slug', SLUG, '--confirm', SLUG])
-    expect(existsSync(join(archiveDir, SLUG))).toBe(true)
-    expect(readdirSync(join(archiveDir, SLUG))[0]).toMatch(/\.tar\.gz$/)
     expect((await sql('select 1 from data.raw where client_id = $1', [clientId])).rowCount).toBe(0)
     expect((await sql('select 1 from auth.users where email = $1', [`smoke+${SLUG}@bcn-services.com`])).rowCount).toBe(0)
 
@@ -259,6 +253,17 @@ describe('scripts', () => {
 
     const objects = await sql('select 1 from storage.objects where name like $1', [`${clientId}/%`])
     expect(objects.rowCount).toBe(0)
+  })
+
+  it('hard-delete pins the 30-day threshold: refuses at 29 days, allows at 31', async () => {
+    await onboard(['--slug', SLUG2 + '-pin', '--name', 'ZZ Pin', '--timezone', 'UTC'])
+    const pinned = (await sql<{ id: string }>('select id from data.clients where slug = $1', [SLUG2 + '-pin'])).rows[0].id
+    await sql(`update data.clients set status = 'churned' where id = $1`, [pinned])
+    await sql(`update data.clients set churned_at = now() - interval '29 days' where id = $1`, [pinned])
+    await expect(hardDelete(['--slug', SLUG2 + '-pin', '--confirm', SLUG2 + '-pin'])).rejects.toThrow(/30 days/)
+    await sql(`update data.clients set churned_at = now() - interval '31 days' where id = $1`, [pinned])
+    await hardDelete(['--slug', SLUG2 + '-pin', '--confirm', SLUG2 + '-pin'])
+    expect((await sql('select 1 from data.clients where id = $1', [pinned])).rowCount).toBe(0)
   })
 
   it('§9 checklist refuses a Meta USER token and a bcns Google client, accepts a system user', async () => {

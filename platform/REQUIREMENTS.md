@@ -143,8 +143,8 @@ Each with its one-line why. Re-open only on a concrete failure.
 
 **Churn**
 - Cancel → `clients.status = churned`; scheduler skips, logins disabled, rows kept. Export on
-  request. Hard delete only by a bcns-run script after 90 days, which archives the export to Spaces
-  first. *Less work than export+delete at cancel, and reversible for a quarter.*
+  request. Hard delete only by a bcns-run script after 30 days. *Less work than export+delete at
+  cancel, and reversible for a month.*
 - Export = one script over `client_id`: CSV per canonical table, raw JSONL, original files.
 - Supabase daily backups retain rows 7 days after hard delete; the contract says so.
 
@@ -244,8 +244,8 @@ Checkable statements. "Must" = platform fails acceptance without it.
 - R34. `clients.status = churned` stops all pulls and logins at the next tick.
 - R35. One script produces a client's full export (CSV per canonical table, raw JSONL, originals)
   from `client_id` alone.
-- R36. Hard delete is a bcns-run script that refuses to run within 90 days of churn and archives the
-  export to Spaces first.
+- R36. Hard delete is a bcns-run script that refuses to run within 30 days of churn, with no
+  pre-delete archive.
 
 **Dashboard template (shared-platform mode)**
 - R37. Template mode "shared platform" ships: login against the shared project, reads via
