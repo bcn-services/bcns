@@ -1,4 +1,9 @@
-// §4.3 Meta Ads — Graph API v21.0, Business Manager system-user token (no expiry).
+// §4.3 Meta Ads — Graph API v21.0, Business Manager system-user token. Meta
+// issues these with a 60-day expiry OR never-expiring, the admin's choice at
+// creation time -- this connector does not know which. It does not read or
+// refresh an expiry; ctx.token.secret is sent as-is on every call, and a
+// token that has expired surfaces as a 401 here, which SourceError below
+// turns into auth_failed for the operator to reconnect.
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import {
