@@ -25,7 +25,7 @@ Object.assign(process.env, {
 const react = createRequire(import.meta.url)("react");
 react.cache ??= (fn) => fn;
 const { NextRequest } = await import("next/server");
-const { bindOrPick, pickGET, pickPOST } = await import("../lib/oauth-connect.ts");
+const { MAX_PICK_COOKIE, bindOrPick, pickGET, pickPOST } = await import("../lib/oauth-connect.ts");
 const { getConfig } = await import("../lib/env.ts");
 
 const OPTIONS = {
@@ -206,3 +206,19 @@ for (const src of ["meta", "monday"]) {
     assert.equal(typeof mod.POST, "function");
   });
 }
+
+test("bindOrPick: 25 multibyte-named options still fit one cookie, and every id survives", async () => {
+  const options = Array.from({ length: 25 }, (_, i) => ({ id: `act_${10_000_000_000_000 + i}`, name: "広告アカウント".repeat(6).slice(0, 40) }));
+  const { session } = fakeSession();
+  const res = await bindOrPick("meta", session, getConfig(), { ...handoff("meta", options), accessToken: "E".repeat(250) });
+  const cookie = res.cookies.get(pickCookie("meta"));
+  assert.ok(cookie.value.length <= MAX_PICK_COOKIE, String(cookie.value.length));
+  const opened = openPick(cookie.value, SECRETS.meta, "meta");
+  assert.deepEqual(opened.pick.options.map((o) => o.id), options.map((o) => o.id));
+});
+
+test("/pick?cancel clears the sealed cookie at its path and goes home", async () => {
+  const res = await pickGET(new NextRequest(`${HUB}${pickPath("monday")}?cancel=1`), "monday");
+  assert.equal(res.headers.get("location"), `${HUB}/`);
+  assert.match(res.headers.get("set-cookie") ?? "", new RegExp(`${pickCookie("monday")}=;[^,]*Path=${pickPath("monday")}`, "i"));
+});

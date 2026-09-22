@@ -60,6 +60,9 @@ export function failRedirect(hub: string, source: PickSource, where: string, cod
   return clearCookies(NextResponse.redirect(`${hub}/?error=connect-failed`, 303), source);
 }
 
+/** Under the ~4096-byte per-cookie limit with room for the name and attributes. */
+export const MAX_PICK_COOKIE = 3800;
+
 const forbidden = (hub: string) => NextResponse.redirect(`${hub}/?error=forbidden`, 303);
 
 function write(session: HubSession, source: PickSource, pick: Omit<PendingPick, "exp">, id: string) {
@@ -118,9 +121,16 @@ export async function bindOrPick(
     return clearCookies(NextResponse.redirect(`${hub}/?connected=${source}`), source);
   }
 
+  const secret = credentials(config, source).secret;
+  let sealed = sealPick(handoff, secret, source);
+  // Browsers silently drop a cookie over ~4 KB. Multibyte names can push 25
+  // options past it, so fall back to ids as labels rather than a dead picker.
+  if (sealed.length > MAX_PICK_COOKIE) {
+    sealed = sealPick({ ...handoff, options: handoff.options.map((o) => ({ id: o.id, name: o.id })) }, secret, source);
+  }
   const response = NextResponse.redirect(`${hub}${pickPath(source)}`);
   response.cookies.delete({ name: stateCookie(source), path: statePath(source) });
-  response.cookies.set(pickCookie(source), sealPick(handoff, credentials(config, source).secret, source), {
+  response.cookies.set(pickCookie(source), sealed, {
     httpOnly: true,
     secure: hub.startsWith("https://"),
     sameSite: "lax",
@@ -137,6 +147,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 export async function pickGET(request: NextRequest, source: PickSource): Promise<NextResponse> {
   const config = getConfig();
   const hub = config.hubBaseUrl;
+  // Cancel drops the sealed token now instead of leaving it for PICK_TTL_MS.
+  if (request.nextUrl.searchParams.has("cancel")) return clearCookies(NextResponse.redirect(`${hub}/`, 303), source);
   if (!oauthEnabled(config, source)) return failRedirect(hub, source, "pick", "unavailable");
   const opened = openPick(request.cookies.get(pickCookie(source))?.value, credentials(config, source).secret, source);
   if (!opened.ok) return failRedirect(hub, source, "pick", opened.reason);
@@ -160,7 +172,7 @@ export async function pickGET(request: NextRequest, source: PickSource): Promise
       `<h1>Which ${noun} should bcns connect?</h1>` +
       `<p>Your ${TITLE[source]} login can see more than one ${noun}. bcns syncs one. Choose it here.</p>` +
       `<form method="post" action="${pickPath(source)}">${options}<button type="submit">Connect</button></form>` +
-      `<p><a href="/">Cancel</a></p></html>`,
+      `<p><a href="${pickPath(source)}?cancel=1">Cancel</a></p></html>`,
     {
       status: 200,
       headers: {
