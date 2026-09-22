@@ -50,13 +50,21 @@ export const dynamic = "force-dynamic";
  * What comes back lasts an hour and carries a 90-day refresh_token.
  */
 async function exchange(shop: string, clientId: string, clientSecret: string, code: string) {
-  const response = await fetch(`https://${shop}${SHOPIFY_TOKEN_PATH}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, expiring: "1" }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`https://${shop}${SHOPIFY_TOKEN_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, expiring: "1" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    // DNS failure, TLS failure, connection reset, or the 10s timeout above —
+    // all throw instead of resolving. Caught here so a Shopify-side network
+    // blip redirects the merchant instead of 500ing the route.
+    return { ok: false, reason: "network_error", detail: err instanceof Error ? err.name : "unknown" } as const;
+  }
   const body = await response.json().catch(() => null);
   return handleTokenResponse(response.status, body);
 }
@@ -64,21 +72,26 @@ async function exchange(shop: string, clientId: string, clientSecret: string, co
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const config = getConfig();
   const hub = config.hubBaseUrl;
+  const params = request.nextUrl.searchParams;
+  // Read-only normalization, safe before any check below. Not yet trusted as
+  // "this request really is Shopify" until verifyQueryHmac passes — only used
+  // here to pick a secret to try and to name the shop in the reject log.
+  const shop = normalizeShop(params.get("shop"));
   /**
    * Every failure lands on the hub with a short code. Deliberately coarse: the
    * page tells a merchant the install did not complete, and a precise reason
    * ("bad signature" vs "expired") is an oracle for whoever forged the request.
-   * The operator-facing detail goes to the server log instead.
+   * The reason code and shop go to the server log instead — never the detail,
+   * which can echo request-controlled or provider-controlled text.
    */
-  const fail = (code: string, detail?: string) => {
-    if (detail) console.warn(`[connect] shopify callback rejected (${code}): ${detail}`);
+  const fail = (code: string) => {
+    console.warn(`[connect] shopify callback rejected (${code}): shop=${shop ?? "none"}`);
     const response = NextResponse.redirect(`${hub}/?error=connect-failed`);
     response.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
     return response;
   };
 
   if (!oauthEnabled(config, "shopify")) return fail("unavailable");
-  const params = request.nextUrl.searchParams;
   // The raw shop only CHOOSES which secret to try; it is trusted after the HMAC below.
   const { clientId, clientSecret: secret, app } = shopifyAppFor(config, normalizeShop(params.get("shop"))); // sb-bridge: remove after SB migrates to bcns Connect
 
@@ -86,7 +99,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // from it is read for anything. A tampered `shop`, `code` or `state` dies here.
   if (!verifyQueryHmac(params, secret)) return fail("query_hmac");
 
-  const shop = normalizeShop(params.get("shop"));
   if (!shop) return fail("invalid_shop");
   const code = params.get("code");
   if (!code) return fail("no_code");
@@ -112,7 +124,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // 6. Only now does the code leave this process.
   const exchanged = await exchange(shop, clientId, secret, code);
-  if (!exchanged.ok) return fail(`exchange_${exchanged.reason}`, exchanged.detail);
+  if (!exchanged.ok) return fail(`exchange_${exchanged.reason}`);
 
   // 7. /finish writes it. Sealed under the DEFAULT app's secret whichever app
   // issued the token: it is our key, and /finish has no shop to choose by.

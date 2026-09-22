@@ -13,6 +13,7 @@ import {
   FINISH_PATH,
   INSTALL_CLIENT_ID,
   INSTALL_TIMESTAMP_MAX_AGE_MS,
+  STATE_TTL_MS,
   isFreshInstallTimestamp,
   PENDING_COOKIE,
   PENDING_TTL_MS,
@@ -161,6 +162,50 @@ test("start: a correctly signed but stale install query never reaches Shopify", 
   const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${installQuery(SECRET, String(nowSec() - 3600))}`));
   assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
   // The callback's HMAC check is untouched: its own old timestamp still passes below.
+});
+
+function captureWarn() {
+  const real = console.warn;
+  const logged = [];
+  console.warn = (...a) => logged.push(a.join(" "));
+  return { logged, restore: () => { console.warn = real; } };
+}
+
+test("start: a reject logs the reason code and shop, and nothing sensitive (hmac/secret/state/token/cookie)", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const { logged, restore } = captureWarn();
+  try {
+    const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${installQuery("attacker-key")}`));
+    assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+  } finally {
+    restore();
+  }
+  const lines = logged.join("\n");
+  assert.match(lines, /\[connect\] shopify start rejected \(connect-failed\)/);
+  assert.match(lines, new RegExp(`shop=${SHOP}`));
+  // Nothing from the (forged) query string leaks into the log line.
+  assert.doesNotMatch(lines, /attacker-key/);
+});
+
+test("start: invalid-shop rejects and logs even with no usable shop to name", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const { logged, restore } = captureWarn();
+  try {
+    const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start`));
+    assert.equal(res.headers.get("location"), `${HUB}/?error=invalid-shop`);
+  } finally {
+    restore();
+  }
+  assert.match(logged.join("\n"), /\[connect\] shopify start rejected \(invalid-shop\): shop=none/);
+});
+
+test("start: the state cookie's maxAge equals STATE_TTL_MS in seconds, not a second hardcoded value", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${installQuery()}`));
+  const cookie = res.cookies.get("shopify_oauth_state");
+  assert.ok(cookie, "expected the state cookie to be set");
+  assert.equal(cookie.maxAge, STATE_TTL_MS / 1000);
+  assert.equal(STATE_TTL_MS / 1000, 300, "sanity: 5 minutes");
 });
 
 /* ----------------------------------------------------------------- /callback */
