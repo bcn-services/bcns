@@ -9,22 +9,30 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { tenantMiddleware } from "@bcn-services/tenant/middleware";
+import { getConfig } from "@/lib/env";
 
 const tenant = tenantMiddleware({ loginPath: "/login" });
 
 /**
  * Shopify opens the app URL (application_url in shopify.app.toml, the hub root)
  * with ?shop=&hmac=&timestamp= on install and on "Open app", with no bcns
- * session, and review requires OAuth to start at once. Rewrite it to /start,
- * which verifies that HMAC before doing anything; the query goes along
- * untouched so the signature still holds.
+ * session, and review requires OAuth to start at once. Send it to /start,
+ * which verifies that HMAC before doing anything.
+ *
+ * A redirect, not a rewrite: in production the app listens on plain HTTP behind
+ * nginx (127.0.0.1:3102), so request.nextUrl is the internal origin
+ * (https://localhost:3102 — same trap documented in
+ * packages/tenant/src/middleware.ts's publicOrigin()). NextResponse.rewrite()
+ * would make Next's internal proxy dial that https URL over a plaintext port
+ * and fail with EPROTO. A redirect instead sends the browser's next request
+ * straight to the hub's public base URL, so no internal proxy is involved.
+ * The query string is carried over untouched, byte-for-byte — Shopify's HMAC
+ * covers it, and any reordering or re-encoding would invalidate it.
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-  const { pathname, searchParams } = request.nextUrl;
+  const { pathname, search, searchParams } = request.nextUrl;
   if (pathname === "/" && searchParams.has("shop") && searchParams.has("hmac")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/api/oauth/shopify/start";
-    return NextResponse.rewrite(url);
+    return NextResponse.redirect(`${getConfig().hubBaseUrl}/api/oauth/shopify/start${search}`);
   }
   return tenant(request);
 }

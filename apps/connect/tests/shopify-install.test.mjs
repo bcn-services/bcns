@@ -85,14 +85,36 @@ test("the sealed cookie does not carry the token in the clear", () => {
 
 /* --------------------------------------------------------------- middleware */
 
-test("middleware rewrites Shopify's app-URL hit to /start, query intact, and gates the rest", async () => {
+test("middleware redirects Shopify's app-URL hit to /start, query intact, and gates the rest", async () => {
   const { middleware } = await import("../middleware.ts");
   const query = installQuery().toString();
   const res = await middleware(new NextRequest(`${HUB}/?${query}`));
-  assert.equal(res.headers.get("x-middleware-rewrite"), `${HUB}/api/oauth/shopify/start?${query}`);
+  assert.equal(res.status, 307);
+  assert.equal(res.headers.get("location"), `${HUB}/api/oauth/shopify/start?${query}`);
   // No hmac: the ordinary tenant gate (a pass-through here, with no Supabase env).
   const plain = await middleware(new NextRequest(`${HUB}/?shop=${SHOP}`));
-  assert.equal(plain.headers.get("x-middleware-rewrite"), null);
+  assert.equal(plain.headers.get("location"), null);
+});
+
+test("middleware sends Shopify's install hit to the PUBLIC hub URL even when the internal request is plain-HTTP localhost behind nginx", async () => {
+  // Production: nginx terminates TLS and proxies plain HTTP to 127.0.0.1:3102,
+  // so the request Next actually sees is the internal origin, not the public
+  // hub URL. A NextResponse.rewrite() built from that internal URL sends
+  // Next's own proxy an https://localhost:3102 target — TLS against a
+  // plaintext port (EPROTO) — and every install 500s. The redirect must go to
+  // the public hub URL regardless of what internal host/protocol nginx handed
+  // this request, with the HMAC-signed query passed through byte-for-byte.
+  const { middleware } = await import("../middleware.ts");
+  const query = installQuery().toString();
+  const res = await middleware(new NextRequest(`https://localhost:3102/?${query}`));
+  const location = res.headers.get("location");
+  assert.ok(location, "middleware must redirect, not silently pass through or rewrite");
+  const target = new URL(location);
+  const expectedOrigin = new URL(HUB);
+  assert.equal(target.protocol, expectedOrigin.protocol);
+  assert.equal(target.host, expectedOrigin.host);
+  assert.equal(target.pathname, "/api/oauth/shopify/start");
+  assert.equal(target.search, `?${query}`);
 });
 
 /* -------------------------------------------------------------------- /start */
