@@ -12,8 +12,8 @@
 import type { HubConfig } from "./env";
 import type { HubSource } from "./sources";
 
-/** Sources with an OAuth flow built. Meta and Monday are chunk 5 W4, not here. */
-export const OAUTH_SOURCES = ["shopify"] as const;
+/** Sources with an OAuth flow built. */
+export const OAUTH_SOURCES = ["shopify", "meta", "monday"] as const;
 
 export type OAuthSource = (typeof OAUTH_SOURCES)[number];
 
@@ -24,6 +24,8 @@ export function isOAuthSource(source: string): source is OAuthSource {
 /** Credentials, per source. Kept here so `oauthEnabled` is one total function. */
 function hasCredentials(config: HubConfig, source: OAuthSource): boolean {
   if (source === "shopify") return Boolean(config.shopifyClientId && config.shopifyClientSecret);
+  if (source === "meta") return Boolean(config.metaClientId && config.metaClientSecret);
+  if (source === "monday") return Boolean(config.mondayClientId && config.mondayClientSecret);
   return false;
 }
 

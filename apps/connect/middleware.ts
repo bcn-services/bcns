@@ -22,7 +22,12 @@ export const config = {
   // app at review. They are not unauthenticated: every one verifies an HMAC over the
   // raw body against the client secret and 401s when it fails (lib/shopify-webhooks.ts).
   //
-  // The OAuth routes are deliberately NOT excluded: /start and /callback both need a
+  // api/oauth/meta/data-deletion is Meta's data-deletion callback: same shape, a
+  // server-to-server POST with no cookie, authenticated by verifying Meta's
+  // signed_request against META_CLIENT_SECRET (lib/meta-oauth.ts). Its GET is the
+  // public status page Meta links a user to.
+  //
+  // The other OAuth routes are deliberately NOT excluded: /start and /callback both need a
   // signed-in owner, and the middleware bounce is the first half of that check.
-  matcher: ["/((?!api/health$|api/webhooks/|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/health$|api/webhooks/|api/oauth/meta/data-deletion$|_next/static|_next/image|favicon.ico).*)"],
 };
