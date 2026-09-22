@@ -143,8 +143,8 @@ Each with its one-line why. Re-open only on a concrete failure.
 
 **Churn**
 - Cancel → `clients.status = churned`; scheduler skips, logins disabled, rows kept. Export on
-  request. Hard delete only by a bcns-run script after 90 days, which archives the export to Spaces
-  first. *Less work than export+delete at cancel, and reversible for a quarter.*
+  request. Hard delete only by a bcns-run script after 30 days. *Less work than export+delete at
+  cancel, and reversible for a month.*
 - Export = one script over `client_id`: CSV per canonical table, raw JSONL, original files.
 - Supabase daily backups retain rows 7 days after hard delete; the contract says so.
 

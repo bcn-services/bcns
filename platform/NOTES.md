@@ -60,7 +60,7 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 - Connector modules live in `worker/src/connectors/` (§4.1 says `worker/connectors/`) so the worker is one tsconfig root; `pnpm tick` = `tsx worker/src/index.ts`.
 - `onboard`: smoke/temp passwords print once (no password-manager API); `rotate-smoke` likewise skips the `gh secret set` hop (dashboard repo unknown at platform level). `add-member` falls back to createUser+printed password when invite mail is unavailable (local stack has no mailer).
 - `onboard` G1 "bcns-org client id fails" is checked against `BCNS_OAUTH_CLIENT_ID` env (the bcns app's id) plus the tokeninfo audience; Workspace "Internal" user type has no API surface.
-- `hard-delete` archives to Spaces via `SPACES_ENDPOINT/KEY/SECRET`, or to `EXPORT_ARCHIVE_DIR` when set (tests/CI); `backfillDepth = 'unbounded'` → `backfill_from = 1970-01-01`.
+- retention-30d (2026-09-21): `hard-delete` no longer archives an export anywhere (SPACES_*/EXPORT_ARCHIVE_DIR removed) and the churn gate is 30 days, not 90 — Shopify §6.2.3 / monday.com §7(e) require every copy gone within 30 days of uninstall. `backfillDepth = 'unbounded'` → `backfill_from = 1970-01-01`.
 - Canonical tables reference `clients` without `on delete cascade` (§1.4 is silent); `hard-delete` deletes them explicitly, in dependency order.
 - `@bcn-services/data-client`: `createDataClient` takes an optional `accessToken` (the template's own auth session) since §8 says the returned object exposes nothing else; `thumbUrls` signs for 300 s and returns a path→url map; `health()` returns the `client_v1` row.
 - `pnpm db:types` uses `--db-url` against 54322 (the CLI's `--local` type-gen container cannot reach the db here).
@@ -85,7 +85,7 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 
 ## Needs Nate
 
-1. Spaces: create bucket `bcns-exports` and provide `SPACES_ENDPOINT/REGION/KEY/SECRET` for `hard-delete` archives (CI/tests use `EXPORT_ARCHIVE_DIR`).
+1. retention-30d: `hard-delete` no longer archives to Spaces, so the `bcns-exports` bucket's existing objects (any client already hard-deleted under the old 90-day/archive rule) should be deleted, and `SPACES_*`/`EXPORT_ARCHIVE_DIR` env can come off wherever they were set (droplet / operator machine) — they're unused now.
 2. `BCNS_OAUTH_CLIENT_ID`: the bcns Google OAuth client id, so onboarding's G1 check can refuse it.
 3. `deploy-worker.yml`: WIF provider + service-account secrets, `GCP_PROJECT`/`GCP_REGION`/`TASK_COUNT` vars, Artifact Registry repo `bcns`, and a pre-created Cloud Run job `bcns-data-worker` (the workflow runs `jobs update`, not `create`). Never run here.
 4. `onboard` / `rotate-smoke`: which password manager and which dashboard repo receive the smoke credentials; today they print once.

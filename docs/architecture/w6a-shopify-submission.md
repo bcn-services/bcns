@@ -145,7 +145,7 @@ the protected-data request has to be amended and re-reviewed.
 | Minimum data | Yes. Three fields, no phone, no address. |
 | Encryption in transit | TLS on every hop: the Shopify Admin API, the hub (`https://connect.bcn-services.com`) and the hosted Supabase database. |
 | Encryption at rest | The data is stored in hosted Supabase Postgres, which encrypts at rest. **TODO(Nate): confirm the provider statement you want to cite.** The access token is stored in `data.source_tokens.secret`, which is plaintext at the column level. That table has no API view, and only the worker reads it (`20260918000100_attach_source_rpc.sql`). |
-| Retention | Kept while the merchant subscribes. After churn, `platform/scripts/hard-delete.ts` deletes every row, but only once the client has been churned for 90 days. **TODO(Nate): state the retention period for the form.** A `shop/redact` has a 48-hour deadline. The 90-day hard-delete can't meet it, so the operator has to delete that shop's rows by hand within 48 hours. |
+| Retention | Kept while the merchant subscribes. After churn, `platform/scripts/hard-delete.ts` deletes every row once the client has been churned for 30 days, with no pre-delete archive — every copy is gone within 30 days of uninstall, per §6.2.3. A `shop/redact` has a separate 48-hour deadline; see the webhook table below for how that's met today. |
 | Staff access | Only the bcns operator (Nate), through the service role on the worker and operator machine. |
 | Data-protection agreement / privacy policy | See §5. |
 
@@ -159,7 +159,7 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 |---|---|---|
 | `customers/data_request` | `/api/webhooks/shopify/customers-data-request` | Recorded, the operator is emailed with a 30-day deadline, 200 returned. |
 | `customers/redact` | `/api/webhooks/shopify/customers-redact` | Recorded, the operator is emailed with a 30-day deadline to erase that customer's rows, 200 returned. |
-| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Recorded, the operator is emailed with a 48-hour deadline to erase the shop's data, 200 returned. |
+| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Recorded, the operator is emailed with a 48-hour deadline to erase the shop's data, 200 returned. Deletion is manual within that 48 hours — automating it needs a way to bind the request to a real shop that a caller without the webhook's HMAC secret can't forge; see `docs/architecture/retention-30d-shop-redact.md` for why the smallest automatic path doesn't clear that bar yet. |
 
 ---
 
