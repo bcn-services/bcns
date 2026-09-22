@@ -51,8 +51,8 @@ interface and the component.
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
 | About | `/about` | `about`, `contactSection`, `pageMeta.about` |
-| Privacy | `/privacy` | Static — no content registry fields |
-| Terms | `/terms` | Static — no content registry fields |
+| Privacy | `/privacy` | `legal.privacy` |
+| Terms | `/terms` | `legal.terms` |
 
 ---
 
@@ -1028,6 +1028,51 @@ Each founder entry has:
 
 ---
 
+## Legal (`siteContent.legal`) — /privacy, /terms
+
+Two static reference pages, `legal.privacy` and `legal.terms`, both `LegalPageContent`. Rendered by `components/legal-content.tsx` (shared between both pages): `effectiveDate` as a byline, then `sections[]` as divide-y blocks (`heading` + one `<p>` per `body[]` entry + an optional `<ul>` from `list[]`).
+
+Every sentence in these two objects must trace to a fact or a Nate decision in `docs/architecture/legal-pages-research.md` — see that file's §(c)/§(d)/§(e) before editing either page. Unknown facts are a visible `[TODO: ...]` string, which renders as-is; never delete the brackets to make a gap look resolved. `content.ts` interpolates `siteConfig.email`/`siteConfig.name` into this copy rather than hardcoding them, because `content-registry.test.mjs` forbids the literal strings.
+
+### eyebrow
+- **Field:** `legal.privacy.eyebrow` / `legal.terms.eyebrow`
+- **Purpose:** `PageHead` eyebrow label
+- **Value:** `"Privacy"` / `"Terms"`
+
+### title
+- **Field:** `legal.privacy.title` / `legal.terms.title`
+- **Purpose:** `<h1>` and page `<title>`
+- **Value:** `"Privacy Policy"` / `"Terms of Service"`
+
+### description
+- **Field:** `legal.privacy.description` / `legal.terms.description`
+- **Purpose:** `PageHead` subhead and meta description
+- **Length:** One sentence
+
+### effectiveDate
+- **Field:** `legal.privacy.effectiveDate` / `legal.terms.effectiveDate`
+- **Purpose:** Rendered as-is above the sections, e.g. `"Last updated September 22, 2026."`
+- **Note:** Update this string whenever a material change is made to either page's `sections`.
+
+### sections[n]
+- **Field:** `legal.privacy.sections[n]` / `legal.terms.sections[n]` (open-ended array; privacy has 16, terms has 21, matching the §(b) outlines in the research doc)
+- **Purpose:** One divide-y block per legal-page section
+
+#### sections[n].heading
+- **Purpose:** Section `<h2>`, e.g. `"How long we keep it"`, `"Governing law and venue"`
+- **Note:** Must match the §(b) outline heading it covers — QA greps for the exact string.
+
+#### sections[n].body[m]
+- **Purpose:** One `<p>` per array entry, plain-English sentences
+- **Note:** No em-dashes anywhere in `content.ts` (repo-wide rule, `w2-hosted-framing.test.mjs`); use a period, comma or semicolon instead.
+
+#### sections[n].list[m] _(optional)_
+- **Purpose:** A bullet list rendered after `body`, used once today for the privacy page's subprocessor list (`Who we share it with`)
+
+> Maintainer-only, not rendered: two comments directly above `legal:` in `content.ts` flag facts that are correct only once something else lands — the "30 days" retention wording matches the not-yet-merged `retention-30d` branch's `hard-delete.ts`, and "stored in the United States" assumes an unconfirmed Supabase/GCP/droplet region. Re-check both before a production deploy.
+
+---
+
 ## Nav Cards (`siteContent.navCards`) — Home
 
 Navigation card grid linking to the main pages. Fixed tuple of 4.
@@ -1216,6 +1261,19 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `about.founders[0..1].bio` | About — founders bio |
 | `about.founders[0..1].credentials[n]` | About — founders credentials |
 | `about.whyBcns` | About — whyBcns |
+| `legal.privacy.eyebrow` | Legal — eyebrow |
+| `legal.privacy.title` | Legal — title |
+| `legal.privacy.description` | Legal — description |
+| `legal.privacy.effectiveDate` | Legal — effectiveDate |
+| `legal.privacy.sections[n].heading` | Legal — sections heading |
+| `legal.privacy.sections[n].body[m]` | Legal — sections body |
+| `legal.privacy.sections[n].list[m]` _(optional)_ | Legal — sections list |
+| `legal.terms.eyebrow` | Legal — eyebrow |
+| `legal.terms.title` | Legal — title |
+| `legal.terms.description` | Legal — description |
+| `legal.terms.effectiveDate` | Legal — effectiveDate |
+| `legal.terms.sections[n].heading` | Legal — sections heading |
+| `legal.terms.sections[n].body[m]` | Legal — sections body |
 | `navCards.items[0..3].title` | Nav Cards — items title |
 | `navCards.items[0..3].description` | Nav Cards — items description |
 | `navCards.items[0..3].href` | Nav Cards — items href |
@@ -1230,7 +1288,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
 
-Total registry fields: 109 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`) and container fields (`screenshots`) included. The bcns Connect pass added 16 rows: `buildingBlocks` (6), `connect` (7) and `useCases.block*` (3); the pricing `setup`/`monthly`/`seats` rows were narrowed to the tiers that carry them. This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 122 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`, `legal.*.sections[n].list[m]`) and container fields (`screenshots`) included. The chunk5-legal-pages pass added 13 rows for the new `legal.privacy`/`legal.terms` sections (§ Legal above). This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
 The FAQ entries appended in the bcns Connect pass live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 
@@ -1267,6 +1325,8 @@ three screenshot captions must not state or imply any dollar figure,
 customer count, or business outcome — the numbers visible in the screenshots
 themselves are invented demo-fixture data, not confirmed client results.
 
+**`legal.privacy`/`legal.terms`** use a separate `[TODO: ...]` marker, not `[INPUT: ...]` — a fact the repo doesn't know yet, rather than a copy slot Nate always fills. Both render visibly, on purpose. Current `[TODO: ...]`s: the registered agent address (`legal.privacy` → "Who we are"); the contact-form vendor name, twice, conditional on whether `NEXT_PUBLIC_CONTACT_ACCESS_KEY` is set in Vercel (`legal.privacy` → "What we collect" and "Who we share it with"); a lawyer-review flag for Google Drive/Meet data over MCP (`legal.privacy` → "AI tools and MCP"); and a DPA link (`legal.terms` → "Data processing"). See `docs/architecture/legal-pages-research.md` before resolving any of these.
+
 **`reviews.items`** is still an empty array, not a placeholder — add entries
 to it to flip reviews live. `pastWork.items` is no longer empty (it holds
 the two case-study slots above); its `screenshots` arrays are no longer
@@ -1275,4 +1335,4 @@ captured from each app's local demo fixture (see the Past Work section).
 
 ---
 
-_Last updated: 2026-09-12 (bcns Connect pass: added the `buildingBlocks` and `connect` sections and the `useCases.block*` fields, rewrote the pricing tiers as bcns Connect / Deluxe build / AI consulting, and re-listed the ten seeded FAQ entries). Source of truth: `apps/web/lib/content.ts`._
+_Last updated: 2026-09-22 (chunk5-legal-pages: added the `legal` section — `privacy` and `terms` — and rewrote `/privacy` and `/terms` to render from it instead of the old placeholder body text). Previously: 2026-09-12 (bcns Connect pass: added the `buildingBlocks` and `connect` sections and the `useCases.block*` fields, rewrote the pricing tiers as bcns Connect / Deluxe build / AI consulting, and re-listed the ten seeded FAQ entries). Source of truth: `apps/web/lib/content.ts`._

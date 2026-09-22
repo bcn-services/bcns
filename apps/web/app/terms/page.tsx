@@ -1,20 +1,29 @@
 import type { Metadata } from "next";
-import { Container } from "@bcn-services/ui";
-import { siteConfig } from "@/lib/site";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
+import { PageHead } from "@/components/kit";
+import { LegalContent } from "@/components/legal-content";
+import { siteContent } from "@/lib/content";
 
 export const metadata: Metadata = {
-  title: "Terms of Service",
+  title: siteContent.legal.terms.title,
+  description: siteContent.legal.terms.description,
 };
 
 export default function TermsPage() {
+  const { terms } = siteContent.legal;
   return (
-    <main className="py-24">
-      <Container>
-        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{siteConfig.name} Terms of Service</h1>
-        <div className="mt-8 prose">
-          <p>[TERMS OF SERVICE BODY: Replace with your actual terms of service before launch.]</p>
-        </div>
-      </Container>
-    </main>
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader />
+      <main className="flex-1">
+        <PageHead
+          eyebrow={terms.eyebrow}
+          title={terms.title}
+          description={terms.description}
+        />
+        <LegalContent content={terms} />
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

@@ -3,11 +3,17 @@
  *
  * Rules:
  * - Strings with "[INPUT: ...]" are real copy. Nate fills them; they render as-is.
+ * - Strings with "[TODO: ...]" are legal-copy gaps (privacy/terms): a fact the
+ *   repo does not know yet. They render as-is, visibly, never silently dropped.
  * - Icons stay in component files, mapped by array index.
- * - siteConfig (site.ts) remains the source for name / domain / email.
+ * - siteConfig (site.ts) remains the source for name / domain / email; the
+ *   `legal` section imports it and interpolates rather than re-typing the
+ *   email address as a literal (content-registry.test.mjs forbids that).
  * - problemSolution and deliveryModels are gone entirely: the sections were cut
  *   from the IA, and their interfaces and stub components have been removed.
  */
+
+import { siteConfig } from "./site.ts";
 
 // ---------------------------------------------------------------------------
 // Section interfaces
@@ -173,6 +179,27 @@ export interface AboutContent {
   whyBcns: string;
 }
 
+export interface LegalSection {
+  heading: string;
+  body: string[];
+  /** Optional bullet list rendered after `body` (e.g. a subprocessor list). */
+  list?: string[];
+}
+
+export interface LegalPageContent {
+  eyebrow: string;
+  title: string;
+  description: string;
+  /** Rendered as-is, e.g. "Last updated September 22, 2026." */
+  effectiveDate: string;
+  sections: LegalSection[];
+}
+
+export interface LegalContent {
+  privacy: LegalPageContent;
+  terms: LegalPageContent;
+}
+
 export interface NavCardItem {
   title: string;
   description: string;
@@ -216,6 +243,7 @@ export interface SiteContent {
   pricing: PricingContent;
   faq: FaqContent;
   about: AboutContent;
+  legal: LegalContent;
   navCards: NavCardsContent;
   pageMeta: PageMetaRegistry;
 }
@@ -617,6 +645,319 @@ export const siteContent: SiteContent = {
     ],
     whyBcns:
       "Every business we have worked in runs on at least one process that could be faster. The software sold to fix it is built for the general version of the problem, not the one that business actually has. We started bcns to build the specific one.",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Legal (privacy / terms)
+  //
+  // Every factual claim below traces to docs/architecture/legal-pages-research.md
+  // §(c) (fact inventory) or §(e) (Nate's 2026-09-22 decisions); see that doc
+  // before editing. `[TODO: ...]` strings are unresolved facts; keep the
+  // brackets, don't fill them with a guess.
+  //
+  // MAINTAINER NOTE (not rendered): the "30 days" / "no archive after
+  // deletion" / "backups roll off within 7 days" wording below matches
+  // platform/scripts/hard-delete.ts on the `retention-30d` branch, now
+  // PR #60 (https://github.com/bcn-services/bcns/pull/60). As of this
+  // branch, `main`'s hard-delete.ts still refuses until 90 days and
+  // archives an export to Spaces first. This copy is only accurate in
+  // production once PR #60 merges to `main`; this branch must merge AFTER
+  // PR #60, and this copy must not ship to production before that merge
+  // lands.
+  //
+  // MAINTAINER NOTE (not rendered): "stored in the United States" (privacy,
+  // "Where your data is stored") assumes the Supabase project region,
+  // GCP_REGION, and the DigitalOcean droplet/Spaces region are all US. Per
+  // legal-pages-research.md §(c) those regions are UNKNOWN in the repo;
+  // confirm them and correct this line if any turns out non-US.
+  //
+  // MAINTAINER NOTE (not rendered): the "Agreement and acceptance" sentence
+  // about the Stripe Checkout consent box and the hub sign-in acceptance
+  // describes a DECIDED but NOT YET BUILT flow. Stripe Checkout is not set
+  // up yet, and the hub has no acceptance step today. The sentence is only
+  // true once both ship: Stripe Checkout setup, and a hub "By signing in
+  // you agree" line (a later PR). The "Who we share it with" list's Stripe
+  // entry is pending the same Stripe Checkout setup.
+  legal: {
+    privacy: {
+      eyebrow: "Privacy",
+      title: "Privacy Policy",
+      description:
+        "How bcns collects, uses, and protects the information that runs through bcns Connect, the hub, and the MCP server.",
+      effectiveDate: "Last updated September 22, 2026.",
+      sections: [
+        {
+          heading: "Who we are",
+          body: [
+            `This policy is for BCNS LLC, a Delaware limited liability company ("${siteConfig.name}," "we," "us"). It covers the marketing site, the ${siteConfig.name} Connect hub, the MCP server, and any custom build or consulting engagement.`,
+            "Registered agent address: [TODO: registered agent address].",
+            `Contact us about this policy at ${siteConfig.email}.`,
+          ],
+        },
+        {
+          heading: "The two roles we play",
+          body: [
+            "For your own account data, like your email and sign-in sessions, bcns is the controller: we decide why that data is collected and how it's used.",
+            "For the data you connect from Shopify, Meta Ads, monday.com, Google Drive, or a meeting-notes folder, bcns is a processor. You are the controller of that data, and you decide what gets connected and why.",
+          ],
+        },
+        {
+          heading: "What we collect",
+          body: [
+            "Contact form: your name, business, email and message, sent through [TODO: name Web3Forms if NEXT_PUBLIC_CONTACT_ACCESS_KEY is set in Vercel, otherwise the fallback vendor].",
+            "Accounts: the email addresses of the account owner and any team members you invite, plus sign-in sessions.",
+            "Shopify, if you connect it: order totals, statuses, line items and refunds going back 13 months; products, variants and prices; inventory counts; Shopify Payments payouts; and, on each order, the customer's ID, email and display name only, with no phone number or address.",
+            "Meta Ads, if you connect it: your ad account's timezone and currency; campaign and ad details, including ad creative; daily performance numbers like spend, impressions, clicks and reach; and copies of your ad creative images, which we store.",
+            "monday.com, if you connect it: the one board you point us at, its name, columns, groups, and every item's name, dates, group and column values. Whatever your team keeps in those columns, including names or emails, comes with it.",
+            "Google Drive and meeting notes, if you connect them: for a meeting-notes folder, the full text of the notes, which can include the names of people in the meeting and what they said. For a Drive folder, file names, types, sizes, dates, links, and thumbnail images we copy and store. We don't touch the underlying file contents in Drive.",
+            "Access tokens: for each source you connect, we store a token that lets our sync service read that source on your behalf. See \"Security\" below for how we protect it.",
+          ],
+        },
+        {
+          heading: "How we use it",
+          body: [
+            "We use your connected data to sync it, store it, and show it back to you in your dashboard, and to make it available to the AI tools you choose to connect.",
+            "We never sell your data, use it to run ads, build profiles of people in it, or use it to train an AI model.",
+          ],
+        },
+        {
+          heading: "AI tools and MCP",
+          body: [
+            "When you connect an AI assistant like Claude or ChatGPT to the MCP server, your data goes to the AI provider you picked, because you asked it to, under your own agreement with that provider.",
+            "bcns does not send your data to any AI provider on its own, and we never train models on your data.",
+            "[TODO: lawyer review: Google Drive/Meet data exposed over MCP]",
+          ],
+        },
+        {
+          heading: "Who we share it with",
+          body: [
+            "We share data with the vendors below only to run the service. We disclose data when the law requires it, and in a business transfer only with the protections this policy already promises.",
+          ],
+          list: [
+            "Supabase: hosts our database, sign-in system and file storage for connected-source data, tokens and accounts",
+            "Google Cloud: runs the background job that syncs each connected source into our database",
+            "DigitalOcean: hosts the Connect hub, the MCP server, client apps, and nightly backups of client apps' databases",
+            "Resend: delivers internal operational email, like alerts when a deletion request comes in",
+            "[TODO: name Web3Forms if NEXT_PUBLIC_CONTACT_ACCESS_KEY is set in Vercel, otherwise the fallback vendor]: delivers the marketing site's contact form",
+            "Cloudflare: provides DNS and TLS for some client apps",
+            "Vercel: hosts this marketing site",
+            "Stripe: processes subscription payments; card details go to Stripe, never to bcns",
+          ],
+        },
+        {
+          heading: "Google user data",
+          body: [
+            "The use of information received from Google Workspace scopes will adhere to the Google User Data Policy, including the Limited Use requirements.",
+            "We use that data only to provide the features you see in the product. We don't sell it to advertisers or data brokers, don't use it for credit or employment decisions, and don't use it to train or improve an AI model beyond your own personalized use. No one reads it by hand except with your agreement, for security, for legal compliance, or as anonymous internal operations.",
+          ],
+        },
+        {
+          heading: "How long we keep it",
+          body: [
+            "While your account is active, we keep your connected data current and available.",
+            "Thirty days after your account ends, we delete the copy of your connected-source data that we hold. We don't keep an archive or backup export of it after that.",
+            "During those 30 days, you can ask us for an export of your data.",
+            "Backup copies our database provider keeps as part of normal operations are fully gone within 7 days after we delete your data.",
+          ],
+        },
+        {
+          heading: "Requesting deletion",
+          body: [
+            `To delete your account or your data, email ${siteConfig.email}.`,
+            "If you're a customer of one of our clients and want your Shopify order data removed, Shopify sends us that request directly. We handle a shop's full data removal (\"shop/redact\") by hand, inside Shopify's 48-hour window, and a customer-level removal request by hand as well.",
+            `If you interacted with a Meta ad and want your data removed, email ${siteConfig.email} and we'll confirm by email once it's done.`,
+            "These requests are handled by a person, not automatically; we'll confirm with you once each one is complete.",
+          ],
+        },
+        {
+          heading: "Security",
+          body: [
+            "Data is encrypted in transit and at rest by our database provider; access tokens are stored in a table only our sync service can read.",
+            "Your data is also isolated from every other client's by row-level database rules, and only bcns's operator has broader access.",
+          ],
+        },
+        {
+          heading: "Your rights",
+          body: [
+            `You can ask to see, correct, delete, or export your data at any time. Email ${siteConfig.email}.`,
+            "If your own customers want to exercise rights over data you hold about them, they should contact you, not us; we hold that data on your behalf.",
+            "bcns is not intended for consumers or for use outside the United States.",
+          ],
+        },
+        {
+          heading: "Where your data is stored",
+          body: ["Your data is stored in the United States."],
+        },
+        {
+          heading: "Cookies and Do Not Track",
+          body: [
+            "We use a sign-in cookie so you stay logged in, and short-lived cookies during the moment you connect a new source. That's all: no analytics, advertising or tracking cookies.",
+            "Because we don't track you across sites, a Do Not Track signal from your browser doesn't change anything here; there's nothing to turn off.",
+          ],
+        },
+        {
+          heading: "Children",
+          body: [
+            "bcns is a business tool. It isn't directed at, and we don't knowingly collect data from, anyone under 13.",
+          ],
+        },
+        {
+          heading: "Changes to this policy",
+          body: [
+            "If we make a material change to this policy, we'll update the date at the top of this page and, where the change matters to you, tell you directly.",
+          ],
+        },
+        {
+          heading: "Contact us",
+          body: [`Questions about this policy: ${siteConfig.email}.`],
+        },
+      ],
+    },
+    terms: {
+      eyebrow: "Terms",
+      title: "Terms of Service",
+      description:
+        "The agreement between BCNS LLC and any business using bcns Connect, a Deluxe build, or AI consulting.",
+      effectiveDate: "Last updated September 22, 2026.",
+      sections: [
+        {
+          heading: "Agreement and acceptance",
+          body: [
+            `These terms are between BCNS LLC ("${siteConfig.name}") and the business signing up ("you"). The person accepting them must have the authority to bind that business.`,
+            "You accept these terms by checking the consent box at checkout in Stripe Checkout, and again every time you sign in to the hub.",
+            "A custom build or a day of AI consulting is governed by these terms plus a signed quote, which sets the scope and price for that engagement.",
+          ],
+        },
+        {
+          heading: "Definitions",
+          body: [
+            '"Services" means bcns Connect, any Deluxe build, and any AI consulting engagement.',
+            '"Customer Data" means the data you or your Connected Sources send us.',
+            '"Connected Sources" means any third-party platform you authorize us to read from, like Shopify, Meta Ads, monday.com, or Google Drive.',
+            '"Order Form" means a signed quote for a Deluxe build or a consulting engagement.',
+            '"AI Output" means anything generated by an AI tool as part of the Services.',
+          ],
+        },
+        {
+          heading: "The services",
+          body: [
+            "bcns Connect is a monthly subscription that connects your tools into one place. Deluxe builds and AI consulting are separate engagements, each scoped and priced on their own Order Form.",
+          ],
+        },
+        {
+          heading: "Accounts and access",
+          body: [
+            "The account owner controls who else on your team has access. You're responsible for keeping your team's credentials safe, and for what your team, and anything they connect, including an AI assistant over MCP, does with that access.",
+          ],
+        },
+        {
+          heading: "Connected sources",
+          body: [
+            "When you connect a source, you're telling us we're authorized to read it, and that you have the right to share that data with us, including any personal data belonging to your own customers, and that you've given your customers any notice they're owed.",
+            "Every connected platform is governed by its own terms. We're not responsible for its outages or for changes it makes to its own API.",
+          ],
+        },
+        {
+          heading: "Your data, your ownership",
+          body: [
+            "You own your data. We get a limited license to process it only to provide the Services; never to sell it, use it for ads, or train a model on it.",
+          ],
+        },
+        {
+          heading: "Data processing",
+          body: [
+            "A short data processing addendum covering how we handle data you connect is available on request. [TODO: link DPA]",
+            "See our Privacy Policy for the full detail on what we collect and how long we keep it.",
+          ],
+        },
+        {
+          heading: "Acceptable use",
+          body: [
+            "Don't send us data you don't have the right to share, scrape or reverse-engineer the Services, run load tests or security probes without asking us first, resell the Services, or use them in a way that breaks a Connected Source's own terms.",
+          ],
+        },
+        {
+          heading: "AI features and output",
+          body: [
+            'AI Output can be wrong. Review it before you rely on it; it isn\'t financial, legal, or tax advice. We don\'t control any third-party AI provider you choose to connect; see "AI tools and MCP" in our Privacy Policy for how that connection works.',
+          ],
+        },
+        {
+          heading: "Fees and billing",
+          body: [
+            "bcns Connect is $200 a month with no setup fee, billed by bcns through Stripe. Deluxe builds and AI consulting are billed per their Order Form.",
+            "You're responsible for any taxes on top of the listed price. If a payment fails, we may suspend the Services until it's resolved.",
+            "If we change our pricing, we'll give you reasonable advance notice before the new price takes effect.",
+          ],
+        },
+        {
+          heading: "Term, cancellation and suspension",
+          body: [
+            "bcns Connect runs month to month. Cancel any time by emailing us. [TODO: Nate to decide whether access continues to the end of the paid period or ends at cancellation; today the platform stops logins and syncs when the account is marked ended.]",
+            "We can suspend the Services for non-payment or for a serious violation of these terms, and we'll tell you when we can.",
+          ],
+        },
+        {
+          heading: "What happens when the service ends",
+          body: [
+            "Once your account ends, logins and syncing stop. You can request an export of your data any time in the 30 days that follow. Thirty days after your account ends, your data is deleted on the schedule in our Privacy Policy.",
+          ],
+        },
+        {
+          heading: "Confidentiality",
+          body: [
+            "Each of us will keep the other's non-public information confidential, and use it only to run this relationship.",
+          ],
+        },
+        {
+          heading: "Warranties and disclaimer",
+          body: [
+            'THE SERVICES ARE PROVIDED "AS IS." WE DON\'T GUARANTEE UNINTERRUPTED SERVICE, AND WE DON\'T GUARANTEE THE ACCURACY OF DATA PULLED FROM A THIRD-PARTY SOURCE.',
+          ],
+        },
+        {
+          heading: "Limitation of liability",
+          body: [
+            "Neither of us is liable to the other for indirect or consequential damages. Our total liability to you is capped at the fees you paid us in the 12 months before the claim. There are no other carve-outs to that cap.",
+          ],
+        },
+        {
+          heading: "Indemnification",
+          body: [
+            "You'll cover any claim arising from your data or from your breach of a Connected Source's own terms. We don't provide a separate intellectual-property indemnity.",
+          ],
+        },
+        {
+          heading: "Intellectual property",
+          body: [
+            "bcns owns the Connect platform, the hub, and the MCP server. Deliverables from a Deluxe build follow whatever the Order Form says.",
+          ],
+        },
+        {
+          heading: "Changes to the service and these terms",
+          body: [
+            "We'll give you reasonable advance notice of a material change to these terms, and for a material change, we'll ask you to accept the updated terms again, the same way you accepted them the first time.",
+          ],
+        },
+        {
+          heading: "Governing law and venue",
+          body: [
+            "These terms are governed by Delaware law. Any dispute goes to the state or federal courts of Delaware, and only those courts. There's no arbitration requirement here.",
+          ],
+        },
+        {
+          heading: "General terms",
+          body: [
+            "These terms, plus any Order Form, are the entire agreement between us; an Order Form controls over these terms if the two conflict. You can't assign this agreement without our consent; we can, as part of a sale or merger of the business. Neither of us is responsible for a delay caused by something outside our control. If any part of these terms turns out to be unenforceable, the rest still stands, and us not enforcing a term once doesn't waive it later.",
+            `We'll send notices to the email on your account, or to ${siteConfig.email} for notices to us.`,
+          ],
+        },
+        {
+          heading: "Contact us",
+          body: [`Questions about these terms: ${siteConfig.email}.`],
+        },
+      ],
+    },
   },
 
   navCards: {
