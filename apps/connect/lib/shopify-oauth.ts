@@ -16,7 +16,7 @@
  *     like a Shopify outage, so it has its own test.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { HubConfig } from "./env"; // sb-bridge: remove after SB migrates to bcns Connect
 
 /** Shopify's Admin API OAuth endpoints live on the shop's own domain. */
@@ -96,7 +96,8 @@ export function safeEqual(a: string, b: string): boolean {
 export interface StatePayload {
   shop: string;
   /** The client the signed-in member belongs to. Bound into the state so the
-   * callback cannot be replayed into a different tenant. */
+   * callback cannot be replayed into a different tenant. INSTALL_CLIENT_ID when
+   * Shopify started the handshake and nobody is signed in yet. */
   clientId: string;
   /** Epoch ms. */
   exp: number;
@@ -322,3 +323,88 @@ export const SHOPIFY_DEFAULTS = { interval: "1 hour", backfillDepth: "13 months"
 
 /** `data.token_kind` for a Shopify Admin token; mirrors `shopify.tokenKind`. */
 export const SHOPIFY_TOKEN_KIND = "shopify_admin";
+
+/**
+ * Install-initiated handshakes (W6a). Shopify's review installs from the admin:
+ * the browser arrives at the app URL with `shop`/`hmac`/`timestamp` and no bcns
+ * session, and Shopify requires OAuth to start immediately. So /start runs the
+ * handshake on Shopify's query HMAC alone, with no tenant in the state, and the
+ * callback parks the token in a sealed cookie instead of writing it. /finish
+ * binds it only once an OWNER is signed in. A shop is never bound to a tenant
+ * without one.
+ */
+export const INSTALL_CLIENT_ID = "";
+
+/** Where every handshake ends; the only `next` the login page will follow. */
+export const FINISH_PATH = "/api/oauth/shopify/finish";
+
+/** Cookie that carries a sealed PendingConnection from /callback to /finish. */
+export const PENDING_COOKIE = "shopify_pending";
+
+/** Long enough to sign in; an owner with no account yet reopens the app from Shopify. */
+export const PENDING_TTL_MS = 15 * 60 * 1000;
+
+export interface PendingConnection {
+  /** The tenant the state named, or INSTALL_CLIENT_ID for an install-initiated handshake. */
+  clientId: string;
+  shop: string;
+  app?: string; // sb-bridge: remove after SB migrates to bcns Connect
+  accessToken: string;
+  refreshToken: string;
+  /** ISO time the access token dies, fixed at exchange time. */
+  expiresAt: string;
+  /** Epoch ms the cookie stops being honoured. */
+  exp: number;
+}
+
+/**
+ * AES-256-GCM, not just signed: the payload IS the access and refresh token.
+ * The key is derived from the client secret under its own label, so nothing
+ * that leaves this server is ever an HMAC a webhook or state check would take.
+ */
+function pendingKey(secret: string): Buffer {
+  return createHmac("sha256", secret).update("pending-connection:v1").digest();
+}
+
+export function sealPending(
+  pending: Omit<PendingConnection, "exp">,
+  secret: string,
+  now: number = Date.now()
+): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", pendingKey(secret), iv, { authTagLength: 16 });
+  const body = Buffer.concat([cipher.update(JSON.stringify({ ...pending, exp: now + PENDING_TTL_MS }), "utf8"), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), body]).toString("base64url");
+}
+
+export type PendingResult =
+  | { ok: true; pending: PendingConnection }
+  | { ok: false; reason: "malformed" | "expired" | "tenant_mismatch" };
+
+/**
+ * Open the cookie for the signed-in owner of `clientId`. A state minted for a
+ * tenant binds only to that tenant; an install-initiated one binds to whichever
+ * owner signs in, in the browser that ran the handshake.
+ */
+export function openPending(
+  sealed: unknown,
+  secret: string,
+  clientId: string,
+  now: number = Date.now()
+): PendingResult {
+  let pending: PendingConnection;
+  try {
+    const raw = Buffer.from(String(sealed ?? ""), "base64url");
+    const decipher = createDecipheriv("aes-256-gcm", pendingKey(secret), raw.subarray(0, 12), { authTagLength: 16 });
+    decipher.setAuthTag(raw.subarray(12, 28));
+    pending = JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8"));
+  } catch {
+    return { ok: false, reason: "malformed" };
+  }
+  if (typeof pending?.exp !== "number" || typeof pending.clientId !== "string" || !normalizeShop(pending.shop)) {
+    return { ok: false, reason: "malformed" };
+  }
+  if (pending.exp < now) return { ok: false, reason: "expired" };
+  if (pending.clientId !== INSTALL_CLIENT_ID && pending.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
+  return { ok: true, pending };
+}

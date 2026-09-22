@@ -173,10 +173,11 @@ test("registered URLs, scopes and dark-by-default gate", () => {
   assert.equal(oauthEnabled(cfg({ approvedOAuthSources: ["meta"] }), "meta"), false); // approved but no secret
 });
 
-test("middleware exempts the deletion callback and nothing else under /api/oauth", () => {
+test("middleware exempts the deletion callback and no other Meta or Monday route", () => {
   const mw = readFileSync(new URL("../middleware.ts", import.meta.url), "utf8");
   assert.match(mw, /api\/oauth\/meta\/data-deletion\$/);
-  assert.doesNotMatch(mw, /matcher:[^\n]*api\/oauth\/(?!meta\/data-deletion)/);
+  // api/oauth/shopify/ is open on purpose (the Shopify-initiated install); see shopify-oauth.test.mjs.
+  assert.doesNotMatch(mw, /matcher:[^\n]*api\/oauth\/(?!meta\/data-deletion|shopify\/)/);
 });
 
 test("META/MONDAY defaults still match the worker connectors", () => {

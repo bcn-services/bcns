@@ -486,6 +486,8 @@ displayName }`. If Declan wants ShopifyQL sessions, add phone and address too:
 without them the §9 checklist sets `sessions_mode` to `none`
 (`platform/scripts/checklist.ts:50`). `read_all_orders` was granted 9/18.
 
+**Submission pack:** `docs/architecture/w6a-shopify-submission.md` has the listing copy, scopes, protected-data answers, reviewer steps, screenshots and your numbered steps.
+
 **Before you submit.** Everything W5a confirmed must be fixed and merged. A rejection
 costs another full review cycle.
 
