@@ -10,19 +10,39 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
-import { safeEqual, verifyState } from "@/lib/oauth-state";
-import {
-  MONDAY_API,
-  MONDAY_DEFAULTS,
-  MONDAY_TOKEN_KIND,
-  MONDAY_TOKEN_URL,
-  handleMondayToken,
-  pickBoard,
-  scheduleConfig,
-} from "@/lib/monday-oauth";
+import { safeEqual, verifyState, type PickOption } from "@/lib/oauth-state";
+import { BOARDS_QUERY, MONDAY_API, MONDAY_TOKEN_URL, handleMondayToken, listBoards } from "@/lib/monday-oauth";
 import { oauthEnabled, redirectUri } from "@/lib/oauth-config";
+import { bindOrPick, stateCookie } from "@/lib/oauth-connect";
 
 export const dynamic = "force-dynamic";
+
+type Handshake = { ok: true; accessToken: string; options: PickOption[] } | { ok: false; code: string; detail?: string };
+
+/** Code → token → the token's boards. Every network call is here. */
+async function handshake(clientId: string, secret: string, redirect: string, code: string): Promise<Handshake> {
+  const tokenResponse = await fetch(MONDAY_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ client_id: clientId, client_secret: secret, code, redirect_uri: redirect }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+  const token = handleMondayToken(tokenResponse.status, await tokenResponse.json().catch(() => null));
+  if (!token.ok) return { ok: false, code: `exchange_${token.reason}`, detail: token.detail };
+
+  // The connector syncs one board and configSchema requires its id.
+  const boards = await fetch(MONDAY_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: token.accessToken, "API-Version": "2025-01" },
+    body: JSON.stringify({ query: BOARDS_QUERY }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+  const options = boards.ok ? listBoards(await boards.json().catch(() => null)) : [];
+  if (!options.length) return { ok: false, code: "no_board", detail: `HTTP ${boards.status}` };
+  return { ok: true, accessToken: token.accessToken, options };
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const config = getConfig();
@@ -30,7 +50,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const fail = (code: string, detail?: string) => {
     if (detail) console.warn(`[connect] monday callback rejected (${code}): ${detail}`);
     const response = NextResponse.redirect(`${hub}/?error=connect-failed`);
-    response.cookies.delete("monday_oauth_state");
+    response.cookies.delete({ name: stateCookie("monday"), path: "/api/oauth/monday" });
     return response;
   };
 
@@ -41,7 +61,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const state = verifyState(params.get("state"), secret);
   if (!state.ok) return fail(`state_${state.reason}`);
 
-  const cookie = request.cookies.get("monday_oauth_state")?.value;
+  const cookie = request.cookies.get(stateCookie("monday"))?.value;
   if (!cookie || !safeEqual(cookie, String(params.get("state")))) return fail("state_cookie");
 
   const session = await requireOwner("/");
@@ -50,43 +70,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = params.get("code");
   if (!code) return fail("no_code");
 
-  const tokenResponse = await fetch(MONDAY_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      client_id: config.mondayClientId!,
-      client_secret: secret,
-      code,
-      redirect_uri: redirectUri(config, "monday"),
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
-  });
-  const token = handleMondayToken(tokenResponse.status, await tokenResponse.json().catch(() => null));
-  if (!token.ok) return fail(`exchange_${token.reason}`, token.detail);
+  // A timeout or DNS failure is a connect-failed with the cookie cleared, not a 500.
+  const result = await handshake(config.mondayClientId!, secret, redirectUri(config, "monday"), code).catch(
+    (): Handshake => ({ ok: false, code: "network" })
+  );
+  if (!result.ok) return fail(result.code, result.detail ?? result.code);
 
-  // The connector syncs one board and configSchema requires its id.
-  const boards = await fetch(MONDAY_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: token.accessToken, "API-Version": "2025-01" },
-    body: JSON.stringify({ query: "{ boards(limit: 25, state: active, order_by: created_at) { id } }" }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
+  // One board: connect it. Several: the owner picks (W5b #1). Never a guess.
+  return bindOrPick("monday", session, config, {
+    clientId: state.payload.clientId,
+    accessToken: result.accessToken,
+    expiresAt: null,
+    options: result.options,
   });
-  const boardId = boards.ok ? pickBoard(await boards.json().catch(() => null)) : null;
-  if (!boardId) return fail("no_board", `HTTP ${boards.status}`);
-
-  const { error } = await session.api.rpc("connect_source", {
-    p_source: "monday",
-    p_kind: MONDAY_TOKEN_KIND,
-    p_secret: token.accessToken,
-    p_config: scheduleConfig(boardId),
-    p_interval: MONDAY_DEFAULTS.interval,
-    p_backfill_depth: MONDAY_DEFAULTS.backfillDepth,
-  });
-  if (error) return fail("write_failed", error.code ?? "rpc");
-
-  const done = NextResponse.redirect(`${hub}/?connected=monday`);
-  done.cookies.delete("monday_oauth_state");
-  return done;
 }

@@ -139,13 +139,20 @@ export default async function SourcesPage({
               ) : null}
               {card.connected ? null : connectPath(config, card.source) && membership.role === "owner" ? (
                 /**
-                 * Self-serve: the source's app is approved and configured. GET,
-                 * not a server action, because the handshake ends in a redirect
-                 * to Shopify and the merchant has to supply their own store.
-                 * Owners only — api.connect_source is owner-gated in the
-                 * database, so a member would consent and then be refused.
+                 * Self-serve: the source's app is approved and configured. A plain
+                 * form, not a server action, because the handshake ends in a
+                 * redirect to the provider. Shopify's /start is a GET (its install
+                 * flow arrives that way and the merchant supplies their store);
+                 * Meta and Monday are POST so a third-party page cannot force a
+                 * reconnect (W5b #3). Owners only — api.connect_source is
+                 * owner-gated in the database, so a member would consent and
+                 * then be refused.
                  */
-                <form action={connectPath(config, card.source)!} method="GET" className="flex gap-2">
+                <form
+                  action={connectPath(config, card.source)!}
+                  method={card.source === "shopify" ? "GET" : "POST"}
+                  className="flex gap-2"
+                >
                   {card.source === "shopify" ? (
                     <input
                       type="text"

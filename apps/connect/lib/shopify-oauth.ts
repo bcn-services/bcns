@@ -16,7 +16,8 @@
  *     like a Shopify outage, so it has its own test.
  */
 
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { seal, unseal } from "./oauth-state";
 import type { HubConfig } from "./env"; // sb-bridge: remove after SB migrates to bcns Connect
 
 /** Shopify's Admin API OAuth endpoints live on the shop's own domain. */
@@ -198,6 +199,26 @@ export function verifyQueryHmac(params: URLSearchParams, secret: string): boolea
 }
 
 /**
+ * How old an install query's `timestamp` may be. The query HMAC never expires,
+ * so without this a leaked app-URL hit (history, a proxy log, a Referer) starts
+ * a fresh handshake forever. Shopify signs the URL as the admin opens the app
+ * and the browser follows at once, so five minutes (the state's own TTL) is
+ * slack for a slow load, not a working window. 90 s the other way is the clock
+ * tolerance Shopify's own API library allows. Install path only: the callback
+ * is already bounded by our state's expiry, which its HMAC also covers.
+ */
+export const INSTALL_TIMESTAMP_MAX_AGE_MS = 5 * 60 * 1000;
+const INSTALL_TIMESTAMP_SKEW_MS = 90 * 1000;
+
+/** `timestamp` is epoch seconds. Missing, non-numeric or outside the window is false. */
+export function isFreshInstallTimestamp(value: unknown, now: number = Date.now()): boolean {
+  const raw = String(value ?? "");
+  if (!/^\d{1,12}$/.test(raw)) return false;
+  const at = Number(raw) * 1000;
+  return at <= now + INSTALL_TIMESTAMP_SKEW_MS && now - at <= INSTALL_TIMESTAMP_MAX_AGE_MS;
+}
+
+/**
  * Webhook signature: BASE64 HMAC-SHA256 over the raw body bytes. The body must
  * be the bytes as received — re-serialising parsed JSON changes whitespace and
  * key order and the signature stops matching.
@@ -358,23 +379,17 @@ export interface PendingConnection {
 }
 
 /**
- * AES-256-GCM, not just signed: the payload IS the access and refresh token.
- * The key is derived from the client secret under its own label, so nothing
- * that leaves this server is ever an HMAC a webhook or state check would take.
+ * Sealed with lib/oauth-state.ts (AES-256-GCM, key derived from the client
+ * secret under this label): the payload IS the access and refresh token.
  */
-function pendingKey(secret: string): Buffer {
-  return createHmac("sha256", secret).update("pending-connection:v1").digest();
-}
+const PENDING_LABEL = "pending-connection:v1";
 
 export function sealPending(
   pending: Omit<PendingConnection, "exp">,
   secret: string,
   now: number = Date.now()
 ): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", pendingKey(secret), iv, { authTagLength: 16 });
-  const body = Buffer.concat([cipher.update(JSON.stringify({ ...pending, exp: now + PENDING_TTL_MS }), "utf8"), cipher.final()]);
-  return Buffer.concat([iv, cipher.getAuthTag(), body]).toString("base64url");
+  return seal(pending, secret, PENDING_LABEL, PENDING_TTL_MS, now);
 }
 
 export type PendingResult =
@@ -392,19 +407,10 @@ export function openPending(
   clientId: string,
   now: number = Date.now()
 ): PendingResult {
-  let pending: PendingConnection;
-  try {
-    const raw = Buffer.from(String(sealed ?? ""), "base64url");
-    const decipher = createDecipheriv("aes-256-gcm", pendingKey(secret), raw.subarray(0, 12), { authTagLength: 16 });
-    decipher.setAuthTag(raw.subarray(12, 28));
-    pending = JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8"));
-  } catch {
-    return { ok: false, reason: "malformed" };
-  }
-  if (typeof pending?.exp !== "number" || typeof pending.clientId !== "string" || !normalizeShop(pending.shop)) {
-    return { ok: false, reason: "malformed" };
-  }
-  if (pending.exp < now) return { ok: false, reason: "expired" };
+  const opened = unseal(sealed, secret, PENDING_LABEL, now);
+  if (!opened.ok) return opened;
+  const pending = opened.value as unknown as PendingConnection;
+  if (typeof pending.clientId !== "string" || !normalizeShop(pending.shop)) return { ok: false, reason: "malformed" };
   if (pending.clientId !== INSTALL_CLIENT_ID && pending.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
   return { ok: true, pending };
 }
