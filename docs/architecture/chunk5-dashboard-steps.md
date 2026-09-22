@@ -145,6 +145,28 @@ steps are in `chunk5-windows.md` §W6a.
 10. Submit for review at W6, once business verification and the flow are both
     ready.
 
+### Matching a Meta deletion request to a tenant
+
+The deletion callback only records Meta's app-scoped user id (the hub log line
+`meta data-deletion request recorded (meta user <id>, …)` and the bcns email). No
+table stores that id, so match it by asking Meta whose each stored token is:
+
+1. In the Supabase SQL editor (service role, never from the hub), list the Meta
+   tokens: `select client_id, secret from data.source_tokens where source = 'meta';`
+2. For each row, send the token in a header, never in the URL (URLs land in shell
+   history and proxy logs):
+   `curl -s -H "Authorization: Bearer $TOKEN" "https://graph.facebook.com/v21.0/me?fields=id"`
+   Read `$TOKEN` with `read -rs TOKEN` so it isn't echoed or saved to history.
+3. The row whose `{"id": …}` equals the user id in the request is the tenant.
+   Delete that tenant's Meta data and token (disconnect Meta in the hub or delete
+   the `source_tokens` row), then reply with the confirmation code from the email.
+4. Removing the app can revoke that user's token, so the match may be a token that
+   now returns an OAuth error rather than an id. If no token returns the id, the
+   candidates are the rows whose call errors or whose `status` is `auth_failed` or
+   `revoked`. With exactly one candidate, treat it as the match. With several,
+   confirm with the tenant owner by email. With none, record "no linked data"
+   against the confirmation code.
+
 ## (c) Monday — OAuth app
 
 1. **developer.monday.com** (or the "Developers" link from your monday.com avatar

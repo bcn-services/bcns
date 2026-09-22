@@ -12,6 +12,8 @@ import { createRequire } from "node:module";
 import {
   FINISH_PATH,
   INSTALL_CLIENT_ID,
+  INSTALL_TIMESTAMP_MAX_AGE_MS,
+  isFreshInstallTimestamp,
   PENDING_COOKIE,
   PENDING_TTL_MS,
   openPending,
@@ -47,8 +49,9 @@ function signQuery(params, secret) {
   return params;
 }
 
-const installQuery = (secret = SECRET) =>
-  signQuery(new URLSearchParams({ host: "YWRtaW4uc2hvcGlmeS5jb20", shop: SHOP, timestamp: "1700000000" }), secret);
+const nowSec = () => Math.floor(Date.now() / 1000);
+const installQuery = (secret = SECRET, timestamp = String(nowSec())) =>
+  signQuery(new URLSearchParams({ host: "YWRtaW4uc2hvcGlmeS5jb20", shop: SHOP, timestamp }), secret);
 
 const TOKEN = { clientId: CLIENT, shop: SHOP, accessToken: "shpat_x", refreshToken: "shprt_y", expiresAt: "2026-09-21T01:00:00.000Z" };
 
@@ -116,6 +119,26 @@ test("start: a forged install query never reaches Shopify", async () => {
   tampered.set("shop", "evil-store.myshopify.com");
   const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${tampered}`));
   assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+});
+
+test("install timestamp: fresh passes; stale, far-future, missing and junk fail", () => {
+  const now = 1_800_000_000_000;
+  const at = (sec) => isFreshInstallTimestamp(String(sec), now);
+  assert.equal(at(now / 1000), true);
+  assert.equal(at(now / 1000 - INSTALL_TIMESTAMP_MAX_AGE_MS / 1000), true);
+  assert.equal(at(now / 1000 - INSTALL_TIMESTAMP_MAX_AGE_MS / 1000 - 1), false);
+  assert.equal(at(now / 1000 + 60), true);
+  assert.equal(at(now / 1000 + 120), false);
+  for (const junk of [null, undefined, "", "abc", "1.5", "-1", "1e9", "9".repeat(13)]) {
+    assert.equal(isFreshInstallTimestamp(junk, now), false, String(junk));
+  }
+});
+
+test("start: a correctly signed but stale install query never reaches Shopify", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${installQuery(SECRET, String(nowSec() - 3600))}`));
+  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+  // The callback's HMAC check is untouched: its own old timestamp still passes below.
 });
 
 /* ----------------------------------------------------------------- /callback */

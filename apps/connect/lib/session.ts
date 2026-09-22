@@ -74,6 +74,16 @@ export async function requireOwner(denyTo: string): Promise<HubSession> {
 }
 
 /**
+ * requireOwner for POST route handlers: null instead of redirect(), whose 307
+ * would make the browser re-POST to the target. The caller answers with a 303.
+ */
+export async function ownerSession(): Promise<HubSession | null> {
+  const { supabase, result } = await loadSession();
+  if (!supabase || !result.ok || result.membership.role !== "owner") return null;
+  return { supabase, api: apiSchema(supabase), membership: result.membership };
+}
+
+/**
  * The client's own row. `select("*")` on purpose: `app_url` is added by
  * 20260916000100_clients_app_url.sql, and naming it explicitly would make the
  * whole page 400 against a database that has not run that migration yet.

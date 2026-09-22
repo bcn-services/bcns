@@ -10,6 +10,8 @@
  *   config — `board_id` (required by configSchema); columns/done_statuses default
  */
 
+import type { PickOption } from "./oauth-state";
+
 export const MONDAY_AUTHORIZE = "https://auth.monday.com/oauth2/authorize";
 export const MONDAY_TOKEN_URL = "https://auth.monday.com/oauth2/token";
 export const MONDAY_API = "https://api.monday.com/v2";
@@ -40,15 +42,36 @@ export function handleMondayToken(status: number, body: unknown): MondayTokenRes
   return accessToken ? { ok: true, accessToken } : { ok: false, reason: "malformed" };
 }
 
-/** First board the token can read; the connector syncs exactly one. */
-export function pickBoard(body: unknown): string | null {
+/** Up to 25 active boards the token can read, with names for the picker. */
+export const BOARDS_QUERY = "{ boards(limit: 25, state: active, order_by: created_at) { id name } }";
+
+/**
+ * Every board the token returned. The callback connects the only one, or makes
+ * the owner choose; it never guesses (W5b #1). Names are cut short to keep the
+ * sealed picker cookie under the browser's 4 KB limit.
+ */
+export function listBoards(body: unknown): PickOption[] {
   const boards = (body as { data?: { boards?: unknown } } | null)?.data?.boards;
-  if (!Array.isArray(boards)) return null;
-  for (const b of boards) {
-    const id = (b as { id?: unknown })?.id;
-    if ((typeof id === "string" || typeof id === "number") && /^\d+$/.test(String(id))) return String(id);
+  if (!Array.isArray(boards)) return [];
+  const out: PickOption[] = [];
+  for (const b of boards as { id?: unknown; name?: unknown }[]) {
+    const id = typeof b?.id === "string" || typeof b?.id === "number" ? String(b.id) : "";
+    if (!/^\d+$/.test(id)) continue;
+    out.push({ id, name: typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 40) : id });
   }
-  return null;
+  return out;
 }
 
 export const scheduleConfig = (boardId: string): Record<string, string> => ({ board_id: boardId });
+
+/** The one api.connect_source call, shared by /callback and /pick. Monday tokens do not expire. */
+export function connectArgs(accessToken: string, boardId: string) {
+  return {
+    p_source: "monday",
+    p_kind: MONDAY_TOKEN_KIND,
+    p_secret: accessToken,
+    p_config: scheduleConfig(boardId),
+    p_interval: MONDAY_DEFAULTS.interval,
+    p_backfill_depth: MONDAY_DEFAULTS.backfillDepth,
+  };
+}

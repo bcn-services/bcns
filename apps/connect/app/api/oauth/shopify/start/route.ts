@@ -20,7 +20,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
-import { INSTALL_CLIENT_ID, installUrl, normalizeShop, shopifyAppFor, signState, verifyQueryHmac } from "@/lib/shopify-oauth";
+import {
+  INSTALL_CLIENT_ID,
+  installUrl,
+  isFreshInstallTimestamp,
+  normalizeShop,
+  shopifyAppFor,
+  signState,
+  verifyQueryHmac,
+} from "@/lib/shopify-oauth";
 import { oauthEnabled, redirectUri } from "@/lib/oauth-config";
 
 /** A signed-in, per-request redirect: nothing here may be cached or prerendered. */
@@ -42,8 +50,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   let clientId: string;
   if (params.has("hmac")) {
-    // Shopify-initiated install. A forged or tampered query stops here.
+    // Shopify-initiated install. A forged or tampered query stops here, and so
+    // does a genuine one replayed after its window (`timestamp` is under the HMAC).
     if (!verifyQueryHmac(params, app.clientSecret)) return back("connect-failed");
+    if (!isFreshInstallTimestamp(params.get("timestamp"))) return back("connect-failed");
     clientId = INSTALL_CLIENT_ID;
   } else {
     // requireOwner redirects on failure; reaching the next line means owner.
