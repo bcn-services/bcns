@@ -308,9 +308,11 @@ step "Confirm the release."
 pause "Deployed? Press Enter to read it back."
 open_url "https://dev.shopify.com/dashboard/235106100/apps/422420021249/versions"
 step "The newest version is Active and lists 8 scopes and the hub redirect."
-ask ALT_VERSION "Active version name (e.g. bcns-data-5):"
-[[ -n "${ALT_VERSION}" && "${ALT_VERSION}" != "bcns-data-4" ]] || {
-  warn "bcns-data-4 is still active — the deploy did not release. Stopping."; exit 1; }
+while :; do
+  ask ALT_VERSION "Active version name (e.g. bcns-data-5):"
+  [[ "${ALT_VERSION}" =~ ^bcns-data-[0-9]+$ && "${ALT_VERSION}" != "bcns-data-4" ]] && break
+  warn "got $(printf '%q' "${ALT_VERSION}") — type the Active name, e.g. bcns-data-5 (bcns-data-4 means the deploy did not release)."
+done
 say "active: ${ALT_VERSION}"
 pause
 
