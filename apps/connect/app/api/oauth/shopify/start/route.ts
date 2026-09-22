@@ -22,6 +22,7 @@ import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
 import {
   INSTALL_CLIENT_ID,
+  STATE_TTL_MS,
   installUrl,
   isFreshInstallTimestamp,
   normalizeShop,
@@ -37,14 +38,19 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const config = getConfig();
   const hub = config.hubBaseUrl;
-  const back = (error: string) => NextResponse.redirect(`${hub}/?error=${error}`);
+  const params = request.nextUrl.searchParams;
+  // Read-only normalization; safe ahead of the checks below. Only used here to
+  // pick a secret to try and to name the shop in the reject log.
+  const shop = normalizeShop(params.get("shop"));
+  const back = (error: string) => {
+    console.warn(`[connect] shopify start rejected (${error}): shop=${shop ?? "none"}`);
+    return NextResponse.redirect(`${hub}/?error=${error}`);
+  };
 
   // Unapproved or unconfigured: behave as if the route does not exist, so a
   // guessed URL can never start a handshake for a source that is not live yet.
   if (!oauthEnabled(config, "shopify")) return back("oauth-unavailable");
 
-  const params = request.nextUrl.searchParams;
-  const shop = normalizeShop(params.get("shop"));
   if (!shop) return back("invalid-shop");
   const app = shopifyAppFor(config, shop); // sb-bridge: remove after SB migrates to bcns Connect
 
@@ -74,7 +80,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     secure: hub.startsWith("https://"),
     sameSite: "lax",
     path: "/api/oauth/shopify",
-    maxAge: 600,
+    maxAge: STATE_TTL_MS / 1000,
   });
   return response;
 }

@@ -66,7 +66,7 @@ check "rejects non-numeric port"    "$(try good abcd ex.com)"               "1"
 check "rejects privileged port"     "$(try good 80 ex.com)"                 "1"
 check "rejects uppercase slug"      "$(try BAD 3000 ex.com)"                "1"
 check "rejects wrong arg count"     "$(bash "$here/onboard-client.sh" only-one >/dev/null 2>&1; echo $?)" "1"
-check "rejects five args"           "$(bash "$here/onboard-client.sh" a 3000 ex.com certbot extra >/dev/null 2>&1; echo $?)" "1"
+check "rejects six args"            "$(bash "$here/onboard-client.sh" a 3000 ex.com certbot next extra >/dev/null 2>&1; echo $?)" "1"
 
 # The vhost heredoc needs root to emit, so assert on the template text instead.
 # 00-default is a `return 444` catch-all: drop the www block and every www
@@ -108,6 +108,28 @@ check "ports.txt slugs are unique" "$(grep -v '^#' "$here/ports.txt" | awk '{pri
 check "ports.txt ports are unique" "$(grep -v '^#' "$here/ports.txt" | awk '{print $2}' | sort -u | wc -l | tr -d ' ')" "$regs"
 check "ports.txt ports are 1024-65535" "$(grep -v '^#' "$here/ports.txt" | awk '$2<1024||$2>65535' | wc -l | tr -d ' ')" "0"
 check "ports.txt pins l2detailz to 3100 (the live unit)" "$(awk '$1=="l2detailz"{print $2}' "$here/ports.txt")" "3100"
+
+echo "onboard-client.sh app kind (5th arg) -- env seeding"
+
+renderenv() { BCNS_PORTS_FILE="$reg" BCNS_RENDER_ONLY=env bash "$here/onboard-client.sh" "$@" 2>/dev/null; }
+check "refuses an unknown app kind" \
+  "$(BCNS_PORTS_FILE="$reg" BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" sb 3101 sb.bcn-services.com certbot bogus-kind >/dev/null 2>&1; echo $?)" "1"
+
+mcpenv=$(renderenv sb 3101 sb.bcn-services.com certbot mcp)
+if printf '%s\n' "$mcpenv" | grep -qx '# SUPABASE_URL='; then ok "mcp kind seeds SUPABASE_URL"; else bad "mcp kind missing SUPABASE_URL"; fi
+if printf '%s\n' "$mcpenv" | grep -qx '# SUPABASE_ANON_KEY='; then ok "mcp kind seeds SUPABASE_ANON_KEY"; else bad "mcp kind missing SUPABASE_ANON_KEY"; fi
+if printf '%s\n' "$mcpenv" | grep -q 'NEXT_PUBLIC_SUPABASE'; then bad "mcp kind must not seed NEXT_PUBLIC_SUPABASE_* names"; else ok "mcp kind has no NEXT_PUBLIC names"; fi
+
+nextenv=$(renderenv sb 3101 sb.bcn-services.com certbot next)
+if printf '%s\n' "$nextenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "next kind seeds NEXT_PUBLIC_SUPABASE_URL"; else bad "next kind missing NEXT_PUBLIC_SUPABASE_URL"; fi
+if printf '%s\n' "$nextenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_ANON_KEY='; then ok "next kind seeds NEXT_PUBLIC_SUPABASE_ANON_KEY"; else bad "next kind missing NEXT_PUBLIC_SUPABASE_ANON_KEY"; fi
+if printf '%s\n' "$nextenv" | grep -qx '# SUPABASE_URL='; then bad "next kind must not seed the bare (mcp) SUPABASE_URL name"; else ok "next kind has no bare SUPABASE_URL"; fi
+
+defenv=$(renderenv sb 3101 sb.bcn-services.com certbot)
+if printf '%s\n' "$defenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "kind defaults to next when the 5th arg is omitted"; else bad "kind default is not next"; fi
+
+emptyenv=$(renderenv sb 3101 sb.bcn-services.com certbot "")
+if printf '%s\n' "$emptyenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "kind defaults to next when the 5th arg is an explicit empty string"; else bad "kind default is not next for an explicit empty string"; fi
 
 echo "onboard-client.sh cert modes"
 

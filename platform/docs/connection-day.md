@@ -15,7 +15,7 @@ each source is one `add-source` command. This doc is the checklist for that day.
   `source_tokens`/`connector_schedule`, it does not pull data.
 - `add-source` ships in `scripts/add-source.ts` on branch `feat/add-source` (PR #3). Merge that
   PR (`! GITHUB_TOKEN= gh pr merge 3`) before connection day.
-- Command form, run from `~/bcns-data` on `main` with hosted env exported:
+- Command form, run from `~/bcns/platform` on `main` with hosted env exported:
   ```
   corepack pnpm tsx scripts/add-source.ts --slug sb --source <shopify|meta|monday|meet|drive> [--reset-cursors]
   ```
@@ -25,6 +25,13 @@ each source is one `add-source` command. This doc is the checklist for that day.
   source, but get the owner's answer up front — "which timezone does your Shopify admin show?").
 
 ## 2. Shopify
+
+**Superseded 2026-09-21: Shopify now connects through the hub, not `add-source`.** The owner opens
+`connect.bcn-services.com` and clicks Connect (or, for a Shopify-initiated install, opens the app
+from the Shopify admin) — `apps/connect`'s `/api/oauth/shopify/start` → `/callback` → `/finish`
+completes the OAuth handshake and writes `source_tokens` directly. §2.3–2.4 below (the `add-source
+--source shopify` flow with a hand-entered token) are kept for rehearsal against a dev store only;
+they are not how a live client is attached any more.
 
 **Method pending** (see `docs/shopify-connection-method.md`). Recommended: **Option A** (OAuth
 install of bcns's Dev Dashboard app via a custom distribution link). Fallback: **Option B**
@@ -40,6 +47,16 @@ with.
 | Scopes (least privilege, from DESIGN §4.2): `read_orders, read_all_orders, read_products, read_inventory, read_shopify_payments_payouts, read_reports, read_customers`. | Same scopes, set on the app version in SB's org. |
 | Also confirm: which store is live (`saunaboy-2` is Basic, 0 orders, password-protected as of 2026-09-12). | Token expires in 24h — needs a refresh path not built yet (see method doc). |
 
+**Finding the permanent domain:** `admin.shopify.com/store/<handle>` is a **handle**, not the OAuth
+host — Shopify can rename the handle without changing the store. The value both `/start?shop=` and
+the `add-source` prompt below need is the permanent `<random>.myshopify.com` domain. Get it by
+either:
+- decoding the custom-distribution install link's `signature` query param: base64-decode the JSON
+  before the `--`, and read its `permanent_domain` field; or
+- Shopify Admin → Settings → Domains, which lists the store's `.myshopify.com` domain.
+
+Example: SaunaBoy's handle is `saunaboy-2`; its permanent domain is `fa8a00-11.myshopify.com`.
+
 ### 2.2 Checklist items that can fail
 
 | id | means | fix |
@@ -53,11 +70,14 @@ with.
 
 ### 2.3 Exact command + prompts
 
+Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` —
+§1 Preflight) before running this.
 ```
 corepack pnpm tsx scripts/add-source.ts --slug sb --source shopify
 ```
 Prompts, in order:
-1. `shopify shop:` → the `*.myshopify.com` subdomain, e.g. `saunaboy-2`
+1. `shopify shop:` → the **permanent** `<random>.myshopify.com` domain (see 2.1 above), e.g.
+   `fa8a00-11.myshopify.com` — not the `saunaboy-2` handle
 2. `shopify admin_url:` → `https://admin.shopify.com/store/saunaboy-2`
 3. `shopify Admin API token:` → the token from step 2.1 (an OAuth install gives `shpua_…`; S1 checks scopes, not the prefix)
 
@@ -106,6 +126,8 @@ where client_id = (select id from data.clients where slug = 'sb') and source = '
 
 ### 3.3 Exact command + prompts
 
+Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` —
+§1 Preflight) before running this.
 ```
 corepack pnpm tsx scripts/add-source.ts --slug sb --source meta
 ```
@@ -152,6 +174,8 @@ Other columns (`due`, `owner`, `priority`, `link`) are autodetected by type/titl
 
 ### 4.3 Exact command + prompts
 
+Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` —
+§1 Preflight) before running this.
 ```
 corepack pnpm tsx scripts/add-source.ts --slug sb --source monday
 ```
@@ -197,6 +221,8 @@ where client_id = (select id from data.clients where slug = 'sb') and source = '
 
 ### 5.3 Exact command + prompts
 
+Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` —
+§1 Preflight) before running this.
 ```
 corepack pnpm tsx scripts/add-source.ts --slug sb --source meet
 ```
@@ -243,6 +269,8 @@ where client_id = (select id from data.clients where slug = 'sb') and source = '
 
 ### 6.3 Exact command + prompts
 
+Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` —
+§1 Preflight) before running this.
 ```
 corepack pnpm tsx scripts/add-source.ts --slug sb --source drive
 ```

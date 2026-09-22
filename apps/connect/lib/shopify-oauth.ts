@@ -256,7 +256,11 @@ export interface TokenExchange {
 
 export type ExchangeResult =
   | { ok: true; token: TokenExchange }
-  | { ok: false; reason: "http_error" | "malformed" | "missing_scopes" | "not_expiring"; detail?: string };
+  | {
+      ok: false;
+      reason: "http_error" | "malformed" | "missing_scopes" | "not_expiring" | "network_error";
+      detail?: string;
+    };
 
 /**
  * Turn Shopify's token response into either a token or a refusal.

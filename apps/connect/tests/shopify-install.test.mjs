@@ -13,6 +13,7 @@ import {
   FINISH_PATH,
   INSTALL_CLIENT_ID,
   INSTALL_TIMESTAMP_MAX_AGE_MS,
+  STATE_TTL_MS,
   isFreshInstallTimestamp,
   PENDING_COOKIE,
   PENDING_TTL_MS,
@@ -163,6 +164,50 @@ test("start: a correctly signed but stale install query never reaches Shopify", 
   // The callback's HMAC check is untouched: its own old timestamp still passes below.
 });
 
+function captureWarn() {
+  const real = console.warn;
+  const logged = [];
+  console.warn = (...a) => logged.push(a.join(" "));
+  return { logged, restore: () => { console.warn = real; } };
+}
+
+test("start: a reject logs the reason code and shop, and nothing sensitive (hmac/secret/state/token/cookie)", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const { logged, restore } = captureWarn();
+  try {
+    const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${installQuery("attacker-key")}`));
+    assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+  } finally {
+    restore();
+  }
+  const lines = logged.join("\n");
+  assert.match(lines, /\[connect\] shopify start rejected \(connect-failed\)/);
+  assert.match(lines, new RegExp(`shop=${SHOP}`));
+  // Nothing from the (forged) query string leaks into the log line.
+  assert.doesNotMatch(lines, /attacker-key/);
+});
+
+test("start: invalid-shop rejects and logs even with no usable shop to name", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const { logged, restore } = captureWarn();
+  try {
+    const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start`));
+    assert.equal(res.headers.get("location"), `${HUB}/?error=invalid-shop`);
+  } finally {
+    restore();
+  }
+  assert.match(logged.join("\n"), /\[connect\] shopify start rejected \(invalid-shop\): shop=none/);
+});
+
+test("start: the state cookie's maxAge equals STATE_TTL_MS in seconds, not a second hardcoded value", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/start/route.ts");
+  const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/start?${installQuery()}`));
+  const cookie = res.cookies.get("shopify_oauth_state");
+  assert.ok(cookie, "expected the state cookie to be set");
+  assert.equal(cookie.maxAge, STATE_TTL_MS / 1000);
+  assert.equal(STATE_TTL_MS / 1000, 300, "sanity: 5 minutes");
+});
+
 /* ----------------------------------------------------------------- /callback */
 
 test("callback: an install-initiated handshake exchanges, seals and hands off to /finish without a session", async () => {
@@ -183,6 +228,54 @@ test("callback: an install-initiated handshake exchanges, seals and hands off to
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("callback: a network failure during exchange redirects generically, deletes the state cookie, and logs only the error name and shop", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
+  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
+  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  };
+  const { logged, restore } = captureWarn();
+  let res;
+  try {
+    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
+  } finally {
+    restore();
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+  const cookie = res.cookies.get("shopify_oauth_state");
+  assert.ok(cookie, "expected the state cookie to still be present in the response, cleared");
+  assert.equal(cookie.value, "", "deleted cookie must carry no value");
+  assert.ok(cookie.expires && new Date(cookie.expires).getTime() <= Date.now(), "deleted cookie must be expired, not just absent maxAge");
+  const lines = logged.join("\n");
+  assert.match(lines, /\[connect\] shopify callback rejected \(exchange_network_error:TimeoutError\)/);
+  assert.match(lines, new RegExp(`shop=${SHOP}`));
+  assert.doesNotMatch(lines, /\.ts:\d+|node_modules|at exchange|at GET/, "no stack trace");
+  assert.doesNotMatch(lines, /code=C|state=|timestamp=1700000000/, "no request params");
+});
+
+test("callback: a non-2xx exchange response logs only the bare numeric HTTP status, never the response body", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
+  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
+  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "invalid_request", error_description: "bad code" }), { status: 401 });
+  const { logged, restore } = captureWarn();
+  let res;
+  try {
+    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
+  } finally {
+    restore();
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+  const lines = logged.join("\n");
+  assert.match(lines, /\[connect\] shopify callback rejected \(exchange_http_error:401\)/);
+  assert.doesNotMatch(lines, /invalid_request|bad code/, "no response body in the log");
 });
 
 /* ------------------------------------------------------------------- /finish */
