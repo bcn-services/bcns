@@ -657,18 +657,27 @@ export const siteContent: SiteContent = {
   //
   // MAINTAINER NOTE (not rendered): the "30 days" / "no archive after
   // deletion" / "backups roll off within 7 days" wording below matches
-  // platform/scripts/hard-delete.ts on the `retention-30d` branch (see
-  // bcns-h-retention worktree, docs/architecture/retention-30d-shop-redact.md).
-  // As of this branch, `main`'s hard-delete.ts still refuses until 90 days and
+  // platform/scripts/hard-delete.ts on the `retention-30d` branch, now
+  // PR #60 (https://github.com/bcn-services/bcns/pull/60). As of this
+  // branch, `main`'s hard-delete.ts still refuses until 90 days and
   // archives an export to Spaces first. This copy is only accurate in
-  // production once `retention-30d` merges to `main`; do not ship this build
-  // to production before that merge lands.
+  // production once PR #60 merges to `main`; this branch must merge AFTER
+  // PR #60, and this copy must not ship to production before that merge
+  // lands.
   //
   // MAINTAINER NOTE (not rendered): "stored in the United States" (privacy,
   // "Where your data is stored") assumes the Supabase project region,
   // GCP_REGION, and the DigitalOcean droplet/Spaces region are all US. Per
   // legal-pages-research.md §(c) those regions are UNKNOWN in the repo;
   // confirm them and correct this line if any turns out non-US.
+  //
+  // MAINTAINER NOTE (not rendered): the "Agreement and acceptance" sentence
+  // about the Stripe Checkout consent box and the hub sign-in acceptance
+  // describes a DECIDED but NOT YET BUILT flow. Stripe Checkout is not set
+  // up yet, and the hub has no acceptance step today. The sentence is only
+  // true once both ship: Stripe Checkout setup, and a hub "By signing in
+  // you agree" line (a later PR). The "Who we share it with" list's Stripe
+  // entry is pending the same Stripe Checkout setup.
   legal: {
     privacy: {
       eyebrow: "Privacy",
@@ -727,10 +736,12 @@ export const siteContent: SiteContent = {
           list: [
             "Supabase: hosts our database, sign-in system and file storage for connected-source data, tokens and accounts",
             "Google Cloud: runs the background job that syncs each connected source into our database",
-            "DigitalOcean: hosts the Connect hub, the MCP server, client apps, and our database backups",
+            "DigitalOcean: hosts the Connect hub, the MCP server, client apps, and nightly backups of client apps' databases",
             "Resend: delivers internal operational email, like alerts when a deletion request comes in",
             "[TODO: name Web3Forms if NEXT_PUBLIC_CONTACT_ACCESS_KEY is set in Vercel, otherwise the fallback vendor]: delivers the marketing site's contact form",
             "Cloudflare: provides DNS and TLS for some client apps",
+            "Vercel: hosts this marketing site",
+            "Stripe: processes subscription payments; card details go to Stripe, never to bcns",
           ],
         },
         {
@@ -744,7 +755,7 @@ export const siteContent: SiteContent = {
           heading: "How long we keep it",
           body: [
             "While your account is active, we keep your connected data current and available.",
-            "Once your account ends, we delete your data from every connected source within 30 days. We don't keep an archive or backup export of it after that.",
+            "Thirty days after your account ends, we delete the copy of your connected-source data that we hold. We don't keep an archive or backup export of it after that.",
             "During those 30 days, you can ask us for an export of your data.",
             "Backup copies our database provider keeps as part of normal operations are fully gone within 7 days after we delete your data.",
           ],
@@ -882,14 +893,14 @@ export const siteContent: SiteContent = {
         {
           heading: "Term, cancellation and suspension",
           body: [
-            "bcns Connect runs month to month. Cancel any time and you'll keep access through the period you already paid for.",
+            "bcns Connect runs month to month. Cancel any time by emailing us. [TODO: Nate to decide whether access continues to the end of the paid period or ends at cancellation; today the platform stops logins and syncs when the account is marked ended.]",
             "We can suspend the Services for non-payment or for a serious violation of these terms, and we'll tell you when we can.",
           ],
         },
         {
           heading: "What happens when the service ends",
           body: [
-            "Once your account ends, logins and syncing stop. You can request an export of your data any time in the 30 days that follow. After that, your data is deleted on the schedule in our Privacy Policy.",
+            "Once your account ends, logins and syncing stop. You can request an export of your data any time in the 30 days that follow. Thirty days after your account ends, your data is deleted on the schedule in our Privacy Policy.",
           ],
         },
         {

@@ -92,7 +92,7 @@ for (const heading of REQUIRED_PRIVACY_HEADINGS) {
 }
 assert(
   "privacy retention text says 30 days",
-  legalBlock.includes("30 days")
+  /30 days|Thirty days/.test(legalBlock)
 );
 
 // ---------------------------------------------------------------------------
