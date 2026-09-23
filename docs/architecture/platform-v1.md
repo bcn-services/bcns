@@ -119,7 +119,9 @@ Done when `/library` lists Drive-sourced rows with a working link, no code path 
 - Shopify: Partner app to public-unlisted (or a new app); `/oauth/shopify/start` + `/callback` in the hub with state + HMAC; token written to the existing token row for that client; the three GDPR webhooks with HMAC verify; privacy/terms URLs (exist on the site); dev-store pass; submit for review.
 - Meta: app with Facebook Login for Business, `ads_read`, long-lived token exchange → token row; data-deletion callback URL; business verification; app review submission.
 - Monday: OAuth app (light review).
-- Google: later. Internal-app path stays. Restricted Drive scope verification is its own project.
+- Google: one Trusted External app, built alongside the other three above. SB stays on the
+  Internal app. CASA (restricted Drive scope verification) is deferred on the trigger recorded
+  above under "Deferred, with triggers".
 - Connector side: **not** the existing `refreshToken` hook — that was the plan, and it was wrong.
   Shopify's Admin API rejects non-expiring tokens outright (403), so `/callback` must request
   `expiring: "1"` (#38) and gets back an access token good for 3600s plus a refresh token good for
