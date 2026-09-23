@@ -12,29 +12,27 @@
  * the Shopify admin through the same install-initiated path (clientId ===
  * INSTALL_CLIENT_ID), and only here — signed in, with a real tenant — can we tell
  * those apart: `alreadyConnected` reads whether this tenant already has a Shopify
- * source before deciding anything. A DB error on that read fails closed toward
- * running the gate (treated as "no source"). The bridge app (SB, `app === ALT_APP`)
- * and any tenant-bound (hub-initiated) pending are never gated — untouched, no
- * network call, straight to the RPC as before. See lib/shopify-oauth.ts's
- * `managedPricingGate` / `subscriptionOutcome` for the pure decision logic.
+ * source before deciding anything. A DB error on that read fails closed to the
+ * generic error page (never silently treated as "no source" — that would gate an
+ * existing paying client). The bridge app (SB, `app === ALT_APP`) and any
+ * tenant-bound (hub-initiated) pending are never gated — untouched, no network
+ * call, straight to the RPC as before. The whole decision is
+ * lib/shopify-oauth.ts's `managedPricingRedirect`, unit-tested there with a fake
+ * `api` and a fake fetch.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { currentMembership, requireOwner } from "@/lib/session";
 import {
-  ALT_APP,
   FINISH_PATH,
-  INSTALL_CLIENT_ID,
   PENDING_COOKIE,
   SHOPIFY_DEFAULTS,
   SHOPIFY_TOKEN_KIND,
-  hasActiveSubscription,
-  managedPricingGate,
+  managedPricingRedirect,
   openPending,
-  planSelectionUrl,
   scheduleConfig,
-  subscriptionOutcome,
+  type HealthCheckApi,
 } from "@/lib/shopify-oauth";
 import { oauthEnabled } from "@/lib/oauth-config";
 
@@ -74,26 +72,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!opened.ok) return fail(opened.reason);
   const { pending } = opened;
 
-  // Only an install-initiated pending on the public app can possibly need the
-  // gate — skip the DB round trip entirely for a tenant-bound or bridge finish.
-  if (pending.clientId === INSTALL_CLIENT_ID && pending.app !== ALT_APP) {
-    const existing = await session.api.from("connector_health_v1").select("source").eq("source", "shopify").limit(1);
-    // Fail closed: a DB error reads as "no source found", i.e. still gated.
-    const alreadyConnected = !existing.error && Array.isArray(existing.data) && existing.data.length > 0;
-
-    if (managedPricingGate(pending, alreadyConnected)) {
-      const appHandle = config.shopifyAppHandle;
-      if (!appHandle) return fail("plan_handle_unconfigured");
-      const checked = await hasActiveSubscription(pending.shop, pending.accessToken);
-      if (subscriptionOutcome(checked) === "plan_page" && !checked.active) {
-        console.warn(`[connect] shopify finish sent to Shopify's plan page (${checked.reason})`);
-        const toPlan = NextResponse.redirect(planSelectionUrl(pending.shop, appHandle, pending.storeHandle));
-        toPlan.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
-        toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
-        return toPlan;
-      }
-    }
-  }
+  const gated = await managedPricingRedirect({
+    // session.api's real type is Supabase's generic PostgrestFilterBuilder chain,
+    // which is structurally compatible with HealthCheckApi but deep enough that
+    // tsc's structural check itself blows its instantiation-depth limit (TS2589)
+    // trying to prove it. The cast is the only new-here bit; the shape it targets
+    // is intentionally narrow so a test's plain fake satisfies it without one.
+    api: session.api as unknown as HealthCheckApi,
+    pending,
+    appHandle: config.shopifyAppHandle,
+    fail,
+  });
+  if (gated) return gated;
 
   // p_refresh_secret and p_expires_at are what make the connection renewable
   // (20260919000100_connect_source_refresh.sql). Without them the row holds an
