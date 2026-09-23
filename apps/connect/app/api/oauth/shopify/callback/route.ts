@@ -13,6 +13,11 @@
  *   6. token exchange     — only now does anything leave this server
  *   7. the hand-off       — the token, sealed, to /finish, which does the write
  *
+ * Managed pricing (W6a follow-up) is NOT gated here. `middleware.ts` sends both
+ * a first-time install AND an existing client's "Open app" click through this
+ * same install-initiated path, and only /finish knows whether this tenant
+ * already has a Shopify source — see finish/route.ts's own step list.
+ *
  * Nothing before step 6 touches the network and nothing here touches the
  * database, so a forged callback costs an HMAC comparison and a redirect.
  */
@@ -32,6 +37,7 @@ import {
   safeEqual,
   sealPending,
   shopifyAppFor,
+  storeHandleFromHost,
   verifyQueryHmac,
   verifyState,
 } from "@/lib/shopify-oauth";
@@ -143,8 +149,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const exchanged = await exchange(shop, clientId, secret, code);
   if (!exchanged.ok) return fail(`exchange_${exchanged.reason}${exchangeDiagnostic(exchanged)}`);
 
-  // 7. /finish writes it. Sealed under the DEFAULT app's secret whichever app
-  // issued the token: it is our key, and /finish has no shop to choose by.
+  // 7. /finish writes it (and, for an install-initiated state on the public
+  // app, decides whether managed pricing needs to be gated first — see its own
+  // doc comment). Sealed under the DEFAULT app's secret whichever app issued
+  // the token: it is our key, and /finish has no shop to choose by. `host` is
+  // under the query HMAC verified in step 2, so it is safe to decode here even
+  // though nothing before this point trusted it.
+  const storeHandle = storeHandleFromHost(params.get("host"));
   const sealed = sealPending(
     {
       clientId: state.payload.clientId,
@@ -153,6 +164,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       accessToken: exchanged.token.accessToken,
       refreshToken: exchanged.token.refreshToken,
       expiresAt: new Date(Date.now() + exchanged.token.expiresIn * 1000).toISOString(),
+      storeHandle,
     },
     config.shopifyClientSecret!
   );

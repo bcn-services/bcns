@@ -38,12 +38,16 @@ The flow only worked when the merchant started from the hub's Connect button.
    in **before** the code is exchanged. After the exchange, the token is not written
    here. It goes into an AES-256-GCM sealed, httpOnly cookie (`shopify_pending`,
    15 min, `lib/shopify-oauth.ts` `sealPending`), and the browser is sent to `/finish`.
-4. `finish/route.ts` (new) is now the only place a Shopify token is written. A
-   signed-out browser goes to `/login?next=/api/oauth/shopify/finish`, which is the
-   only `next` value the login action follows. After sign-in the route requires an
-   **owner** and opens the cookie (`openPending`). A tenant-bound hand-off only binds
-   to its own tenant. An install hand-off binds to the owner who signed in. The route
-   then calls `api.connect_source` and sends the browser to `/?connected=shopify`.
+4. `finish/route.ts` (new) is now the only place a Shopify token is written, and the
+   only place managed pricing (below) is gated. A signed-out browser goes to
+   `/login?next=/api/oauth/shopify/finish`, which is the only `next` value the login
+   action follows. After sign-in the route requires an **owner** and opens the cookie
+   (`openPending`). A tenant-bound hand-off only binds to its own tenant. An install
+   hand-off binds to the owner who signed in. For an install hand-off on the public
+   app, the route then reads whether this tenant already has a Shopify source
+   (`connector_health_v1`) before deciding whether the managed-pricing gate applies —
+   see below. Once past that, it calls `api.connect_source` and sends the browser to
+   `/?connected=shopify`.
 5. The login page tells the merchant what is going on. It also gives someone with no
    bcns account a way forward: email bcns, then open the app again from the Shopify admin.
 
@@ -54,6 +58,29 @@ middleware.
 Also fixed along the way: `cookies.delete("shopify_oauth_state")` never cleared the
 cookie. Next sets `path=/` by default, but the cookie lives at `/api/oauth/shopify`.
 The delete calls now pass that path.
+
+**Managed-pricing follow-up (branch `shopify-managed-pricing`).** bcns Connect is
+public unlisted: hub-initiated connects stay billed off-platform (Stripe, no
+subscription check), but a Shopify-initiated install with no tenant yet needs an
+ACTIVE managed-pricing subscription before the shop is bound to one. **The gate lives
+in `finish/route.ts`, not `callback/route.ts`.** Root cause: `middleware.ts` sends
+both a first-time install AND an existing client's "Open app" click from the Shopify
+admin through the same install-initiated path (no tenant in the state) — a gate at
+`/callback` cannot tell those apart and would send every already-billed client to the
+$200 plan page. `/finish` can: signed in with a real tenant, it first reads whether
+this tenant already has a Shopify source (`connector_health_v1`); if one exists, this
+is an existing client re-binding and the gate is skipped entirely (behaves exactly as
+before this branch). Only when there is none does it query Admin GraphQL
+`currentAppInstallation.activeSubscriptions` with the merchant's own fresh token; no
+`ACTIVE` entry (or any error/timeout, ~5s time-box, or a DB error reading
+`connector_health_v1`) fails closed to Shopify's plan-selection page instead of the
+RPC write, deleting both the pending and the state cookies. The plan-selection URL is
+built from `storeHandleFromHost` (the store's admin handle, decoded from Shopify's
+`host` query param — sealed into the pending cookie at `/callback`, since a shop's
+permanent domain is not reliably its admin handle) and falls back to the shop domain
+only when `host` was absent. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is
+provably unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on
+the return trip is never trusted — only the query result is.
 
 **Needs one live check before Submit (step 3 below).** The unit tests cover every branch
 that runs without a database. The sign-in round trip and the RPC write only run on the
@@ -100,10 +127,16 @@ check that a reviewer can use it end to end. The hub's Access page issues logins
 software, but MCP sign-in for clients still needs OAuth (see memory
 `project-mcp-needs-oauth-self-service`). If it can't be shown working, leave it out.
 
-**TODO(Nate): pricing model on the listing.** $200/mo is billed by bcns, not through
-Shopify's Billing API. Check how Shopify's current App Store requirements treat a charge
-billed outside Shopify for this kind of app, and pick the matching pricing option in the
-listing form before submitting. This doc does not settle it.
+**Pricing model on the listing.** Merchants are existing bcns Connect customers
+onboarded off-platform and billed directly; a Shopify billing plan is available for any
+App Store installs. In practice: the app is **public unlisted**, hub-initiated connects
+(the normal path, Stripe billing) never touch Shopify's billing at all, and a merchant
+who installs straight from Shopify with no active plan is redirected to Shopify's
+managed-pricing plan-selection page (`$200/mo`, `shopify-managed-pricing` branch,
+§1) rather than being connected unbilled. Pick the listing-form pricing option that
+matches "managed pricing" with that plan. This supersedes the earlier plan to request
+off-platform billing approval under 1.2.1; the managed-pricing plan is the answer to
+that requirement.
 
 ---
 
@@ -169,8 +202,8 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 |---|---|
 | App URL | `https://connect.bcn-services.com` |
 | Redirect URL | `https://connect.bcn-services.com/api/oauth/shopify/callback` |
-| Privacy policy URL | `https://bcn-services.com/privacy`. **TODO(Nate), blocking:** `apps/web/app/privacy/page.tsx` is still the placeholder text "[PRIVACY POLICY BODY: Replace with your actual privacy policy before launch.]". A reviewer who opens it will reject the app. It needs a real policy covering Shopify data (the fields in §4, retention, deletion on request, contact). |
-| Terms URL (if asked) | `https://bcn-services.com/terms`. **TODO(Nate):** check that it isn't also a placeholder. |
+| Privacy policy URL | `https://bcn-services.com/privacy` — real policy live since PR #61 (merged `558087c`); **submit only after PR #62** (`legal-todos-fill`) is deployed, since until then the page still shows bracketed TODO text. |
+| Terms URL (if asked) | `https://bcn-services.com/terms` — same URL pattern and same PR #61/#62 condition as the privacy row above. |
 | Support email | `nseluga@bcn-services.com` is the only bcns contact in the repo (`BCNS_EMAIL`, `apps/connect/lib/request-connection.ts:18`, also `siteConfig.email`). **TODO(Nate):** use it or pick a support alias. `siteConfig` notes that a user-facing mailbox should be confirmed first. |
 | Support website | **TODO(Nate)**, e.g. `https://bcn-services.com`. |
 
@@ -240,16 +273,52 @@ Don't include the Access page unless §2's AI-tools check passes.
    the install flow. If the compliance webhook URLs or the eighth scope are not in the
    released app version yet, run `pnpm dlx @shopify/cli app deploy --path apps/connect`
    and release that version first.
+1b. **Create the managed-pricing plan in the Partner dashboard.** Under the app's
+   Pricing / Managed Pricing settings, create the $200/mo plan. This is what
+   `hasActiveSubscription` checks for and what the plan-selection page (§1) offers.
+1c. **Deploy `shopify.app.toml` so the `handle` field takes effect.** This branch adds
+   a top-level `handle = "bcns-connect"` to `shopify.app.toml` (confirmed valid against
+   shopify.dev's CLI app-configuration reference), which the callback route reads via
+   `SHOPIFY_APP_HANDLE` to build the plan-selection redirect. Confirm `bcns-connect`
+   matches the handle shown in the Partner dashboard, then run
+   `pnpm dlx @shopify/cli app deploy --path apps/connect` and release the new version
+   (same command as the compliance-webhook step above — one deploy covers both).
+1d. **Set `SHOPIFY_APP_HANDLE` on the droplet and restart.** Add it to
+   `/srv/connect/env` (value: the confirmed handle, e.g. `bcns-connect`), then restart
+   the connect service. Unset = a Shopify-initiated install with no active subscription
+   fails closed to the hub's generic error page instead of Shopify's plan page.
 2. **Fill in the TODOs above.** The privacy policy page is the one that blocks
-   submission. Also: the support email, the retention statement, the pricing model,
-   and the reviewer account (its own tenant plus one owner, with a dashboard link that
-   loads).
-3. **Test the install on bcns-data-dev yourself, signed out of the hub.** Uninstall
-   bcns Connect from bcns-data-dev. Open a private window and install it from the
-   Partners "Test your app" link. You should see the consent screen, then the bcns
-   sign-in page with the Shopify message. Sign in as the reviewer owner. You should
-   land on `/?connected=shopify`. In the hub logs, look for
-   `shopify finish rejected`. If that line appears, stop and don't submit.
+   submission. Also: the support email, the retention statement, and the reviewer
+   account (its own tenant plus one owner, with a dashboard link that loads).
+3. **Test the install on bcns-data-dev yourself, signed out of the hub, through both
+   entry paths.** Uninstall bcns Connect from bcns-data-dev.
+   - **Shopify-initiated, with the plan active:** open a private window and install it
+     from the Partners "Test your app" link (or the dev store's app listing). You
+     should see the consent screen, then — since the dev store should have the $200/mo
+     plan active from step 1b — the bcns sign-in page with the Shopify message. Sign in
+     as the reviewer owner. You should land on `/?connected=shopify`.
+   - **Shopify-initiated, with no plan active:** cancel/decline the dev store's
+     subscription first, then repeat the install. You should land on Shopify's own
+     plan-selection page (`admin.shopify.com/store/.../charges/bcns-connect/pricing_plans`),
+     never on the bcns sign-in page or `/?connected=shopify`.
+   - **Hub-initiated (unaffected path):** from the hub's own Connect button (signed in
+     as the reviewer owner), connect the same store. This never touches Shopify's
+     billing at all and should behave exactly as before this branch.
+   - **Existing client "Open app" from the Shopify admin:** with the dev store already
+     connected (from the case above) and its plan cancelled, click the app from the
+     Shopify admin (not a fresh install). You should land in the hub connected, never
+     on Shopify's plan page — this is the case a gate at `/callback` would have
+     gotten wrong.
+   - **A new dev-store install with the plan cancelled:** uninstall, cancel/decline the
+     subscription, then install fresh. You should land on the bcns sign-in page first,
+     and only after signing in does it redirect to Shopify's plan-selection page.
+   - **After approving the plan, Shopify's return must reopen the app through the
+     in-admin app link (signed query), not `application_url` directly** — a bare
+     `application_url` return has no `hmac`, hits the login wall, and never reaches
+     `/finish`. Confirm the welcome/return link used is the in-admin app home, not a
+     raw `application_url`.
+   In the hub logs, look for `shopify finish rejected` or `shopify callback rejected`.
+   If either line appears where you didn't expect it, stop and don't submit.
 4. **Register as an App Store publisher.** In Partners (org 5179321), go to Settings.
    Complete the publisher / business profile form (legal name, address, contact
    email, payout and tax details if asked).

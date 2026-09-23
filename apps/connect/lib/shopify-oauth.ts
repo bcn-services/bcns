@@ -17,6 +17,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { NextResponse } from "next/server";
 import { seal, unseal } from "./oauth-state";
 import type { HubConfig } from "./env"; // sb-bridge: remove after SB migrates to bcns Connect
 
@@ -360,6 +361,129 @@ export const SHOPIFY_TOKEN_KIND = "shopify_admin";
  */
 export const INSTALL_CLIENT_ID = "";
 
+/**
+ * Admin GraphQL API version for the managed-pricing subscription check below
+ * (W6a follow-up). Mirrors API_VERSION in
+ * platform/worker/src/connectors/shopify-url.ts and `[webhooks] api_version`
+ * in shopify.app.toml — not imported, for the same reason SHOPIFY_DEFAULTS
+ * above is mirrored rather than imported (apps/connect must not depend on
+ * platform/).
+ */
+const ADMIN_API_VERSION = "2026-07";
+
+const ACTIVE_SUBSCRIPTIONS_QUERY =
+  "query{currentAppInstallation{activeSubscriptions{id name status}}}";
+
+export type SubscriptionCheckResult =
+  | { active: true }
+  | {
+      active: false;
+      reason: "http_error" | "graphql_error" | "malformed" | "timeout" | "network_error" | "none_active";
+    };
+
+/**
+ * The managed-pricing gate for a Shopify-initiated install on the PUBLIC app
+ * (W6a follow-up). Hub-initiated connects are billed off-platform; an install
+ * that starts from Shopify with no active $200/mo managed-pricing
+ * subscription must land on Shopify's plan page instead of being bound to a
+ * tenant. Queried with the merchant's own fresh access token — no Partner API
+ * credential needed, matching how the worker already queries the Admin API
+ * (platform/worker/src/connectors/shopify.ts's `gql()`).
+ *
+ * Fails closed: a timeout, a non-2xx, a GraphQL error, a malformed body, or a
+ * response with no ACTIVE entry are ALL treated as "no subscription". The
+ * caller never trusts a redirect's `plan_handle`; this is the only source of
+ * truth (shopify.dev "Redirect to the plan selection page" / "Managed
+ * pricing").
+ */
+export async function hasActiveSubscription(
+  shop: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<SubscriptionCheckResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://${shop}/admin/api/${ADMIN_API_VERSION}/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+      body: JSON.stringify({ query: ACTIVE_SUBSCRIPTIONS_QUERY }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    return { active: false, reason: timedOut ? "timeout" : "network_error" };
+  }
+  if (!response.ok) return { active: false, reason: "http_error" };
+  const body = (await response.json().catch(() => null)) as
+    | { data?: { currentAppInstallation?: { activeSubscriptions?: unknown } }; errors?: unknown[] }
+    | null;
+  if (!body || (Array.isArray(body.errors) && body.errors.length)) return { active: false, reason: "graphql_error" };
+  const subs = body.data?.currentAppInstallation?.activeSubscriptions;
+  if (!Array.isArray(subs)) return { active: false, reason: "malformed" };
+  const active = subs.some((s) => (s as { status?: unknown })?.status === "ACTIVE");
+  return active ? { active: true } : { active: false, reason: "none_active" };
+}
+
+/**
+ * Decodes Shopify's `host` query param — base64url of
+ * `admin.shopify.com/store/<handle>` — into the store's admin handle.
+ * Needed because a shop's permanent domain is NOT its admin handle: SaunaBoy's
+ * admin handle is `saunaboy-2` but its permanent domain is
+ * `fa8a00-11.myshopify.com`, and newer stores get random permanent domains, so
+ * `shop.split(".")[0]` (the previous approach) is usually wrong. `host` rides
+ * on the callback query, which verifyQueryHmac has already authenticated by
+ * the time this is read. Null on a missing or malformed host; never throws.
+ */
+export function storeHandleFromHost(host: string | null): string | null {
+  if (!host) return null;
+  const decoded = Buffer.from(host, "base64url").toString("utf8");
+  return decoded.match(/^admin\.shopify\.com\/store\/([a-z0-9][a-z0-9-]*)\/?$/)?.[1] ?? null;
+}
+
+/**
+ * Where a Shopify-initiated install with no active plan is sent to pick one.
+ * `appHandle` is the `handle` field in shopify.app.toml (also read at runtime
+ * from SHOPIFY_APP_HANDLE, env.ts — Next has no access to the toml).
+ * `storeHandle` (storeHandleFromHost above) is preferred over `shop`, which is
+ * only a valid fallback for the rare case `host` was absent — Shopify itself
+ * redirects the legacy `/admin/charges/...` path to the correct
+ * admin.shopify.com URL. Source: shopify.dev "Redirect to the plan selection
+ * page" / "Managed pricing".
+ */
+export function planSelectionUrl(shop: string, appHandle: string, storeHandle: string | null): string {
+  return storeHandle
+    ? `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`
+    : `https://${shop}/admin/charges/${appHandle}/pricing_plans`;
+}
+
+/**
+ * Whether a Shopify-initiated hand-off (install-initiated, `clientId ===
+ * INSTALL_CLIENT_ID`) on the PUBLIC app needs the managed-pricing gate before
+ * /finish writes it. Excludes the bridge app (SB, `app === ALT_APP`) and — the
+ * W6a follow-up fix — an EXISTING client re-binding: `middleware.ts` sends
+ * both a first-time install AND an existing client's "Open app" click from the
+ * Shopify admin through this same install-initiated path, so gating on
+ * `clientId` alone would send every real, already-billed client to the $200
+ * plan page. `alreadyConnected` is the caller's read of whether this tenant
+ * already has a Shopify source (a DB read, so it lives in the route, not
+ * here). Pure and exhaustively unit-testable — every other branch in this
+ * decision already lives in this file for the same reason.
+ */
+export function managedPricingGate(pending: { clientId: string; app?: string }, alreadyConnected: boolean): boolean {
+  return pending.clientId === INSTALL_CLIENT_ID && pending.app !== ALT_APP && !alreadyConnected;
+}
+
+/**
+ * The single place "does an ACTIVE subscription mean we write?" is decided —
+ * finish/route.ts calls this rather than re-testing `checked.active` inline,
+ * so the whole managed-pricing decision (gate AND outcome) is pure and
+ * unit-tested, not just the fetch that feeds it.
+ */
+export function subscriptionOutcome(checked: SubscriptionCheckResult): "write" | "plan_page" {
+  return checked.active ? "write" : "plan_page";
+}
+
 /** Where every handshake ends; the only `next` the login page will follow. */
 export const FINISH_PATH = "/api/oauth/shopify/finish";
 
@@ -378,6 +502,13 @@ export interface PendingConnection {
   refreshToken: string;
   /** ISO time the access token dies, fixed at exchange time. */
   expiresAt: string;
+  /**
+   * The store's admin handle, decoded at /callback from Shopify's `host` query
+   * param (storeHandleFromHost). Not a secret — carried through only because
+   * /finish, not /callback, is where the managed-pricing redirect is now
+   * built, and /finish has no query string of its own to read it from.
+   */
+  storeHandle: string | null;
   /** Epoch ms the cookie stops being honoured. */
   exp: number;
 }
@@ -413,8 +544,74 @@ export function openPending(
 ): PendingResult {
   const opened = unseal(sealed, secret, PENDING_LABEL, now);
   if (!opened.ok) return opened;
-  const pending = opened.value as unknown as PendingConnection;
-  if (typeof pending.clientId !== "string" || !normalizeShop(pending.shop)) return { ok: false, reason: "malformed" };
-  if (pending.clientId !== INSTALL_CLIENT_ID && pending.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
+  const raw = opened.value as unknown as PendingConnection;
+  if (typeof raw.clientId !== "string" || !normalizeShop(raw.shop)) return { ok: false, reason: "malformed" };
+  if (raw.clientId !== INSTALL_CLIENT_ID && raw.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
+  // A cookie sealed by a deploy before storeHandle existed on PendingConnection
+  // decodes with that key simply absent (undefined), not null — coalesce so it
+  // still matches the `string | null` field instead of smuggling undefined through.
+  const pending: PendingConnection = { ...raw, storeHandle: raw.storeHandle ?? null };
   return { ok: true, pending };
+}
+
+/**
+ * The narrow shape /finish's connector_health_v1 existence check needs from
+ * `session.api` — deliberately not the full Supabase schema type, so a test
+ * can satisfy it with a plain fake instead of a real client.
+ */
+export interface HealthCheckApi {
+  from(table: string): {
+    select(columns: string): {
+      eq(column: string, value: string): {
+        limit(count: number): PromiseLike<{ data: unknown[] | null; error: { message?: string } | null }>;
+      };
+    };
+  };
+}
+
+/**
+ * The whole managed-pricing decision for one /finish request, extracted out of
+ * the route so it is testable without a server or a database (route.ts just
+ * calls this and returns whatever it gets back). `null` means "proceed to the
+ * write"; anything else is what the route should return instead.
+ *
+ * `fail` is the route's own fail() closure (builds the generic error redirect
+ * and clears the pending cookie) — passed in rather than duplicated here, and
+ * trivially fakeable in a test.
+ */
+export async function managedPricingRedirect(params: {
+  api: HealthCheckApi;
+  pending: PendingConnection;
+  appHandle: string | undefined;
+  fail: (code: string) => NextResponse;
+  fetchImpl?: typeof fetch;
+}): Promise<NextResponse | null> {
+  const { api, pending, appHandle, fail, fetchImpl = fetch } = params;
+
+  // Only an install-initiated pending on the public app can possibly need the
+  // gate — skip the DB round trip entirely for a tenant-bound or bridge finish.
+  if (pending.clientId !== INSTALL_CLIENT_ID || pending.app === ALT_APP) return null;
+
+  const existing = await api.from("connector_health_v1").select("source").eq("source", "shopify").limit(1);
+  // A DB error here must NOT read as "no source found": that would gate an
+  // existing, already-connected, paying client to the $200 plan page on a mere
+  // read hiccup. Fail closed to the generic error page instead.
+  if (existing.error) return fail("health_read");
+  const alreadyConnected = Array.isArray(existing.data) && existing.data.length > 0;
+
+  if (!managedPricingGate(pending, alreadyConnected)) return null;
+  if (!appHandle) return fail("plan_handle_unconfigured");
+
+  const checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
+  // subscriptionOutcome is the pure "write vs plan_page" decision; the
+  // `!checked.active` re-check exists only so TS narrows `checked` to the
+  // branch that carries `.reason`, for the log line below.
+  if (subscriptionOutcome(checked) === "plan_page" && !checked.active) {
+    console.warn(`[connect] shopify finish sent to Shopify's plan page (${checked.reason}) shop=${pending.shop}`);
+    const toPlan = NextResponse.redirect(planSelectionUrl(pending.shop, appHandle, pending.storeHandle));
+    toPlan.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
+    toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
+    return toPlan;
+  }
+  return null;
 }

@@ -6,6 +6,19 @@
  * the usual case after a Shopify-initiated install — goes to /login, which sends
  * the owner straight back here. Binding needs a signed-in OWNER, and a
  * tenant-bound handshake binds only to its own tenant (openPending).
+ *
+ * Managed pricing (W6a follow-up) is gated HERE, not at /callback. `middleware.ts`
+ * sends both a first-time install AND an existing client's "Open app" click from
+ * the Shopify admin through the same install-initiated path (clientId ===
+ * INSTALL_CLIENT_ID), and only here — signed in, with a real tenant — can we tell
+ * those apart: `alreadyConnected` reads whether this tenant already has a Shopify
+ * source before deciding anything. A DB error on that read fails closed to the
+ * generic error page (never silently treated as "no source" — that would gate an
+ * existing paying client). The bridge app (SB, `app === ALT_APP`) and any
+ * tenant-bound (hub-initiated) pending are never gated — untouched, no network
+ * call, straight to the RPC as before. The whole decision is
+ * lib/shopify-oauth.ts's `managedPricingRedirect`, unit-tested there with a fake
+ * `api` and a fake fetch.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -16,8 +29,10 @@ import {
   PENDING_COOKIE,
   SHOPIFY_DEFAULTS,
   SHOPIFY_TOKEN_KIND,
+  managedPricingRedirect,
   openPending,
   scheduleConfig,
+  type HealthCheckApi,
 } from "@/lib/shopify-oauth";
 import { oauthEnabled } from "@/lib/oauth-config";
 
@@ -56,6 +71,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const opened = openPending(sealed, config.shopifyClientSecret!, session.membership.clientId);
   if (!opened.ok) return fail(opened.reason);
   const { pending } = opened;
+
+  const gated = await managedPricingRedirect({
+    // session.api's real type is Supabase's generic PostgrestFilterBuilder chain,
+    // which is structurally compatible with HealthCheckApi but deep enough that
+    // tsc's structural check itself blows its instantiation-depth limit (TS2589)
+    // trying to prove it. The cast is the only new-here bit; the shape it targets
+    // is intentionally narrow so a test's plain fake satisfies it without one.
+    api: session.api as unknown as HealthCheckApi,
+    pending,
+    appHandle: config.shopifyAppHandle,
+    fail,
+  });
+  if (gated) return gated;
 
   // p_refresh_secret and p_expires_at are what make the connection renewable
   // (20260919000100_connect_source_refresh.sql). Without them the row holds an
