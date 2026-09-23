@@ -131,17 +131,39 @@ for (const phrase of FORBIDDEN_PHRASES) {
 }
 
 // ---------------------------------------------------------------------------
-// [2b] Every unresolved fact is a visible [TODO: ...], never a silent gap
+// [2b] Every unresolved fact is a visible [TODO: ...], never a silent gap.
+// As of the legal-todos-fill pass, all facts are resolved, so none should
+// remain; if a future edit reintroduces a gap it must still be bracketed.
 // ---------------------------------------------------------------------------
 console.log("\n[2b] TODO placeholders are visibly wrapped");
 const todoMatches = legalBlock.match(/\[TODO:[^\]]*\]/g) || [];
-assert("at least one [TODO: ...] placeholder exists", todoMatches.length > 0);
 // A bare "TODO" with no brackets would render as a naked, non-obvious gap.
 const bareTodo = legalBlock.match(/(?<!\[)TODO(?!:[^\]]*\])/g) || [];
 assert(
   "no unbracketed TODO in legal copy",
   bareTodo.length === 0,
   `found: ${JSON.stringify(bareTodo)}`
+);
+
+// ---------------------------------------------------------------------------
+// [2c] All facts resolved: no [TODO placeholders left in the rendered
+// /privacy or /terms output (legal-todos-fill closed the last 6)
+// ---------------------------------------------------------------------------
+console.log("\n[2c] No [TODO placeholders remain in privacy/terms output");
+const privacyLegalBlock = legalBlock.slice(
+  legalBlock.indexOf("privacy: {"),
+  legalBlock.indexOf("\n    terms: {")
+);
+const termsLegalBlock = legalBlock.slice(legalBlock.indexOf("\n    terms: {"));
+assert(
+  "rendered /privacy output contains no [TODO",
+  !privacyLegalBlock.includes("[TODO"),
+  `found: ${JSON.stringify(privacyLegalBlock.match(/\[TODO[^\]]*\]/g) || [])}`
+);
+assert(
+  "rendered /terms output contains no [TODO",
+  !termsLegalBlock.includes("[TODO"),
+  `found: ${JSON.stringify(termsLegalBlock.match(/\[TODO[^\]]*\]/g) || [])}`
 );
 
 // ---------------------------------------------------------------------------
