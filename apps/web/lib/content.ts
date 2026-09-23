@@ -589,7 +589,7 @@ export const siteContent: SiteContent = {
       {
         question: "What happens if I want to cancel?",
         answer:
-          "You are free to cancel any time. Your access continues for 30 days after you cancel, then the service ends; you can get an export of your data any time before then.",
+          "You are free to cancel any time. Your access continues for 30 days after you cancel, then the service ends; you can request an export of your data any time before it is deleted, about 60 days after you cancel.",
       },
       {
         question: "What is bcns Connect?",
@@ -660,6 +660,17 @@ export const siteContent: SiteContent = {
   // platform/scripts/hard-delete.ts on the `retention-30d` branch, merged
   // to `main` as PR #60 (https://github.com/bcn-services/bcns/pull/60,
   // main 558087c). This copy is accurate as shipped.
+  // Deletion is operator-run: nothing schedules hard-delete.ts; the 30-day
+  // figure is when the script permits deletion, and running it promptly is
+  // an operating practice (Shopify §6.2.3 requires deletion within 30 days
+  // of uninstall).
+  //
+  // MAINTAINER NOTE (not rendered): the 30-day access after cancellation
+  // (FAQ, terms) is an operating practice, not a platform state: the
+  // platform has only `clients.status = churned` (R34, logins and syncs
+  // stop at the next tick). The operator marks the client churned 30 days
+  // after the cancel email, so "account ends" = churned_at, and deletion
+  // is permitted 30 days after that.
   //
   // MAINTAINER NOTE (not rendered): "stored in the United States" (privacy,
   // "Where your data is stored") is confirmed: droplet and Spaces are
@@ -672,7 +683,8 @@ export const siteContent: SiteContent = {
   // up yet, and the hub has no acceptance step today. The sentence is only
   // true once both ship: Stripe Checkout setup, and a hub "By signing in
   // you agree" line (a later PR). The "Who we share it with" list's Stripe
-  // entry is pending the same Stripe Checkout setup.
+  // entry, the terms' "Fees and billing" line, and the FAQ deliberately
+  // omit or soften Stripe until Checkout is live.
   legal: {
     privacy: {
       eyebrow: "Privacy",
@@ -734,7 +746,7 @@ export const siteContent: SiteContent = {
             "Web3Forms: delivers the marketing site's contact form",
             "Cloudflare: provides DNS and TLS for some client apps",
             "Vercel: hosts this marketing site",
-            "Stripe: processes subscription payments; card details go to Stripe, never to bcns",
+            "Stripe: will process subscription payments once we take card payments; card details go to Stripe, never to bcns",
           ],
         },
         {
@@ -750,7 +762,7 @@ export const siteContent: SiteContent = {
             "While your account is active, we keep your connected data current and available.",
             "Thirty days after your account ends, we delete the copy of your connected-source data that we hold. We don't keep an archive or backup export of it after that.",
             "During those 30 days, you can ask us for an export of your data.",
-            "Backup copies our database provider keeps as part of normal operations are fully gone within 7 days after we delete your data.",
+            "Backup copies our database provider keeps as part of normal operations roll off on its normal backup rotation, currently 7 days, after we delete your data.",
           ],
         },
         {
@@ -878,7 +890,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Fees and billing",
           body: [
-            "bcns Connect is $200 a month with no setup fee, billed by bcns through Stripe. Deluxe builds and AI consulting are billed per their Order Form.",
+            "bcns Connect is $200 a month with no setup fee, billed by bcns. Deluxe builds and AI consulting are billed per their Order Form.",
             "You're responsible for any taxes on top of the listed price. If a payment fails, we may suspend the Services until it's resolved.",
             "If we change our pricing, we'll give you reasonable advance notice before the new price takes effect.",
           ],
