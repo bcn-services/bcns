@@ -103,11 +103,16 @@ steps are in `chunk5-windows.md` §W6a.
    **Client secret** (click "Show" first) appear. Client ID → paste into the W2
    Claude session. Client secret → GitHub secrets + hub env directly, never into
    Claude.
-6. **Distribution**: set to **Custom distribution** — this is what "unlisted" means
-   here: bcns generates one install link, any client's store owner with
-   app-install permission uses it, and it never appears on the Shopify App Store.
-   Custom-distribution apps still go through Shopify's scope/protected-data review
-   because the app installs on merchants outside bcns's own store.
+6. **Superseded 2026-09-23 — this step is wrong.** "Custom distribution" and
+   "public, unlisted" are not the same thing: custom distribution is scoped to
+   one named store and cannot be reused across clients, which is why it was the
+   wrong choice here. The decision is a **public, unlisted** app instead — every
+   client can install it via a shared link, it still never appears on the
+   Shopify App Store — with Shopify's $200/mo managed-pricing plan kept only as
+   a fallback; real clients are billed through Stripe, not Shopify billing.
+   Custom-distribution apps still go through Shopify's scope/protected-data
+   review because the app installs on merchants outside bcns's own store, and
+   so does a public unlisted app.
 7. Because `read_customers` is requested, also file for **Protected Customer Data**
    access: **App setup** → **API access request** (or **Protected customer data**
    section) → describe the use case (order attribution to a customer record) and

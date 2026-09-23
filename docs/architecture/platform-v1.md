@@ -119,7 +119,9 @@ Done when `/library` lists Drive-sourced rows with a working link, no code path 
 - Shopify: Partner app to public-unlisted (or a new app); `/oauth/shopify/start` + `/callback` in the hub with state + HMAC; token written to the existing token row for that client; the three GDPR webhooks with HMAC verify; privacy/terms URLs (exist on the site); dev-store pass; submit for review.
 - Meta: app with Facebook Login for Business, `ads_read`, long-lived token exchange → token row; data-deletion callback URL; business verification; app review submission.
 - Monday: OAuth app (light review).
-- Google: later. Internal-app path stays. Restricted Drive scope verification is its own project.
+- Google: one Trusted External app, built alongside the other three above. SB stays on the
+  Internal app. CASA (restricted Drive scope verification) is deferred on the trigger recorded
+  above under "Deferred, with triggers".
 - Connector side: **not** the existing `refreshToken` hook — that was the plan, and it was wrong.
   Shopify's Admin API rejects non-expiring tokens outright (403), so `/callback` must request
   `expiring: "1"` (#38) and gets back an access token good for 3600s plus a refresh token good for
@@ -239,7 +241,13 @@ already present; `@modelcontextprotocol/sdk` **approved 2026-09-20**, that one i
 
 - Own REST facade with API keys and metering — usage-based billing or leaving Supabase.
 - OAuth 2.1 on the MCP server — an agent product that cannot pass a bearer token.
-- Google OAuth app with restricted-scope verification — second client on Drive/Meet.
+- Google OAuth app with CASA verification — triggered by the first client with no Google
+  Workspace of their own, or by a client admin who refuses to mark the bcns app Trusted.
+  Decided 2026-09-23: SB stays Internal; every other client's Workspace admin marks one
+  bcns External app Trusted in their own Workspace, which is exempt from Google's
+  verification requirement — so "second client on Drive/Meet" alone is not the trigger,
+  only losing that exemption is. CASA AL1 (~$700) covers roughly the first 2-3 years;
+  AL2 is $5,400.
 - Flatten `platform/` into root `supabase/` and `worker/` — when the nesting costs a session.
 - Extract a client app to its own repo — a client wants code ownership or a contractor needs isolated access.
 - Move marketing off Vercel — only if the Hobby plan's non-commercial rule becomes a problem. Then static export served by nginx on the droplet (already supported by `pnpm --filter @bcn-services/web export`), not a Node process, or Vercel Pro. Never a reason to put the app on Vercel: schedules and long-running processes stay on the droplet and Cloud Run.
