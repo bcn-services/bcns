@@ -134,7 +134,9 @@ App Store installs. In practice: the app is **public unlisted**, hub-initiated c
 who installs straight from Shopify with no active plan is redirected to Shopify's
 managed-pricing plan-selection page (`$200/mo`, `shopify-managed-pricing` branch,
 §1) rather than being connected unbilled. Pick the listing-form pricing option that
-matches "managed pricing" with that plan.
+matches "managed pricing" with that plan. This supersedes the earlier plan to request
+off-platform billing approval under 1.2.1; the managed-pricing plan is the answer to
+that requirement.
 
 ---
 
@@ -200,8 +202,8 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 |---|---|
 | App URL | `https://connect.bcn-services.com` |
 | Redirect URL | `https://connect.bcn-services.com/api/oauth/shopify/callback` |
-| Privacy policy URL | `https://bcn-services.com/privacy`. **TODO(Nate), blocking:** `apps/web/app/privacy/page.tsx` is still the placeholder text "[PRIVACY POLICY BODY: Replace with your actual privacy policy before launch.]". A reviewer who opens it will reject the app. It needs a real policy covering Shopify data (the fields in §4, retention, deletion on request, contact). |
-| Terms URL (if asked) | `https://bcn-services.com/terms`. **TODO(Nate):** check that it isn't also a placeholder. |
+| Privacy policy URL | `https://bcn-services.com/privacy` — real policy live since PR #61 (merged `558087c`); **submit only after PR #62** (`legal-todos-fill`) is deployed, since until then the page still shows bracketed TODO text. |
+| Terms URL (if asked) | `https://bcn-services.com/terms` — same URL pattern and same PR #61/#62 condition as the privacy row above. |
 | Support email | `nseluga@bcn-services.com` is the only bcns contact in the repo (`BCNS_EMAIL`, `apps/connect/lib/request-connection.ts:18`, also `siteConfig.email`). **TODO(Nate):** use it or pick a support alias. `siteConfig` notes that a user-facing mailbox should be confirmed first. |
 | Support website | **TODO(Nate)**, e.g. `https://bcn-services.com`. |
 
