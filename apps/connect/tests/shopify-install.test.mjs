@@ -472,10 +472,10 @@ test("finish: signed out keeps the hand-off and sends the merchant to sign in, t
 function fakeApi(result) {
   let calls = 0;
   const api = {
-    from: (_table) => ({
-      select: (_cols) => ({
-        eq: (_col, _val) => ({
-          limit: (_n) => {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          limit: () => {
             calls++;
             return Promise.resolve(result);
           },
