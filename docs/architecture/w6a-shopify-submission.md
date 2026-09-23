@@ -55,6 +55,17 @@ Also fixed along the way: `cookies.delete("shopify_oauth_state")` never cleared 
 cookie. Next sets `path=/` by default, but the cookie lives at `/api/oauth/shopify`.
 The delete calls now pass that path.
 
+**Managed-pricing follow-up (branch `shopify-managed-pricing`).** bcns Connect is
+public unlisted: hub-initiated connects stay billed off-platform (Stripe, no
+subscription check), but a Shopify-initiated install now needs an ACTIVE managed-pricing
+subscription before the shop is bound to a tenant. After the token exchange,
+`callback/route.ts` queries Admin GraphQL `currentAppInstallation.activeSubscriptions`
+with the merchant's own fresh token; no `ACTIVE` entry (or any error/timeout, ~5s
+time-box) redirects to Shopify's plan-selection page instead of `/finish`, and no
+pending cookie is set. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is provably
+unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on the return
+trip is never trusted — only the query result is.
+
 **Needs one live check before Submit (step 3 below).** The unit tests cover every branch
 that runs without a database. The sign-in round trip and the RPC write only run on the
 live hub.
@@ -100,10 +111,14 @@ check that a reviewer can use it end to end. The hub's Access page issues logins
 software, but MCP sign-in for clients still needs OAuth (see memory
 `project-mcp-needs-oauth-self-service`). If it can't be shown working, leave it out.
 
-**TODO(Nate): pricing model on the listing.** $200/mo is billed by bcns, not through
-Shopify's Billing API. Check how Shopify's current App Store requirements treat a charge
-billed outside Shopify for this kind of app, and pick the matching pricing option in the
-listing form before submitting. This doc does not settle it.
+**Pricing model on the listing.** Merchants are existing bcns Connect customers
+onboarded off-platform and billed directly; a Shopify billing plan is available for any
+App Store installs. In practice: the app is **public unlisted**, hub-initiated connects
+(the normal path, Stripe billing) never touch Shopify's billing at all, and a merchant
+who installs straight from Shopify with no active plan is redirected to Shopify's
+managed-pricing plan-selection page (`$200/mo`, `shopify-managed-pricing` branch,
+§1) rather than being connected unbilled. Pick the listing-form pricing option that
+matches "managed pricing" with that plan.
 
 ---
 
@@ -240,16 +255,39 @@ Don't include the Access page unless §2's AI-tools check passes.
    the install flow. If the compliance webhook URLs or the eighth scope are not in the
    released app version yet, run `pnpm dlx @shopify/cli app deploy --path apps/connect`
    and release that version first.
+1b. **Create the managed-pricing plan in the Partner dashboard.** Under the app's
+   Pricing / Managed Pricing settings, create the $200/mo plan. This is what
+   `hasActiveSubscription` checks for and what the plan-selection page (§1) offers.
+1c. **Deploy `shopify.app.toml` so the `handle` field takes effect.** This branch adds
+   a top-level `handle = "bcns-connect"` to `shopify.app.toml` (confirmed valid against
+   shopify.dev's CLI app-configuration reference), which the callback route reads via
+   `SHOPIFY_APP_HANDLE` to build the plan-selection redirect. Confirm `bcns-connect`
+   matches the handle shown in the Partner dashboard, then run
+   `pnpm dlx @shopify/cli app deploy --path apps/connect` and release the new version
+   (same command as the compliance-webhook step above — one deploy covers both).
+1d. **Set `SHOPIFY_APP_HANDLE` on the droplet and restart.** Add it to
+   `/srv/connect/env` (value: the confirmed handle, e.g. `bcns-connect`), then restart
+   the connect service. Unset = a Shopify-initiated install with no active subscription
+   fails closed to the hub's generic error page instead of Shopify's plan page.
 2. **Fill in the TODOs above.** The privacy policy page is the one that blocks
-   submission. Also: the support email, the retention statement, the pricing model,
-   and the reviewer account (its own tenant plus one owner, with a dashboard link that
-   loads).
-3. **Test the install on bcns-data-dev yourself, signed out of the hub.** Uninstall
-   bcns Connect from bcns-data-dev. Open a private window and install it from the
-   Partners "Test your app" link. You should see the consent screen, then the bcns
-   sign-in page with the Shopify message. Sign in as the reviewer owner. You should
-   land on `/?connected=shopify`. In the hub logs, look for
-   `shopify finish rejected`. If that line appears, stop and don't submit.
+   submission. Also: the support email, the retention statement, and the reviewer
+   account (its own tenant plus one owner, with a dashboard link that loads).
+3. **Test the install on bcns-data-dev yourself, signed out of the hub, through both
+   entry paths.** Uninstall bcns Connect from bcns-data-dev.
+   - **Shopify-initiated, with the plan active:** open a private window and install it
+     from the Partners "Test your app" link (or the dev store's app listing). You
+     should see the consent screen, then — since the dev store should have the $200/mo
+     plan active from step 1b — the bcns sign-in page with the Shopify message. Sign in
+     as the reviewer owner. You should land on `/?connected=shopify`.
+   - **Shopify-initiated, with no plan active:** cancel/decline the dev store's
+     subscription first, then repeat the install. You should land on Shopify's own
+     plan-selection page (`admin.shopify.com/store/.../charges/bcns-connect/pricing_plans`),
+     never on the bcns sign-in page or `/?connected=shopify`.
+   - **Hub-initiated (unaffected path):** from the hub's own Connect button (signed in
+     as the reviewer owner), connect the same store. This never touches Shopify's
+     billing at all and should behave exactly as before this branch.
+   In the hub logs, look for `shopify finish rejected` or `shopify callback rejected`.
+   If either line appears where you didn't expect it, stop and don't submit.
 4. **Register as an App Store publisher.** In Partners (org 5179321), go to Settings.
    Complete the publisher / business profile form (legal name, address, contact
    email, payout and tax details if asked).
