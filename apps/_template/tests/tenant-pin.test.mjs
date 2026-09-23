@@ -46,3 +46,21 @@ test("middleware.ts routes deny to a denial, not to an unpinned tenantMiddleware
   assert.match(src, /error=misconfigured/, "deny must send the browser to the login error");
   assert.match(src, /status:\s*500/, "deny must 500 for /api/* callers");
 });
+
+test("misconfigured-env redirect: a signed-out POST must not replay as a POST to /login (303), a GET keeps 307", () => {
+  // Same constraint as the test above: middleware.ts is an edge module (its
+  // @bcn-services/tenant import has no built dist/ here), so this is a text
+  // check, not a live call — same rule @bcn-services/tenant's own redirectTo
+  // uses, verified live in packages/tenant/tests/middleware.test.mjs.
+  const src = readFileSync(new URL("../middleware.ts", import.meta.url), "utf8");
+  assert.match(
+    src,
+    /request\.method === "GET" \|\| request\.method === "HEAD" \? 307 : 303/,
+    "the misconfigured redirect must use 303 for a non-GET/HEAD request, 307 for GET/HEAD"
+  );
+  assert.match(
+    src,
+    /NextResponse\.redirect\(new URL\(`\$\{LOGIN_PATH\}\?error=misconfigured`, request\.url\), status\)/,
+    "the misconfigured redirect must actually pass that computed status, not a hardcoded one"
+  );
+});

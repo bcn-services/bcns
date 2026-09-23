@@ -27,7 +27,12 @@ export async function middleware(request: NextRequest) {
       );
     }
     if (request.nextUrl.pathname === LOGIN_PATH) return NextResponse.next();
-    return NextResponse.redirect(new URL(`${LOGIN_PATH}?error=misconfigured`, request.url));
+    // Same rule as @bcn-services/tenant's redirectTo: NextResponse.redirect()
+    // defaults to 307, which replays a non-GET/HEAD (a POST on a misconfigured
+    // deploy) as a POST against /login. 303 forces the browser's follow-up to a
+    // GET; GET/HEAD keep 307 (no behavioural change for the common case).
+    const status = request.method === "GET" || request.method === "HEAD" ? 307 : 303;
+    return NextResponse.redirect(new URL(`${LOGIN_PATH}?error=misconfigured`, request.url), status);
   }
   const opts = decision.kind === "pin" ? { expectedClientId: decision.clientId } : {};
   return tenantMiddleware(opts)(request);
