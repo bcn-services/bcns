@@ -109,10 +109,19 @@ assert(
 );
 // {cardTitleBio} / {cardTitleCredentials} wiring checks removed — no successor
 // field after the B2 rework (see note above).
+//
+// about.description is no longer rendered inside about-founder.tsx itself —
+// it moved to the page-level PageHead (app/about/page.tsx), matching the
+// "section heading lives in the page's PageHead" comment at the top of this
+// file. Check the wiring where it actually lives now.
+const aboutPageSrc = readFileSync(
+  join(__dirname, "../app/about/page.tsx"),
+  "utf8",
+);
 assert(
-  "about-founder.tsx passes description to SectionHeading",
-  aboutFounderSrc.includes("description={description}"),
-  "description not wired to SectionHeading",
+  "app/about/page.tsx passes about.description to PageHead",
+  aboutPageSrc.includes("description={about.description}"),
+  "description not wired to PageHead",
 );
 
 // ---------------------------------------------------------------------------
