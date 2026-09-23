@@ -17,6 +17,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { NextResponse } from "next/server";
 import { seal, unseal } from "./oauth-state";
 import type { HubConfig } from "./env"; // sb-bridge: remove after SB migrates to bcns Connect
 
@@ -551,4 +552,66 @@ export function openPending(
   // still matches the `string | null` field instead of smuggling undefined through.
   const pending: PendingConnection = { ...raw, storeHandle: raw.storeHandle ?? null };
   return { ok: true, pending };
+}
+
+/**
+ * The narrow shape /finish's connector_health_v1 existence check needs from
+ * `session.api` — deliberately not the full Supabase schema type, so a test
+ * can satisfy it with a plain fake instead of a real client.
+ */
+export interface HealthCheckApi {
+  from(table: string): {
+    select(columns: string): {
+      eq(column: string, value: string): {
+        limit(count: number): PromiseLike<{ data: unknown[] | null; error: { message?: string } | null }>;
+      };
+    };
+  };
+}
+
+/**
+ * The whole managed-pricing decision for one /finish request, extracted out of
+ * the route so it is testable without a server or a database (route.ts just
+ * calls this and returns whatever it gets back). `null` means "proceed to the
+ * write"; anything else is what the route should return instead.
+ *
+ * `fail` is the route's own fail() closure (builds the generic error redirect
+ * and clears the pending cookie) — passed in rather than duplicated here, and
+ * trivially fakeable in a test.
+ */
+export async function managedPricingRedirect(params: {
+  api: HealthCheckApi;
+  pending: PendingConnection;
+  appHandle: string | undefined;
+  fail: (code: string) => NextResponse;
+  fetchImpl?: typeof fetch;
+}): Promise<NextResponse | null> {
+  const { api, pending, appHandle, fail, fetchImpl = fetch } = params;
+
+  // Only an install-initiated pending on the public app can possibly need the
+  // gate — skip the DB round trip entirely for a tenant-bound or bridge finish.
+  if (pending.clientId !== INSTALL_CLIENT_ID || pending.app === ALT_APP) return null;
+
+  const existing = await api.from("connector_health_v1").select("source").eq("source", "shopify").limit(1);
+  // A DB error here must NOT read as "no source found": that would gate an
+  // existing, already-connected, paying client to the $200 plan page on a mere
+  // read hiccup. Fail closed to the generic error page instead.
+  if (existing.error) return fail("health_read");
+  const alreadyConnected = Array.isArray(existing.data) && existing.data.length > 0;
+
+  if (!managedPricingGate(pending, alreadyConnected)) return null;
+  if (!appHandle) return fail("plan_handle_unconfigured");
+
+  const checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
+  // subscriptionOutcome is the pure "write vs plan_page" decision; the
+  // `!checked.active` re-check exists only so TS narrows `checked` to the
+  // branch that carries `.reason`, for the log line below.
+  if (subscriptionOutcome(checked) === "plan_page" && !checked.active) {
+    console.warn(`[connect] shopify finish sent to Shopify's plan page (${checked.reason}) shop=${pending.shop}`);
+    const toPlan = NextResponse.redirect(planSelectionUrl(pending.shop, appHandle, pending.storeHandle));
+    toPlan.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
+    toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
+    return toPlan;
+  }
+  return null;
 }
