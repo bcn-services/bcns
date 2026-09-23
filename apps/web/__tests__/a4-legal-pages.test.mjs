@@ -136,7 +136,6 @@ for (const phrase of FORBIDDEN_PHRASES) {
 // remain; if a future edit reintroduces a gap it must still be bracketed.
 // ---------------------------------------------------------------------------
 console.log("\n[2b] TODO placeholders are visibly wrapped");
-const todoMatches = legalBlock.match(/\[TODO:[^\]]*\]/g) || [];
 // A bare "TODO" with no brackets would render as a naked, non-obvious gap.
 const bareTodo = legalBlock.match(/(?<!\[)TODO(?!:[^\]]*\])/g) || [];
 assert(
