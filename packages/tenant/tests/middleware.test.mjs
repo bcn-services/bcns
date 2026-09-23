@@ -190,6 +190,19 @@ test("behind nginx: the redirect uses the Host header, not the internal server o
   assert.equal(response.headers.get("location"), "https://sb.bcn-services.com/login");
 });
 
+test("signed out POST: redirected to /login with 303, not 307 (must not replay the POST)", async () => {
+  const req = request("/dashboard");
+  const postReq = new NextRequest(req, { method: "POST" });
+  const response = await tenantMiddleware()(postReq);
+  assert.equal(response.status, 303);
+  assert.equal(new URL(response.headers.get("location")).pathname, "/login");
+});
+
+test("signed out GET: keeps 307 (no behavioural change for the common case)", async () => {
+  const response = await tenantMiddleware()(request("/dashboard"));
+  assert.equal(response.status, 307);
+});
+
 test("behind nginx: X-Forwarded-Host is ignored (nginx passes it through, so it is client-controlled)", async () => {
   const req = new NextRequest("https://localhost:3101/dashboard", {
     headers: { host: "sb.bcn-services.com", "x-forwarded-proto": "https", "x-forwarded-host": "evil.example" },

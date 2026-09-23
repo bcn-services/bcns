@@ -68,7 +68,13 @@ export function tenantMiddleware(
       return `${proto}://${host}`;
     };
     const redirectTo = (target: string): NextResponse => {
-      const redirect = NextResponse.redirect(new URL(target, publicOrigin()));
+      // A non-GET/HEAD request (a server action or form POST on an expired
+      // session) must NOT be replayed as a POST to /login: NextResponse.redirect()
+      // defaults to 307, which preserves method and body on redirect. 303 forces
+      // the browser to follow up with a GET instead. GET/HEAD keep 307 (no
+      // behavioural change) since there is no body to misreplay.
+      const status = request.method === "GET" || request.method === "HEAD" ? 307 : 303;
+      const redirect = NextResponse.redirect(new URL(target, publicOrigin()), status);
       for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
       return redirect;
     };
