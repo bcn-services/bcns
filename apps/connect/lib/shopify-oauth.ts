@@ -543,8 +543,12 @@ export function openPending(
 ): PendingResult {
   const opened = unseal(sealed, secret, PENDING_LABEL, now);
   if (!opened.ok) return opened;
-  const pending = opened.value as unknown as PendingConnection;
-  if (typeof pending.clientId !== "string" || !normalizeShop(pending.shop)) return { ok: false, reason: "malformed" };
-  if (pending.clientId !== INSTALL_CLIENT_ID && pending.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
+  const raw = opened.value as unknown as PendingConnection;
+  if (typeof raw.clientId !== "string" || !normalizeShop(raw.shop)) return { ok: false, reason: "malformed" };
+  if (raw.clientId !== INSTALL_CLIENT_ID && raw.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
+  // A cookie sealed by a deploy before storeHandle existed on PendingConnection
+  // decodes with that key simply absent (undefined), not null — coalesce so it
+  // still matches the `string | null` field instead of smuggling undefined through.
+  const pending: PendingConnection = { ...raw, storeHandle: raw.storeHandle ?? null };
   return { ok: true, pending };
 }
