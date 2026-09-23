@@ -11,6 +11,14 @@
 
 client_id = "a87d4fe4a4c2b0a57d370e24f28a12bf"
 name = "bcns Connect"
+# The URL slug of the app in the Shopify admin (top-level `handle`, confirmed
+# in shopify.dev's CLI app-configuration reference). Used to build the
+# managed-pricing plan-selection redirect (W6a follow-up,
+# docs/architecture/w6a-shopify-submission.md §9): only takes effect once a
+# version with this file is deployed and released. Nate: confirm this matches
+# the handle shown in the Partner dashboard before relying on it — changing it
+# later breaks any admin link to the app.
+handle = "bcns-connect"
 application_url = "https://connect.bcn-services.com"
 
 # false since bcns-connect-4: the hub is a standalone Next.js app with no App

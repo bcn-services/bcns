@@ -360,6 +360,79 @@ export const SHOPIFY_TOKEN_KIND = "shopify_admin";
  */
 export const INSTALL_CLIENT_ID = "";
 
+/**
+ * Admin GraphQL API version for the managed-pricing subscription check below
+ * (W6a follow-up). Mirrors API_VERSION in
+ * platform/worker/src/connectors/shopify-url.ts and `[webhooks] api_version`
+ * in shopify.app.toml — not imported, for the same reason SHOPIFY_DEFAULTS
+ * above is mirrored rather than imported (apps/connect must not depend on
+ * platform/).
+ */
+const ADMIN_API_VERSION = "2026-07";
+
+const ACTIVE_SUBSCRIPTIONS_QUERY =
+  "query{currentAppInstallation{activeSubscriptions{id name status test}}}";
+
+export type SubscriptionCheckResult =
+  | { active: true }
+  | {
+      active: false;
+      reason: "http_error" | "graphql_error" | "malformed" | "timeout" | "network_error" | "none_active";
+    };
+
+/**
+ * The managed-pricing gate for a Shopify-initiated install on the PUBLIC app
+ * (W6a follow-up). Hub-initiated connects are billed off-platform; an install
+ * that starts from Shopify with no active $200/mo managed-pricing
+ * subscription must land on Shopify's plan page instead of being bound to a
+ * tenant. Queried with the merchant's own fresh access token — no Partner API
+ * credential needed, matching how the worker already queries the Admin API
+ * (platform/worker/src/connectors/shopify.ts's `gql()`).
+ *
+ * Fails closed: a timeout, a non-2xx, a GraphQL error, a malformed body, or a
+ * response with no ACTIVE entry are ALL treated as "no subscription". The
+ * caller never trusts a redirect's `plan_handle`; this is the only source of
+ * truth (shopify.dev "Redirect to the plan selection page" / "Managed
+ * pricing").
+ */
+export async function hasActiveSubscription(
+  shop: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<SubscriptionCheckResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://${shop}/admin/api/${ADMIN_API_VERSION}/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+      body: JSON.stringify({ query: ACTIVE_SUBSCRIPTIONS_QUERY }),
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    return { active: false, reason: timedOut ? "timeout" : "network_error" };
+  }
+  if (!response.ok) return { active: false, reason: "http_error" };
+  const body = (await response.json().catch(() => null)) as
+    | { data?: { currentAppInstallation?: { activeSubscriptions?: unknown } }; errors?: unknown[] }
+    | null;
+  if (!body || (Array.isArray(body.errors) && body.errors.length)) return { active: false, reason: "graphql_error" };
+  const subs = body.data?.currentAppInstallation?.activeSubscriptions;
+  if (!Array.isArray(subs)) return { active: false, reason: "malformed" };
+  const active = subs.some((s) => (s as { status?: unknown })?.status === "ACTIVE");
+  return active ? { active: true } : { active: false, reason: "none_active" };
+}
+
+/**
+ * Where a Shopify-initiated install with no active plan is sent to pick one.
+ * `appHandle` is the `handle` field in shopify.app.toml (also read at runtime
+ * from SHOPIFY_APP_HANDLE, env.ts — Next has no access to the toml). Source:
+ * shopify.dev "Redirect to the plan selection page".
+ */
+export function planSelectionUrl(shop: string, appHandle: string): string {
+  return `https://admin.shopify.com/store/${shop.split(".")[0]}/charges/${appHandle}/pricing_plans`;
+}
+
 /** Where every handshake ends; the only `next` the login page will follow. */
 export const FINISH_PATH = "/api/oauth/shopify/finish";
 

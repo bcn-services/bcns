@@ -33,6 +33,14 @@ export interface HubConfig {
   approvedOAuthSources: string[];
   /** Where Shopify sends the browser back. Overridable for a local dev-store install. */
   hubBaseUrl: string;
+  /**
+   * The `handle` field in shopify.app.toml (W6a follow-up). Next has no
+   * access to the toml at runtime, so the callback route reads its own copy
+   * here to build the managed-pricing plan-selection redirect. Unset =
+   * a Shopify-initiated install with no active subscription fails closed to
+   * the hub's error page instead of Shopify's plan page.
+   */
+  shopifyAppHandle?: string;
 
   // sb-bridge: remove after SB migrates to bcns Connect
   /** The one store (full *.myshopify.com) that installs the bcns-data app instead. */
@@ -60,6 +68,7 @@ export function getConfig(): HubConfig {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
     hubBaseUrl: (readEnv("HUB_BASE_URL") ?? HUB_BASE_URL).replace(/\/+$/, ""),
+    shopifyAppHandle: readEnv("SHOPIFY_APP_HANDLE"),
 
     // sb-bridge: remove after SB migrates to bcns Connect
     shopifyAltShop: readEnv("SHOPIFY_ALT_SHOP"), // sb-bridge: remove after SB migrates to bcns Connect
