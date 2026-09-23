@@ -11,11 +11,12 @@
  *   5. the session        — owner, and the SAME tenant the state was minted for
  *                           (skipped for an install-initiated state: no tenant yet)
  *   6. token exchange     — only now does anything leave this server
- *   6b. managed pricing   — a Shopify-initiated install on the public app
- *                           needs an ACTIVE subscription or it goes to
- *                           Shopify's plan page instead (skipped for a
- *                           tenant-bound state and for the bridge app)
  *   7. the hand-off       — the token, sealed, to /finish, which does the write
+ *
+ * Managed pricing (W6a follow-up) is NOT gated here. `middleware.ts` sends both
+ * a first-time install AND an existing client's "Open app" click through this
+ * same install-initiated path, and only /finish knows whether this tenant
+ * already has a Shopify source — see finish/route.ts's own step list.
  *
  * Nothing before step 6 touches the network and nothing here touches the
  * database, so a forged callback costs an HMAC comparison and a redirect.
@@ -25,7 +26,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
 import {
-  ALT_APP,
   FINISH_PATH,
   INSTALL_CLIENT_ID,
   PENDING_COOKIE,
@@ -33,12 +33,11 @@ import {
   SHOPIFY_TOKEN_PATH,
   type ExchangeResult,
   handleTokenResponse,
-  hasActiveSubscription,
   normalizeShop,
-  planSelectionUrl,
   safeEqual,
   sealPending,
   shopifyAppFor,
+  storeHandleFromHost,
   verifyQueryHmac,
   verifyState,
 } from "@/lib/shopify-oauth";
@@ -150,30 +149,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const exchanged = await exchange(shop, clientId, secret, code);
   if (!exchanged.ok) return fail(`exchange_${exchanged.reason}${exchangeDiagnostic(exchanged)}`);
 
-  // 6b. Managed pricing (W6a follow-up). Hub-initiated connects are billed
-  // off-platform; a Shopify-initiated install on the PUBLIC app (no tenant in
-  // the state) must carry an ACTIVE $200/mo subscription before the shop is
-  // ever bound to a tenant. The bridge app (`app === ALT_APP`, SB) is
-  // excluded: it installs through its own custom-app credentials and keeps
-  // behaving exactly as it does today. Fail closed — a missing appHandle, a
-  // failed query, or no ACTIVE entry all land on Shopify's plan page (or the
-  // hub's generic error page if there is no plan URL to send to), never on
-  // /finish. `plan_handle` on a later return trip is never trusted; only this
-  // query is.
-  if (state.payload.clientId === INSTALL_CLIENT_ID && app !== ALT_APP) {
-    const appHandle = config.shopifyAppHandle;
-    if (!appHandle) return fail("plan_handle_unconfigured");
-    const checked = await hasActiveSubscription(shop, exchanged.token.accessToken);
-    if (!checked.active) {
-      console.warn(`[connect] shopify callback sent to Shopify's plan page (${checked.reason}): shop=${shop}`);
-      const toPlan = NextResponse.redirect(planSelectionUrl(shop, appHandle));
-      toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
-      return toPlan;
-    }
-  }
-
-  // 7. /finish writes it. Sealed under the DEFAULT app's secret whichever app
-  // issued the token: it is our key, and /finish has no shop to choose by.
+  // 7. /finish writes it (and, for an install-initiated state on the public
+  // app, decides whether managed pricing needs to be gated first — see its own
+  // doc comment). Sealed under the DEFAULT app's secret whichever app issued
+  // the token: it is our key, and /finish has no shop to choose by. `host` is
+  // under the query HMAC verified in step 2, so it is safe to decode here even
+  // though nothing before this point trusted it.
+  const storeHandle = storeHandleFromHost(params.get("host"));
   const sealed = sealPending(
     {
       clientId: state.payload.clientId,
@@ -182,6 +164,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       accessToken: exchanged.token.accessToken,
       refreshToken: exchanged.token.refreshToken,
       expiresAt: new Date(Date.now() + exchanged.token.expiresIn * 1000).toISOString(),
+      storeHandle,
     },
     config.shopifyClientSecret!
   );
