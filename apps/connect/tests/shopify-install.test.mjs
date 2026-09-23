@@ -14,10 +14,12 @@ import {
   INSTALL_CLIENT_ID,
   INSTALL_TIMESTAMP_MAX_AGE_MS,
   STATE_TTL_MS,
+  hasActiveSubscription,
   isFreshInstallTimestamp,
   PENDING_COOKIE,
   PENDING_TTL_MS,
   openPending,
+  planSelectionUrl,
   sealPending,
   signState,
   verifyState,
@@ -28,12 +30,22 @@ const SECRET = "shpss_install_secret";
 const SHOP = "bcns-data-dev.myshopify.com";
 const CLIENT = "11111111-2222-3333-4444-555555555555";
 const OTHER = "99999999-2222-3333-4444-555555555555";
+const APP_HANDLE = "bcns-connect";
+const PLAN_URL = `https://admin.shopify.com/store/${SHOP.split(".")[0]}/charges/${APP_HANDLE}/pricing_plans`;
+const ALT_SHOP = "sb-bridge-shop.myshopify.com";
+const ALT_SECRET = "alt-secret";
+const GRANTED_SCOPE =
+  "read_orders,read_all_orders,read_products,read_inventory,read_shopify_payments_accounts,read_shopify_payments_payouts,read_reports,read_customers";
 
 Object.assign(process.env, {
   SHOPIFY_CLIENT_ID: "cid",
   SHOPIFY_CLIENT_SECRET: SECRET,
   OAUTH_APPROVED_SOURCES: "shopify",
   HUB_BASE_URL: HUB,
+  SHOPIFY_APP_HANDLE: APP_HANDLE,
+  SHOPIFY_ALT_SHOP: ALT_SHOP,
+  SHOPIFY_ALT_CLIENT_ID: "alt-cid",
+  SHOPIFY_ALT_CLIENT_SECRET: ALT_SECRET,
 });
 // session.ts wraps loaders in React's server-only cache(); absent outside Next.
 const react = createRequire(import.meta.url)("react");
@@ -210,13 +222,28 @@ test("start: the state cookie's maxAge equals STATE_TTL_MS in seconds, not a sec
 
 /* ----------------------------------------------------------------- /callback */
 
-test("callback: an install-initiated handshake exchanges, seals and hands off to /finish without a session", async () => {
+/** The two fetches a Shopify-initiated callback makes: the token exchange, then the subscription check. */
+function tokenThenSubscription(subscriptions) {
+  return async (url) => {
+    if (String(url).includes("/oauth/access_token")) {
+      return new Response(
+        JSON.stringify({ access_token: "shpat_x", scope: GRANTED_SCOPE, expires_in: 3600, refresh_token: "shprt_y" }),
+        { status: 200 }
+      );
+    }
+    return new Response(
+      JSON.stringify({ data: { currentAppInstallation: { activeSubscriptions: subscriptions } } }),
+      { status: 200 }
+    );
+  };
+}
+
+test("callback: an install-initiated handshake with an ACTIVE subscription exchanges, seals and hands off to /finish without a session", async () => {
   const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
   const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
   const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () =>
-    new Response(JSON.stringify({ access_token: "shpat_x", scope: "read_orders,read_all_orders,read_products,read_inventory,read_shopify_payments_accounts,read_shopify_payments_payouts,read_reports,read_customers", expires_in: 3600, refresh_token: "shprt_y" }), { status: 200 });
+  globalThis.fetch = tokenThenSubscription([{ id: "gid://shopify/AppSubscription/1", name: "bcns Connect", status: "ACTIVE", test: true }]);
   try {
     const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
     assert.equal(res.headers.get("location"), `${HUB}${FINISH_PATH}`);
@@ -228,6 +255,104 @@ test("callback: an install-initiated handshake exchanges, seals and hands off to
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("callback: an install-initiated handshake with NO active subscription is sent to Shopify's plan page, never bound to a tenant", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
+  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
+  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = tokenThenSubscription([{ id: "gid://shopify/AppSubscription/2", name: "old", status: "CANCELLED", test: true }]);
+  const { logged, restore } = captureWarn();
+  let res;
+  try {
+    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
+  } finally {
+    restore();
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(res.headers.get("location"), PLAN_URL);
+  assert.equal(res.cookies.get(PENDING_COOKIE), undefined, "never sealed: no pending hand-off to /finish");
+  const cookie = res.cookies.get("shopify_oauth_state");
+  assert.ok(cookie && cookie.value === "", "state cookie cleared");
+  const lines = logged.join("\n");
+  assert.match(lines, /\[connect\] shopify callback sent to Shopify's plan page \(none_active\): shop=bcns-data-dev\.myshopify\.com/);
+  assert.doesNotMatch(lines, /shpat_x|shprt_y/, "no access or refresh token in the log");
+});
+
+test("callback: a failed or malformed subscription check fails closed to the plan page, never to /finish", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
+  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
+  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/oauth/access_token")) {
+      return new Response(JSON.stringify({ access_token: "shpat_x", scope: GRANTED_SCOPE, expires_in: 3600, refresh_token: "shprt_y" }), { status: 200 });
+    }
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  };
+  let res;
+  try {
+    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(res.headers.get("location"), PLAN_URL);
+  assert.equal(res.cookies.get(PENDING_COOKIE), undefined);
+});
+
+test("callback: the bridge app (SB, SHOPIFY_ALT_*) never runs the subscription check and is never sent to the plan page", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
+  const state = signState({ shop: ALT_SHOP, clientId: INSTALL_CLIENT_ID }, ALT_SECRET);
+  const query = signQuery(new URLSearchParams({ code: "C", shop: ALT_SHOP, state, timestamp: "1700000000" }), ALT_SECRET);
+  let subscriptionQueried = false;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/oauth/access_token")) {
+      return new Response(JSON.stringify({ access_token: "shpat_bridge", scope: GRANTED_SCOPE, expires_in: 3600, refresh_token: "shprt_bridge" }), { status: 200 });
+    }
+    subscriptionQueried = true;
+    return new Response(JSON.stringify({ data: { currentAppInstallation: { activeSubscriptions: [] } } }), { status: 200 });
+  };
+  let res;
+  try {
+    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(subscriptionQueried, false, "the bridge path must never query for a subscription");
+  assert.equal(res.headers.get("location"), `${HUB}${FINISH_PATH}`);
+  // Sealed under the DEFAULT app's secret regardless of which app issued the token (callback/route.ts step 7).
+  const opened = openPending(res.cookies.get(PENDING_COOKIE)?.value, SECRET, OTHER);
+  assert.ok(opened.ok);
+  assert.equal(opened.pending.accessToken, "shpat_bridge");
+});
+
+test("planSelectionUrl builds the managed-pricing redirect from the shop and appHandle", () => {
+  assert.equal(planSelectionUrl(SHOP, APP_HANDLE), PLAN_URL);
+});
+
+test("hasActiveSubscription: true only with an ACTIVE entry; fails closed on http error, graphql error, malformed body, timeout and network error", async () => {
+  const withBody = (body, status = 200) => async () => new Response(JSON.stringify(body), { status });
+  assert.deepEqual(
+    await hasActiveSubscription(SHOP, "shpat_x", withBody({ data: { currentAppInstallation: { activeSubscriptions: [{ status: "PENDING" }, { status: "ACTIVE" }] } } })),
+    { active: true }
+  );
+  assert.deepEqual(
+    await hasActiveSubscription(SHOP, "shpat_x", withBody({ data: { currentAppInstallation: { activeSubscriptions: [{ status: "PENDING" }] } } })),
+    { active: false, reason: "none_active" }
+  );
+  assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", withBody({}, 500)), { active: false, reason: "http_error" });
+  assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", withBody({ errors: [{ message: "boom" }] })), { active: false, reason: "graphql_error" });
+  assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", withBody({ data: {} })), { active: false, reason: "malformed" });
+  assert.deepEqual(
+    await hasActiveSubscription(SHOP, "shpat_x", async () => { throw new DOMException("timed out", "TimeoutError"); }),
+    { active: false, reason: "timeout" }
+  );
+  assert.deepEqual(
+    await hasActiveSubscription(SHOP, "shpat_x", async () => { throw new Error("ECONNRESET"); }),
+    { active: false, reason: "network_error" }
+  );
 });
 
 test("callback: a network failure during exchange redirects generically, deletes the state cookie, and logs only the error name and shop", async () => {
