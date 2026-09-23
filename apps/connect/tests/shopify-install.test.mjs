@@ -18,6 +18,7 @@ import {
   hasActiveSubscription,
   isFreshInstallTimestamp,
   managedPricingGate,
+  managedPricingRedirect,
   PENDING_COOKIE,
   PENDING_TTL_MS,
   openPending,
@@ -60,7 +61,7 @@ Object.assign(process.env, {
 // session.ts wraps loaders in React's server-only cache(); absent outside Next.
 const react = createRequire(import.meta.url)("react");
 react.cache ??= (fn) => fn;
-const { NextRequest } = await import("next/server");
+const { NextRequest, NextResponse } = await import("next/server");
 
 function signQuery(params, secret) {
   const message = [...params.entries()]
@@ -463,4 +464,128 @@ test("finish: signed out keeps the hand-off and sends the merchant to sign in, t
   const res = await GET(new NextRequest(`${HUB}${FINISH_PATH}`, { headers: { cookie: `${PENDING_COOKIE}=${sealed}` } }));
   assert.equal(res.headers.get("location"), `${HUB}/login?next=${encodeURIComponent(FINISH_PATH)}`);
   assert.equal(res.cookies.get(PENDING_COOKIE), undefined, "the hand-off must survive the trip to /login");
+});
+
+/* ------------------------------------------------------ managedPricingRedirect */
+
+/** A fake `api` implementing only the from().select().eq().limit() chain the gate reads. */
+function fakeApi(result) {
+  let calls = 0;
+  const api = {
+    from: (_table) => ({
+      select: (_cols) => ({
+        eq: (_col, _val) => ({
+          limit: (_n) => {
+            calls++;
+            return Promise.resolve(result);
+          },
+        }),
+      }),
+    }),
+  };
+  api.callCount = () => calls;
+  return api;
+}
+
+/** A fake fail() matching the route's own: records the code, returns a distinguishable response. */
+function fakeFail() {
+  const codes = [];
+  const fail = (code) => {
+    codes.push(code);
+    return NextResponse.redirect(`${HUB}/?error=connect-failed`);
+  };
+  fail.codes = codes;
+  return fail;
+}
+
+/** A subscription-check fetch that never calls the network module — just answers the GraphQL POST. */
+function subscriptionFetch(active) {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls++;
+    return new Response(
+      JSON.stringify({ data: { currentAppInstallation: { activeSubscriptions: active ? [{ status: "ACTIVE" }] : [] } } }),
+      { status: 200 }
+    );
+  };
+  fetchImpl.callCount = () => calls;
+  return fetchImpl;
+}
+
+const INSTALL_PENDING = { ...TOKEN, clientId: INSTALL_CLIENT_ID };
+
+test("managedPricingRedirect: already connected -> null, no fetch", async () => {
+  const api = fakeApi({ data: [{ source: "shopify" }], error: null });
+  const fetchImpl = subscriptionFetch(true);
+  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  assert.equal(result, null);
+  assert.equal(api.callCount(), 1);
+  assert.equal(fetchImpl.callCount(), 0);
+});
+
+test("managedPricingRedirect: not connected, no active subscription -> redirect to the plan page, pending cookie deleted, fetch called once", async () => {
+  const api = fakeApi({ data: [], error: null });
+  const fetchImpl = subscriptionFetch(false);
+  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  assert.equal(result.status, 307);
+  // INSTALL_PENDING inherits TOKEN.storeHandle (null), so planSelectionUrl falls back to the shop URL.
+  assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK);
+  assert.equal(result.cookies.get(PENDING_COOKIE).value, "");
+  assert.equal(fetchImpl.callCount(), 1);
+});
+
+test("managedPricingRedirect: not connected, active subscription -> null", async () => {
+  const api = fakeApi({ data: [], error: null });
+  const fetchImpl = subscriptionFetch(true);
+  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  assert.equal(result, null);
+  assert.equal(fetchImpl.callCount(), 1);
+});
+
+test("managedPricingRedirect: a health-read DB error fails to the generic error page, never gates on it", async () => {
+  const api = fakeApi({ data: null, error: { message: "connection reset" } });
+  const fetchImpl = subscriptionFetch(true);
+  const fail = fakeFail();
+  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
+  assert.equal(result.headers.get("location"), `${HUB}/?error=connect-failed`);
+  assert.deepEqual(fail.codes, ["health_read"]);
+  assert.equal(fetchImpl.callCount(), 0, "must never reach the subscription check on a DB error");
+});
+
+test("managedPricingRedirect: an unconfigured plan handle fails with plan_handle_unconfigured", async () => {
+  const api = fakeApi({ data: [], error: null });
+  const fetchImpl = subscriptionFetch(true);
+  const fail = fakeFail();
+  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: undefined, fail, fetchImpl });
+  assert.equal(result.headers.get("location"), `${HUB}/?error=connect-failed`);
+  assert.deepEqual(fail.codes, ["plan_handle_unconfigured"]);
+  assert.equal(fetchImpl.callCount(), 0);
+});
+
+test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the gate entirely -- no api call, no fetch", async () => {
+  const bridgeApi = fakeApi({ data: [], error: null });
+  const bridgeFetch = subscriptionFetch(false);
+  const bridgeResult = await managedPricingRedirect({
+    api: bridgeApi,
+    pending: { ...INSTALL_PENDING, app: ALT_APP },
+    appHandle: APP_HANDLE,
+    fail: fakeFail(),
+    fetchImpl: bridgeFetch,
+  });
+  assert.equal(bridgeResult, null);
+  assert.equal(bridgeApi.callCount(), 0);
+  assert.equal(bridgeFetch.callCount(), 0);
+
+  const hubApi = fakeApi({ data: [], error: null });
+  const hubFetch = subscriptionFetch(false);
+  const hubResult = await managedPricingRedirect({
+    api: hubApi,
+    pending: { ...TOKEN, clientId: CLIENT },
+    appHandle: APP_HANDLE,
+    fail: fakeFail(),
+    fetchImpl: hubFetch,
+  });
+  assert.equal(hubResult, null);
+  assert.equal(hubApi.callCount(), 0);
+  assert.equal(hubFetch.callCount(), 0);
 });
