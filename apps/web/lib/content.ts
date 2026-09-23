@@ -589,7 +589,7 @@ export const siteContent: SiteContent = {
       {
         question: "What happens if I want to cancel?",
         answer:
-          "You are free to cancel any time. You will retain access for the time paid for and receive all your data once the service ends.",
+          "You are free to cancel any time. Your access continues for 30 days after you cancel, then the service ends; you can request an export of your data any time before it is deleted, about 60 days after you cancel.",
       },
       {
         question: "What is bcns Connect?",
@@ -657,19 +657,25 @@ export const siteContent: SiteContent = {
   //
   // MAINTAINER NOTE (not rendered): the "30 days" / "no archive after
   // deletion" / "backups roll off within 7 days" wording below matches
-  // platform/scripts/hard-delete.ts on the `retention-30d` branch, now
-  // PR #60 (https://github.com/bcn-services/bcns/pull/60). As of this
-  // branch, `main`'s hard-delete.ts still refuses until 90 days and
-  // archives an export to Spaces first. This copy is only accurate in
-  // production once PR #60 merges to `main`; this branch must merge AFTER
-  // PR #60, and this copy must not ship to production before that merge
-  // lands.
+  // platform/scripts/hard-delete.ts on the `retention-30d` branch, merged
+  // to `main` as PR #60 (https://github.com/bcn-services/bcns/pull/60,
+  // main 558087c). This copy is accurate as shipped.
+  // Deletion is operator-run: nothing schedules hard-delete.ts; the 30-day
+  // figure is when the script permits deletion, and running it promptly is
+  // an operating practice (Shopify §6.2.3 requires deletion within 30 days
+  // of uninstall).
+  //
+  // MAINTAINER NOTE (not rendered): the 30-day access after cancellation
+  // (FAQ, terms) is an operating practice, not a platform state: the
+  // platform has only `clients.status = churned` (R34, logins and syncs
+  // stop at the next tick). The operator marks the client churned 30 days
+  // after the cancel email, so "account ends" = churned_at, and deletion
+  // is permitted 30 days after that.
   //
   // MAINTAINER NOTE (not rendered): "stored in the United States" (privacy,
-  // "Where your data is stored") assumes the Supabase project region,
-  // GCP_REGION, and the DigitalOcean droplet/Spaces region are all US. Per
-  // legal-pages-research.md §(c) those regions are UNKNOWN in the repo;
-  // confirm them and correct this line if any turns out non-US.
+  // "Where your data is stored") is confirmed: droplet and Spaces are
+  // SFO3, Supabase is N. Virginia, Cloud Run is us-east4 (checked
+  // 2026-09-22). All US.
   //
   // MAINTAINER NOTE (not rendered): the "Agreement and acceptance" sentence
   // about the Stripe Checkout consent box and the hub sign-in acceptance
@@ -677,7 +683,8 @@ export const siteContent: SiteContent = {
   // up yet, and the hub has no acceptance step today. The sentence is only
   // true once both ship: Stripe Checkout setup, and a hub "By signing in
   // you agree" line (a later PR). The "Who we share it with" list's Stripe
-  // entry is pending the same Stripe Checkout setup.
+  // entry, the terms' "Fees and billing" line, and the FAQ deliberately
+  // omit or soften Stripe until Checkout is live.
   legal: {
     privacy: {
       eyebrow: "Privacy",
@@ -690,7 +697,6 @@ export const siteContent: SiteContent = {
           heading: "Who we are",
           body: [
             `This policy is for BCNS LLC, a Delaware limited liability company ("${siteConfig.name}," "we," "us"). It covers the marketing site, the ${siteConfig.name} Connect hub, the MCP server, and any custom build or consulting engagement.`,
-            "Registered agent address: [TODO: registered agent address].",
             `Contact us about this policy at ${siteConfig.email}.`,
           ],
         },
@@ -704,7 +710,7 @@ export const siteContent: SiteContent = {
         {
           heading: "What we collect",
           body: [
-            "Contact form: your name, business, email and message, sent through [TODO: name Web3Forms if NEXT_PUBLIC_CONTACT_ACCESS_KEY is set in Vercel, otherwise the fallback vendor].",
+            "Contact form: your name, business, email and message, sent through Web3Forms.",
             "Accounts: the email addresses of the account owner and any team members you invite, plus sign-in sessions.",
             "Shopify, if you connect it: order totals, statuses, line items and refunds going back 13 months; products, variants and prices; inventory counts; Shopify Payments payouts; and, on each order, the customer's ID, email and display name only, with no phone number or address.",
             "Meta Ads, if you connect it: your ad account's timezone and currency; campaign and ad details, including ad creative; daily performance numbers like spend, impressions, clicks and reach; and copies of your ad creative images, which we store.",
@@ -725,7 +731,6 @@ export const siteContent: SiteContent = {
           body: [
             "When you connect an AI assistant like Claude or ChatGPT to the MCP server, your data goes to the AI provider you picked, because you asked it to, under your own agreement with that provider.",
             "bcns does not send your data to any AI provider on its own, and we never train models on your data.",
-            "[TODO: lawyer review: Google Drive/Meet data exposed over MCP]",
           ],
         },
         {
@@ -738,10 +743,10 @@ export const siteContent: SiteContent = {
             "Google Cloud: runs the background job that syncs each connected source into our database",
             "DigitalOcean: hosts the Connect hub, the MCP server, client apps, and nightly backups of client apps' databases",
             "Resend: delivers internal operational email, like alerts when a deletion request comes in",
-            "[TODO: name Web3Forms if NEXT_PUBLIC_CONTACT_ACCESS_KEY is set in Vercel, otherwise the fallback vendor]: delivers the marketing site's contact form",
+            "Web3Forms: delivers the marketing site's contact form",
             "Cloudflare: provides DNS and TLS for some client apps",
             "Vercel: hosts this marketing site",
-            "Stripe: processes subscription payments; card details go to Stripe, never to bcns",
+            "Stripe: will process subscription payments once we take card payments; card details go to Stripe, never to bcns",
           ],
         },
         {
@@ -757,7 +762,7 @@ export const siteContent: SiteContent = {
             "While your account is active, we keep your connected data current and available.",
             "Thirty days after your account ends, we delete the copy of your connected-source data that we hold. We don't keep an archive or backup export of it after that.",
             "During those 30 days, you can ask us for an export of your data.",
-            "Backup copies our database provider keeps as part of normal operations are fully gone within 7 days after we delete your data.",
+            "Backup copies our database provider keeps as part of normal operations roll off on its normal backup rotation, currently 7 days, after we delete your data.",
           ],
         },
         {
@@ -866,7 +871,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Data processing",
           body: [
-            "A short data processing addendum covering how we handle data you connect is available on request. [TODO: link DPA]",
+            "A short data processing addendum covering how we handle data you connect is available on request.",
             "See our Privacy Policy for the full detail on what we collect and how long we keep it.",
           ],
         },
@@ -885,7 +890,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Fees and billing",
           body: [
-            "bcns Connect is $200 a month with no setup fee, billed by bcns through Stripe. Deluxe builds and AI consulting are billed per their Order Form.",
+            "bcns Connect is $200 a month with no setup fee, billed by bcns. Deluxe builds and AI consulting are billed per their Order Form.",
             "You're responsible for any taxes on top of the listed price. If a payment fails, we may suspend the Services until it's resolved.",
             "If we change our pricing, we'll give you reasonable advance notice before the new price takes effect.",
           ],
@@ -893,7 +898,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Term, cancellation and suspension",
           body: [
-            "bcns Connect runs month to month. Cancel any time by emailing us. [TODO: Nate to decide whether access continues to the end of the paid period or ends at cancellation; today the platform stops logins and syncs when the account is marked ended.]",
+            "bcns Connect runs month to month. Cancel any time by emailing us. Your access continues for 30 days after you cancel, then your account ends, so your data is deleted about 60 days after you cancel.",
             "We can suspend the Services for non-payment or for a serious violation of these terms, and we'll tell you when we can.",
           ],
         },
