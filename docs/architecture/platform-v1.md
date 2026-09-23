@@ -239,7 +239,13 @@ already present; `@modelcontextprotocol/sdk` **approved 2026-09-20**, that one i
 
 - Own REST facade with API keys and metering — usage-based billing or leaving Supabase.
 - OAuth 2.1 on the MCP server — an agent product that cannot pass a bearer token.
-- Google OAuth app with restricted-scope verification — second client on Drive/Meet.
+- Google OAuth app with CASA verification — triggered by the first client with no Google
+  Workspace of their own, or by a client admin who refuses to mark the bcns app Trusted.
+  Decided 2026-09-23: SB stays Internal; every other client's Workspace admin marks one
+  bcns External app Trusted in their own Workspace, which is exempt from Google's
+  verification requirement — so "second client on Drive/Meet" alone is not the trigger,
+  only losing that exemption is. CASA AL1 (~$700) covers roughly the first 2-3 years;
+  AL2 is $5,400.
 - Flatten `platform/` into root `supabase/` and `worker/` — when the nesting costs a session.
 - Extract a client app to its own repo — a client wants code ownership or a contractor needs isolated access.
 - Move marketing off Vercel — only if the Hobby plan's non-commercial rule becomes a problem. Then static export served by nginx on the droplet (already supported by `pnpm --filter @bcn-services/web export`), not a Node process, or Vercel Pro. Never a reason to put the app on Vercel: schedules and long-running processes stay on the droplet and Cloud Run.
