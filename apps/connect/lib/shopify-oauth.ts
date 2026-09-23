@@ -371,7 +371,7 @@ export const INSTALL_CLIENT_ID = "";
 const ADMIN_API_VERSION = "2026-07";
 
 const ACTIVE_SUBSCRIPTIONS_QUERY =
-  "query{currentAppInstallation{activeSubscriptions{id name status test}}}";
+  "query{currentAppInstallation{activeSubscriptions{id name status}}}";
 
 export type SubscriptionCheckResult =
   | { active: true }
@@ -406,6 +406,7 @@ export async function hasActiveSubscription(
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
       body: JSON.stringify({ query: ACTIVE_SUBSCRIPTIONS_QUERY }),
+      cache: "no-store",
       signal: AbortSignal.timeout(5_000),
     });
   } catch (err) {
@@ -424,13 +425,62 @@ export async function hasActiveSubscription(
 }
 
 /**
+ * Decodes Shopify's `host` query param — base64url of
+ * `admin.shopify.com/store/<handle>` — into the store's admin handle.
+ * Needed because a shop's permanent domain is NOT its admin handle: SaunaBoy's
+ * admin handle is `saunaboy-2` but its permanent domain is
+ * `fa8a00-11.myshopify.com`, and newer stores get random permanent domains, so
+ * `shop.split(".")[0]` (the previous approach) is usually wrong. `host` rides
+ * on the callback query, which verifyQueryHmac has already authenticated by
+ * the time this is read. Null on a missing or malformed host; never throws.
+ */
+export function storeHandleFromHost(host: string | null): string | null {
+  if (!host) return null;
+  const decoded = Buffer.from(host, "base64url").toString("utf8");
+  return decoded.match(/^admin\.shopify\.com\/store\/([a-z0-9][a-z0-9-]*)\/?$/)?.[1] ?? null;
+}
+
+/**
  * Where a Shopify-initiated install with no active plan is sent to pick one.
  * `appHandle` is the `handle` field in shopify.app.toml (also read at runtime
- * from SHOPIFY_APP_HANDLE, env.ts — Next has no access to the toml). Source:
- * shopify.dev "Redirect to the plan selection page".
+ * from SHOPIFY_APP_HANDLE, env.ts — Next has no access to the toml).
+ * `storeHandle` (storeHandleFromHost above) is preferred over `shop`, which is
+ * only a valid fallback for the rare case `host` was absent — Shopify itself
+ * redirects the legacy `/admin/charges/...` path to the correct
+ * admin.shopify.com URL. Source: shopify.dev "Redirect to the plan selection
+ * page" / "Managed pricing".
  */
-export function planSelectionUrl(shop: string, appHandle: string): string {
-  return `https://admin.shopify.com/store/${shop.split(".")[0]}/charges/${appHandle}/pricing_plans`;
+export function planSelectionUrl(shop: string, appHandle: string, storeHandle: string | null): string {
+  return storeHandle
+    ? `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`
+    : `https://${shop}/admin/charges/${appHandle}/pricing_plans`;
+}
+
+/**
+ * Whether a Shopify-initiated hand-off (install-initiated, `clientId ===
+ * INSTALL_CLIENT_ID`) on the PUBLIC app needs the managed-pricing gate before
+ * /finish writes it. Excludes the bridge app (SB, `app === ALT_APP`) and — the
+ * W6a follow-up fix — an EXISTING client re-binding: `middleware.ts` sends
+ * both a first-time install AND an existing client's "Open app" click from the
+ * Shopify admin through this same install-initiated path, so gating on
+ * `clientId` alone would send every real, already-billed client to the $200
+ * plan page. `alreadyConnected` is the caller's read of whether this tenant
+ * already has a Shopify source (a DB read, so it lives in the route, not
+ * here). Pure and exhaustively unit-testable — every other branch in this
+ * decision already lives in this file for the same reason.
+ */
+export function managedPricingGate(pending: { clientId: string; app?: string }, alreadyConnected: boolean): boolean {
+  return pending.clientId === INSTALL_CLIENT_ID && pending.app !== ALT_APP && !alreadyConnected;
+}
+
+/**
+ * The single place "does an ACTIVE subscription mean we write?" is decided —
+ * finish/route.ts calls this rather than re-testing `checked.active` inline,
+ * so the whole managed-pricing decision (gate AND outcome) is pure and
+ * unit-tested, not just the fetch that feeds it.
+ */
+export function subscriptionOutcome(checked: SubscriptionCheckResult): "write" | "plan_page" {
+  return checked.active ? "write" : "plan_page";
 }
 
 /** Where every handshake ends; the only `next` the login page will follow. */
@@ -451,6 +501,13 @@ export interface PendingConnection {
   refreshToken: string;
   /** ISO time the access token dies, fixed at exchange time. */
   expiresAt: string;
+  /**
+   * The store's admin handle, decoded at /callback from Shopify's `host` query
+   * param (storeHandleFromHost). Not a secret — carried through only because
+   * /finish, not /callback, is where the managed-pricing redirect is now
+   * built, and /finish has no query string of its own to read it from.
+   */
+  storeHandle: string | null;
   /** Epoch ms the cookie stops being honoured. */
   exp: number;
 }
