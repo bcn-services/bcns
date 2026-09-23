@@ -38,12 +38,16 @@ The flow only worked when the merchant started from the hub's Connect button.
    in **before** the code is exchanged. After the exchange, the token is not written
    here. It goes into an AES-256-GCM sealed, httpOnly cookie (`shopify_pending`,
    15 min, `lib/shopify-oauth.ts` `sealPending`), and the browser is sent to `/finish`.
-4. `finish/route.ts` (new) is now the only place a Shopify token is written. A
-   signed-out browser goes to `/login?next=/api/oauth/shopify/finish`, which is the
-   only `next` value the login action follows. After sign-in the route requires an
-   **owner** and opens the cookie (`openPending`). A tenant-bound hand-off only binds
-   to its own tenant. An install hand-off binds to the owner who signed in. The route
-   then calls `api.connect_source` and sends the browser to `/?connected=shopify`.
+4. `finish/route.ts` (new) is now the only place a Shopify token is written, and the
+   only place managed pricing (below) is gated. A signed-out browser goes to
+   `/login?next=/api/oauth/shopify/finish`, which is the only `next` value the login
+   action follows. After sign-in the route requires an **owner** and opens the cookie
+   (`openPending`). A tenant-bound hand-off only binds to its own tenant. An install
+   hand-off binds to the owner who signed in. For an install hand-off on the public
+   app, the route then reads whether this tenant already has a Shopify source
+   (`connector_health_v1`) before deciding whether the managed-pricing gate applies —
+   see below. Once past that, it calls `api.connect_source` and sends the browser to
+   `/?connected=shopify`.
 5. The login page tells the merchant what is going on. It also gives someone with no
    bcns account a way forward: email bcns, then open the app again from the Shopify admin.
 
@@ -57,14 +61,26 @@ The delete calls now pass that path.
 
 **Managed-pricing follow-up (branch `shopify-managed-pricing`).** bcns Connect is
 public unlisted: hub-initiated connects stay billed off-platform (Stripe, no
-subscription check), but a Shopify-initiated install now needs an ACTIVE managed-pricing
-subscription before the shop is bound to a tenant. After the token exchange,
-`callback/route.ts` queries Admin GraphQL `currentAppInstallation.activeSubscriptions`
-with the merchant's own fresh token; no `ACTIVE` entry (or any error/timeout, ~5s
-time-box) redirects to Shopify's plan-selection page instead of `/finish`, and no
-pending cookie is set. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is provably
-unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on the return
-trip is never trusted — only the query result is.
+subscription check), but a Shopify-initiated install with no tenant yet needs an
+ACTIVE managed-pricing subscription before the shop is bound to one. **The gate lives
+in `finish/route.ts`, not `callback/route.ts`.** Root cause: `middleware.ts` sends
+both a first-time install AND an existing client's "Open app" click from the Shopify
+admin through the same install-initiated path (no tenant in the state) — a gate at
+`/callback` cannot tell those apart and would send every already-billed client to the
+$200 plan page. `/finish` can: signed in with a real tenant, it first reads whether
+this tenant already has a Shopify source (`connector_health_v1`); if one exists, this
+is an existing client re-binding and the gate is skipped entirely (behaves exactly as
+before this branch). Only when there is none does it query Admin GraphQL
+`currentAppInstallation.activeSubscriptions` with the merchant's own fresh token; no
+`ACTIVE` entry (or any error/timeout, ~5s time-box, or a DB error reading
+`connector_health_v1`) fails closed to Shopify's plan-selection page instead of the
+RPC write, deleting both the pending and the state cookies. The plan-selection URL is
+built from `storeHandleFromHost` (the store's admin handle, decoded from Shopify's
+`host` query param — sealed into the pending cookie at `/callback`, since a shop's
+permanent domain is not reliably its admin handle) and falls back to the shop domain
+only when `host` was absent. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is
+provably unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on
+the return trip is never trusted — only the query result is.
 
 **Needs one live check before Submit (step 3 below).** The unit tests cover every branch
 that runs without a database. The sign-in round trip and the RPC write only run on the
@@ -286,6 +302,19 @@ Don't include the Access page unless §2's AI-tools check passes.
    - **Hub-initiated (unaffected path):** from the hub's own Connect button (signed in
      as the reviewer owner), connect the same store. This never touches Shopify's
      billing at all and should behave exactly as before this branch.
+   - **Existing client "Open app" from the Shopify admin:** with the dev store already
+     connected (from the case above) and its plan cancelled, click the app from the
+     Shopify admin (not a fresh install). You should land in the hub connected, never
+     on Shopify's plan page — this is the case a gate at `/callback` would have
+     gotten wrong.
+   - **A new dev-store install with the plan cancelled:** uninstall, cancel/decline the
+     subscription, then install fresh. You should land on the bcns sign-in page first,
+     and only after signing in does it redirect to Shopify's plan-selection page.
+   - **After approving the plan, Shopify's return must reopen the app through the
+     in-admin app link (signed query), not `application_url` directly** — a bare
+     `application_url` return has no `hmac`, hits the login wall, and never reaches
+     `/finish`. Confirm the welcome/return link used is the in-admin app home, not a
+     raw `application_url`.
    In the hub logs, look for `shopify finish rejected` or `shopify callback rejected`.
    If either line appears where you didn't expect it, stop and don't submit.
 4. **Register as an App Store publisher.** In Partners (org 5179321), go to Settings.
