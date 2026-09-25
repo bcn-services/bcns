@@ -25,6 +25,8 @@ export interface HubConfig {
   metaClientSecret?: string;
   mondayClientId?: string;
   mondayClientSecret?: string;
+  quickbooksClientId?: string;
+  quickbooksClientSecret?: string;
   /**
    * Sources whose OAuth app is approved and may show a "Connect" button.
    * Everything absent from this list keeps the chunk-4 "Request connection"
@@ -63,6 +65,8 @@ export function getConfig(): HubConfig {
     metaClientSecret: readEnv("META_CLIENT_SECRET"),
     mondayClientId: readEnv("MONDAY_CLIENT_ID"),
     mondayClientSecret: readEnv("MONDAY_CLIENT_SECRET"),
+    quickbooksClientId: readEnv("QUICKBOOKS_CLIENT_ID"),
+    quickbooksClientSecret: readEnv("QUICKBOOKS_CLIENT_SECRET"),
     approvedOAuthSources: (readEnv("OAUTH_APPROVED_SOURCES") ?? "")
       .split(",")
       .map((s) => s.trim().toLowerCase())
