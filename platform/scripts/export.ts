@@ -7,8 +7,6 @@ import type pg from 'pg'
 import { die, pgClient, serviceClient, clientIdForSlug, isMain, runMain } from './_lib.js'
 import { rawPartitions } from '../worker/src/scope.js'
 
-export { rawPartitions }
-
 export const CANONICAL_TABLES = [
   'customers', 'jobs', 'messages', 'money', 'media', 'media_sets', 'media_set_items', 'products',
   'daily_metrics', 'records',
