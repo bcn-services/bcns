@@ -39,7 +39,7 @@ RPC never sees the signature. See the options considered below; option 4 is the 
   body only, never the unsigned `X-Shopify-Shop-Domain` header. Writes through
   `api.record_shop_redact` — idempotent via `data.privacy_requests.webhook_id`'s unique
   constraint (`on conflict do nothing`), so a replay queues nothing new.
-- **Migration** (`platform/supabase/migrations/20260924000100_shop_redact.sql`):
+- **Migration** (`platform/supabase/migrations/20260924000300_shop_redact.sql`):
   `data.privacy_requests` (RLS enabled + forced, no policies — only the pooled worker role and
   the one RPC touch it) and `api.record_shop_redact`, a `SECURITY DEFINER` function with
   `search_path = ''`, `EXECUTE` revoked from everyone then granted to `service_role` alone, plus

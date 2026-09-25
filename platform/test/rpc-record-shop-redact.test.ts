@@ -1,4 +1,4 @@
-// api.record_shop_redact (20260924000100_shop_redact.sql): the RPC the shopify-shop-redact
+// api.record_shop_redact (20260924000300_shop_redact.sql): the RPC the shopify-shop-redact
 // Edge Function calls in as service_role after it has independently re-verified the Shopify
 // HMAC. Two things worth a DB-level test, not just the pure-handler test's injected fake: the
 // unique(webhook_id) constraint is what actually makes a replay a no-op, and nobody but
