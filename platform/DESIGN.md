@@ -1193,8 +1193,7 @@ resolves `shop → client_id` via `connector_schedule` (`source = 'shopify'`,
 `worker/src/scope.ts`'s `deleteClientRows` (shared with `hard-delete.ts`, §5.10) in one
 transaction, or escalates to `needs_operator` (a `data.notifications` row, delivered by the
 existing `alerts()` → `sendPending()` path, §5.6) on: the sb-bridge shop, the sb-bridge config
-marker, an ambiguous shop→client match, or a token newer than the request (reconnected after
-uninstall).
+marker, an ambiguous shop→client match, or a shopify token not confirmed dead (still `active`, or created/refreshed/expiring within 24 h of the request — a reconnect after uninstall).
 
 ### 5.10 Scripts (bcns-run, `scripts/`, service key from the local env)
 

@@ -51,8 +51,7 @@ RPC never sees the signature. See the options considered below; option 4 is the 
   `needs_operator` (a `data.notifications` row, delivered by the existing `alerts()` →
   `sendPending()` Resend path — no second mailer) on: the sb-bridge shop by domain
   (`fa8a00-11.myshopify.com`), the sb-bridge config marker (`config->>'app' = 'bcns-data'`), an
-  ambiguous match (0 or >1 clients), or a token newer than the request (reconnected after
-  uninstall). Otherwise deletes that client's `source = 'shopify'` rows
+  ambiguous match (0 or >1 clients), or a shopify token not confirmed dead (still `active`, or created/refreshed/expiring within 24 h of the request — a reconnect after uninstall). Otherwise deletes that client's `source = 'shopify'` rows
   (`worker/src/scope.ts`'s `deleteClientRows`, shared with `hard-delete.ts`) in one transaction and
   marks the row `done`.
 - **Logging**: shop + webhook id (implicitly, the row id) + outcome only, at every layer — no
