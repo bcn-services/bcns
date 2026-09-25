@@ -124,7 +124,9 @@ export interface RecordLike {
   id?: string | null;
   kind?: string | null;
   source?: string | null;
+  external_id?: string | null;
   title?: string | null;
+  body?: string | null;
   attributes?: unknown;
   occurred_at?: string | null;
   updated_at?: string | null;
@@ -456,4 +458,339 @@ export function financialRecordsQuery(client: DataClient, from: string, to: stri
     .lte("attributes->>date", to)
     .order("occurred_at", { ascending: false })
     .limit(ENTRY_ROW_LIMIT);
+}
+
+/* ========================================================================
+ * QuickBooks quarterly budget + recent transactions
+ *
+ * Worker-written qbo_expense records (source='quickbooks') are read-only
+ * here. Sector budgets and sector assignments are dashboard records
+ * (source='dashboard', same as financial_entry), written through
+ * api.save_record and never through delete_record — an unassign is a plain
+ * update to `{ sector: null }`, so it upserts onto the same row and survives
+ * every worker re-sync, which only ever touches source='quickbooks' rows.
+ * ======================================================================== */
+
+export const QBO_SOURCE = "quickbooks";
+export const QBO_EXPENSE_KIND = "qbo_expense";
+export const SECTOR_BUDGET_KIND = "sector_budget";
+export const SECTOR_ASSIGNMENT_KIND = "sector_assignment";
+
+/** `Purchase:123` or `Bill:456` — the worker's own external_id shape. */
+export const TXN_EXTERNAL_ID_RE = /^(Purchase|Bill):[0-9]+$/;
+export const QUARTER_RE = /^\d{4}Q[1-4]$/;
+
+// ponytail: capped, no paging — a quarter's worth of QBO expenses or a
+// client's whole assignment history comfortably fits. Upgrade to a paged
+// read if either ever grows past this.
+export const QBO_QUARTER_ROW_LIMIT = 5000;
+export const QBO_RECENT_LIMIT = 50;
+export const SECTOR_BUDGET_ROW_LIMIT = 50;
+export const SECTOR_ASSIGNMENT_ROW_LIMIT = 5000;
+
+/** Default sectors shown even with zero budget/spend, per the mockup. Sector
+ *  ids beyond these can still appear (see collectSectorIds) if a budget or
+ *  assignment already names one — there is no sector editor UI to create one. */
+export const DEFAULT_SECTOR_IDS = ["marketing", "operations", "meta_ads", "sales", "inventory"] as const;
+
+const SECTOR_LABELS: Record<string, string> = {
+  marketing: "Marketing",
+  operations: "Operations",
+  meta_ads: "Meta Ads",
+  sales: "Sales",
+  inventory: "Inventory",
+};
+
+/** Display name for a sector id: the known map, else title-cased from its slug. */
+export function sectorLabel(id: string): string {
+  return SECTOR_LABELS[id] ?? id.split("_").filter(Boolean).map((w) => (w[0] ?? "").toUpperCase() + w.slice(1)).join(" ");
+}
+
+/** The only sectors a write is allowed to name — the default five. There is no
+ *  sector editor UI, so this is the whole enumerable set for setSectorBudget /
+ *  assignTransaction. (collectSectorIds separately unions in anything already
+ *  on a budget or assignment row, so older/foreign data still renders.) */
+export function isKnownSectorId(id: unknown): id is string {
+  return typeof id === "string" && (DEFAULT_SECTOR_IDS as readonly string[]).includes(id);
+}
+
+/** Calendar quarter of a YYYY-MM-DD date, as 'YYYYQn'. */
+export function quarterOf(ymd: string): string {
+  const [y, m] = ymd.split("-").map(Number);
+  const q = Math.floor(((m ?? 1) - 1) / 3) + 1;
+  return `${y}Q${q}`;
+}
+
+/** [start, endExclusive) for a 'YYYYQn' quarter, both YYYY-MM-DD. null for a
+ *  malformed quarter string. */
+export function quarterBounds(quarter: string): { start: string; endExclusive: string } | null {
+  const m = QUARTER_RE.exec(quarter);
+  if (!m) return null;
+  const year = Number(quarter.slice(0, 4));
+  const q = Number(quarter[5]);
+  const startMonth = (q - 1) * 3 + 1;
+  const endMonth = startMonth + 3;
+  const endYear = endMonth > 12 ? year + 1 : year;
+  const endMonthNorm = endMonth > 12 ? endMonth - 12 : endMonth;
+  return {
+    start: `${year}-${String(startMonth).padStart(2, "0")}-01`,
+    endExclusive: `${endYear}-${String(endMonthNorm).padStart(2, "0")}-01`,
+  };
+}
+
+export interface QboTxn {
+  externalId: string;
+  date: string;
+  amountCents: number;
+  currency: string;
+  vendor: string;
+  memo: string | null;
+  txnType: "Purchase" | "Bill";
+}
+
+/** One records_v1 row -> a QBO expense txn, or null when it is not a
+ *  well-formed source='quickbooks' qbo_expense row. */
+export function toQboTxn(row: RecordLike): QboTxn | null {
+  if (!row.external_id || row.kind !== QBO_EXPENSE_KIND || row.source !== QBO_SOURCE) return null;
+  if (!TXN_EXTERNAL_ID_RE.test(row.external_id)) return null;
+  const a = attr(row);
+  const date = typeof a.date === "string" ? a.date : "";
+  if (!isValidYmd(date)) return null;
+  const amountCents = Number(a.amount_cents);
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return null;
+  const txnType = a.txn_type === "Purchase" || a.txn_type === "Bill" ? a.txn_type : null;
+  if (!txnType) return null;
+  return {
+    externalId: row.external_id,
+    date,
+    amountCents,
+    currency: typeof a.currency === "string" && a.currency ? a.currency : "USD",
+    vendor: typeof a.vendor === "string" && a.vendor.trim() ? a.vendor.trim() : (row.title ?? "Unknown vendor"),
+    memo: typeof a.memo === "string" && a.memo.trim() ? a.memo.trim() : (typeof row.body === "string" && row.body.trim() ? row.body.trim() : null),
+    txnType,
+  };
+}
+
+export interface SectorBudget {
+  quarter: string;
+  sector: string;
+  budgetCents: number;
+}
+
+/** One records_v1 row -> a sector_budget, or null when malformed. */
+export function toSectorBudget(row: RecordLike): SectorBudget | null {
+  if (row.kind !== SECTOR_BUDGET_KIND || row.source !== FINANCIAL_ENTRY_SOURCE) return null;
+  const a = attr(row);
+  const quarter = typeof a.quarter === "string" ? a.quarter : "";
+  if (!QUARTER_RE.test(quarter)) return null;
+  const sector = typeof a.sector === "string" && a.sector ? a.sector : "";
+  if (!sector) return null;
+  const budgetCents = Number(a.budget_cents);
+  if (!Number.isSafeInteger(budgetCents) || budgetCents < 0) return null;
+  return { quarter, sector, budgetCents };
+}
+
+export interface SectorAssignment {
+  txn: string;
+  sector: string | null;
+}
+
+/** One records_v1 row -> a sector_assignment, or null when malformed. A
+ *  `sector` of exactly `null` is a deliberate unassign, not a missing field. */
+export function toSectorAssignment(row: RecordLike): SectorAssignment | null {
+  if (row.kind !== SECTOR_ASSIGNMENT_KIND || row.source !== FINANCIAL_ENTRY_SOURCE) return null;
+  const a = attr(row);
+  const txn = typeof a.txn === "string" ? a.txn : "";
+  if (!TXN_EXTERNAL_ID_RE.test(txn)) return null;
+  if (a.sector !== null && typeof a.sector !== "string") return null;
+  return { txn, sector: a.sector === null ? null : (a.sector as string) };
+}
+
+/** txn external_id -> current sector (or null), one row per txn by
+ *  construction (save_record upserts on external_id). */
+export function toAssignmentMap(assignments: SectorAssignment[]): Map<string, string | null> {
+  return new Map(assignments.map((a) => [a.txn, a.sector]));
+}
+
+/** Sectors = the default five, unioned with any sector a budget or assignment
+ *  already names (defensive: nothing in the UI can write an unknown sector,
+ *  but older or foreign data might still carry one). */
+export function collectSectorIds(budgets: SectorBudget[], assignments: SectorAssignment[]): string[] {
+  const ids = new Set<string>(DEFAULT_SECTOR_IDS);
+  for (const b of budgets) ids.add(b.sector);
+  for (const a of assignments) if (a.sector) ids.add(a.sector);
+  return [...ids];
+}
+
+export interface SectorTotal {
+  id: string;
+  label: string;
+  budgetCents: number;
+  spentCents: number;
+  remainingCents: number;
+  pctUsed: number;
+}
+
+export interface SectorTotalsResult {
+  sectors: SectorTotal[];
+  totalBudgetCents: number;
+  totalSpentCents: number;
+  totalRemainingCents: number;
+}
+
+/** Per-sector budget/spent/remaining/% for one quarter, plus header totals.
+ *  Spent counts only a txn whose own `date` falls inside [quarter start,
+ *  quarter end) AND whose assignment (keyed on the txn's external_id, never
+ *  its row id) names that sector. */
+export function sectorTotals({
+  txns,
+  assignments,
+  budgets,
+  quarter,
+  sectors,
+}: {
+  txns: QboTxn[];
+  assignments: SectorAssignment[];
+  budgets: SectorBudget[];
+  quarter: string;
+  sectors: string[];
+}): SectorTotalsResult {
+  const bounds = quarterBounds(quarter);
+  const assignBySectorTxn = toAssignmentMap(assignments);
+  const spentBySector = new Map<string, number>();
+  if (bounds) {
+    for (const t of txns) {
+      if (t.date < bounds.start || t.date >= bounds.endExclusive) continue;
+      const sector = assignBySectorTxn.get(t.externalId);
+      if (!sector) continue;
+      spentBySector.set(sector, (spentBySector.get(sector) ?? 0) + t.amountCents);
+    }
+  }
+  const budgetBySector = new Map(budgets.filter((b) => b.quarter === quarter).map((b) => [b.sector, b.budgetCents]));
+
+  const result: SectorTotal[] = sectors.map((id) => {
+    const budgetCents = budgetBySector.get(id) ?? 0;
+    const spentCents = spentBySector.get(id) ?? 0;
+    const remainingCents = budgetCents - spentCents;
+    const pctUsed = budgetCents > 0 ? (spentCents / budgetCents) * 100 : spentCents > 0 ? 100 : 0;
+    return { id, label: sectorLabel(id), budgetCents, spentCents, remainingCents, pctUsed };
+  });
+
+  const totalBudgetCents = result.reduce((sum, s) => sum + s.budgetCents, 0);
+  const totalSpentCents = result.reduce((sum, s) => sum + s.spentCents, 0);
+  return { sectors: result, totalBudgetCents, totalSpentCents, totalRemainingCents: totalBudgetCents - totalSpentCents };
+}
+
+/* ---------------------------------------------------------- parse* gates */
+
+export type SectorErrorCode = "sector" | "quarter" | "txn" | "budget";
+export type SectorParseResult<T> = { ok: true; value: T } | { ok: false; code: SectorErrorCode };
+
+export interface SetSectorBudgetInput {
+  quarter: string;
+  sector: string;
+  budgetCents: number;
+}
+
+/** The whole server-side gate for setSectorBudget. */
+export function parseSectorBudgetInput(input: { quarter?: unknown; sector?: unknown; budget?: unknown }): SectorParseResult<SetSectorBudgetInput> {
+  const quarter = typeof input.quarter === "string" ? input.quarter : "";
+  if (!QUARTER_RE.test(quarter)) return { ok: false, code: "quarter" };
+  if (!isKnownSectorId(input.sector)) return { ok: false, code: "sector" };
+  const budgetCents = parseAmountToCents(typeof input.budget === "string" ? input.budget : "");
+  if (budgetCents === null) return { ok: false, code: "budget" };
+  return { ok: true, value: { quarter, sector: input.sector, budgetCents } };
+}
+
+export interface AssignTxnInput {
+  txn: string;
+  sector: string | null;
+}
+
+/** The whole server-side gate for assignTransaction (a null/empty `sector`
+ *  parses as an explicit unassign). */
+export function parseAssignInput(input: { txn?: unknown; sector?: unknown }): SectorParseResult<AssignTxnInput> {
+  const txn = typeof input.txn === "string" ? input.txn : "";
+  if (!TXN_EXTERNAL_ID_RE.test(txn)) return { ok: false, code: "txn" };
+  const sectorRaw = input.sector;
+  if (sectorRaw === null || sectorRaw === undefined || sectorRaw === "") return { ok: true, value: { txn, sector: null } };
+  if (!isKnownSectorId(sectorRaw)) return { ok: false, code: "sector" };
+  return { ok: true, value: { txn, sector: sectorRaw } };
+}
+
+/** The whole server-side gate for unassignTransaction: only the txn id needs
+ *  validating, since the sector is always null. */
+export function parseUnassignInput(input: { txn?: unknown }): SectorParseResult<{ txn: string }> {
+  const txn = typeof input.txn === "string" ? input.txn : "";
+  if (!TXN_EXTERNAL_ID_RE.test(txn)) return { ok: false, code: "txn" };
+  return { ok: true, value: { txn } };
+}
+
+export interface BulkAssignInput {
+  txns: string[];
+  sector: string | null;
+}
+
+/** The whole server-side gate for bulkAssign: every txn id must be well-formed
+ *  (malformed ones are dropped, not fatal — a stale checkbox shouldn't sink
+ *  the rest of the selection) and at least one must remain. */
+export function parseBulkAssignInput(input: { txns?: unknown[]; sector?: unknown }): SectorParseResult<BulkAssignInput> {
+  const txns = Array.isArray(input.txns) ? input.txns.filter((t): t is string => typeof t === "string" && TXN_EXTERNAL_ID_RE.test(t)) : [];
+  if (!txns.length) return { ok: false, code: "txn" };
+  const sectorRaw = input.sector;
+  if (sectorRaw === null || sectorRaw === undefined || sectorRaw === "") return { ok: true, value: { txns, sector: null } };
+  if (!isKnownSectorId(sectorRaw)) return { ok: false, code: "sector" };
+  return { ok: true, value: { txns, sector: sectorRaw } };
+}
+
+/** save_record's exact shapes for the two dashboard record kinds above. */
+export function sectorBudgetExternalId(quarter: string, sector: string): string {
+  return `sector_budget:${quarter}:${sector}`;
+}
+export function sectorBudgetAttributes(v: SetSectorBudgetInput) {
+  return { quarter: v.quarter, sector: v.sector, budget_cents: v.budgetCents };
+}
+export function sectorAssignmentExternalId(txn: string): string {
+  return `sector_assignment:${txn}`;
+}
+export function sectorAssignmentAttributes(txn: string, sector: string | null) {
+  return { txn, sector };
+}
+
+/* ------------------------------------------------------- read queries */
+
+export function qboQuarterTxnsQuery(client: DataClient, quarterStart: string, quarterEndExclusive: string) {
+  return client.views
+    .records_v1("id,kind,source,external_id,title,body,attributes,occurred_at,updated_at")
+    .eq("kind", QBO_EXPENSE_KIND)
+    .eq("source", QBO_SOURCE)
+    .gte("attributes->>date", quarterStart)
+    .lt("attributes->>date", quarterEndExclusive)
+    .limit(QBO_QUARTER_ROW_LIMIT);
+}
+
+export function qboRecentTxnsQuery(client: DataClient) {
+  return client.views
+    .records_v1("id,kind,source,external_id,title,body,attributes,occurred_at,updated_at")
+    .eq("kind", QBO_EXPENSE_KIND)
+    .eq("source", QBO_SOURCE)
+    .order("occurred_at", { ascending: false })
+    .limit(QBO_RECENT_LIMIT);
+}
+
+export function sectorBudgetsQuery(client: DataClient, quarter: string) {
+  return client.views
+    .records_v1("id,kind,source,attributes,updated_at")
+    .eq("kind", SECTOR_BUDGET_KIND)
+    .eq("source", FINANCIAL_ENTRY_SOURCE)
+    .eq("attributes->>quarter", quarter)
+    .limit(SECTOR_BUDGET_ROW_LIMIT);
+}
+
+export function sectorAssignmentsQuery(client: DataClient) {
+  return client.views
+    .records_v1("id,kind,source,attributes,updated_at")
+    .eq("kind", SECTOR_ASSIGNMENT_KIND)
+    .eq("source", FINANCIAL_ENTRY_SOURCE)
+    .limit(SECTOR_ASSIGNMENT_ROW_LIMIT);
 }
