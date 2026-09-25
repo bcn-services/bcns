@@ -10,13 +10,13 @@ import {
   cn,
 } from "@bcn-services/ui";
 import { requestConnectionAction } from "./actions";
+import { DashboardButton } from "./nav";
 import { loadClient, requireHub } from "@/lib/session";
 import { mailtoLink } from "@/lib/request-connection";
 import { getConfig } from "@/lib/env";
 import { connectPath } from "@/lib/oauth-config";
 import {
   composeSources,
-  dashboardUrl,
   egressLine,
   type EgressRow,
   type HealthRow,
@@ -55,7 +55,6 @@ export default async function SourcesPage({
 
   const cards = composeSources((health.data as HealthRow[] | null) ?? []);
   const usage = egressLine(egress.data as EgressRow | null);
-  const dashboard = dashboardUrl(client);
 
   const pending = searchParams.email;
   const mailto = pending
@@ -82,11 +81,7 @@ export default async function SourcesPage({
             <p className="font-medium">{client?.name ?? "Your workspace"}</p>
             <p className="text-sm text-muted-foreground">{usage ?? "Usage is not available yet."}</p>
           </div>
-          {dashboard ? (
-            <a href={dashboard} className="shrink-0">
-              <Button type="button">Open your dashboard</Button>
-            </a>
-          ) : null}
+          <DashboardButton client={client} />
         </CardContent>
       </Card>
 

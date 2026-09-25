@@ -309,8 +309,8 @@ test("csv cap: the default cap is 50,000 and 50,001 rows hit it", async () => {
 
 /* ---------------------------------------------------------------- c: url */
 
-test("dashboardUrl falls back to /data; app_url wins; no client is null", () => {
-  assert.equal(dashboardUrl({ slug: "acme" }), "/data");
+test("dashboardUrl is app_url or null, never a /data fallback", () => {
+  assert.equal(dashboardUrl({ slug: "acme" }), null);
   assert.equal(dashboardUrl({ slug: "acme", app_url: "https://acme.example.com" }), "https://acme.example.com");
   assert.equal(dashboardUrl(null), null);
 });

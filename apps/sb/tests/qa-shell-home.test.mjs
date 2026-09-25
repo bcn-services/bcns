@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { parsePopup } from "../app/_components/AppHeader.tsx";
+import { HUB_URL, parsePopup } from "../app/_components/AppHeader.tsx";
 import { SERVICE_LINKS, EXTERNAL_LINK_PROPS } from "../lib/links.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,4 +41,12 @@ test("SERVICE_LINKS: every outbound target is a real https URL, not a placeholde
 test("EXTERNAL_LINK_PROPS: carries target=_blank and rel=noopener noreferrer", () => {
   assert.equal(EXTERNAL_LINK_PROPS.target, "_blank");
   assert.equal(EXTERNAL_LINK_PROPS.rel, "noopener noreferrer");
+});
+
+test("header links back to the bcns hub, same tab", () => {
+  assert.equal(HUB_URL, "https://connect.bcn-services.com");
+  const src = readFileSync(join(root, "app/_components/AppHeader.tsx"), "utf8");
+  const link = src.match(/<a className="page-btn" href=\{HUB_URL\}[^>]*>\s*Sources &amp; data\s*<\/a>/);
+  assert.ok(link, "AppHeader renders the Sources & data link");
+  assert.doesNotMatch(link[0], /target=/);
 });

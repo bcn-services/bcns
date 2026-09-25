@@ -123,15 +123,13 @@ export interface ClientRow {
 }
 
 /**
- * Where "Open your dashboard" points. `app_url` wins when the column exists and
- * is set; otherwise the hub's own "Your data" viewer (relative, so it works on any
- * origin). The optional property is what lets the page `select("*")` against a
- * database that has not run the migration yet.
+ * The client's custom dashboard (`app_url`), or null when it has none — then the
+ * hub shows no dashboard button or link at all; "Your data" in the top bar is the
+ * only way to /data. The optional property is what lets the page `select("*")`
+ * against a database that has not run the migration yet.
  */
 export function dashboardUrl(client: ClientRow | null | undefined): string | null {
-  const appUrl = client?.app_url?.trim();
-  if (appUrl) return appUrl;
-  return client?.slug?.trim() ? "/data" : null;
+  return client?.app_url?.trim() || null;
 }
 
 /** Binary units, one decimal, because quotas are set in GiB. */

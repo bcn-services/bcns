@@ -223,8 +223,8 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 >    This account owns a test workspace set up for review.
 > 3. After sign-in you land on **Sources**. A green banner reads "shopify is connected. The first
 >    pull starts within the hour." The Shopify card lists the store as a source.
-> 4. Within the hour the Shopify card shows a "Last success" time, and **Open your dashboard**
->    opens **Your data** (`/data`) with that store's orders, customers and products. It has
+> 4. Within the hour the Shopify card shows a "Last success" time. Click **Your data** in the
+>    top bar to see that store's orders, customers and products. It has
 >    search, a date filter and CSV export, and the top of the page shows the last 30 days of
 >    orders and revenue.
 > 5. To test the privacy webhooks, uninstall the app from the store admin. `shop/redact` is
@@ -234,10 +234,9 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 
 **TODO(Nate): before submitting, create the reviewer account.** It needs its own client
 (tenant). Never use SB or any real client. Give it one **owner** member (`platform/scripts/onboard.ts`,
-`add-member.ts`). Make sure the client's dashboard link goes to a page that
-actually loads. With no `app_url` set, `lib/sources.ts` `dashboardUrl` now falls back to the
-hub's own **Your data** page (`/data`), so the reviewer client should leave `app_url` empty.
-If `app_url` is set, it wins and must load.
+`add-member.ts`). Leave the reviewer client's `app_url` empty: the hub then shows no dashboard
+button, and **Your data** in the top bar is how the reviewer reaches `/data`. If `app_url` is
+set, the hub shows "Open your dashboard" and a "Dashboard" top-bar link to it, and it must load.
 
 ---
 
@@ -251,7 +250,7 @@ Capture them from the reviewer workspace after a real sync, so the data is from 
 3. **Sources after connecting:** `/?connected=shopify`, with the green banner and the
    Shopify card.
 4. **Sources after the first sync:** the Shopify card with a "Last success" time and the usage line.
-5. **Your data:** `/data` (reached from "Open your dashboard"), with the 30-day orders and
+5. **Your data:** `/data` (reached from **Your data** in the top bar), with the 30-day orders and
    revenue numbers at the top and the Shopify orders table below. Add a second shot with a
    search or date filter applied, and note that **Export CSV** downloads the filtered rows.
 6. *(Optional)* **Team:** `/team`, which shows the workspace belongs to the merchant's own people.
