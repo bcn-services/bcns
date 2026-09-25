@@ -43,6 +43,12 @@ export interface HubConfig {
    * the hub's error page instead of Shopify's plan page.
    */
   shopifyAppHandle?: string;
+  /**
+   * Edge Function URL for `shopify-shop-redact` (docs/architecture/retention-30d-shop-redact.md).
+   * Unset, unreachable, timed out, or a non-2xx response = gdprRoute falls back to the operator
+   * email exactly as before — this is an upgrade path, not a hard dependency.
+   */
+  shopRedactFunctionUrl?: string;
 
   // sb-bridge: remove after SB migrates to bcns Connect
   /** The one store (full *.myshopify.com) that installs the bcns-data app instead. */
@@ -73,6 +79,7 @@ export function getConfig(): HubConfig {
       .filter(Boolean),
     hubBaseUrl: (readEnv("HUB_BASE_URL") ?? HUB_BASE_URL).replace(/\/+$/, ""),
     shopifyAppHandle: readEnv("SHOPIFY_APP_HANDLE"),
+    shopRedactFunctionUrl: readEnv("SHOP_REDACT_FUNCTION_URL"),
 
     // sb-bridge: remove after SB migrates to bcns Connect
     shopifyAltShop: readEnv("SHOPIFY_ALT_SHOP"), // sb-bridge: remove after SB migrates to bcns Connect
