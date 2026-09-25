@@ -1,11 +1,11 @@
-// §4.6 QuickBooks connector — pure unit tests, NO database. normalize/amountCents/
+// §4.7 QuickBooks connector — pure unit tests, NO database. normalize/amountCents/
 // refreshToken/baseUrl/buildQuery are all plain functions or take a stubbed ctx,
 // so none of this needs a client, a schema, or writeRaw.
 // index.js is imported first (not quickbooks.js) so the shopify/meta/monday/meet/drive/quickbooks
 // circular import resolves connectors.quickbooks before this file's own top-level code runs —
 // importing quickbooks.js first here left `quickbooks` undefined inside index.ts's own registry.
 import { afterEach, describe, expect, it } from 'vitest'
-import { classify, SourceError, type RawRow, type RunContext } from '../worker/src/connectors/index.js'
+import { classify, SourceError, type Json, type RawRow, type RunContext } from '../worker/src/connectors/index.js'
 import { amountCents, baseUrl, buildQuery, quickbooks } from '../worker/src/connectors/quickbooks.js'
 
 const purchase: RawRow = {
@@ -47,6 +47,20 @@ const billPayment: RawRow = {
   payload: { Id: '303', TxnDate: '2026-09-03', TotalAmt: '1000.00' },
 }
 
+const purchaseCredit: RawRow = {
+  entity: 'Purchase',
+  externalId: '404',
+  payload: {
+    Id: '404',
+    TxnDate: '2026-09-04',
+    TotalAmt: '25.00',
+    Credit: true,
+    CurrencyRef: { value: 'USD' },
+    EntityRef: { name: 'Staples' },
+    MetaData: { LastUpdatedTime: '2026-09-04T10:00:00-07:00' },
+  },
+}
+
 describe('normalize', () => {
   it('maps a Purchase to a qbo_expense record', () => {
     const { records = [] } = quickbooks.normalize({} as RunContext, [purchase])
@@ -85,6 +99,13 @@ describe('normalize', () => {
         payment_type: null,
       },
     })
+  })
+
+  it('negates amount_cents for a Purchase.Credit (vendor refund, money IN) even though TotalAmt is positive', () => {
+    const { records = [] } = quickbooks.normalize({} as RunContext, [purchaseCredit])
+    expect(records).toHaveLength(1)
+    expect(records[0].attributes.amount_cents).toBe(-2500)
+    expect(records[0].attributes.credit).toBe(true)
   })
 
   it('drops BillPayment — money-out entities are Purchase and Bill only', () => {
@@ -178,5 +199,50 @@ describe('refreshToken', () => {
     try { await quickbooks.refreshToken!(ctx(fetchImpl)) } catch (e) { caught = e }
     expect(caught).toBeInstanceOf(SourceError)
     expect(classify(caught)).toBe('auth')
+  })
+})
+
+describe('pull() generator (via incremental) — pagination, entity handoff, and the >= boundary', () => {
+  const ctx = (fetchImpl: typeof fetch): RunContext => ({
+    clientId: 'c1', source: 'quickbooks', config: { realm_id: '123' }, timezone: 'America/New_York',
+    token: { client_id: 'c1', source: 'quickbooks', kind: 'quickbooks_oauth_refresh', secret: 'tok', refresh_secret: 'r', expires_at: null, attributes: {} },
+    fetch: fetchImpl, log: () => {}, putObject: async () => {}, hasMetricToday: async () => false,
+    knownMedia: async () => new Set(), mergeConfig: async () => {},
+  }) as unknown as RunContext
+
+  it('yields a full Purchase page then a partial one, only starts Bill after Purchase is entityDone, and finishes done on Bill’s partial page — query carries an inclusive >= boundary', async () => {
+    const mkRows = (n: number, startId: number): Json[] =>
+      Array.from({ length: n }, (_, i) => ({ Id: String(startId + i), MetaData: { LastUpdatedTime: '2026-09-05T00:00:00.000Z' } }))
+
+    const queries: string[] = []
+    const fetchImpl = (async (url: string | URL) => {
+      const query = new URL(String(url)).searchParams.get('query') ?? ''
+      queries.push(query)
+      const body = query.startsWith('select * from Purchase')
+        ? { QueryResponse: { Purchase: query.includes('startposition 1 ') ? mkRows(1000, 1) : mkRows(3, 1001) } }
+        : { QueryResponse: { Bill: mkRows(2, 1) } }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof fetch
+
+    const cursors = { Purchase: { last_updated: '2026-09-01T00:00:00.000Z' } }
+    const pages = []
+    for await (const page of quickbooks.incremental(ctx(fetchImpl), cursors)) pages.push(page)
+
+    expect(pages.map(p => [p.entity, p.raw.length, p.entityDone, p.done])).toEqual([
+      ['Purchase', 1000, false, false],
+      ['Purchase', 3, true, false],
+      ['Bill', 2, true, true],
+    ])
+    expect(pages[0].cursor).toEqual({ entity: 'Purchase', start: 1001 })
+    expect(pages[1].cursor).toEqual({ entity: 'Bill', start: 1 }) // Bill's first query only fires after this page
+    expect(pages[2].cursor).toMatchObject({ last_updated: expect.any(String) })
+
+    expect(queries.length).toBe(3)
+    expect(queries[2].startsWith('select * from Bill')).toBe(true)
+
+    // Inclusive boundary: mutating `>=` back to `>` drops this exact substring and reddens the test.
+    expect(queries[0]).toContain("MetaData.LastUpdatedTime >= '2026-09-01T00:00:00.000Z'")
+    expect(queries[1]).toContain("MetaData.LastUpdatedTime >= '2026-09-01T00:00:00.000Z'")
+    expect(queries[2]).toContain("MetaData.LastUpdatedTime >= '1970-01-01T00:00:00.000Z'")
   })
 })

@@ -1,8 +1,12 @@
-// §4.6 QuickBooks Online — Purchase + Bill (money out), via the Query endpoint.
+// §4.7 QuickBooks Online — Purchase + Bill (money out), via the Query endpoint.
 //
-// No CDC: incremental is a plain `MetaData.LastUpdatedTime >` query, same shape
-// as a human would run in the QBO API Explorer. minorversion=75 is the floor —
-// 1-74 were deprecated 2025-08-01 (Intuit's own migration notice).
+// No CDC: incremental is a plain `MetaData.LastUpdatedTime >=` query, same shape
+// as a human would run in the QBO API Explorer. `>=` not `>`: LastUpdatedTime is
+// one-second precision, so a row updated in the same second as the prior
+// high-water mark, but written after that query's snapshot, would be skipped
+// forever under a strict `>`. Re-querying the boundary row is harmless —
+// writeRaw and upsertCanonical are both idempotent. minorversion=75 is the
+// floor — 1-74 were deprecated 2025-08-01 (Intuit's own migration notice).
 //
 // Access tokens live 60 minutes. Refresh tokens rotate roughly every 24-26
 // hours (Intuit changed this from "every use" in Nov 2025) and, with regular
@@ -70,7 +74,7 @@ async function* pull(ctx: RunContext, mode: 'backfill' | 'incremental', from: Da
     for (;;) {
       const where = mode === 'backfill'
         ? `TxnDate >= '${fmtDate(from!)}'`
-        : `MetaData.LastUpdatedTime > '${prior?.last_updated ?? new Date(0).toISOString()}'`
+        : `MetaData.LastUpdatedTime >= '${prior?.last_updated ?? new Date(0).toISOString()}'`
       const rows = await runQuery(ctx, entity, where, start)
       const raw: RawRow[] = rows.map((o: Json) => {
         const updated = o?.MetaData?.LastUpdatedTime ? new Date(o.MetaData.LastUpdatedTime) : undefined
@@ -102,7 +106,8 @@ async function* pull(ctx: RunContext, mode: 'backfill' | 'incremental', from: Da
   }
 }
 
-/** Decimal string/number → integer cents, no float multiply (banker's-safe for QBO's decimal-string TotalAmt). */
+/** Decimal string/number → integer cents, no float multiply (banker's-safe for QBO's decimal-string TotalAmt).
+ * `.slice(0, 2)` truncates a 3rd decimal digit rather than rounding, but QBO's TotalAmt never emits more than 2. */
 export function amountCents(amount: unknown): number {
   const s = String(amount ?? '0')
   const neg = s.startsWith('-')
@@ -173,13 +178,18 @@ export const quickbooks: Connector = {
       const { accounts, account } = lineAccounts(o.Line ?? [])
       const isBill = r.entity === 'Bill'
       const vendor = isBill ? (o.VendorRef?.name ?? null) : (o.EntityRef?.name ?? null)
+      // Purchase.Credit: QBO reports TotalAmt as a positive magnitude even when the
+      // transaction is a vendor refund (money IN); Bill has no Credit field. Negate
+      // so the records contract's "negative for credits" holds regardless of source.
+      const credit = o.Credit === true
+      const magnitude = amountCents(o.TotalAmt)
       records.push({
         externalId: `${r.entity}:${o.Id}`,
         kind: 'qbo_expense',
         occurred_at: o.TxnDate ? new Date(o.TxnDate).toISOString() : new Date().toISOString(),
         attributes: {
           date: o.TxnDate ?? null,
-          amount_cents: amountCents(o.TotalAmt),
+          amount_cents: credit ? -magnitude : magnitude,
           currency: o.CurrencyRef?.value ?? 'USD',
           vendor,
           memo: o.PrivateNote ?? null,
@@ -187,6 +197,7 @@ export const quickbooks: Connector = {
           accounts,
           txn_type: r.entity,
           payment_type: isBill ? null : (o.PaymentType ?? null),
+          credit,
         },
         source_updated_at: o.MetaData?.LastUpdatedTime ?? null,
       })

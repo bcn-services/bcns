@@ -949,6 +949,22 @@ dashboard — the next complete run un-deletes anything still in the folder.
 | Pull `file` | Every run lists the whole folder — no `modifiedTime` filter, because a changed-only page would tombstone every unchanged file: `GET drive/v3/files?q='<folder_id>' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))&pageSize=100`. Flat folder only. For rows that have no thumbnail yet (`knownMedia` = a row whose bytes or thumbnail landed) the connector fetches `thumbnailLink` (`=s512`) and writes it to `<client_id>/thumb/<file_id>.jpg`; a missing or failed thumbnail is logged (`drive_thumb_skip`) and the row still lands. |
 | Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule and, like a dashboard delete, purged (row and thumbnail) 30 days later unless they return first. |
 
+### 4.7 QuickBooks Online
+
+Money out. Two entities only — `Purchase` (a direct expense: cash/card/check) and `Bill` (an
+accounts-payable bill); `BillPayment` is deliberately excluded, since a paid Bill would otherwise
+be counted twice (once as the Bill, again as its payment).
+
+| | |
+|---|---|
+| Auth | `quickbooks_oauth_refresh`. Access tokens live 60 minutes; refresh tokens rotate roughly every 24–26 hours and, with regular use, are valid up to 5 years — `refreshToken` always persists whatever `refresh_token` Intuit's response carries, and throws (rather than silently keeping the stale one) if the response omits it. |
+| config | `{ realm_id: "<QBO company id>" }`. |
+| Env | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENV` (`sandbox` \| `production`, defaults to `sandbox` so a missing var fails safe). |
+| API | Query endpoint, `minorversion=75` (the floor — 1–74 were deprecated 2025-08-01), `select * from <entity> where <clause> orderby Id startposition <n> maxresults 1000`. `rateLimit = { concurrency: 2, minDelayMs: 500 }` — well inside Intuit's 500 req/min per realm, 10 concurrent per app. |
+| Backfill cursor | Per entity, in order (`Purchase` then `Bill`): `TxnDate >= backfill_from`, paged by `startposition`; one `{ entity, start }` object persisted every page, as usual for backfill (§4.1). |
+| Incremental cursor | Per entity watermark, `MetaData.LastUpdatedTime >= <max LastUpdatedTime seen for that entity>` (epoch on first run). **`>=`, not `>`**: `LastUpdatedTime` is one-second precision, so a row updated in the same second as the watermark but written after that query's snapshot would be skipped forever under a strict `>`. Re-querying the boundary row is harmless — `writeRaw`/`upsertCanonical` are idempotent (§4.1). No CDC: QBO's Query API has no changed-rows feed, so this plain watermark query is the same shape a human would run in the API Explorer. |
+| Normalize → `records` | `kind = 'qbo_expense'`, `external_id = "<Purchase\|Bill>:<Id>"`, `occurred_at = TxnDate`, `attributes = { date, amount_cents, currency, vendor, memo, account, accounts, txn_type, payment_type, credit }`. `vendor` is `EntityRef.name` (Purchase) or `VendorRef.name` (Bill); `account`/`accounts` come from each `Line[].AccountBasedExpenseLineDetail.AccountRef.name` (first / all, deduped). `amount_cents` is `TotalAmt` in integer cents (decimal-string parsed, never float-multiplied), **negated when `Purchase.Credit === true`** — QBO reports `TotalAmt` as a positive magnitude even for a vendor-refund Purchase (money *in*), and the records/money convention throughout this doc is negative for a credit/refund (cf. `money.amount_minor`, §3). `Bill` has no `Credit` field. |
+
 ## 5. Worker and jobs
 
 ### 5.1 Runtime
@@ -1170,7 +1186,7 @@ null`. Only that client's rows are touched.
 
 | script | does |
 |---|---|
-| `onboard --slug --name --timezone [--sources shopify,meta,monday,meet,drive]` | Inserts `clients`; creates the smoke user (`smoke+<slug>@bcn-services.com`, random password stored in the bcns password manager) + membership `is_smoke`; prompts for each source's credential (per the §9 checklist, refusing a Meta user token or non-Internal Google app by inspecting the token's `/debug_token` type and the OAuth client's audience), writes `source_tokens`; copies connector defaults into `connector_schedule` (`backfill_from = today − backfillDepth`, `backfill_cursor = {}`, `next_run_at = now()`); for Monday, auto-fills `config.columns`; for Meta, fills `account_timezone/currency` and warns on mismatch. |
+| `onboard --slug --name --timezone [--sources shopify,meta,monday,meet,drive,quickbooks]` | Inserts `clients`; creates the smoke user (`smoke+<slug>@bcn-services.com`, random password stored in the bcns password manager) + membership `is_smoke`; prompts for each source's credential (per the §9 checklist, refusing a Meta user token or non-Internal Google app by inspecting the token's `/debug_token` type and the OAuth client's audience), writes `source_tokens`; copies connector defaults into `connector_schedule` (`backfill_from = today − backfillDepth`, `backfill_cursor = {}`, `next_run_at = now()`); for Monday, auto-fills `config.columns`; for Meta, fills `account_timezone/currency` and warns on mismatch. |
 | `add-member --slug --email [--owner]` | Creates the auth user (invite email via Auth admin API) + membership. |
 | `add-member --slug --agent` | Mints/rotates the platform agent user (`agent+<slug>@bcn-services.com`, role member, `is_smoke = false`, no invite — `admin.createUser`/`updateUserById`, fresh password printed once). Mutually exclusive with `--email`/`--owner`. |
 | `import-media --slug --dir <folder> [--set <name>] [--tags a,b]` | Walks a folder, uploads each file to `orig`, registers it through `data.register_media(client_id, path, …)` — the same validation the RPC uses (§3.3) — optionally adds to a set. Idempotent on filename+size. |
