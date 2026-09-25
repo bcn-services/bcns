@@ -27,6 +27,9 @@ async function Header() {
               <Link href="/" className="hover:text-foreground">
                 Sources
               </Link>
+              <Link href="/data" className="hover:text-foreground">
+                Your data
+              </Link>
               <Link href="/team" className="hover:text-foreground">
                 Team
               </Link>

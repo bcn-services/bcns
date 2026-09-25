@@ -92,11 +92,11 @@ live hub.
 
 **App name:** bcns Connect
 
-**Tagline (≤ 62 chars):** Your store's orders, customers and products, in one dashboard
+**Tagline (≤ 62 chars):** See, search and export your orders, customers and products
 
 **Short description:** bcns Connect copies your Shopify orders, customers, products,
-inventory and payouts into a private workspace you own. You see them on your own bcns
-dashboard next to the other tools your business runs on.
+refunds and payouts into a private workspace you own. On the Your data page you see,
+search and export them, with your last 30 days of orders and revenue at the top.
 
 **Description:**
 
@@ -104,10 +104,11 @@ dashboard next to the other tools your business runs on.
 > project board. bcns Connect puts them in one place that belongs to you.
 >
 > Install the app, approve read access, and sign in to your bcns workspace. Within the hour
-> bcns starts pulling your orders, customers, products, inventory levels and Shopify Payments
-> payouts. After that it keeps them current every hour. Your dashboard shows sales, refunds,
-> payouts and stock together, and the Sources page shows exactly what is connected and when it
-> last updated.
+> bcns starts pulling your orders, customers, products, refunds and Shopify Payments
+> payouts. After that it keeps them current every hour. The Your data page shows your orders
+> and revenue for the last 30 days, and lets you see, search and export your orders,
+> customers and products as tables. Refunds and payouts are there as tables too. The Sources
+> page shows exactly what is connected and when it last updated.
 >
 > bcns Connect only reads. It never edits your products, orders or customers.
 >
@@ -115,8 +116,9 @@ dashboard next to the other tools your business runs on.
 
 **Key benefits (three):**
 
-1. **One place for your numbers.** Orders, refunds, payouts and inventory on one dashboard,
-   refreshed every hour.
+1. **See, search and export your data.** Your orders, customers and products in searchable
+   tables with a date filter and CSV export, plus 30-day order and revenue totals, refreshed
+   every hour.
 2. **Your data stays yours.** It lives in your own bcns workspace, which only people you
    invite can open.
 3. **Read-only.** The app requests read scopes only and never changes your store.
@@ -148,10 +150,10 @@ From `SHOPIFY_SCOPES` (`apps/connect/lib/shopify-oauth.ts:44`), which matches
 
 | Scope | Why the app needs it |
 |---|---|
-| `read_orders` | `Q_ORDERS`: order totals, status, line items and refunds for the sales dashboard. |
+| `read_orders` | `Q_ORDERS`: order totals, status, line items and refunds, shown on the Your data page and in its last-30-days orders and revenue totals. |
 | `read_all_orders` | The first sync goes back 13 months (`SHOPIFY_DEFAULTS.backfillDepth`). Without this scope Shopify only returns the last 60 days. Granted 2026-09-18. |
 | `read_products` | `Q_PRODUCTS`: product titles, status, variants and prices for the product view. |
-| `read_inventory` | `Q_INVENTORY` / `variants.inventoryQuantity`: the daily stock-on-hand total. |
+| `read_inventory` | `Q_INVENTORY` / `variants.inventoryQuantity`: the stock level shown per product on the Your data page. |
 | `read_shopify_payments_accounts` | Opens the `shopifyPaymentsAccount` root field that `Q_PAYOUTS` reads. Without it the query fails with ACCESS_DENIED (2026-09-19). |
 | `read_shopify_payments_payouts` | The `payouts` list under that account: payout amounts and dates. |
 | `read_reports` | ShopifyQL sessions query (`sessions_day`), used only when the store's `sessions_mode` is `shopifyql`. |
@@ -172,7 +174,7 @@ the protected-data request has to be amended and re-reviewed.
 
 | Question | Answer |
 |---|---|
-| Why the app needs it | So the merchant can see who placed each order and how many orders each customer has made, on the merchant's own dashboard. |
+| Why the app needs it | So the merchant can see who placed each order and how many orders each customer has made, on the merchant's own Your data page. |
 | Is the data shown only to the merchant? | Yes. It is visible only to members of that merchant's bcns workspace. Database row-level security scopes every read to the signed-in member's client (`api` views). |
 | Is it sold, shared or used for ads? | No. |
 | Minimum data | Yes. Three fields, no phone, no address. |
@@ -222,7 +224,9 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 > 3. After sign-in you land on **Sources**. A green banner reads "shopify is connected. The first
 >    pull starts within the hour." The Shopify card lists the store as a source.
 > 4. Within the hour the Shopify card shows a "Last success" time, and **Open your dashboard**
->    shows that store's orders, products, inventory and payouts.
+>    opens **Your data** (`/data`) with that store's orders, customers and products. It has
+>    search, a date filter and CSV export, and the top of the page shows the last 30 days of
+>    orders and revenue.
 > 5. To test the privacy webhooks, uninstall the app from the store admin. `shop/redact` is
 >    acknowledged with HTTP 200.
 >
@@ -230,9 +234,10 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 
 **TODO(Nate): before submitting, create the reviewer account.** It needs its own client
 (tenant). Never use SB or any real client. Give it one **owner** member (`platform/scripts/onboard.ts`,
-`add-member.ts`). Make sure the client's dashboard link (`app_url`, or the
-`<slug>.bcn-services.com` fallback in `lib/sources.ts` `dashboardUrl`) goes to a
-dashboard that actually loads. If it doesn't, "Open your dashboard" is a dead end.
+`add-member.ts`). Make sure the client's dashboard link goes to a page that
+actually loads. With no `app_url` set, `lib/sources.ts` `dashboardUrl` now falls back to the
+hub's own **Your data** page (`/data`), so the reviewer client should leave `app_url` empty.
+If `app_url` is set, it wins and must load.
 
 ---
 
@@ -246,8 +251,9 @@ Capture them from the reviewer workspace after a real sync, so the data is from 
 3. **Sources after connecting:** `/?connected=shopify`, with the green banner and the
    Shopify card.
 4. **Sources after the first sync:** the Shopify card with a "Last success" time and the usage line.
-5. **Dashboard:** the workspace dashboard ("Open your dashboard") showing Shopify orders and
-   revenue.
+5. **Your data:** `/data` (reached from "Open your dashboard"), with the 30-day orders and
+   revenue numbers at the top and the Shopify orders table below. Add a second shot with a
+   search or date filter applied, and note that **Export CSV** downloads the filtered rows.
 6. *(Optional)* **Team:** `/team`, which shows the workspace belongs to the merchant's own people.
 
 Don't include the Access page unless §2's AI-tools check passes.

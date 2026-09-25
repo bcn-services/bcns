@@ -123,3 +123,13 @@ export async function callFunction(
   const json = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   return { ok: response.ok, status: response.status, json };
 }
+
+/**
+ * A signed-in member of any role, or null: for route handlers (CSV export) that
+ * must answer 401 rather than redirect. Reads still go through RLS via `api`.
+ */
+export async function memberSession(): Promise<HubSession | null> {
+  const { supabase, result } = await loadSession();
+  if (!supabase || !result.ok) return null;
+  return { supabase, api: apiSchema(supabase), membership: result.membership };
+}
