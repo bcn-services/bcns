@@ -29,6 +29,7 @@ export interface TxnRowData {
   vendor: string;
   memo: string | null;
   amountCents: number;
+  currency: string;
   sector: string | null;
 }
 
@@ -73,6 +74,7 @@ export function QuarterlyBudgetPanel({
   totalBudgetCents,
   totalSpentCents,
   totalRemainingCents,
+  skippedCurrencyCount,
   currency,
   range,
 }: {
@@ -81,6 +83,7 @@ export function QuarterlyBudgetPanel({
   totalBudgetCents: number;
   totalSpentCents: number;
   totalRemainingCents: number;
+  skippedCurrencyCount: number;
   currency: string;
   range: { from: string; to: string };
 }) {
@@ -183,6 +186,11 @@ export function QuarterlyBudgetPanel({
           </div>
         ))}
       </div>
+      {skippedCurrencyCount > 0 ? (
+        <p className="state-note">
+          {skippedCurrencyCount} transaction{skippedCurrencyCount === 1 ? "" : "s"} in a different currency than {currency} excluded from these totals.
+        </p>
+      ) : null}
       <p className="state-note" id={DROP_HINT_ID}>
         Drag a transaction from Recent Transactions onto a sector to assign it, or use that transaction&rsquo;s Actions menu
         &mdash; the keyboard-accessible way to assign it.
@@ -196,14 +204,12 @@ export function RecentTransactionsPanel({
   lastSyncedLabel,
   txns,
   sectors,
-  currency,
   range,
 }: {
   connected: boolean;
   lastSyncedLabel: string | null;
   txns: TxnRowData[];
   sectors: SectorTotal[];
-  currency: string;
   range: { from: string; to: string };
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -280,7 +286,7 @@ export function RecentTransactionsPanel({
                       <div className="txn-row__vendor">{t.vendor}</div>
                       {t.memo ? <div className="txn-row__memo">{t.memo}</div> : null}
                     </td>
-                    <td className="fin-table__num">{formatMoney(t.amountCents, currency)}</td>
+                    <td className="fin-table__num">{formatMoney(t.amountCents, t.currency)}</td>
                     <td>
                       <span className={`badge ${t.sector ? "badge--sector" : "badge--idle"}`}>{sectorLabelFor(t.sector) ?? "Unassigned"}</span>
                     </td>
@@ -327,8 +333,10 @@ export function RecentTransactionsPanel({
               <input type="hidden" name="from" value={range.from} />
               <input type="hidden" name="to" value={range.to} />
               <span className="bulk-bar__label">{checked.size} selected</span>
-              <select className="lib-input lib-input--select lib-input--sm" name="sector" defaultValue="" aria-label="Sector to assign">
-                <option value="">Assign to&hellip;</option>
+              <select className="lib-input lib-input--select lib-input--sm" name="sector" defaultValue="" required aria-label="Sector to assign">
+                <option value="" disabled>
+                  Assign to&hellip;
+                </option>
                 {sectors.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}

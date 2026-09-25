@@ -20,6 +20,7 @@ import {
   entryErrorMessage,
   financialRecordsQuery,
   pickCurrency,
+  pickQboCurrency,
   qboQuarterTxnsQuery,
   qboRecentTxnsQuery,
   quarterBounds,
@@ -120,20 +121,11 @@ export default async function FinancialsPage({
   const sectorBudgets = sectorBudgetRows.rows.map(toSectorBudget).filter((b): b is NonNullable<typeof b> => b !== null);
   const sectorAssignments = sectorAssignmentRows.rows.map(toSectorAssignment).filter((a): a is NonNullable<typeof a> => a !== null);
   const sectorIds = collectSectorIds(sectorBudgets, sectorAssignments);
-  const budgetTotals = sectorTotals({ txns: qboQuarterTxns, assignments: sectorAssignments, budgets: sectorBudgets, quarter, sectors: sectorIds });
   const assignmentMap = toAssignmentMap(sectorAssignments);
 
   const qboHealth = healthFor(shell.health, "quickbooks");
   const qboConnected = qboHealth !== null;
   const qboLastSynced = qboHealth?.last_success_at ? formatRelativeTime(qboHealth.last_success_at) : null;
-  const recentTxnRows = qboRecentTxns.map((t) => ({
-    externalId: t.externalId,
-    date: t.date,
-    vendor: t.vendor,
-    memo: t.memo,
-    amountCents: t.amountCents,
-    sector: assignmentMap.get(t.externalId) ?? null,
-  }));
 
   const summarySplit = splitPeriods(summary.rows, range.from, range.to, range.prevFrom, range.prevTo);
   const spendSplit = splitPeriods(spend.rows, range.from, range.to, range.prevFrom, range.prevTo);
@@ -141,6 +133,26 @@ export default async function FinancialsPage({
   const prevEntries = shapeEntries(records.rows, range.prevFrom, range.prevTo);
 
   const currency = pickCurrency(summary.rows, spend.rows);
+  // Separate from the page-wide `currency` above: the QuickBooks panels' own
+  // rows/totals shouldn't be labeled with whatever Shopify/Meta happen to use.
+  const qboCurrency = pickQboCurrency([...qboQuarterTxns, ...qboRecentTxns], currency);
+  const budgetTotals = sectorTotals({
+    txns: qboQuarterTxns,
+    assignments: sectorAssignments,
+    budgets: sectorBudgets,
+    quarter,
+    sectors: sectorIds,
+    currency: qboCurrency,
+  });
+  const recentTxnRows = qboRecentTxns.map((t) => ({
+    externalId: t.externalId,
+    date: t.date,
+    vendor: t.vendor,
+    memo: t.memo,
+    amountCents: t.amountCents,
+    currency: t.currency,
+    sector: assignmentMap.get(t.externalId) ?? null,
+  }));
   const totals = computeFinancialTotals(summarySplit.current, spendSplit.current, entries);
   const prevTotals = computeFinancialTotals(summarySplit.previous, spendSplit.previous, prevEntries);
   const tiles = computeFinancialTiles(totals, prevTotals);
@@ -342,7 +354,8 @@ export default async function FinancialsPage({
           totalBudgetCents={budgetTotals.totalBudgetCents}
           totalSpentCents={budgetTotals.totalSpentCents}
           totalRemainingCents={budgetTotals.totalRemainingCents}
-          currency={currency}
+          skippedCurrencyCount={budgetTotals.skippedCurrencyCount}
+          currency={qboCurrency}
           range={range}
         />
         <RecentTransactionsPanel
@@ -350,7 +363,6 @@ export default async function FinancialsPage({
           lastSyncedLabel={qboLastSynced}
           txns={recentTxnRows}
           sectors={budgetTotals.sectors}
-          currency={currency}
           range={range}
         />
       </div>

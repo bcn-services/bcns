@@ -15,8 +15,10 @@ import {
   parseBulkAssignInput,
   parseSectorBudgetInput,
   parseUnassignInput,
+  pickQboCurrency,
   quarterBounds,
   quarterOf,
+  QBO_RECENT_LIMIT,
   sectorAssignmentAttributes,
   sectorTotals,
   toAssignmentMap,
@@ -98,6 +100,43 @@ test("sectorTotals: header totals sum every sector's budget/spent, remaining can
   assert.equal(result.totalBudgetCents, 10_000);
 });
 
+test("sectorTotals: a negative amount_cents (credit/refund) offsets that sector's spend", () => {
+  const debit = toQboTxn(txnRow({ external_id: "Purchase:1", attributes: { ...txnRow().attributes, amount_cents: 10_000 } }));
+  const credit = toQboTxn(txnRow({ external_id: "Purchase:2", attributes: { ...txnRow().attributes, amount_cents: -2_500 } }));
+  assert.ok(debit && credit, "toQboTxn must accept a negative amount_cents");
+  const assignments = [
+    { txn: "Purchase:1", sector: "marketing" },
+    { txn: "Purchase:2", sector: "marketing" },
+  ];
+  const result = sectorTotals({ txns: [debit, credit], assignments, budgets: [], quarter: "2026Q3", sectors: ["marketing"] });
+  assert.equal(result.sectors[0].spentCents, 7_500, "10000 debit + (-2500) credit should net to 7500");
+});
+
+test("sectorTotals: a txn whose currency disagrees with the given `currency` is excluded from spend and counted", () => {
+  const usd = toQboTxn(txnRow({ external_id: "Purchase:1", attributes: { ...txnRow().attributes, amount_cents: 5000, currency: "USD" } }));
+  const eur = toQboTxn(txnRow({ external_id: "Purchase:2", attributes: { ...txnRow().attributes, amount_cents: 5000, currency: "EUR" } }));
+  assert.ok(usd && eur);
+  const assignments = [
+    { txn: "Purchase:1", sector: "marketing" },
+    { txn: "Purchase:2", sector: "marketing" },
+  ];
+  const withCheck = sectorTotals({ txns: [usd, eur], assignments, budgets: [], quarter: "2026Q3", sectors: ["marketing"], currency: "USD" });
+  assert.equal(withCheck.sectors[0].spentCents, 5000, "only the USD txn should count");
+  assert.equal(withCheck.skippedCurrencyCount, 1);
+
+  const noCheck = sectorTotals({ txns: [usd, eur], assignments, budgets: [], quarter: "2026Q3", sectors: ["marketing"] });
+  assert.equal(noCheck.sectors[0].spentCents, 10000, "omitting `currency` performs no filtering, unchanged from before");
+  assert.equal(noCheck.skippedCurrencyCount, 0);
+});
+
+test("pickQboCurrency: most common currency among txns, else the fallback", () => {
+  const usd = toQboTxn(txnRow({ external_id: "Purchase:1", attributes: { ...txnRow().attributes, currency: "USD" } }));
+  const usd2 = toQboTxn(txnRow({ external_id: "Purchase:2", attributes: { ...txnRow().attributes, currency: "USD" } }));
+  const eur = toQboTxn(txnRow({ external_id: "Purchase:3", attributes: { ...txnRow().attributes, currency: "EUR" } }));
+  assert.equal(pickQboCurrency([usd, usd2, eur], "CAD"), "USD");
+  assert.equal(pickQboCurrency([], "CAD"), "CAD");
+});
+
 /* ------------------------------------------------- re-sync keeps assignment */
 
 test("re-sync: a rebuilt txn row (new uuid, refreshed attributes) with the same external_id keeps its sector and totals", () => {
@@ -171,6 +210,28 @@ test("parseBulkAssignInput: drops malformed txn ids, rejects when none remain, a
   assert.equal(parseBulkAssignInput({ txns: ["garbage"], sector: "marketing" }).ok, false);
   assert.equal(parseBulkAssignInput({ txns: [], sector: "marketing" }).ok, false);
   assert.equal(parseBulkAssignInput({ txns: ["Purchase:1"], sector: "not_a_sector" }).ok, false);
+});
+
+test("parseBulkAssignInput: rejects an empty/missing sector — bulk unassign is not a feature", () => {
+  assert.deepEqual(parseBulkAssignInput({ txns: ["Purchase:1"], sector: "" }), { ok: false, code: "sector" });
+  assert.deepEqual(parseBulkAssignInput({ txns: ["Purchase:1"], sector: null }), { ok: false, code: "sector" });
+  assert.deepEqual(parseBulkAssignInput({ txns: ["Purchase:1"] }), { ok: false, code: "sector" });
+});
+
+test("parseBulkAssignInput: collapses duplicate txn ids and rejects over the page-size cap", () => {
+  const dup = parseBulkAssignInput({ txns: ["Purchase:1", "Purchase:1", "Bill:2"], sector: "marketing" });
+  assert.equal(dup.ok, true);
+  assert.deepEqual(dup.value.txns, ["Purchase:1", "Bill:2"]);
+
+  const overCap = Array.from({ length: QBO_RECENT_LIMIT + 1 }, (_, i) => `Purchase:${i + 1}`);
+  assert.equal(parseBulkAssignInput({ txns: overCap, sector: "marketing" }).ok, false);
+  const atCap = Array.from({ length: QBO_RECENT_LIMIT }, (_, i) => `Purchase:${i + 1}`);
+  assert.equal(parseBulkAssignInput({ txns: atCap, sector: "marketing" }).ok, true);
+});
+
+test("TXN_EXTERNAL_ID_RE (via parseBulkAssignInput): rejects a txn id with more than 20 digits", () => {
+  const tooLong = parseBulkAssignInput({ txns: [`Purchase:${"1".repeat(21)}`], sector: "marketing" });
+  assert.equal(tooLong.ok, false);
 });
 
 /* ---------------------------------------------------------- static assertions */

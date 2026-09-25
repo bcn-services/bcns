@@ -477,7 +477,7 @@ export const SECTOR_BUDGET_KIND = "sector_budget";
 export const SECTOR_ASSIGNMENT_KIND = "sector_assignment";
 
 /** `Purchase:123` or `Bill:456` — the worker's own external_id shape. */
-export const TXN_EXTERNAL_ID_RE = /^(Purchase|Bill):[0-9]+$/;
+export const TXN_EXTERNAL_ID_RE = /^(Purchase|Bill):[0-9]{1,20}$/;
 export const QUARTER_RE = /^\d{4}Q[1-4]$/;
 
 // ponytail: capped, no paging — a quarter's worth of QBO expenses or a
@@ -556,8 +556,10 @@ export function toQboTxn(row: RecordLike): QboTxn | null {
   const a = attr(row);
   const date = typeof a.date === "string" ? a.date : "";
   if (!isValidYmd(date)) return null;
+  // Negative amount_cents is a deliberate credit/refund (worker negates
+  // Purchase.Credit) — it must pass through so it offsets a sector's spend.
   const amountCents = Number(a.amount_cents);
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return null;
+  if (!Number.isSafeInteger(amountCents)) return null;
   const txnType = a.txn_type === "Purchase" || a.txn_type === "Bill" ? a.txn_type : null;
   if (!txnType) return null;
   return {
@@ -636,33 +638,45 @@ export interface SectorTotalsResult {
   totalBudgetCents: number;
   totalSpentCents: number;
   totalRemainingCents: number;
+  /** In-window, sector-assigned txns excluded because their currency didn't
+   *  match `currency` — 0 when `currency` is omitted (no check performed). */
+  skippedCurrencyCount: number;
 }
 
 /** Per-sector budget/spent/remaining/% for one quarter, plus header totals.
  *  Spent counts only a txn whose own `date` falls inside [quarter start,
  *  quarter end) AND whose assignment (keyed on the txn's external_id, never
- *  its row id) names that sector. */
+ *  its row id) names that sector. When `currency` is given, a matching txn
+ *  whose own currency disagrees is excluded from spend rather than silently
+ *  summed in with a different unit — see `skippedCurrencyCount`. */
 export function sectorTotals({
   txns,
   assignments,
   budgets,
   quarter,
   sectors,
+  currency,
 }: {
   txns: QboTxn[];
   assignments: SectorAssignment[];
   budgets: SectorBudget[];
   quarter: string;
   sectors: string[];
+  currency?: string;
 }): SectorTotalsResult {
   const bounds = quarterBounds(quarter);
   const assignBySectorTxn = toAssignmentMap(assignments);
   const spentBySector = new Map<string, number>();
+  let skippedCurrencyCount = 0;
   if (bounds) {
     for (const t of txns) {
       if (t.date < bounds.start || t.date >= bounds.endExclusive) continue;
       const sector = assignBySectorTxn.get(t.externalId);
       if (!sector) continue;
+      if (currency !== undefined && t.currency !== currency) {
+        skippedCurrencyCount++;
+        continue;
+      }
       spentBySector.set(sector, (spentBySector.get(sector) ?? 0) + t.amountCents);
     }
   }
@@ -678,7 +692,30 @@ export function sectorTotals({
 
   const totalBudgetCents = result.reduce((sum, s) => sum + s.budgetCents, 0);
   const totalSpentCents = result.reduce((sum, s) => sum + s.spentCents, 0);
-  return { sectors: result, totalBudgetCents, totalSpentCents, totalRemainingCents: totalBudgetCents - totalSpentCents };
+  return {
+    sectors: result,
+    totalBudgetCents,
+    totalSpentCents,
+    totalRemainingCents: totalBudgetCents - totalSpentCents,
+    skippedCurrencyCount,
+  };
+}
+
+/** Currency for the QuickBooks panels: the most common currency among the
+ *  connector's own txns (mode), since the ad-spend/Shopify `pickCurrency` is
+ *  unrelated data. `fallback` (the page currency) covers the no-txns case. */
+export function pickQboCurrency(txns: QboTxn[], fallback: string): string {
+  const counts = new Map<string, number>();
+  for (const t of txns) counts.set(t.currency, (counts.get(t.currency) ?? 0) + 1);
+  let best = fallback;
+  let bestCount = 0;
+  for (const [currency, count] of counts) {
+    if (count > bestCount) {
+      best = currency;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 /* ---------------------------------------------------------- parse* gates */
@@ -733,14 +770,20 @@ export interface BulkAssignInput {
 
 /** The whole server-side gate for bulkAssign: every txn id must be well-formed
  *  (malformed ones are dropped, not fatal — a stale checkbox shouldn't sink
- *  the rest of the selection) and at least one must remain. */
+ *  the rest of the selection), duplicates collapse to one, and at least one
+ *  must remain but no more than a page's worth (a huge `txns[]` body should
+ *  not fan out thousands of parallel RPCs). Unlike per-row assign/unassign,
+ *  bulk has no "Assign to…" UI affordance for clearing a sector, so an
+ *  empty/missing sector is rejected rather than treated as a bulk unassign —
+ *  the bulk bar's own `<select>` defaults to that empty value, and silently
+ *  wiping every checked row's sector on a plain "Assign" click is a bug, not
+ *  a feature. */
 export function parseBulkAssignInput(input: { txns?: unknown[]; sector?: unknown }): SectorParseResult<BulkAssignInput> {
-  const txns = Array.isArray(input.txns) ? input.txns.filter((t): t is string => typeof t === "string" && TXN_EXTERNAL_ID_RE.test(t)) : [];
-  if (!txns.length) return { ok: false, code: "txn" };
-  const sectorRaw = input.sector;
-  if (sectorRaw === null || sectorRaw === undefined || sectorRaw === "") return { ok: true, value: { txns, sector: null } };
-  if (!isKnownSectorId(sectorRaw)) return { ok: false, code: "sector" };
-  return { ok: true, value: { txns, sector: sectorRaw } };
+  const filtered = Array.isArray(input.txns) ? input.txns.filter((t): t is string => typeof t === "string" && TXN_EXTERNAL_ID_RE.test(t)) : [];
+  const txns = [...new Set(filtered)];
+  if (!txns.length || txns.length > QBO_RECENT_LIMIT) return { ok: false, code: "txn" };
+  if (!isKnownSectorId(input.sector)) return { ok: false, code: "sector" };
+  return { ok: true, value: { txns, sector: input.sector } };
 }
 
 /** save_record's exact shapes for the two dashboard record kinds above. */
