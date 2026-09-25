@@ -16,8 +16,19 @@ import { getDataClient } from "@/lib/data";
 import {
   FINANCIAL_ENTRY_KIND,
   FINANCIAL_ENTRY_SOURCE,
+  SECTOR_BUDGET_KIND,
+  SECTOR_ASSIGNMENT_KIND,
   entryAttributes,
   parseEntryInput,
+  parseAssignInput,
+  parseBulkAssignInput,
+  parseSectorBudgetInput,
+  parseUnassignInput,
+  sectorAssignmentAttributes,
+  sectorAssignmentExternalId,
+  sectorBudgetAttributes,
+  sectorBudgetExternalId,
+  sectorLabel,
   type EntryErrorCode,
 } from "@/lib/financials";
 import { isValidYmd } from "@/lib/overview";
@@ -120,4 +131,118 @@ export async function deleteFinancialEntry(form: FormData): Promise<void> {
     fail(form, "delete", false);
   }
   done(form);
+}
+
+/* ------------------------------------------------------------------ *
+ * QuickBooks quarterly budget + recent transactions.
+ *
+ * The quarter and sector are both constrained to a fixed, known shape (a
+ * `/^\d{4}Q[1-4]$/` string; one of the five sector slugs) before any RPC is
+ * issued — the same trust-boundary rule as the manual-entry gate above. None
+ * of these four writes ever calls delete_record: an unassign is a plain
+ * save_record upsert onto the assignment row with `sector: null`.
+ *
+ * These controls have no dedicated error banner (drag-and-drop, a native
+ * <select>, and a plain number input already constrain what a form can send),
+ * so a rejected submission is logged and the page just re-renders unchanged
+ * rather than growing a second error-code vocabulary.
+ * ------------------------------------------------------------------ */
+
+function backToFinancials(form: FormData): never {
+  revalidatePath("/financials");
+  const qs = rangeParams(form).toString();
+  redirect(qs ? `/financials?${qs}` : "/financials");
+}
+
+export async function setSectorBudget(form: FormData): Promise<void> {
+  const parsed = parseSectorBudgetInput({ quarter: form.get("quarter"), sector: form.get("sector"), budget: form.get("budget") });
+  if (!parsed.ok) {
+    console.error("financials: setSectorBudget rejected", parsed.code);
+    backToFinancials(form);
+  }
+
+  const client = await getDataClient();
+  if (!client) backToFinancials(form);
+
+  try {
+    await client.rpc.save_record({
+      kind: SECTOR_BUDGET_KIND,
+      attributes: sectorBudgetAttributes(parsed.value),
+      external_id: sectorBudgetExternalId(parsed.value.quarter, parsed.value.sector),
+      title: sectorLabel(parsed.value.sector),
+    });
+  } catch (err) {
+    console.error("financials: save_record (sector_budget) failed", err instanceof Error ? err.message : err);
+  }
+  backToFinancials(form);
+}
+
+export async function assignTransaction(form: FormData): Promise<void> {
+  const parsed = parseAssignInput({ txn: form.get("txn"), sector: form.get("sector") });
+  if (!parsed.ok) {
+    console.error("financials: assignTransaction rejected", parsed.code);
+    backToFinancials(form);
+  }
+
+  const client = await getDataClient();
+  if (!client) backToFinancials(form);
+
+  try {
+    await client.rpc.save_record({
+      kind: SECTOR_ASSIGNMENT_KIND,
+      attributes: sectorAssignmentAttributes(parsed.value.txn, parsed.value.sector),
+      external_id: sectorAssignmentExternalId(parsed.value.txn),
+    });
+  } catch (err) {
+    console.error("financials: save_record (sector_assignment) failed", err instanceof Error ? err.message : err);
+  }
+  backToFinancials(form);
+}
+
+export async function unassignTransaction(form: FormData): Promise<void> {
+  const parsed = parseUnassignInput({ txn: form.get("txn") });
+  if (!parsed.ok) {
+    console.error("financials: unassignTransaction rejected", parsed.code);
+    backToFinancials(form);
+  }
+
+  const client = await getDataClient();
+  if (!client) backToFinancials(form);
+
+  try {
+    await client.rpc.save_record({
+      kind: SECTOR_ASSIGNMENT_KIND,
+      attributes: sectorAssignmentAttributes(parsed.value.txn, null),
+      external_id: sectorAssignmentExternalId(parsed.value.txn),
+    });
+  } catch (err) {
+    console.error("financials: save_record (sector_assignment unassign) failed", err instanceof Error ? err.message : err);
+  }
+  backToFinancials(form);
+}
+
+export async function bulkAssign(form: FormData): Promise<void> {
+  const parsed = parseBulkAssignInput({ txns: form.getAll("txns"), sector: form.get("sector") });
+  if (!parsed.ok) {
+    console.error("financials: bulkAssign rejected", parsed.code);
+    backToFinancials(form);
+  }
+
+  const client = await getDataClient();
+  if (!client) backToFinancials(form);
+
+  const { txns, sector } = parsed.value;
+  const results = await Promise.allSettled(
+    txns.map((txn) =>
+      client.rpc.save_record({
+        kind: SECTOR_ASSIGNMENT_KIND,
+        attributes: sectorAssignmentAttributes(txn, sector),
+        external_id: sectorAssignmentExternalId(txn),
+      }),
+    ),
+  );
+  for (const r of results) {
+    if (r.status === "rejected") console.error("financials: save_record (bulk sector_assignment) failed", r.reason);
+  }
+  backToFinancials(form);
 }
