@@ -4,7 +4,7 @@
 // index.js is imported first (not quickbooks.js) so the shopify/meta/monday/meet/drive/quickbooks
 // circular import resolves connectors.quickbooks before this file's own top-level code runs —
 // importing quickbooks.js first here left `quickbooks` undefined inside index.ts's own registry.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { classify, SourceError, type Json, type RawRow, type RunContext } from '../worker/src/connectors/index.js'
 import { amountCents, baseUrl, buildQuery, quickbooks } from '../worker/src/connectors/quickbooks.js'
 
@@ -139,9 +139,9 @@ describe('baseUrl', () => {
     else process.env.QUICKBOOKS_ENV = prev
   })
 
-  it('defaults to sandbox when unset', () => {
+  it('throws when unset — no silent default, sandbox or otherwise', () => {
     delete process.env.QUICKBOOKS_ENV
-    expect(baseUrl()).toBe('https://sandbox-quickbooks.api.intuit.com')
+    expect(() => baseUrl()).toThrow(/QUICKBOOKS_ENV must be 'sandbox' or 'production'/)
   })
 
   it('switches to production when QUICKBOOKS_ENV=production', () => {
@@ -149,9 +149,14 @@ describe('baseUrl', () => {
     expect(baseUrl()).toBe('https://quickbooks.api.intuit.com')
   })
 
-  it('anything else (e.g. a typo) fails safe to sandbox', () => {
-    process.env.QUICKBOOKS_ENV = 'prod'
+  it('resolves sandbox when QUICKBOOKS_ENV=sandbox', () => {
+    process.env.QUICKBOOKS_ENV = 'sandbox'
     expect(baseUrl()).toBe('https://sandbox-quickbooks.api.intuit.com')
+  })
+
+  it('throws rather than failing safe on a typo', () => {
+    process.env.QUICKBOOKS_ENV = 'prod'
+    expect(() => baseUrl()).toThrow(/QUICKBOOKS_ENV must be 'sandbox' or 'production'/)
   })
 })
 
@@ -191,6 +196,22 @@ describe('refreshToken', () => {
     await expect(quickbooks.refreshToken!(ctx(fetchImpl))).rejects.toThrow(/refresh_token/)
   })
 
+  it('throws when Intuit omits access_token', async () => {
+    const fetchImpl = (async () => new Response(JSON.stringify({
+      refresh_token: 'new-refresh', expires_in: 3600, // no access_token
+    }), { status: 200 })) as unknown as typeof fetch
+    await expect(quickbooks.refreshToken!(ctx(fetchImpl))).rejects.toThrow(/access_token/)
+  })
+
+  it('throws on a non-positive or non-finite expires_in rather than letting `new Date` misbehave', async () => {
+    const bad = (expires_in: unknown) => (async () => new Response(JSON.stringify({
+      access_token: 'new-access', refresh_token: 'new-refresh', expires_in,
+    }), { status: 200 })) as unknown as typeof fetch
+    await expect(quickbooks.refreshToken!(ctx(bad(0)))).rejects.toThrow(/expires_in/)
+    await expect(quickbooks.refreshToken!(ctx(bad(-1)))).rejects.toThrow(/expires_in/)
+    await expect(quickbooks.refreshToken!(ctx(bad('nope')))).rejects.toThrow(/expires_in/)
+  })
+
   it('throws on invalid_grant (dead refresh token), classified as auth', async () => {
     const fetchImpl = (async () => new Response(JSON.stringify({
       error: 'invalid_grant', error_description: 'Token expired',
@@ -203,6 +224,14 @@ describe('refreshToken', () => {
 })
 
 describe('pull() generator (via incremental) — pagination, entity handoff, and the >= boundary', () => {
+  // runQuery() calls baseUrl(), which now throws rather than defaulting when unset.
+  const prevEnv = process.env.QUICKBOOKS_ENV
+  beforeEach(() => { process.env.QUICKBOOKS_ENV = 'sandbox' })
+  afterEach(() => {
+    if (prevEnv === undefined) delete process.env.QUICKBOOKS_ENV
+    else process.env.QUICKBOOKS_ENV = prevEnv
+  })
+
   const ctx = (fetchImpl: typeof fetch): RunContext => ({
     clientId: 'c1', source: 'quickbooks', config: { realm_id: '123' }, timezone: 'America/New_York',
     token: { client_id: 'c1', source: 'quickbooks', kind: 'quickbooks_oauth_refresh', secret: 'tok', refresh_secret: 'r', expires_at: null, attributes: {} },

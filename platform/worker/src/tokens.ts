@@ -10,11 +10,14 @@ import { baseUrl as quickbooksBaseUrl } from './connectors/quickbooks.js'
  * A null expires_at skips the row by itself, which is what keeps the never-expiring
  * kinds out. google_oauth_refresh and shopify_admin both carry one.
  *
- * auth_failed rows are retried too, hourly. refreshOne marks a row auth_failed on ANY
- * throw — a transient 5xx included — and probeAuthFailed cannot rescue a Shopify row,
- * because it probes with the one-hour access token that is already dead. Without this
- * clause one bad network moment bricked a merchant permanently. The hourly cadence
- * matches probeAuthFailed's, so a genuinely revoked token is not retried every tick.
+ * auth_failed rows are retried too, hourly. refreshOne only marks a row auth_failed when
+ * classify(e) === 'auth' — a dead/invalid refresh token — not on a transient 5xx or
+ * network error (those leave status untouched, so the very next tick just tries again).
+ * A row that IS auth_failed still needs this clause: probeAuthFailed cannot rescue a
+ * Shopify row, because it probes with the one-hour access token that is already dead,
+ * so a credential that becomes valid again (owner reconnected, Intuit un-revoked it)
+ * would otherwise never get another refresh attempt. The hourly cadence matches
+ * probeAuthFailed's, so a genuinely revoked token is not retried every tick.
  */
 export async function refreshTokens(t: Tick): Promise<number> {
   const due = await sql<{ client_id: string; source: Source }>(

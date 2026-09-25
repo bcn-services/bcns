@@ -33,11 +33,14 @@ const configSchema = z.object({
   realm_id: z.string().regex(/^[0-9]{1,32}$/),
 }).passthrough()
 
-/** Sandbox vs production host; QUICKBOOKS_ENV defaults to sandbox so a missing env var fails safe. */
+/** Sandbox vs production host. No default: an unset/invalid QUICKBOOKS_ENV must fail
+ *  loud at startup, not silently run production traffic against the sandbox host
+ *  (or vice versa) because a deploy forgot to set it. */
 export function baseUrl(): string {
-  return envStr('QUICKBOOKS_ENV', 'sandbox') === 'production'
-    ? 'https://quickbooks.api.intuit.com'
-    : 'https://sandbox-quickbooks.api.intuit.com'
+  const env = envStr('QUICKBOOKS_ENV')
+  if (env === 'production') return 'https://quickbooks.api.intuit.com'
+  if (env === 'sandbox') return 'https://sandbox-quickbooks.api.intuit.com'
+  throw new Error(`QUICKBOOKS_ENV must be 'sandbox' or 'production', got: ${JSON.stringify(env)}`)
 }
 
 /** `'YYYY-MM-DD'`, matching what TxnDate compares against. */
@@ -157,12 +160,19 @@ export const quickbooks: Connector = {
     })
     const b: Json = await r.json().catch(() => ({}))
     if (!r.ok || b.error) throw new SourceError('quickbooks', String(b.error_description ?? b.error ?? `HTTP ${r.status}`), r.status, b)
+    if (typeof b.access_token !== 'string' || !b.access_token) {
+      throw new SourceError('quickbooks', 'refresh response carried no access_token', r.status, b)
+    }
     if (typeof b.refresh_token !== 'string' || !b.refresh_token) {
       throw new SourceError('quickbooks', 'refresh response carried no refresh_token', r.status, b)
     }
+    const expiresIn = Number(b.expires_in)
+    if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new SourceError('quickbooks', 'refresh response carried an invalid expires_in', r.status, b)
+    }
     return {
-      secret: String(b.access_token),
-      expiresAt: new Date(Date.now() + Number(b.expires_in ?? 3600) * 1000),
+      secret: b.access_token,
+      expiresAt: new Date(Date.now() + expiresIn * 1000),
       refreshSecret: b.refresh_token,
     }
   },
