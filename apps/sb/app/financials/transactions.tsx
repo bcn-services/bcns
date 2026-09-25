@@ -97,6 +97,7 @@ export function QuarterlyBudgetPanel({
             }}
           >
             <div className="sector-card__title">{s.label}</div>
+            <div className="sector-card__subtitle">{s.id}</div>
             <div className="sector-card__row">
               <span>Budget</span>
               <strong>{formatMoney(s.budgetCents, currency)}</strong>

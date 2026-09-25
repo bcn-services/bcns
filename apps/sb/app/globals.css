@@ -1753,7 +1753,7 @@ summary::-webkit-details-marker {
 
 .sector-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1777,6 +1777,15 @@ summary::-webkit-details-marker {
   font-weight: 700;
   color: var(--text);
   margin-bottom: 2px;
+}
+
+.sector-card__subtitle {
+  margin: -4px 0 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
 .sector-card__row {
