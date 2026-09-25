@@ -39,7 +39,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
 export const config = {
   // /api/health is an unauthenticated uptime probe; static assets need no session.
-  // TENANT_MATCHER plus one exclusion, inlined so Next can statically extract the
+  // TENANT_MATCHER plus CONNECT_PUBLIC_ROUTES (both in packages/tenant/src/middleware.ts,
+  // tests/matcher.test.mjs enforces it), inlined so Next can statically extract the
   // matcher at build.
   //
   // api/webhooks/ is Shopify's three mandatory privacy webhooks. Shopify calls them
