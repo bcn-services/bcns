@@ -45,19 +45,34 @@ export async function rawPartitions(db: Db): Promise<string[]> {
 }
 
 /**
- * Deletes one client's rows across DATA_TABLES (and, when scoped to a source, the data.raw
- * partitions too, fetched internally). No source = hard-delete.ts's unchanged full-wipe loop; it
- * still does its own separately-chunked raw deletion before this runs, so this function never
- * touches raw in that path (only when `source` narrows it — raw is unbounded, so an unscoped raw
- * delete stays hard-delete's own chunked-by-ctid loop, not a plain DELETE here).
+ * One client+source's data.raw rows, chunked at 50k ctids per committed delete — mirrors
+ * hard-delete.ts's own unscoped loop, since raw is the one table an active client can grow
+ * without bound. Callers run this OUTSIDE any transaction (privacy.ts does, before its guarded
+ * transaction): each chunk commits on its own, so a crash mid-loop just leaves fewer rows to
+ * redo on the next pass — never a rollback of work already done.
+ */
+export async function deleteRawScoped(db: Db, clientId: string, source: string): Promise<void> {
+  for (const part of await rawPartitions(db)) {
+    for (;;) {
+      const r = await db.query(
+        `delete from data.${part} where ctid = any(array(
+           select ctid from data.${part} where client_id = $1 and source = $2 limit 50000))`,
+        [clientId, source]
+      )
+      if (!r.rowCount) break
+    }
+  }
+}
+
+/**
+ * Deletes one client's rows across DATA_TABLES's canonical tables only — never data.raw. A
+ * source-scoped caller must chunk data.raw itself first via deleteRawScoped (privacy.ts does,
+ * outside its transaction, before this runs); hard-delete.ts's unscoped path does its own
+ * separately-chunked raw deletion before this runs too. Raw is unbounded, so it is never a plain
+ * DELETE here in either path.
  */
 export async function deleteClientRows(db: Db, clientId: string, opts: ScopeOpts = {}): Promise<void> {
   const { source } = opts
-  if (source) {
-    for (const part of await rawPartitions(db)) {
-      await db.query(`delete from data.${part} where client_id = $1 and source = $2`, [clientId, source])
-    }
-  }
   const tables = source ? DATA_TABLES.filter((t) => HAS_SOURCE.has(t)) : DATA_TABLES
   for (const t of tables) {
     if (source) await db.query(`delete from data.${t} where client_id = $1 and source = $2`, [clientId, source])
