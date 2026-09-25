@@ -85,6 +85,20 @@ export function LibraryIcon() {
   );
 }
 
+/** Six-dot grip for a draggable table row. */
+export function DragHandleIcon() {
+  return (
+    <svg width="12" height="16" viewBox="0 0 12 16" fill="var(--text-placeholder)" aria-hidden="true">
+      <circle cx="3" cy="3" r="1.4" />
+      <circle cx="9" cy="3" r="1.4" />
+      <circle cx="3" cy="8" r="1.4" />
+      <circle cx="9" cy="8" r="1.4" />
+      <circle cx="3" cy="13" r="1.4" />
+      <circle cx="9" cy="13" r="1.4" />
+    </svg>
+  );
+}
+
 export function ActivityIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
