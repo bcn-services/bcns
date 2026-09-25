@@ -1,58 +1,66 @@
-# retention-30d — `shop/redact` automatic deletion: plan, not shipped
+# retention-30d — `shop/redact` automatic deletion: shipped
 
-**Status:** not implemented. `customers/redact` and `customers/data_request` stay manual by
-design either way (out of scope); this is only about `shop/redact`'s 48-hour deadline.
+**Status:** implemented (branch `shop-redact-auto`), option 4 below. `customers/redact` and
+`customers/data_request` stay manual by design either way (out of scope); this was only ever
+about `shop/redact`'s 48-hour deadline.
 
-## Why this is a plan and not a diff
+## Why a plan came first
 
-The smallest automatic path the `ponytail:` comment in `apps/connect/lib/shopify-webhooks.ts`
-names — the webhook writes a row to `data.privacy_requests`, a worker task deletes it — needs the
-webhook to write that row without a session. `apps/connect` holds only the Supabase anon key, by
-design (no service-role key outside `platform/worker`/Edge Functions). Any Postgres RPC granted to
-`anon` is, by construction, callable by anyone holding the public anon key (it ships in every
-browser bundle), not only by our HMAC-verified route. The HMAC check that proves a request really
-came from Shopify happens in `gdprRoute` (`apps/connect/lib/shopify-webhook-route.ts`) — a step
-*before* the DB call. Nothing at the RPC layer can tell a real webhook from a forged one, because
-the RPC never sees the signature.
-
-**What that means concretely.** A `record_privacy_request('shop/redact', p_shop text)` RPC
-grantable to `anon` would let anyone who knows (or guesses) a live merchant's `*.myshopify.com`
-domain — often visible on the storefront itself — enqueue a real deletion of that merchant's
-connected data, with no uninstall ever happening. The worker's whole job is to act on queued rows,
-so it would carry the deletion out within 5 minutes. That is an unauthenticated data-loss vector on
-a store still actively using bcns Connect. This item's own CAUTION ("treat every deletion path as
-security-grade") rules it out, so the smallest path doesn't clear the bar it has to clear.
+The smallest automatic path — the webhook writes a row to `data.privacy_requests`, a worker task
+deletes it — needs the webhook to write that row without a session. `apps/connect` holds only the
+Supabase anon key by design (no service-role key outside `platform/worker`/Edge Functions), and no
+RPC grantable to `anon` can distinguish a real HMAC-verified webhook from a forged one, because the
+RPC never sees the signature. See the options considered below; option 4 is the one built.
 
 ## Options considered
 
-1. **Pass the RPC no proof, trust the Next.js layer.** Rejected above — the `anon` grant is itself
-   the hole; PostgREST doesn't know the caller went through `gdprRoute`.
-2. **Re-verify the Shopify HMAC inside Postgres** (pass the raw body + header through, `pgcrypto`'s
-   `hmac()`, compare against the client secret). Needs `SHOPIFY_CLIENT_SECRET` available to
-   Postgres — a secret-in-DB mechanism (Vault, or a superuser-set config parameter) that doesn't
-   exist in this repo today. New infra, new hosted step, past this item's scope.
+1. **Pass the RPC no proof, trust the Next.js layer.** Rejected — the `anon` grant is itself the
+   hole; PostgREST doesn't know the caller went through `gdprRoute`.
+2. **Re-verify the Shopify HMAC inside Postgres** (`pgcrypto`'s `hmac()`). Needs
+   `SHOPIFY_CLIENT_SECRET` available to Postgres — no secret-in-DB mechanism exists in this repo.
 3. **Give `apps/connect` a service-role key just for this one insert.** Directly forbidden by this
-   item's own constraints ("No service-role key outside `platform/worker` or Edge Functions").
-4. **A Supabase Edge Function holding the service-role key, invoked from the webhook route**, which
-   re-verifies the Shopify HMAC itself before writing `data.privacy_requests`. Closes the hole —
-   only a request that passes HMAC ever reaches the queue — but it's a new deploy target this repo
-   doesn't use yet (no `supabase/functions/`, no CI for it, no prior art to follow). Its own item,
-   not a ~200-line addition to a retention-window change.
+   item's own constraints.
+4. **A Supabase Edge Function holding the service-role key, invoked from the webhook route, which
+   re-verifies the Shopify HMAC itself before writing `data.privacy_requests`.** Built. Closes the
+   hole — only a request that independently passes HMAC ever reaches the queue.
 
-## Current state, unchanged by this branch
+## What's built
 
-`shop/redact` is recorded (shop domain + webhook id in the operator email, never the payload) and
-the operator is emailed with the 48-hour deadline. Deletion is manual: the operator deletes that
-shop's rows by hand within the window — the same per-table scope `hard-delete.ts` uses
-(`data.raw` partitions, `data.customers`, `data.products`, `data.money`, `records`/`jobs`/
-`messages`/`daily_metrics` filtered by `source = 'shopify'`, plus the `source_tokens` row), just run
-against one `source` instead of one `client_id`.
+- **Hub** (`apps/connect/lib/shopify-webhook-route.ts`, `gdprRoute`): after its own HMAC check
+  passes, `shop/redact` (only) is forwarded — raw body plus the same three Shopify headers — to
+  `SHOP_REDACT_FUNCTION_URL`. Any forward failure (unset URL, network error, timeout, non-2xx)
+  falls back to the pre-existing operator email exactly as before. `customers/redact` and
+  `customers/data_request` never forward.
+- **Edge Function** (`platform/supabase/functions/shopify-shop-redact/`): pure-handler
+  (`handler.ts`) + injected deps (`deps.ts`), Deno entry (`index.ts`). Re-verifies the HMAC itself
+  via `_shared/shopify-hmac.ts` (WebCrypto, so it needs no Deno mock under vitest/Node — see
+  `platform/test/edge-shopify-shop-redact.test.ts`'s parity test against
+  `apps/connect/lib/shopify-oauth.ts`'s `verifyWebhookHmac`). Binds the shop from the **signed**
+  body only, never the unsigned `X-Shopify-Shop-Domain` header. Writes through
+  `api.record_shop_redact` — idempotent via `data.privacy_requests.webhook_id`'s unique
+  constraint (`on conflict do nothing`), so a replay queues nothing new.
+- **Migration** (`platform/supabase/migrations/20260924000100_shop_redact.sql`):
+  `data.privacy_requests` (RLS enabled + forced, no policies — only the pooled worker role and
+  the one RPC touch it) and `api.record_shop_redact`, a `SECURITY DEFINER` function with
+  `search_path = ''`, `EXECUTE` revoked from everyone then granted to `service_role` alone, plus
+  the `usage on schema api` grant that's a prerequisite for `service_role` to reach it at all
+  (`service_role` otherwise has zero `data`/`api` access, by design).
+- **Worker task** (`platform/worker/src/privacy.ts`, wired into `tick.ts`'s housekeeping list
+  before `alerts`): claims pending rows (`for update skip locked`), resolves shop → client via
+  `data.connector_schedule` (`source = 'shopify'`, `config->>'shop'`), and refuses/escalates to
+  `needs_operator` (a `data.notifications` row, delivered by the existing `alerts()` →
+  `sendPending()` Resend path — no second mailer) on: the sb-bridge shop by domain
+  (`fa8a00-11.myshopify.com`), the sb-bridge config marker (`config->>'app' = 'bcns-data'`), an
+  ambiguous match (0 or >1 clients), or a token newer than the request (reconnected after
+  uninstall). Otherwise deletes that client's `source = 'shopify'` rows
+  (`worker/src/scope.ts`'s `deleteClientRows`, shared with `hard-delete.ts`) in one transaction and
+  marks the row `done`.
+- **Logging**: shop + webhook id (implicitly, the row id) + outcome only, at every layer — no
+  payload, HMAC, or secret is ever logged (see the Edge Function's own log call and
+  `edge-shopify-shop-redact.test.ts`'s log-content assertion).
 
-## Recommended next step
+## Manual fallback, unchanged
 
-Build option 4 as its own item: an Edge Function that duplicates `verifyWebhookHmac` (already pure,
-already tested) server-side, and only on a pass writes to `data.privacy_requests`; a worker task
-then resolves the shop domain to a `client_id` via `data.connector_schedule.config->>'shop'`
-(`source = 'shopify'`) and runs the scoped delete above. Worth scoping — and reviewing — on its own,
-since it's the first Edge Function in this repo (build, deploy, secrets), not folded into a 30-day
-retention-window change.
+If the forward fails for any reason, the pre-existing manual path still runs: the operator is
+emailed (shop domain + webhook id, never the payload) with the 48-hour deadline, and deletes that
+shop's rows by hand using the same per-table scope the worker now automates.
