@@ -16,20 +16,33 @@ import {
   computeDailyRows,
   computeFinancialTiles,
   computeFinancialTotals,
+  collectSectorIds,
   entryErrorMessage,
   financialRecordsQuery,
   pickCurrency,
+  qboQuarterTxnsQuery,
+  qboRecentTxnsQuery,
+  quarterBounds,
+  quarterOf,
+  sectorAssignmentsQuery,
+  sectorBudgetsQuery,
+  sectorTotals,
   shapeEntries,
+  toAssignmentMap,
+  toQboTxn,
+  toSectorAssignment,
+  toSectorBudget,
   type FinancialEntry,
   type FinancialTile,
 } from "@/lib/financials";
-import { panelState, type PanelState } from "@/lib/panels";
+import { healthFor, panelState, type PanelState } from "@/lib/panels";
 import {
   formatCount,
   formatDayLabel,
   formatMoney,
   formatMoneyWhole,
   formatRangeLabel,
+  formatRelativeTime,
   isValidYmd,
   parseRange,
   rangeQuery,
@@ -41,6 +54,7 @@ import { MetricCard } from "@/app/_components/MetricCard";
 import { Panel, PanelHead, StateNote, Unconfigured } from "@/app/_components/Panel";
 import { FinanceIcon } from "@/app/_components/icons";
 import { createFinancialEntry, deleteFinancialEntry } from "./actions";
+import { QuarterlyBudgetPanel, RecentTransactionsPanel } from "./transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -72,18 +86,54 @@ export default async function FinancialsPage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
-  const [summaryR, spendR, recordsR] = await Promise.allSettled([
+  const quarter = quarterOf(today);
+  const bounds = quarterBounds(quarter);
+  // quarterBounds only returns null for a malformed 'YYYYQn' string, and
+  // quarterOf always produces one — this is here so a future refactor can't
+  // silently start querying with an empty range.
+  const qStart = bounds?.start ?? today;
+  const qEndExclusive = bounds?.endExclusive ?? today;
+
+  const [summaryR, spendR, recordsR, qboQuarterR, qboRecentR, sectorBudgetsR, sectorAssignmentsR] = await Promise.allSettled([
     client.views.daily_summary_v1("day,revenue_minor,orders,currency").gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: capped at PostgREST's 1000-row default, same as the home page;
     // a long range on a large ad account rolls up partial spend. Upgrade: a
     // per-range aggregate RPC in bcns-data.
     client.views.campaign_daily_v1("day,spend_minor,currency").gte("day", range.prevFrom).lte("day", range.to).order("day", { ascending: false }).limit(ROW_LIMIT),
     financialRecordsQuery(client, range.prevFrom, range.to),
+    qboQuarterTxnsQuery(client, qStart, qEndExclusive),
+    qboRecentTxnsQuery(client),
+    sectorBudgetsQuery(client, quarter),
+    sectorAssignmentsQuery(client),
   ]);
 
   const summary = unwrap(summaryR, "daily_summary_v1");
   const spend = unwrap(spendR, "campaign_daily_v1");
   const records = unwrap(recordsR, "records_v1");
+  const qboQuarter = unwrap(qboQuarterR, "qbo_quarter_txns");
+  const qboRecent = unwrap(qboRecentR, "qbo_recent_txns");
+  const sectorBudgetRows = unwrap(sectorBudgetsR, "sector_budgets");
+  const sectorAssignmentRows = unwrap(sectorAssignmentsR, "sector_assignments");
+
+  const qboQuarterTxns = qboQuarter.rows.map(toQboTxn).filter((t): t is NonNullable<typeof t> => t !== null);
+  const qboRecentTxns = qboRecent.rows.map(toQboTxn).filter((t): t is NonNullable<typeof t> => t !== null);
+  const sectorBudgets = sectorBudgetRows.rows.map(toSectorBudget).filter((b): b is NonNullable<typeof b> => b !== null);
+  const sectorAssignments = sectorAssignmentRows.rows.map(toSectorAssignment).filter((a): a is NonNullable<typeof a> => a !== null);
+  const sectorIds = collectSectorIds(sectorBudgets, sectorAssignments);
+  const budgetTotals = sectorTotals({ txns: qboQuarterTxns, assignments: sectorAssignments, budgets: sectorBudgets, quarter, sectors: sectorIds });
+  const assignmentMap = toAssignmentMap(sectorAssignments);
+
+  const qboHealth = healthFor(shell.health, "quickbooks");
+  const qboConnected = qboHealth !== null;
+  const qboLastSynced = qboHealth?.last_success_at ? formatRelativeTime(qboHealth.last_success_at) : null;
+  const recentTxnRows = qboRecentTxns.map((t) => ({
+    externalId: t.externalId,
+    date: t.date,
+    vendor: t.vendor,
+    memo: t.memo,
+    amountCents: t.amountCents,
+    sector: assignmentMap.get(t.externalId) ?? null,
+  }));
 
   const summarySplit = splitPeriods(summary.rows, range.from, range.to, range.prevFrom, range.prevTo);
   const spendSplit = splitPeriods(spend.rows, range.from, range.to, range.prevFrom, range.prevTo);
@@ -283,6 +333,26 @@ export default async function FinancialsPage({
             )}
           </div>
         </Panel>
+      </div>
+
+      <div className="fin-grid">
+        <QuarterlyBudgetPanel
+          quarter={quarter}
+          sectors={budgetTotals.sectors}
+          totalBudgetCents={budgetTotals.totalBudgetCents}
+          totalSpentCents={budgetTotals.totalSpentCents}
+          totalRemainingCents={budgetTotals.totalRemainingCents}
+          currency={currency}
+          range={range}
+        />
+        <RecentTransactionsPanel
+          connected={qboConnected}
+          lastSyncedLabel={qboLastSynced}
+          txns={recentTxnRows}
+          sectors={budgetTotals.sectors}
+          currency={currency}
+          range={range}
+        />
       </div>
     </>
   );
