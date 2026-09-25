@@ -19,6 +19,7 @@ import { bearer, type Caller, type CallerMembership } from "./guard.ts";
 import type { InviteDeps } from "../invite-member/handler.ts";
 import type { MintDeps } from "../mint-agent-login/handler.ts";
 import { randomPassword } from "../mint-agent-login/handler.ts";
+import type { ShopRedactDeps } from "../shopify-shop-redact/handler.ts";
 
 const URL_ = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -137,6 +138,30 @@ export function mintDeps(request: Request): MintDeps {
     },
     async insertMembership(userId: string, clientId: string, role: "member") {
       await base.insertMembership(userId, clientId, role);
+    },
+  };
+}
+
+/**
+ * shopify-shop-redact has no caller JWT (HMAC is the only auth), so unlike guardDeps' `as` client
+ * this calls the RPC as the SERVICE ROLE — the one new grant that requires (migration
+ * 20260924000100: `usage on schema api` + `execute on api.record_shop_redact` to service_role
+ * only; still zero access to any `data` table, which is the wall this file's own comment
+ * describes). The RPC itself is the narrow SECURITY DEFINER surface, not this client.
+ */
+export function shopRedactDeps(): ShopRedactDeps {
+  return {
+    async recordShopRedact(shop, webhookId) {
+      const { data, error } = await admin().schema("api").rpc("record_shop_redact", {
+        p_shop: shop,
+        p_webhook_id: webhookId,
+      });
+      if (error) throw new Error(`record_shop_redact: ${error.message}`);
+      return { inserted: data === true };
+    },
+    // Shop + webhook id + outcome only — never the payload, the HMAC header, or the secret.
+    log(event, data) {
+      console.log(JSON.stringify({ event, ...data }));
     },
   };
 }
