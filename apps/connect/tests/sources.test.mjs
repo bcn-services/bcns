@@ -91,15 +91,15 @@ test("last_error is flattened and truncated", () => {
   assert.equal(truncate(null), null);
 });
 
-test("app_url wins over the subdomain convention", () => {
+test("app_url wins over the /data fallback", () => {
   assert.equal(dashboardUrl({ slug: "acme", app_url: "https://acme.example.com" }), "https://acme.example.com");
 });
 
-test("a row with no app_url column at all falls back to the convention", () => {
+test("a row with no app_url column at all falls back to the hub's /data", () => {
   // `select("*")` against a database that has not run 20260916000100 yet.
-  assert.equal(dashboardUrl({ name: "Acme", slug: "acme" }), "https://acme.bcn-services.com");
-  assert.equal(dashboardUrl({ slug: "acme", app_url: null }), "https://acme.bcn-services.com");
-  assert.equal(dashboardUrl({ slug: "acme", app_url: "  " }), "https://acme.bcn-services.com");
+  assert.equal(dashboardUrl({ name: "Acme", slug: "acme" }), "/data");
+  assert.equal(dashboardUrl({ slug: "acme", app_url: null }), "/data");
+  assert.equal(dashboardUrl({ slug: "acme", app_url: "  " }), "/data");
 });
 
 test("no client row and no slug means no dashboard link", () => {
