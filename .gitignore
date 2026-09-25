@@ -46,3 +46,4 @@ out/
 
 # Claude Code worktree scratch dirs
 .claude/worktrees/
+SHOP_REDACT_NOTES.md
