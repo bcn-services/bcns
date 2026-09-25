@@ -28,6 +28,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title: string | null
           updated_at: string | null
@@ -62,6 +63,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           spend_minor: number | null
           updated_at: string | null
@@ -98,6 +100,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status: "active" | "paused" | "churned" | null
           timezone: string | null
@@ -141,6 +144,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status: "ok" | "stale" | "auth_failed" | "error" | "never_ran" | null
           status_since: string | null
@@ -161,6 +165,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status?: "ok" | "stale" | "auth_failed" | "error" | "never_ran" | null
           status_since?: string | null
@@ -181,6 +186,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status?: "ok" | "stale" | "auth_failed" | "error" | "never_ran" | null
           status_since?: string | null
@@ -232,6 +238,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           spend_minor: number | null
           storage_path: string | null
@@ -276,6 +283,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at: string | null
           total_spent_minor: number | null
@@ -301,6 +309,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at?: string | null
           total_spent_minor?: number | null
@@ -326,6 +335,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at?: string | null
           total_spent_minor?: number | null
@@ -365,6 +375,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at: string | null
           value: number | null
@@ -385,6 +396,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at?: string | null
           value?: number | null
@@ -405,6 +417,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at?: string | null
           value?: number | null
@@ -455,6 +468,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at: string | null
         }
@@ -476,6 +490,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at: string | null
         }
@@ -502,6 +517,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at: string | null
           status: string | null
@@ -529,6 +545,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -556,6 +573,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -596,6 +614,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at: string | null
         }
@@ -673,6 +692,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at: string | null
         }
@@ -737,6 +757,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           storage_path: string | null
           tags: string[] | null
@@ -767,6 +788,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           storage_path?: string | null
           tags?: string[] | null
@@ -797,6 +819,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           storage_path?: string | null
           tags?: string[] | null
@@ -838,6 +861,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           updated_at: string | null
           user_id: string | null
@@ -896,6 +920,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title: string | null
           updated_at: string | null
@@ -919,6 +944,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title?: string | null
           updated_at?: string | null
@@ -942,6 +968,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title?: string | null
           updated_at?: string | null
@@ -987,6 +1014,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at: string | null
           status: string | null
@@ -1015,6 +1043,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -1043,6 +1072,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           source_updated_at?: string | null
           status?: string | null
@@ -1087,6 +1117,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status: string | null
           title: string | null
@@ -1115,6 +1146,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status?: string | null
           title?: string | null
@@ -1143,6 +1175,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           status?: string | null
           title?: string | null
@@ -1186,6 +1219,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title: string | null
           updated_at: string | null
@@ -1207,6 +1241,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title?: string | null
           updated_at?: string | null
@@ -1228,6 +1263,7 @@ export type Database = {
             | "dashboard"
             | "platform"
             | "drive"
+            | "quickbooks"
             | null
           title?: string | null
           updated_at?: string | null

@@ -34,6 +34,9 @@ const ROUTES: Record<Source, (u: URL, body: string) => Response | undefined> = {
   monday: () => json(MONDAY),
   meet: (u) => u.pathname.endsWith('/export') ? new Response(MEET.exports[u.pathname.split('/').at(-2)!]) : u.pathname.endsWith('/files') ? json(MEET.files) : undefined,
   drive: (u) => u.hostname.startsWith('lh3.') ? jpeg() : u.pathname.endsWith('/files') ? json(DRIVE.files) : undefined,
+  // Not exercised by this rehearsal (no fixture yet); platform/test/quickbooks.test.ts
+  // covers normalize/backfill/incremental without a database.
+  quickbooks: () => undefined,
 }
 
 const CASES: { source: Source; kind: string; config: object; tables: string[]; views: string[] }[] = [

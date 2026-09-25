@@ -1717,3 +1717,208 @@ summary::-webkit-details-marker {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* === item D: quickbooks quarterly budget + recent transactions ============
+ * Two panels below Manual Entries on /financials. Reuses .panel, .badge,
+ * .fin-table, .popup/.popup-panel, .lib-input, .btn-plain--inline and
+ * .state-note wherever they fit; only the sector grid/cards, progress bar and
+ * drag states below are new.
+ * ========================================================================= */
+
+.budget-summary {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.budget-summary__stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.budget-summary__value {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-summary__label {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.sector-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sector-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 13px 13px;
+  border: 1px solid var(--border-panel);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.sector-card.is-dragover {
+  border-color: var(--accent-chrome-border);
+  background: var(--accent-chrome);
+}
+
+.sector-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.sector-card__subtitle {
+  margin: -4px 0 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.sector-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sector-card__row strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.budget-progress {
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--hairline-row);
+  overflow: hidden;
+}
+
+.budget-progress__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+.sector-card__pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.sector-card__budget-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sector-card__budget-form .field__input {
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+
+/* ---------------------------------------------------- recent transactions */
+
+.txn-panel__sync {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.txn-table th:nth-child(1),
+.txn-table td:nth-child(1),
+.txn-table th:nth-child(2),
+.txn-table td:nth-child(2) {
+  width: 1%;
+  padding-right: 0;
+}
+
+.drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+}
+
+.txn-row {
+  cursor: default;
+}
+
+.txn-row:hover {
+  background: var(--hairline-row);
+}
+
+.txn-row.is-dragging {
+  opacity: 0.45;
+}
+
+.txn-row__vendor {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.txn-row__memo {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.badge--sector {
+  color: var(--text-secondary);
+  background: var(--accent-soft);
+}
+
+.popup-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.popup-menu-item:hover {
+  background: var(--accent-chrome);
+}
+
+.popup-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.popup-menu-item--muted {
+  color: var(--text-faint);
+}
+
+@media (max-width: 1100px) {
+  .sector-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .sector-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

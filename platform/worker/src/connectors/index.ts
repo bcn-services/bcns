@@ -2,8 +2,8 @@
 import type { ZodTypeAny } from 'zod'
 
 export type Json = any
-export type Source = 'shopify' | 'meta' | 'monday' | 'meet' | 'drive'
-export type TokenKind = 'shopify_admin' | 'monday_personal' | 'meta_system_user' | 'google_oauth_refresh'
+export type Source = 'shopify' | 'meta' | 'monday' | 'meet' | 'drive' | 'quickbooks'
+export type TokenKind = 'shopify_admin' | 'monday_personal' | 'meta_system_user' | 'google_oauth_refresh' | 'quickbooks_oauth_refresh'
 export type CanonTable = 'jobs' | 'records' | 'media'
 
 export interface RawRow { entity: string; externalId: string; sourceUpdatedAt?: Date; payload: Json }
@@ -182,6 +182,12 @@ export function classify(e: unknown): ErrorClass {
     if (status === 403 && /(userR|r)ateLimitExceeded/.test(text)) return 'throttle'
     if (/invalid_grant/.test(text)) return 'auth'
   }
+  if (source === 'quickbooks') {
+    // Intuit's refresh endpoint answers a dead/spent refresh token with HTTP 400
+    // and body.error === 'invalid_grant', not 401 — the generic 401 branch above
+    // never sees it.
+    if (/invalid_grant/.test(text)) return 'auth'
+  }
   return 'error'
 }
 
@@ -191,8 +197,9 @@ import { meta } from './meta.js'
 import { monday } from './monday.js'
 import { meet } from './meet.js'
 import { drive } from './drive.js'
+import { quickbooks } from './quickbooks.js'
 
-export const connectors: Record<Source, Connector> = { shopify, meta, monday, meet, drive }
+export const connectors: Record<Source, Connector> = { shopify, meta, monday, meet, drive, quickbooks }
 
 /** Sources whose connector declares a fullList entity — the only ones the §5.5 zero-row rule applies to. */
 export const fullListSources: Source[] = (Object.keys(connectors) as Source[]).filter(
