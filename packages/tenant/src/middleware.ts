@@ -21,6 +21,22 @@ export interface TenantMiddlewareOptions {
 /** Everything except the self-authenticating health route and static assets. */
 export const TENANT_MATCHER = ["/((?!api/health$|_next/static|_next/image|favicon.ico).*)"];
 
+/**
+ * The only extra exclusions apps/connect may add to TENANT_MATCHER, inserted
+ * after `api/health$|` in this order (tests/matcher.test.mjs enforces it). Each
+ * is a server-to-server or pre-sign-in route that authenticates itself — the
+ * middleware's /login redirect would break it.
+ */
+export const CONNECT_PUBLIC_ROUTES = [
+  // Shopify's mandatory GDPR webhooks: no cookie; HMAC over the raw body, 401 on failure.
+  "api/webhooks/",
+  // Meta's data-deletion callback: no cookie; verifies signed_request, 401 on failure.
+  "api/oauth/meta/data-deletion$",
+  // Shopify install OAuth, reached before sign-in: start checks HMAC or an owner,
+  // callback HMAC + state + cookie + owner, finish an owner.
+  "api/oauth/shopify/",
+];
+
 export function tenantMiddleware(
   opts: TenantMiddlewareOptions = {}
 ): (request: NextRequest) => Promise<NextResponse> {
