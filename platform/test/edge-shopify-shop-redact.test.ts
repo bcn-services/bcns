@@ -40,6 +40,11 @@ function post(body: string, headers: Record<string, string> = {}): Request {
   })
 }
 
+function postStream(body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}): Request {
+  const init: RequestInit & { duplex?: string } = { method: 'POST', headers, body, duplex: 'half' }
+  return new Request('https://p.supabase.co/functions/v1/shopify-shop-redact', init)
+}
+
 describe('shopify-shop-redact', () => {
   it('a valid HMAC queues exactly one row', async () => {
     const { deps: d, rec } = deps(true)
@@ -134,6 +139,40 @@ describe('shopify-shop-redact', () => {
       d,
     )
     expect(res.status).toBe(400)
+    expect(rec.inserts).toEqual([])
+  })
+
+  it('N2: a Content-Length over 64KB is 413 before the body is read, writes nothing', async () => {
+    const { deps: d, rec } = deps()
+    const body = JSON.stringify({ shop_domain: SHOP }) // small real body; the header is what lies
+    const res = await handle(
+      post(body, {
+        'Content-Length': String(64 * 1024 + 1),
+        'X-Shopify-Hmac-Sha256': sign(body),
+        'X-Shopify-Webhook-Id': 'wh-1',
+      }),
+      SECRET,
+      d,
+    )
+    expect(res.status).toBe(413)
+    expect(rec.inserts).toEqual([])
+  })
+
+  it('N2: real bytes over 64KB are 413 even with no Content-Length header (streamed body)', async () => {
+    const { deps: d, rec } = deps()
+    const big = 'a'.repeat(64 * 1024 + 1)
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(big))
+        controller.close()
+      },
+    })
+    const res = await handle(
+      postStream(stream, { 'X-Shopify-Hmac-Sha256': sign(big), 'X-Shopify-Webhook-Id': 'wh-1' }),
+      SECRET,
+      d,
+    )
+    expect(res.status).toBe(413)
     expect(rec.inserts).toEqual([])
   })
 

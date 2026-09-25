@@ -16,6 +16,8 @@ import { verifyShopifyHmac } from "../_shared/shopify-hmac.ts";
 const SHOP_DOMAIN = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 /** Generous but bounded — Shopify's webhook ids are UUIDs; this only stops an absurd header. */
 const MAX_WEBHOOK_ID_LEN = 200;
+/** N2: a shop/redact body is a handful of fields; 64KB is generous but bounded either way. */
+const MAX_BODY_BYTES = 64 * 1024;
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -28,11 +30,53 @@ export interface ShopRedactDeps {
   log(event: string, data: Record<string, unknown>): void;
 }
 
+/**
+ * N2: reads at most maxBytes off the wire regardless of what Content-Length claims — a header can
+ * be absent, wrong, or bypassed via chunked transfer-encoding, so the real defense is capping the
+ * bytes actually read, not trusting the header. Returns null (never a partial buffer) on overflow.
+ */
+async function readBodyCapped(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array(await request.arrayBuffer());
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 export async function handle(request: Request, secret: string | undefined, deps: ShopRedactDeps): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
+  // N2 fast path: reject on the declared size before reading anything, when Shopify (or anyone
+  // else) sends one. The actual read below is capped independently, since this header is never
+  // trusted alone.
+  const declaredLength = Number(request.headers.get("Content-Length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    deps.log("shop_redact_rejected", { reason: "payload_too_large" });
+    return json({ error: "payload_too_large" }, 413);
+  }
+
   // Auth first: verify over the raw bytes before anything else is trusted, including the body's shape.
-  const bodyBytes = new Uint8Array(await request.arrayBuffer());
+  const bodyBytes = await readBodyCapped(request, MAX_BODY_BYTES);
+  if (!bodyBytes) {
+    deps.log("shop_redact_rejected", { reason: "payload_too_large" });
+    return json({ error: "payload_too_large" }, 413);
+  }
   const hmacHeader = request.headers.get("X-Shopify-Hmac-Sha256");
   if (!(await verifyShopifyHmac(bodyBytes, hmacHeader, secret ?? ""))) {
     deps.log("shop_redact_rejected", { reason: "bad_or_missing_hmac" });
