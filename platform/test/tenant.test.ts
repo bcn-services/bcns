@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { sql, pool, rest, signIn, anonClient, apiViews, betaRpcArgs, betaSnapshot, USERS, CLIENTS, localKeys, thumbPath } from './helpers.js'
+import { sql, pool, rest, signIn, anonClient, apiViews, betaRpcArgs, betaSnapshot, SERVICE_ROLE_ONLY_API_FNS, USERS, CLIENTS, localKeys, thumbPath } from './helpers.js'
 
 afterAll(() => pool.end())
 
@@ -7,7 +7,9 @@ const rpcCode = (e: any) => e?.code
 
 describe('tenant isolation', () => {
   it('rpc_every_write_scoped', async () => {
-    const rpcs = (await sql<{ proname: string }>(`select proname from pg_proc where pronamespace = 'api'::regnamespace order by 1`)).rows.map(r => r.proname)
+    const rpcs = (await sql<{ proname: string }>(`select proname from pg_proc where pronamespace = 'api'::regnamespace order by 1`)).rows
+      .map(r => r.proname)
+      .filter(p => !SERVICE_ROLE_ONLY_API_FNS.has(p))
     const argsFor = await betaRpcArgs()
     const before = await betaSnapshot()
     const { client } = await signIn(USERS.acmeOwner)

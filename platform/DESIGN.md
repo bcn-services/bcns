@@ -1015,11 +1015,12 @@ task 0 skips them (they are all retried next tick). Step 7 takes its own per-cli
 | 2 | `refreshTokens` + `probeAuthFailed` | §5.4 |
 | 3 | `claimAndRun` | §5.3 (all tasks, sharded) |
 | 4 | `computeHealth` | §5.5 |
-| 5 | `alerts` | §5.6 (including the unsent-notification retry) |
-| 6 | `thumbnails` | §5.7 |
-| 7 | `renormalize` | §5.8 |
-| 8 | `purge` | media past `purge_after`; orphan objects; expired tickets; `connector_runs` > 90 d; §5.9 |
-| 9 | `egressPooled` | §5.6 |
+| 5 | `shopRedact` | claims pending `data.privacy_requests` rows and deletes or escalates them — before `alerts` so an escalation this step raises is emailed in the same tick, since `alerts` ends by flushing every unsent `data.notifications` row, not only its own; see retention-30d-shop-redact.md |
+| 6 | `alerts` | §5.6 (including the unsent-notification retry) |
+| 7 | `thumbnails` | §5.7 |
+| 8 | `renormalize` | §5.8 |
+| 9 | `purge` | media past `purge_after`; orphan objects; expired tickets; `connector_runs` > 90 d; §5.9 |
+| 10 | `egressPooled` | §5.6 |
 
 ### 5.3 Claim and run (R25, R26, R28)
 
@@ -1181,6 +1182,18 @@ null`. Only that client's rows are touched.
 - `download_tickets where expires_at < now() − 1 hour` → delete.
 - `connector_runs where started_at < now() − 90 days limit 5000` → delete.
 - `notifications where sent_at < now() − 180 days` → delete.
+
+### 5.9a `shop/redact` automation (`worker/src/privacy.ts`)
+
+Full design in `docs/architecture/retention-30d-shop-redact.md`. Summary: the
+`shopify-shop-redact` Edge Function re-verifies the webhook's HMAC itself and queues a
+`data.privacy_requests` row; this step claims pending rows (`for update skip locked`, ≤ 50/tick),
+resolves `shop → client_id` via `connector_schedule` (`source = 'shopify'`,
+`config->>'shop'`), and either deletes that client's `source = 'shopify'` rows via
+`worker/src/scope.ts`'s `deleteClientRows` (shared with `hard-delete.ts`, §5.10) in one
+transaction, or escalates to `needs_operator` (a `data.notifications` row, delivered by the
+existing `alerts()` → `sendPending()` path, §5.6) on: the sb-bridge shop, the sb-bridge config
+marker, an ambiguous shop→client match, or a shopify token not confirmed dead (still `active`, or created/refreshed/expiring within 24 h of the request — a reconnect after uninstall).
 
 ### 5.10 Scripts (bcns-run, `scripts/`, service key from the local env)
 

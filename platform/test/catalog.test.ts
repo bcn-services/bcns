@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { sql, pool, rest, signIn, mintJwt, apiViews, betaRpcArgs, USERS, CLIENTS } from './helpers.js'
+import { sql, pool, rest, signIn, mintJwt, apiViews, betaRpcArgs, SERVICE_ROLE_ONLY_API_FNS, USERS, CLIENTS } from './helpers.js'
 
 const T = '( SELECT data.active_client_id() AS active_client_id)'
 // Allowed policy quals per table (§2.4). Anything not listed must be exactly `client_id = T`.
@@ -55,8 +55,11 @@ describe('catalog', () => {
               has_function_privilege('anon', p.oid, 'execute') anon
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('data','api')`)
     for (const f of fns.rows) {
+      const short = f.name.split('.').pop()!
       expect(f.anon, `${f.name} executable by anon`).toBe(false)
-      expect(f.auth, `${f.name} authenticated`).toBe(f.schema === 'api' || HELPERS.includes(f.name))
+      expect(f.auth, `${f.name} authenticated`).toBe(
+        (f.schema === 'api' && !SERVICE_ROLE_ONLY_API_FNS.has(short)) || HELPERS.includes(f.name)
+      )
     }
   })
 
@@ -183,7 +186,7 @@ describe('catalog', () => {
     }
     const rpcs = await sql<{ proname: string }>(`select proname from pg_proc where pronamespace = 'api'::regnamespace`)
     const argsFor = await betaRpcArgs()
-    for (const f of rpcs.rows) {
+    for (const f of rpcs.rows.filter((f) => !SERVICE_ROLE_ONLY_API_FNS.has(f.proname))) {
       expect(argsFor[f.proname], `no RPC_ARGS entry for ${f.proname}`).toBeDefined()
       const { status, body } = await rest(`rpc/${f.proname}`, token, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(argsFor[f.proname].args) })
       expect(status, f.proname).toBeGreaterThanOrEqual(400)

@@ -8,14 +8,7 @@
 // that. Export-on-request during the 30-day window is unaffected (scripts/export.ts).
 import { parseArgs } from 'node:util'
 import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
-import { rawPartitions } from './export.js'
-
-// Reverse dependency order: items before sets, sets before media, everything before clients.
-const DATA_TABLES = [
-  'media_set_items', 'media_sets', 'media', 'daily_metrics', 'records', 'products', 'money', 'messages',
-  'jobs', 'customers', 'raw_latest', 'download_tickets', 'egress_ledger', 'notifications', 'connector_runs',
-  'connector_health', 'connector_schedule', 'source_tokens', 'dashboard_versions',
-] as const
+import { deleteClientRows, rawPartitions } from '../worker/src/scope.js'
 
 async function deleteStoragePrefix(admin: ReturnType<typeof serviceClient>, clientId: string): Promise<number> {
   const bucket = admin.storage.from('media')
@@ -59,7 +52,7 @@ export async function main(argv: string[]): Promise<void> {
       }
     }
     const members = await db.query<{ user_id: string }>('select user_id from data.memberships where client_id = $1', [clientId])
-    for (const t of DATA_TABLES) await db.query(`delete from data.${t} where client_id = $1`, [clientId])
+    await deleteClientRows(db, clientId)
     await db.query('delete from data.memberships where client_id = $1', [clientId])
     await db.query('delete from data.clients where id = $1', [clientId])
     for (const { user_id } of members.rows) {

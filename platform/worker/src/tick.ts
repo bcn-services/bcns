@@ -7,6 +7,7 @@ import { probeAuthFailed, refreshTokens } from './tokens.js'
 import { alerts, computeHealth, egressPooled } from './health.js'
 import { purge, thumbnails } from './media.js'
 import { renormalize } from './renormalize.js'
+import { shopRedact } from './privacy.js'
 
 export interface TickOpts {
   taskIndex?: number
@@ -80,6 +81,10 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
 
   if (housekeeping) {
     await step('computeHealth', () => computeHealth(t))
+    // Before alerts: alerts() ends its own call with sendPending(), which flushes every unsent
+    // data.notifications row (not just the ones alerts() itself just raised) — so an escalation
+    // shopRedact() writes here goes out over email in this same tick instead of waiting one more.
+    await step('shopRedact', () => shopRedact(t))
     await step('alerts', () => alerts(t))
     await step('thumbnails', () => thumbnails(t))
     await step('renormalize', () => renormalize(t))

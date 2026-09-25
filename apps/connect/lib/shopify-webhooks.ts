@@ -16,16 +16,19 @@
  * Writing a privileged delete path for it would mean a service-role credential
  * in the hub, which is exactly what the platform's access model forbids.
  *
- * So these handlers do the honest thing: verify, record, notify a human, 200.
- * A queue table and an operator runbook are the upgrade path, and the volume
- * that justifies one is zero requests a year at the current client count.
+ * So these handlers do the honest thing: verify, record, notify a human, 200 —
+ * for `customers/data_request` and `customers/redact`, which stay manual (zero
+ * requests a year at the current client count does not justify automating a
+ * human-readable data export or a single-customer erase).
  *
- * ponytail: notify-a-human, not an automated redaction. Upgrade to a
- * data.privacy_requests table + a worker task if a client ever receives these at
- * a rate a person cannot service inside the 30-day window. For shop/redact
- * specifically, that upgrade needs a way to bind the request to a real shop that a
- * caller without this route's HMAC secret can't forge — see
- * docs/architecture/retention-30d-shop-redact.md before building it.
+ * `shop/redact` is automated (docs/architecture/retention-30d-shop-redact.md,
+ * shipped): gdprRoute forwards the verified request to the `shopify-shop-redact`
+ * Edge Function, which re-verifies the HMAC itself and queues a
+ * `data.privacy_requests` row for the worker to act on. This file's own HMAC
+ * check still runs first and unchanged — the forward is an addition after it,
+ * not a replacement — and any forwarding failure (unset URL, network error,
+ * timeout, non-2xx) falls back to this file's own operator email exactly as
+ * before, so shop/redact never depends on the Edge Function being reachable.
  */
 
 import { BCNS_EMAIL, REQUEST_FROM, type ResendEmail } from "./request-connection";
@@ -70,8 +73,8 @@ export function isFreshTriggeredAt(header: string | null, now: number = Date.now
 /** Headers that let a human find the request in the Shopify admin. Never the body. */
 export type WebhookMeta = { shopDomain: string | null; webhookId: string | null };
 
-/** Unsigned header text going into an email body: one line, bounded. */
-const oneLine = (v: string | null): string => (v ? v.replace(/\s+/g, " ").slice(0, 200) : "(none)");
+/** Unsigned header text going into an email body (or a log line): one line, bounded. */
+export const oneLine = (v: string | null): string => (v ? v.replace(/\s+/g, " ").slice(0, 200) : "(none)");
 
 export type WebhookResult =
   | { status: 401; body: { error: string } }
