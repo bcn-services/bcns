@@ -22,7 +22,10 @@ create table data.privacy_requests (
   status       text not null default 'pending' check (status in ('pending', 'done', 'needs_operator')),
   received_at  timestamptz not null default now(),
   processed_at timestamptz,
-  error        text
+  error        text,
+  -- S2: a row failing repeatedly (bumped by the worker, outside the row's own failed transaction)
+  -- becomes an operator escalation instead of a silent forever-retry.
+  attempts     int not null default 0
 );
 create index on data.privacy_requests (status) where status = 'pending';
 
@@ -44,8 +47,11 @@ begin
   return found;
 end $$;
 
--- Default EXECUTE goes to PUBLIC on a new function; strip it, then allow-list to service_role
--- only — this RPC has no caller JWT to check, unlike api.add_member's authenticated grant.
+-- N1: service_role's EXECUTE surface in `api` must be exactly this one function, never whatever
+-- happens to default to PUBLIC on some future api.* function — revoke everything first, then
+-- allow-list only record_shop_redact. This RPC has no caller JWT to check, unlike
+-- api.add_member's authenticated grant.
+revoke execute on all functions in schema api from service_role;
 revoke all on function api.record_shop_redact(text, text) from public, anon, authenticated, service_role;
 grant execute on function api.record_shop_redact(text, text) to service_role;
 grant usage on schema api to service_role;
