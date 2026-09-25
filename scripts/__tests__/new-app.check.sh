@@ -72,6 +72,8 @@ echo "happy path"
 out=$(run coventry-hills 3110 2>&1)
 check "happy path exits zero" "$?" "0"
 check "app dir created" "$([ -d "$tree/apps/coventry-hills" ] && echo yes || echo no)" "yes"
+check "prints the app_url step for this slug" \
+  "$(grep -c "app_url = 'https://<domain>' where slug = 'coventry-hills';" <<<"$out")" "1"
 check "package name stamped" \
   "$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).name)' "$tree/apps/coventry-hills/package.json")" \
   "@bcn-services/coventry-hills"

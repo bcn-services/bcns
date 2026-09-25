@@ -117,3 +117,6 @@ echo "     AND strategy.matrix.slug — a push deploys nothing for $slug until y
 echo "  6. set EXPECTED_CLIENT_ID in /srv/$slug/env from clients.id in the platform"
 echo "     project — this script does NOT set it, and the app denies every request"
 echo "     until it is set (see apps/$slug/DEPLOY.md)"
+echo "  7. once it is live, point the hub's dashboard button at it (Supabase SQL editor;"
+echo "     only service-role can write app_url, so nothing sets it for you):"
+echo "     update data.clients set app_url = 'https://<domain>' where slug = '$slug';"
