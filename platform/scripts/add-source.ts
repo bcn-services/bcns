@@ -13,7 +13,7 @@ import { die, pgClient, isMain, runMain } from './_lib.js'
 
 const USAGE = 'usage: add-source --slug <slug> --source meta|monday|meet|drive [--reset-cursors]'
 // The config field naming the vendor object the cursors point into.
-const TARGET: Record<Source, string> = { shopify: 'shop', meta: 'act_id', monday: 'board_id', meet: 'folder_id', drive: 'folder_id' }
+const TARGET: Record<Source, string> = { shopify: 'shop', meta: 'act_id', monday: 'board_id', meet: 'folder_id', drive: 'folder_id', quickbooks: 'realm_id' }
 
 export async function main(argv: string[], ask?: (q: string) => Promise<string>): Promise<void> {
   const { values } = parseArgs({ args: argv, options: {

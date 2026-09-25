@@ -4,6 +4,7 @@ import type { Tick } from './db.js'
 import { type RunContext, type Source, connectors, redact } from './connectors/index.js'
 import { contextFor, refreshOne } from './run.js'
 import { shopifyEndpoint } from './connectors/shopify-url.js'
+import { baseUrl as quickbooksBaseUrl } from './connectors/quickbooks.js'
 
 /**
  * A null expires_at skips the row by itself, which is what keeps the never-expiring
@@ -51,6 +52,10 @@ const PROBES: Record<Source, (ctx: RunContext) => Promise<Response>> = {
   }),
   meet: google,
   drive: google,
+  quickbooks: ctx => ctx.fetch(
+    `${quickbooksBaseUrl()}/v3/company/${ctx.config.realm_id}/companyinfo/${ctx.config.realm_id}?minorversion=75`,
+    { headers: { Authorization: `Bearer ${ctx.token.secret}` } },
+  ),
 }
 
 /** A token mis-classified during an outage recovers within an hour; a failure bumps updated_at so the probe stays hourly. */

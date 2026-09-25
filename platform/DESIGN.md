@@ -1322,6 +1322,9 @@ Recorded by `scripts/onboard`; a failed item stops the script.
 | G2 | Meet | Drive folder id of the Gemini notes; at least one doc readable through the token. |
 | U1 | all | Smoke user created and `is_smoke = true`. |
 | U2 | all | `clients.timezone` confirmed with the owner ("which timezone does your Shopify admin show?") **and** equal to S5's `store_timezone` and M3's `timezone_name`; if the three disagree, record which one the owner chose in `clients.notes` before continuing. |
+| Q1 | QuickBooks | OAuth self-serve only (no manual token prompt): hub Connect completed, `config.realm_id` set from the callback's `realmId`, not typed by hand. |
+| Q2 | QuickBooks | `companyinfo/{realm_id}` probed once (`PROBES.quickbooks`, minorversion=75) with the fresh access token; a non-2xx or `ACCESS_DENIED`/`error` body fails the item (wrong realm, or app not authorized for this company). |
+| Q3 | QuickBooks | `QUICKBOOKS_ENV` (sandbox/production) matches the realm the owner actually connected; a sandbox realm queried against the production host (or vice versa) 404s at the first sync, not at onboarding, so this is a manual confirm with the owner. |
 
 ## 10. Requirement → section map
 

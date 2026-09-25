@@ -12,13 +12,14 @@ import { die, pgClient, serviceClient, isMain, runMain } from './_lib.js'
 
 // What the operator is asked for, per source (§4.2–§4.6 config + token shapes).
 const PROMPTS: Record<Source, { config: string[]; secret: string; refresh?: string; attribute?: string }> = {
-  // Unreachable: attachSource refuses shopify before it prompts. Kept so the Record
-  // stays total over Source, and so the config field names stay next to the others.
+  // Unreachable: attachSource refuses shopify (and quickbooks) before it prompts. Kept so
+  // the Record stays total over Source, and so the config field names stay next to the others.
   shopify: { config: ['shop', 'admin_url'], secret: 'Admin API token' },
   meta: { config: ['act_id', 'ads_manager_url'], secret: 'system user token' },
   monday: { config: ['board_id', 'board_url'], secret: 'personal token' },
   meet: { config: ['folder_id', 'oauth_client_id', 'notes_url'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
   drive: { config: ['folder_id', 'oauth_client_id'], secret: 'access token (blank to mint from refresh)', refresh: 'refresh token', attribute: 'oauth_client_secret' },
+  quickbooks: { config: ['realm_id'], secret: 'access token' },
 }
 
 /**
@@ -42,6 +43,16 @@ export function shopifyRefusal(): string {
   ].join('\n')
 }
 
+/** Same rationale as shopifyRefusal(): a 60-minute access token and a rotating 100-day refresh token only ever come out of an OAuth round-trip. */
+export function quickbooksRefusal(): string {
+  return [
+    'quickbooks is connected in the browser, not here: its access token expires in an hour and only',
+    'an OAuth round-trip produces the refresh token that renews it.',
+    `  have the client's OWNER sign in at ${HUB_BASE_URL}/ and click Connect on the QuickBooks card`,
+    'The callback writes the same rows this script would, through api.connect_source.',
+  ].join('\n')
+}
+
 export function backfillFrom(depth: string): string {
   if (depth === 'unbounded') return `'1970-01-01'::date`
   return `(current_date - interval '${depth === '0' ? '0 days' : depth}')::date`
@@ -57,6 +68,7 @@ export async function main(argv: string[], ask?: (q: string) => Promise<string>)
   // attach loop would leave an orphan client behind.
   for (const s of sources) if (!(s in connectors)) die(`unknown source: ${s}`)
   if (sources.includes('shopify')) die(shopifyRefusal())
+  if (sources.includes('quickbooks')) die(quickbooksRefusal())
 
   const db = pgClient()
   const rl = ask ? null : createInterface({ input: process.stdin, output: process.stdout })
@@ -90,6 +102,7 @@ export async function attachSource(db: ReturnType<typeof pgClient>, clientId: st
   question: (q: string) => Promise<string>): Promise<void> {
   // The one guard both CLI entry points route through, so add-source refuses too.
   if (source === 'shopify') die(shopifyRefusal())
+  if (source === 'quickbooks') die(quickbooksRefusal())
   const p = PROMPTS[source]
   const creds: Creds = { secret: '', config: {} }
   for (const k of p.config) creds.config[k] = await question(`${source} ${k}: `)
