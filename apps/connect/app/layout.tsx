@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button, Container } from "@bcn-services/ui";
 import { currentMembership, loadClient } from "@/lib/session";
 import { signOut } from "./login/actions";
+import { HubNav } from "./nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,22 +24,7 @@ async function Header() {
         </Link>
         {membership ? (
           <>
-            <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-              <Link href="/" className="hover:text-foreground">
-                Sources
-              </Link>
-              <Link href="/data" className="hover:text-foreground">
-                Your data
-              </Link>
-              <Link href="/team" className="hover:text-foreground">
-                Team
-              </Link>
-              {membership.role === "owner" ? (
-                <Link href="/access" className="hover:text-foreground">
-                  Access
-                </Link>
-              ) : null}
-            </nav>
+            <HubNav client={client} role={membership.role} />
             <div className="ml-auto flex items-center gap-4 text-sm">
               <span className="text-muted-foreground">{client?.name ?? "Your workspace"}</span>
               <form action={signOut}>

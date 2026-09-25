@@ -25,6 +25,8 @@ export function parsePopup(value: string | undefined): OpenPopup {
   return value === "integrations" || value === "settings" ? value : undefined;
 }
 
+export const HUB_URL = "https://connect.bcn-services.com";
+
 const PAGES: { key: ActivePage; href: string; label: string }[] = [
   { key: "financials", href: "/financials", label: "Financial Information" },
   { key: "library", href: "/library", label: "Content Library" },
@@ -75,6 +77,10 @@ export function AppHeader({
             {page.label}
           </Link>
         ))}
+        {/* Back to the bcns hub (sources, team, the raw data viewer). Same tab: it is home, not an outbound service. */}
+        <a className="page-btn" href={HUB_URL}>
+          Sources &amp; data
+        </a>
 
         <details className="popup" open={openPopup === "integrations"}>
           <summary className="icon-btn" title="Integrations" aria-label="Integrations">

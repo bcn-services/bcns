@@ -91,18 +91,15 @@ test("last_error is flattened and truncated", () => {
   assert.equal(truncate(null), null);
 });
 
-test("app_url wins over the /data fallback", () => {
+test("app_url is the dashboard when set", () => {
   assert.equal(dashboardUrl({ slug: "acme", app_url: "https://acme.example.com" }), "https://acme.example.com");
 });
 
-test("a row with no app_url column at all falls back to the hub's /data", () => {
+test("no app_url means no dashboard: null, never a /data fallback", () => {
   // `select("*")` against a database that has not run 20260916000100 yet.
-  assert.equal(dashboardUrl({ name: "Acme", slug: "acme" }), "/data");
-  assert.equal(dashboardUrl({ slug: "acme", app_url: null }), "/data");
-  assert.equal(dashboardUrl({ slug: "acme", app_url: "  " }), "/data");
-});
-
-test("no client row and no slug means no dashboard link", () => {
+  assert.equal(dashboardUrl({ name: "Acme", slug: "acme" }), null);
+  assert.equal(dashboardUrl({ slug: "acme", app_url: null }), null);
+  assert.equal(dashboardUrl({ slug: "acme", app_url: "  " }), null);
   assert.equal(dashboardUrl(null), null);
   assert.equal(dashboardUrl({ name: "Acme" }), null);
 });
