@@ -20,6 +20,8 @@ import { FinanceIcon, DragHandleIcon } from "@/app/_components/icons";
 import type { SectorTotal } from "@/lib/financials";
 import { assignTransaction, bulkAssign, setSectorBudget, unassignTransaction } from "./actions";
 
+const DROP_HINT_ID = "qb-sector-drop-hint";
+
 export interface TxnRowData {
   externalId: string;
   date: string;
@@ -84,6 +86,7 @@ export function QuarterlyBudgetPanel({
           <div
             key={s.id}
             className={`sector-card${dragOverSector === s.id ? " is-dragover" : ""}`}
+            aria-describedby={DROP_HINT_ID}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOverSector(s.id);
@@ -110,7 +113,14 @@ export function QuarterlyBudgetPanel({
               <span>Remaining</span>
               <strong>{formatMoney(s.remainingCents, currency)}</strong>
             </div>
-            <div className="budget-progress">
+            <div
+              className="budget-progress"
+              role="progressbar"
+              aria-valuenow={Math.round(Math.min(100, Math.max(0, s.pctUsed)))}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${s.label} budget used`}
+            >
               <div className="budget-progress__fill" style={{ width: `${Math.min(100, Math.max(0, s.pctUsed))}%` }} />
             </div>
             <div className="sector-card__pct">{Math.round(s.pctUsed)}% used</div>
@@ -137,7 +147,10 @@ export function QuarterlyBudgetPanel({
           </div>
         ))}
       </div>
-      <p className="state-note">Drag a transaction from Recent Transactions onto a sector to assign it.</p>
+      <p className="state-note" id={DROP_HINT_ID}>
+        Drag a transaction from Recent Transactions onto a sector to assign it, or use that transaction&rsquo;s Actions menu
+        &mdash; the keyboard-accessible way to assign it.
+      </p>
     </Panel>
   );
 }
