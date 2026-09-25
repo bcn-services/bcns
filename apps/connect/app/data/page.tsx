@@ -1,23 +1,23 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import {
   Badge,
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   SectionHeading,
   buttonVariants,
   cn,
 } from "@bcn-services/ui";
 import { requireHub } from "@/lib/session";
 import { composeSources, type HealthRow } from "@/lib/sources";
-import { findView, sourceState, viewsFor } from "@/lib/data-views";
-import { PAGE_SIZE, dataHref, fetchLast30, fetchPage, parseParams, toDataApi } from "@/lib/data-query";
+import { DATA_VIEWS, findView, sourceState, viewsFor } from "@/lib/data-views";
+import { PAGE_SIZE, dataHref, fetchCounts30, fetchLast30, fetchMeta30, fetchPage, parseParams, toDataApi } from "@/lib/data-query";
+import { PINS_COOKIE, buildCatalog, parsePins, resolvePins } from "@/lib/data-stats";
 import { EXPORT_ROW_CAP, truncationNote } from "@/lib/data-csv";
-import { formatDateTime, formatMoney } from "@/lib/data-format";
+import { formatDateTime } from "@/lib/data-format";
 import { DataTable } from "./DataTable";
+import { StatsStrip } from "./StatsStrip";
 
 export const dynamic = "force-dynamic";
 
@@ -48,13 +48,15 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const { api: schema } = await requireHub();
   const api = toDataApi(schema);
 
+  const now = new Date();
   const [health, last30Result] = await Promise.all([
     schema.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
-    fetchLast30(api, new Date()),
+    fetchLast30(api, now),
   ]);
   const last30 = last30Result.totals;
   const cards = composeSources((health.data as HealthRow[] | null) ?? []);
   const connected = cards.filter((c) => c.connected);
+  const connectedSources = connected.map((c) => c.source);
 
   const heading = (
     <SectionHeading
@@ -92,7 +94,15 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const cfg = findView(card.source, first(searchParams.view)) ?? views[0]!;
   const params = parseParams(searchParams);
 
-  const result = state.kind === "ready" ? await fetchPage(api, cfg, params) : null;
+  // Stats span every connected source; the pinned strip is the same on every tab. All reads run together.
+  const [counts, meta, result] = await Promise.all([
+    fetchCounts30(api, DATA_VIEWS.filter((v) => connectedSources.includes(v.source)), now),
+    connectedSources.includes("meta") ? fetchMeta30(api, now) : null,
+    state.kind === "ready" ? fetchPage(api, cfg, params) : null,
+  ]);
+  const catalog = buildCatalog(connectedSources, { counts, last30, meta });
+  const pinned = resolvePins(parsePins(cookies().get(PINS_COOKIE)?.value), catalog, connectedSources);
+
   const pages = result ? Math.max(1, Math.ceil(result.count / PAGE_SIZE)) : 1;
   const link = (page: number) => dataHref("/data", { source: card.source, view: cfg.id, ...params, page });
   const filtered = Boolean(params.q || params.from || params.to);
@@ -102,41 +112,16 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
     <>
       {heading}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardDescription>Orders, last 30 days</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">{last30 ? last30.orders.toLocaleString("en-US") : "Totals unavailable"}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Revenue, last 30 days</CardDescription>
-            <CardTitle className="break-words text-2xl tabular-nums">
-              {!last30
-                ? "Totals unavailable"
-                : last30.revenue.length === 0
-                ? "—"
-                : last30.revenue.map((r) => formatMoney(r.minor, r.currency)).join(" + ")}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Last successful sync</CardDescription>
-            <dl className="space-y-1 text-sm">
-              {connected.map((c) => (
-                <div key={c.source} className="flex flex-wrap justify-between gap-x-3">
-                  <dt>{c.title}</dt>
-                  <dd className="text-muted-foreground tabular-nums">
-                    {c.lastSuccessAt ? formatDateTime(c.lastSuccessAt) : "never"}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </CardHeader>
-        </Card>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {connected.map((c) => `${c.title} synced ${c.lastSuccessAt ? formatDateTime(c.lastSuccessAt) : "never"}`).join(" · ")}
+      </p>
+
+      <StatsStrip
+        pinned={catalog.filter((s) => pinned.includes(s.id))}
+        catalog={catalog}
+        sources={connected}
+        returnTo={link(params.page)}
+      />
 
       <nav aria-label="Data sources" className="flex flex-wrap gap-2">
         {tabs.map((c) => (
@@ -166,21 +151,30 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
       ) : (
         <>
           <nav aria-label={`${card.title} views`} className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border text-sm">
-            {views.map((v) => (
-              <Link
-                key={v.id}
-                href={`/data?source=${card.source}&view=${v.id}`}
-                aria-current={v.id === cfg.id ? "page" : undefined}
-                className={cn(
-                  "-mb-px rounded-sm border-b-2 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  v.id === cfg.id
-                    ? "border-primary font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {v.label}
-              </Link>
-            ))}
+            {views.map((v) => {
+              const count = counts[`${card.source}/${v.id}`];
+              return (
+                <Link
+                  key={v.id}
+                  href={`/data?source=${card.source}&view=${v.id}`}
+                  aria-current={v.id === cfg.id ? "page" : undefined}
+                  className={cn(
+                    "-mb-px rounded-sm border-b-2 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    v.id === cfg.id
+                      ? "border-primary font-medium text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {v.label}
+                  <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+                    <span aria-hidden="true">
+                      {count?.toLocaleString("en-US") ?? "—"} <span className="text-[10px]">30d</span>
+                    </span>
+                    <span className="sr-only">{count == null ? " count unavailable" : ` ${count.toLocaleString("en-US")} rows in the last 30 days`}</span>
+                  </span>
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">

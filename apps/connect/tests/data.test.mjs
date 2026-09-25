@@ -20,7 +20,20 @@ import {
   safeHref,
   searchFilter,
 } from "../lib/data-format.ts";
-import { PAGE_SIZE, dataHref, fetchLast30, fetchPage, last30Cutoff, paramsFromUrl, parseParams, summarizeLast30 } from "../lib/data-query.ts";
+import {
+  PAGE_SIZE,
+  dataHref,
+  fetchCounts30,
+  fetchLast30,
+  fetchMeta30,
+  fetchPage,
+  last30Cutoff,
+  paramsFromUrl,
+  parseParams,
+  summarizeLast30,
+  summarizeSpend,
+} from "../lib/data-query.ts";
+import { STAT_IDS, buildCatalog, defaultPins, parsePins, resolvePins, sanitizeReturnTo, serializePins } from "../lib/data-stats.ts";
 import { DATA_VIEWS, findView, selectKeys, sourceState } from "../lib/data-views.ts";
 import { composeSources, dashboardUrl } from "../lib/sources.ts";
 
@@ -52,7 +65,8 @@ function fakeApi(db, clientId, calls = [], opts = {}) {
     calls,
     from(view) {
       return {
-        select(columns) {
+        select(columns, options) {
+          if (options) calls.push(["select-options", view, options]);
           const cols = columns.split(",");
           const filters = [];
           const orders = [];
@@ -477,6 +491,169 @@ test("csv end to end: a row with a formula and a comma comes out safe", async ()
   assert.ok(row.includes('"a,b"'));
 });
 
+/* ------------------------------------------------- h: pinned header stats */
+
+const NOW = new Date("2026-09-24T15:00:00Z");
+const inputs = (over = {}) => ({
+  counts: { "shopify/orders": 1234, "shopify/refunds": null, "meta/campaigns": 0 },
+  last30: { orders: 5, revenue: [{ currency: "USD", minor: 150000 }, { currency: "EUR", minor: 700 }] },
+  meta: { spend: [{ currency: "USD", minor: 2500 }] },
+  ...over,
+});
+const byId = (cat) => Object.fromEntries(cat.map((s) => [s.id, s]));
+
+test("stats catalog: money per currency, null count is a dash, counts get thousands separators", () => {
+  const cat = byId(buildCatalog(["shopify", "meta"], inputs()));
+  assert.equal(cat["shopify/orders"].value, "1,234");
+  assert.equal(cat["shopify/orders"].label, "Orders, 30 days");
+  assert.equal(cat["shopify/refunds"].value, "—"); // a failed count
+  assert.equal(cat["shopify/payouts"].value, "—"); // never fetched
+  assert.equal(cat["meta/campaigns"].value, "0");
+  assert.equal(cat["shopify/revenue"].value, "$1,500.00 + €7.00");
+  assert.equal(cat["shopify/revenue"].label, "Revenue, 30 days");
+  assert.equal(cat["meta/spend"].value, "$25.00");
+  assert.equal(cat["meta/spend"].label, "Ad spend, 30 days");
+});
+
+test("stats catalog: failed reads say Unavailable, no rows says a dash", () => {
+  const failed = byId(buildCatalog(["shopify", "meta"], inputs({ last30: null, meta: null })));
+  assert.equal(failed["shopify/revenue"].value, "Unavailable");
+  assert.equal(failed["meta/spend"].value, "Unavailable");
+  const empty = byId(buildCatalog(["shopify", "meta"], inputs({ last30: { orders: 0, revenue: [] }, meta: { spend: [] } })));
+  assert.equal(empty["shopify/revenue"].value, "—");
+  assert.equal(empty["meta/spend"].value, "—");
+});
+
+test("stats catalog: only connected sources, one count per view, ids are source/key", () => {
+  const cat = buildCatalog(["shopify"], inputs());
+  assert.ok(cat.every((s) => s.source === "shopify" && s.id.startsWith("shopify/")));
+  assert.equal(cat.filter((s) => s.id !== "shopify/revenue").length, DATA_VIEWS.filter((v) => v.source === "shopify").length);
+  assert.ok(!cat.some((s) => s.id === "meta/spend"));
+  assert.deepEqual(buildCatalog([], inputs()), []);
+  assert.equal(STAT_IDS.length, 14); // 12 views + shopify/revenue + meta/spend
+  assert.equal(new Set(STAT_IDS).size, 14);
+  const all = buildCatalog(["shopify", "meta", "monday", "meet", "drive"], inputs());
+  assert.equal(all.length, 14);
+  for (const s of all) assert.ok(STAT_IDS.includes(s.id), s.id);
+});
+
+test("stats defaults: orders+revenue for Shopify, spend for Meta, nothing for Monday-only", () => {
+  assert.deepEqual(defaultPins(["shopify"]), ["shopify/orders", "shopify/revenue"]);
+  assert.deepEqual(defaultPins(["meta"]), ["meta/spend"]);
+  assert.deepEqual(defaultPins(["shopify", "meta"]), ["shopify/orders", "shopify/revenue", "meta/spend"]);
+  assert.deepEqual(defaultPins(["monday"]), []);
+});
+
+test("stats pins: round trip, none is empty, undefined is no choice, junk and repeats are dropped", () => {
+  assert.equal(parsePins(undefined), null);
+  assert.deepEqual(parsePins("none"), []);
+  assert.equal(serializePins([]), "none");
+  assert.deepEqual(parsePins(serializePins([])), []);
+  const ids = ["shopify/orders", "meta/spend", "drive/files"];
+  assert.equal(serializePins(ids), "shopify/orders,meta/spend,drive/files");
+  assert.deepEqual(parsePins(serializePins(ids)), ids);
+  assert.deepEqual(parsePins("shopify/orders,evil/x,,shopify/orders,../etc,meta/spend"), ["shopify/orders", "meta/spend"]);
+  assert.equal(parsePins("junk,more junk"), null); // nothing usable: back to defaults, not an empty strip
+  assert.equal(parsePins(""), null);
+  assert.equal(parsePins(STAT_IDS.join(",")).length, 14);
+});
+
+test("stats pins: resolved against today's catalog, unconnected sources drop out silently", () => {
+  const cat = buildCatalog(["shopify"], inputs());
+  assert.deepEqual(resolvePins(["shopify/orders", "meta/spend", "monday/jobs"], cat, ["shopify"]), ["shopify/orders"]);
+  assert.deepEqual(resolvePins(null, cat, ["shopify"]), ["shopify/orders", "shopify/revenue"]);
+  assert.deepEqual(resolvePins([], cat, ["shopify"]), []); // saved empty stays empty
+  assert.deepEqual(resolvePins(null, buildCatalog(["monday"], inputs()), ["monday"]), []);
+});
+
+test("stats returnTo: only /data and its query string, everything else is /data", () => {
+  const ok = "/data?source=meta&view=campaigns&page=2";
+  assert.equal(sanitizeReturnTo(ok), ok);
+  assert.equal(sanitizeReturnTo("/data"), "/data");
+  for (const bad of ["//evil.com", "//data", "https://x", "javascript:alert(1)", "/other", "/dataX", "/data\\..", "/data?x=\\evil", "/data/../x", "/data\n", "", null, undefined, 5, ["/data"]]) {
+    assert.equal(sanitizeReturnTo(bad), "/data", JSON.stringify(bad));
+  }
+});
+
+test("counts 30d: same filters as the table (source, extra, live only, cutoff) and no client filter", async () => {
+  const api = fakeApi({ A: {} }, "A");
+  const cfgs = [findView("shopify", "orders"), findView("monday", "jobs"), findView("drive", "files"), findView("meta", "campaigns")];
+  await fetchCounts30(api, cfgs, NOW);
+  const has = (...call) => assert.ok(api.calls.some((c) => JSON.stringify(c) === JSON.stringify(call)), JSON.stringify(call));
+  has("eq", "source", "shopify");
+  has("eq", "kind", "order");
+  has("eq", "source", "monday");
+  has("eq", "source", "drive");
+  has("eq", "source", "meta");
+  has("gte", "occurred_at", "2026-08-26");
+  has("gte", "updated_at", "2026-08-26");
+  has("gte", "created_at", "2026-08-26");
+  has("gte", "day", "2026-08-26");
+  assert.equal(api.calls.filter((c) => c[0] === "is" && c[1] === "deleted_at" && c[2] === null).length, 2); // jobs + files only
+  // A head count: no rows are fetched, so no range is asked for.
+  assert.equal(api.calls.filter((c) => c[0] === "range").length, 0);
+  assert.equal(api.calls.filter((c) => c[0] === "select-options" && c[2].count === "exact" && c[2].head === true).length, 4);
+  noClientFilter(api.calls);
+});
+
+test("counts 30d: counts what the table would show, hides soft-deleted, null on a failed read", async () => {
+  const file = (id, deleted_at, created_at = "2026-09-20T00:00:00Z") => ({ id, source: "drive", filename: id, created_at, deleted_at });
+  const api = fakeApi(
+    {
+      A: {
+        media_v1: [file("live", null), file("gone", "2026-09-21T00:00:00Z"), file("old", null, "2026-01-01T00:00:00Z")],
+        money_v1: [order("A", 1, { occurred_at: "2026-09-20T00:00:00Z" }), order("A", 2, { occurred_at: "2026-01-01T00:00:00Z" })],
+      },
+    },
+    "A"
+  );
+  const counts = await fetchCounts30(api, [findView("drive", "files"), findView("shopify", "orders"), findView("shopify", "refunds")], NOW);
+  assert.deepEqual(counts, { "drive/files": 1, "shopify/orders": 1, "shopify/refunds": 0 });
+  const failing = { from: () => ({ select: () => { const q = { eq: () => q, is: () => q, gte: () => q, order: () => q, then: (r) => Promise.resolve({ data: null, error: { message: "x" }, count: null }).then(r) }; return q; } }) };
+  assert.deepEqual(await fetchCounts30(failing, [ordersCfg], NOW), { "shopify/orders": null });
+});
+
+test("meta spend: per currency, non-finite ignored, no rows empty, failed read is null", async () => {
+  assert.deepEqual(summarizeSpend(null), { spend: [] });
+  assert.deepEqual(summarizeSpend([]), { spend: [] });
+  assert.deepEqual(
+    summarizeSpend([
+      { spend_minor: 1000, currency: "USD" },
+      { spend_minor: "500", currency: "USD" },
+      { spend_minor: 300, currency: "EUR" },
+      { spend_minor: "abc", currency: "USD" },
+      { spend_minor: Infinity, currency: "EUR" },
+    ]),
+    { spend: [{ currency: "USD", minor: 1500 }, { currency: "EUR", minor: 300 }] }
+  );
+  const api = fakeApi({ A: { campaign_daily_v1: [{ source: "meta", day: "2026-09-20", spend_minor: 700, currency: "USD" }, { source: "meta", day: "2026-08-01", spend_minor: 9, currency: "USD" }] } }, "A");
+  assert.deepEqual(await fetchMeta30(api, NOW), { spend: [{ currency: "USD", minor: 700 }] });
+  assert.deepEqual(api.calls.find((c) => c[0] === "gte"), ["gte", "day", "2026-08-26"]);
+  noClientFilter(api.calls);
+  const failing = { from: () => ({ select: () => { const q = { eq: () => q, gte: () => q, order: () => q, range: () => q, then: (r) => Promise.resolve({ data: null, error: { message: "x" } }).then(r) }; return q; } }) };
+  assert.equal(await fetchMeta30(failing, NOW), null);
+});
+
+test("meta spend: pages through a 1000-row server cap, exact total, stable order", async () => {
+  const rows = Array.from({ length: 2500 }, (_, i) => ({ source: "meta", day: "2026-09-20", campaign_id: `c${String(i).padStart(5, "0")}`, spend_minor: 10, currency: "USD" }));
+  const api = fakeApi({ A: { campaign_daily_v1: rows } }, "A", [], { maxRows: 1000 });
+  assert.deepEqual(await fetchMeta30(api, NOW), { spend: [{ currency: "USD", minor: 25_000 }] });
+  assert.deepEqual(api.calls.filter((c) => c[0] === "range"), [["range", 0, 999], ["range", 1000, 1999], ["range", 2000, 2999]]);
+  assert.deepEqual(api.calls.filter((c) => c[0] === "order").map((c) => c[1]), ["day", "campaign_id", "day", "campaign_id", "day", "campaign_id"]);
+  noClientFilter(api.calls);
+  // Exactly one full page, then an empty one: still exact.
+  const exact = fakeApi({ A: { campaign_daily_v1: rows.slice(0, 1000) } }, "A", [], { maxRows: 1000 });
+  assert.deepEqual(await fetchMeta30(exact, NOW), { spend: [{ currency: "USD", minor: 10_000 }] });
+  assert.equal(exact.calls.filter((c) => c[0] === "range").length, 2);
+});
+
+test("meta spend: more than 20 full pages is null, never a partial sum", async () => {
+  const rows = Array.from({ length: 20_500 }, (_, i) => ({ source: "meta", day: "2026-09-20", campaign_id: `c${String(i).padStart(6, "0")}`, spend_minor: 1, currency: "USD" }));
+  const api = fakeApi({ A: { campaign_daily_v1: rows } }, "A", [], { maxRows: 1000 });
+  assert.equal(await fetchMeta30(api, NOW), null);
+  assert.equal(api.calls.filter((c) => c[0] === "range").length, 20);
+});
+
 /* ------------------------------------------- access rule, checked in source */
 
 const root = new URL("../", import.meta.url);
@@ -494,6 +671,15 @@ test("source: no data file uses a service-role/admin client or names a client_id
     assert.doesNotMatch(code, /service_role|SERVICE_ROLE|createAdmin|createClient\b|@supabase\/supabase-js|process\.env/i, file);
     assert.doesNotMatch(code, /client_id|clientId|client-id/, `${file} must not read or filter by a client id`);
   }
+});
+
+test("source: the stats strip and its action have no service-role client and no client_id", () => {
+  for (const f of ["app/data/StatsStrip.tsx", "app/data/actions.ts"]) {
+    const code = stripComments(readFileSync(new URL(f, root), "utf8"));
+    assert.doesNotMatch(code, /service_role|SERVICE_ROLE|createAdmin|createClient\b|@supabase\/supabase-js/i, f);
+    assert.doesNotMatch(code, /client_id|clientId|client-id/, f);
+  }
+  assert.ok(dataSources.some(([f]) => f === "lib/data-stats.ts"), "lib/data-stats.ts is covered by the lib/data-*.ts glob");
 });
 
 test("source: the export route and page read only through the signed-in session", () => {

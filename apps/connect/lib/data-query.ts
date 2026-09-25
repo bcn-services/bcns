@@ -35,7 +35,7 @@ export interface QueryResult {
 
 export interface DataApi {
   from(view: string): {
-    select(columns: string, options?: { count: "exact" }): QueryLike & PromiseLike<QueryResult>;
+    select(columns: string, options?: { count: "exact"; head?: boolean }): QueryLike & PromiseLike<QueryResult>;
   };
 }
 
@@ -140,6 +140,59 @@ export async function fetchLast30(api: DataApi, now: Date): Promise<{ totals: La
     .order("day", { ascending: false });
   if (error) return { totals: null, error: error.message };
   return { totals: summarizeLast30(data as SummaryRow[] | null), error: null };
+}
+
+/** Rows per view in the last 30 days, keyed `${source}/${viewId}`. Same filters as the table, so a badge matches its tab. null = read failed. */
+export async function fetchCounts30(api: DataApi, cfgs: readonly ViewConfig[], now: Date): Promise<Record<string, number | null>> {
+  const p: DataParams = { from: last30Cutoff(now), to: null, q: "", page: 1 };
+  const counts: Record<string, number | null> = {};
+  await Promise.all(
+    cfgs.map(async (cfg) => {
+      // head: the count comes back without any rows.
+      const { error, count } = await applyFilters(api.from(cfg.view).select(cfg.tieBreak, { count: "exact", head: true }), cfg, p);
+      counts[`${cfg.source}/${cfg.id}`] = error ? null : (count ?? 0);
+    })
+  );
+  return counts;
+}
+
+export interface Meta30 {
+  spend: { currency: string | null; minor: number }[];
+}
+
+export function summarizeSpend(rows: readonly { spend_minor?: number | string | null; currency?: string | null }[] | null | undefined): Meta30 {
+  const byCurrency = new Map<string | null, number>();
+  for (const row of rows ?? []) {
+    const s = Number(row.spend_minor);
+    if (Number.isFinite(s)) byCurrency.set(row.currency ?? null, (byCurrency.get(row.currency ?? null) ?? 0) + s);
+  }
+  return { spend: [...byCurrency].map(([currency, minor]) => ({ currency, minor })) };
+}
+
+const SPEND_CHUNK = 1000; // PostgREST max_rows: a bigger range is silently clamped to this
+const SPEND_MAX_PAGES = 20;
+
+/**
+ * Ad spend per currency over the last 30 days. The view is one row per campaign per day, so it is read
+ * in stable-ordered chunks. null (the stat says "Unavailable") on a failed read or when 20,000 rows are
+ * not enough: a partial sum would look like a real number.
+ */
+export async function fetchMeta30(api: DataApi, now: Date): Promise<Meta30 | null> {
+  const rows: { spend_minor?: number | string | null; currency?: string | null }[] = [];
+  for (let page = 0; page < SPEND_MAX_PAGES; page++) {
+    const { data, error } = await api
+      .from("campaign_daily_v1")
+      .select("spend_minor,currency")
+      .eq("source", "meta")
+      .gte("day", last30Cutoff(now))
+      .order("day")
+      .order("campaign_id")
+      .range(page * SPEND_CHUNK, (page + 1) * SPEND_CHUNK - 1);
+    if (error) return null;
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < SPEND_CHUNK) return summarizeSpend(rows);
+  }
+  return null;
 }
 
 /* -------------------------------------------------------------------- hrefs */
