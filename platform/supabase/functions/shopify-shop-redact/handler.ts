@@ -35,7 +35,7 @@ export interface ShopRedactDeps {
  * be absent, wrong, or bypassed via chunked transfer-encoding, so the real defense is capping the
  * bytes actually read, not trusting the header. Returns null (never a partial buffer) on overflow.
  */
-async function readBodyCapped(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+async function readBodyCapped(request: Request, maxBytes: number): Promise<Uint8Array<ArrayBuffer> | null> {
   const reader = request.body?.getReader();
   if (!reader) return new Uint8Array(await request.arrayBuffer());
   const chunks: Uint8Array[] = [];
