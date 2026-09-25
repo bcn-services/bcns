@@ -31,6 +31,21 @@ export interface TxnRowData {
   sector: string | null;
 }
 
+// ponytail: recomputes fixed-position coords from getBoundingClientRect() on
+// open so the popup escapes .table-scroll's overflow clipping without a
+// portal; doesn't reposition on scroll/resize while open, only on toggle.
+function positionMenu(e: React.SyntheticEvent<HTMLDetailsElement>) {
+  const details = e.currentTarget;
+  if (!details.open) return;
+  const panel = details.querySelector<HTMLElement>(".popup-panel");
+  if (!panel) return;
+  const rect = details.getBoundingClientRect();
+  panel.style.position = "fixed";
+  panel.style.top = `${rect.bottom + 8}px`;
+  panel.style.right = `${window.innerWidth - rect.right}px`;
+  panel.style.left = "auto";
+}
+
 export function QuarterlyBudgetPanel({
   quarter,
   sectors,
@@ -249,7 +264,7 @@ export function RecentTransactionsPanel({
                       <span className={`badge ${t.sector ? "badge--sector" : "badge--idle"}`}>{sectorLabelFor(t.sector) ?? "Unassigned"}</span>
                     </td>
                     <td>
-                      <details className="popup lib-menu">
+                      <details className="popup lib-menu" onToggle={positionMenu}>
                         <summary className="icon-btn" aria-label={`Actions for ${t.vendor}`}>
                           &hellip;
                         </summary>
