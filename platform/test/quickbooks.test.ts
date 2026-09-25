@@ -263,7 +263,10 @@ describe('pull() generator (via incremental) — pagination, entity handoff, and
       ['Bill', 2, true, true],
     ])
     expect(pages[0].cursor).toEqual({ entity: 'Purchase', start: 1001 })
-    expect(pages[1].cursor).toEqual({ entity: 'Bill', start: 1 }) // Bill's first query only fires after this page
+    // Incremental entityDone always carries this entity's own watermark (not a handoff to Bill) —
+    // otherwise run.ts's per-entity incremental_cursor map loses Purchase's cursor entirely, and
+    // the next tick re-queries all Purchases from 1970-01-01 (the bug this test now guards against).
+    expect(pages[1].cursor).toEqual({ last_updated: '2026-09-05T00:00:00.000Z' })
     expect(pages[2].cursor).toMatchObject({ last_updated: expect.any(String) })
 
     expect(queries.length).toBe(3)
@@ -273,5 +276,75 @@ describe('pull() generator (via incremental) — pagination, entity handoff, and
     expect(queries[0]).toContain("MetaData.LastUpdatedTime >= '2026-09-01T00:00:00.000Z'")
     expect(queries[1]).toContain("MetaData.LastUpdatedTime >= '2026-09-01T00:00:00.000Z'")
     expect(queries[2]).toContain("MetaData.LastUpdatedTime >= '1970-01-01T00:00:00.000Z'")
+  })
+
+  it('reads each entity\'s own prior cursor from the per-entity incremental map, and every entityDone yields only { last_updated } — no entity/start handoff keys', async () => {
+    const queries: string[] = []
+    const fetchImpl = (async (url: string | URL) => {
+      const query = new URL(String(url)).searchParams.get('query') ?? ''
+      queries.push(query)
+      const isPurchase = query.startsWith('select * from Purchase')
+      const body = isPurchase
+        ? { QueryResponse: { Purchase: [{ Id: '1', MetaData: { LastUpdatedTime: '2026-09-10T00:00:00.000Z' } }] } }
+        : { QueryResponse: { Bill: [{ Id: '1', MetaData: { LastUpdatedTime: '2026-08-20T00:00:00.000Z' } }] } }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof fetch
+
+    const cursors = {
+      Purchase: { last_updated: '2026-09-01T00:00:00.000Z' },
+      Bill: { last_updated: '2026-08-15T00:00:00.000Z' },
+    }
+    const pages = []
+    for await (const page of quickbooks.incremental(ctx(fetchImpl), cursors)) pages.push(page)
+
+    expect(queries[0]).toContain("MetaData.LastUpdatedTime >= '2026-09-01T00:00:00.000Z'")
+    expect(queries[1]).toContain("MetaData.LastUpdatedTime >= '2026-08-15T00:00:00.000Z'")
+
+    for (const page of pages) {
+      expect(page.cursor).toEqual({ last_updated: expect.any(String) })
+      expect(page.cursor).not.toHaveProperty('entity')
+      expect(page.cursor).not.toHaveProperty('start')
+    }
+  })
+})
+
+describe('pull() generator (via backfill) — entity handoff still uses { entity, start } (backfill_cursor is one shared value, not per-entity)', () => {
+  const prevEnv = process.env.QUICKBOOKS_ENV
+  beforeEach(() => { process.env.QUICKBOOKS_ENV = 'sandbox' })
+  afterEach(() => {
+    if (prevEnv === undefined) delete process.env.QUICKBOOKS_ENV
+    else process.env.QUICKBOOKS_ENV = prevEnv
+  })
+
+  const ctx = (fetchImpl: typeof fetch): RunContext => ({
+    clientId: 'c1', source: 'quickbooks', config: { realm_id: '123' }, timezone: 'America/New_York',
+    token: { client_id: 'c1', source: 'quickbooks', kind: 'quickbooks_oauth_refresh', secret: 'tok', refresh_secret: 'r', expires_at: null, attributes: {} },
+    fetch: fetchImpl, log: () => {}, putObject: async () => {}, hasMetricToday: async () => false,
+    knownMedia: async () => new Set(), mergeConfig: async () => {},
+  }) as unknown as RunContext
+
+  it('a full first-entity page still hands off { entity: "Bill", start: 1 } on Purchase entityDone, and the final page carries { last_updated }', async () => {
+    const mkRows = (n: number, startId: number): Json[] =>
+      Array.from({ length: n }, (_, i) => ({ Id: String(startId + i), MetaData: { LastUpdatedTime: '2026-09-05T00:00:00.000Z' } }))
+
+    const fetchImpl = (async (url: string | URL) => {
+      const query = new URL(String(url)).searchParams.get('query') ?? ''
+      const body = query.startsWith('select * from Purchase')
+        ? { QueryResponse: { Purchase: query.includes('startposition 1 ') ? mkRows(1000, 1) : mkRows(3, 1001) } }
+        : { QueryResponse: { Bill: mkRows(2, 1) } }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof fetch
+
+    const pages = []
+    for await (const page of quickbooks.backfill(ctx(fetchImpl), new Date('2026-01-01'), null)) pages.push(page)
+
+    expect(pages.map(p => [p.entity, p.raw.length, p.entityDone, p.done])).toEqual([
+      ['Purchase', 1000, false, false],
+      ['Purchase', 3, true, false],
+      ['Bill', 2, true, true],
+    ])
+    expect(pages[0].cursor).toEqual({ entity: 'Purchase', start: 1001 })
+    expect(pages[1].cursor).toEqual({ entity: 'Bill', start: 1 })
+    expect(pages[2].cursor).toMatchObject({ last_updated: expect.any(String) })
   })
 })

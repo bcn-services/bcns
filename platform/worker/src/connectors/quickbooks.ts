@@ -95,11 +95,15 @@ async function* pull(ctx: RunContext, mode: 'backfill' | 'incremental', from: Da
         return new Date(finalMs).toISOString()
       }
 
-      const cursor: Json = done
-        ? { last_updated: lastUpdatedIso() }
-        : entityDone
-          ? { entity: ENTITIES[i + 1], start: 1 }
-          : { entity, start: start + PAGE }
+      // Cursor shape differs by mode: run.ts stores backfill_cursor as one shared value, so a
+      // non-last entityDone hands off `{ entity, start }` to resume at the next entity. It stores
+      // incremental_cursor keyed per entity, so every entityDone (not just the last) must carry
+      // that entity's own `{ last_updated }` watermark, or the next tick has no prior cursor for it.
+      const cursor: Json = entityDone
+        ? (mode === 'incremental' || done)
+          ? { last_updated: lastUpdatedIso() }
+          : { entity: ENTITIES[i + 1], start: 1 }
+        : { entity, start: start + PAGE }
 
       yield { raw, entity, cursor, entityDone, done }
       if (done) return
