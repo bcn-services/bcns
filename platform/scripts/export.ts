@@ -5,6 +5,9 @@ import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type pg from 'pg'
 import { die, pgClient, serviceClient, clientIdForSlug, isMain, runMain } from './_lib.js'
+import { rawPartitions } from '../worker/src/scope.js'
+
+export { rawPartitions }
 
 export const CANONICAL_TABLES = [
   'customers', 'jobs', 'messages', 'money', 'media', 'media_sets', 'media_set_items', 'products',
@@ -15,12 +18,6 @@ function csvCell(v: unknown): string {
   if (v === null || v === undefined) return ''
   const s = v instanceof Date ? v.toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v)
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
-
-export async function rawPartitions(db: pg.Pool | pg.PoolClient): Promise<string[]> {
-  const r = await db.query<{ relname: string }>(
-    `select c.relname from pg_inherits i join pg_class c on c.oid = i.inhrelid where i.inhparent = 'data.raw'::regclass order by 1`)
-  return r.rows.map((x) => x.relname)
 }
 
 export async function exportClient(db: pg.Pool, clientId: string, out: string): Promise<void> {
