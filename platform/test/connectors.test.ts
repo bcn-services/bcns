@@ -12,6 +12,7 @@ const SHOPIFY = fx('shopify'), META = fx('meta'), MONDAY = fx('monday'), MEET = 
 
 const KIND: Record<Source, string> = {
   shopify: 'shopify_admin', meta: 'meta_system_user', monday: 'monday_personal', meet: 'google_oauth_refresh', drive: 'google_oauth_refresh',
+  quickbooks: 'quickbooks_oauth_refresh',
 }
 const CANON = ['customers', 'jobs', 'messages', 'money', 'media', 'products', 'daily_metrics', 'records']
 const made: string[] = []

@@ -16,6 +16,13 @@ function migrationText(): string {
   return readFileSync(new URL(file, MIGRATIONS_DIR), 'utf8')
 }
 
+/** quickbooks lands in a later migration that recreates the same function; both apply in order. */
+function quickbooksMigrationText(): string {
+  const file = readdirSync(MIGRATIONS_DIR).find((f) => f.includes('quickbooks_connect_config'))
+  if (!file) throw new Error('expected a 20260924* quickbooks_connect_config migration')
+  return readFileSync(new URL(file, MIGRATIONS_DIR), 'utf8')
+}
+
 describe('api.connect_source validates p_config per source', () => {
   const sql = migrationText()
 
@@ -46,5 +53,20 @@ describe('api.connect_source validates p_config per source', () => {
     expect(sql).toContain("p_source = 'shopify' and")
     expect(sql).toContain("p_source = 'meta' and")
     expect(sql).toContain("p_source = 'monday' and")
+  })
+})
+
+describe('api.connect_source validates p_config->>realm_id for quickbooks', () => {
+  const sql = quickbooksMigrationText()
+
+  it('recreates api.connect_source with the unchanged 8-arg signature', () => {
+    expect(sql).toMatch(/create or replace function api\.connect_source/)
+    expect(sql).not.toMatch(/drop function api\.connect_source/)
+  })
+
+  it('validates quickbooks: p_config->>realm_id must be 1-32 digits, gated on its own p_source', () => {
+    expect(sql).toContain("p_source = 'quickbooks' and")
+    expect(sql).toContain("p_config->>'realm_id'")
+    expect(sql).toContain(String.raw`^[0-9]{1,32}$`)
   })
 })

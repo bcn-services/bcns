@@ -21,7 +21,7 @@
  * channels. A card for them could never leave "Not connected / Request connection",
  * so they are deliberately not listed here (platform-v1 §9, dropped 2026-09-19).
  */
-export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive"] as const;
+export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive", "quickbooks"] as const;
 
 export type HubSource = (typeof HUB_SOURCES)[number];
 
@@ -58,6 +58,7 @@ const TITLES: Record<HubSource, string> = {
   monday: "Monday.com",
   meet: "Google Meet",
   drive: "Google Drive",
+  quickbooks: "QuickBooks",
 };
 
 const STATES: Record<HealthStatus | "none", { label: string; tone: Tone }> = {
