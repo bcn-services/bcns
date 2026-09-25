@@ -14,6 +14,7 @@
  */
 
 import { useState, useTransition } from "react";
+import { useFormStatus } from "react-dom";
 import { formatDayLabel, formatMoney } from "@/lib/overview";
 import { Panel, PanelHead } from "@/app/_components/Panel";
 import { FinanceIcon, DragHandleIcon } from "@/app/_components/icons";
@@ -29,6 +30,26 @@ export interface TxnRowData {
   memo: string | null;
   amountCents: number;
   sector: string | null;
+}
+
+// Shared submit button: disables + swaps its label while its form's server
+// action is in flight, so a slow round trip can't be double-submitted and
+// the user gets feedback instead of a dead-looking click.
+function SubmitButton({
+  className,
+  pendingLabel,
+  children,
+}: {
+  className: string;
+  pendingLabel: string;
+  children: React.ReactNode;
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <button className={className} type="submit" disabled={pending} aria-busy={pending}>
+      {pending ? pendingLabel : children}
+    </button>
+  );
 }
 
 // ponytail: recomputes fixed-position coords from getBoundingClientRect() on
@@ -155,9 +176,9 @@ export function QuarterlyBudgetPanel({
                 placeholder="0.00"
                 aria-label={`${s.label} budget`}
               />
-              <button className="btn-accent btn-accent--sm" type="submit">
+              <SubmitButton className="btn-accent btn-accent--sm" pendingLabel="Saving…">
                 Save
-              </button>
+              </SubmitButton>
             </form>
           </div>
         ))}
@@ -276,18 +297,18 @@ export function RecentTransactionsPanel({
                               <input type="hidden" name="sector" value={s.id} />
                               <input type="hidden" name="from" value={range.from} />
                               <input type="hidden" name="to" value={range.to} />
-                              <button className="popup-menu-item" type="submit">
+                              <SubmitButton className="popup-menu-item" pendingLabel="Assigning…">
                                 {s.label}
-                              </button>
+                              </SubmitButton>
                             </form>
                           ))}
                           <form action={unassignTransaction}>
                             <input type="hidden" name="txn" value={t.externalId} />
                             <input type="hidden" name="from" value={range.from} />
                             <input type="hidden" name="to" value={range.to} />
-                            <button className="popup-menu-item popup-menu-item--muted" type="submit">
+                            <SubmitButton className="popup-menu-item popup-menu-item--muted" pendingLabel="Unassigning…">
                               Unassign
-                            </button>
+                            </SubmitButton>
                           </form>
                         </div>
                       </details>
@@ -314,9 +335,9 @@ export function RecentTransactionsPanel({
                   </option>
                 ))}
               </select>
-              <button className="btn-plain btn-plain--inline" type="submit">
+              <SubmitButton className="btn-plain btn-plain--inline" pendingLabel="Assigning…">
                 Assign
-              </button>
+              </SubmitButton>
             </form>
           ) : null}
         </>

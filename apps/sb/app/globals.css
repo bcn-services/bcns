@@ -1859,6 +1859,10 @@ summary::-webkit-details-marker {
   cursor: default;
 }
 
+.txn-row:hover {
+  background: var(--hairline-row);
+}
+
 .txn-row.is-dragging {
   opacity: 0.45;
 }
@@ -1896,6 +1900,11 @@ summary::-webkit-details-marker {
 
 .popup-menu-item:hover {
   background: var(--accent-chrome);
+}
+
+.popup-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .popup-menu-item--muted {
