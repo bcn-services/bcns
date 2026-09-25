@@ -12,8 +12,8 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { STATE_TTL_MS, signState } from "../lib/oauth-state.ts";
 import {
-  authorizeUrl, basicAuth, connectArgs, exchangeCode, handleQuickbooksToken, QUICKBOOKS_DEFAULTS,
-  QUICKBOOKS_SCOPES, QUICKBOOKS_STATE_COOKIE, scheduleConfig,
+  authorizeUrl, basicAuth, connectArgs, exchangeCode, handleQuickbooksToken, isValidRealmId,
+  QUICKBOOKS_DEFAULTS, QUICKBOOKS_SCOPES, QUICKBOOKS_STATE_COOKIE, scheduleConfig,
 } from "../lib/quickbooks-oauth.ts";
 import { oauthEnabled, redirectUri } from "../lib/oauth-config.ts";
 
@@ -48,6 +48,29 @@ test("handleQuickbooksToken: token + expiry, missing expires_in defaults to 3600
   assert.equal(handleQuickbooksToken(200, { access_token: "A" }).reason, "malformed"); // no refresh_token
   assert.equal(handleQuickbooksToken(200, { refresh_token: "R" }).reason, "malformed"); // no access_token
   assert.equal(handleQuickbooksToken(200, null).reason, "malformed");
+});
+
+test("handleQuickbooksToken: rejects an expires_in that would make toISOString() unsafe", () => {
+  const base = { access_token: "A", refresh_token: "R" };
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: 0 }).reason, "malformed");
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: -1 }).reason, "malformed");
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: 1.5 }).reason, "malformed");
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: Infinity }).reason, "malformed");
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: Number.MAX_SAFE_INTEGER }).reason, "malformed");
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: 86400 * 7 + 1 }).reason, "malformed");
+  assert.equal(handleQuickbooksToken(200, { ...base, expires_in: 86400 * 7 }).ok, true);
+});
+
+test("isValidRealmId: digits only, 1-32 chars, no sign or decimal", () => {
+  assert.equal(isValidRealmId("9130001234567890"), true);
+  assert.equal(isValidRealmId("1"), true);
+  assert.equal(isValidRealmId("1".repeat(32)), true);
+  assert.equal(isValidRealmId("1".repeat(33)), false);
+  assert.equal(isValidRealmId(""), false);
+  assert.equal(isValidRealmId("-1"), false);
+  assert.equal(isValidRealmId("1.5"), false);
+  assert.equal(isValidRealmId("abc"), false);
+  assert.equal(isValidRealmId("123abc"), false);
 });
 
 test("connectArgs: token only as p_secret/p_refresh_secret, realm only in p_config, defaults match the worker", () => {
@@ -137,10 +160,29 @@ test("callback: requires realmId as well as code, and checks it before exchangeC
   const route = readFileSync(new URL("../app/api/oauth/quickbooks/callback/route.ts", import.meta.url), "utf8");
   assert.match(route, /if \(!code\) return fail\("no_code"\)/);
   assert.match(route, /if \(!realmId\) return fail\("no_realm_id"\)/);
+  assert.match(route, /if \(!isValidRealmId\(realmId\)\) return fail\("bad_realm_id"\)/);
   const codeIdx = route.indexOf('if (!code)');
   const realmIdx = route.indexOf('if (!realmId)');
+  const validIdx = route.indexOf('if (!isValidRealmId');
   const exchangeIdx = route.indexOf('exchangeCode(');
-  assert.ok(codeIdx > 0 && realmIdx > codeIdx && exchangeIdx > realmIdx, "both are checked, before the network call");
+  assert.ok(
+    codeIdx > 0 && realmIdx > codeIdx && validIdx > realmIdx && exchangeIdx > validIdx,
+    "all three are checked, in order, before the network call"
+  );
+});
+
+/* ------------------------------------------------------ malformed realmId */
+
+test("callback: a non-numeric realmId would be rejected before exchangeCode's fetch ever runs", () => {
+  // Same constraint as the no-realmId test above: requireOwner needs a live Supabase
+  // session to reach past it in-process, so this is proven the same way — by the
+  // guard's presence and its position strictly before exchangeCode (the only fetch
+  // in this flow) — plus isValidRealmId's own unit test above for the regex itself.
+  assert.equal(isValidRealmId("abc123"), false, "a non-numeric realmId fails the guard");
+  const route = readFileSync(new URL("../app/api/oauth/quickbooks/callback/route.ts", import.meta.url), "utf8");
+  const validIdx = route.indexOf('if (!isValidRealmId');
+  const exchangeIdx = route.indexOf('exchangeCode(');
+  assert.ok(validIdx > 0 && exchangeIdx > validIdx, "the realmId guard runs before the one network call");
 });
 
 /* ------------------------------------------------------ config + wiring */

@@ -14,7 +14,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
 import { safeEqual, verifyState } from "@/lib/oauth-state";
-import { connectArgs, exchangeCode, QUICKBOOKS_STATE_COOKIE } from "@/lib/quickbooks-oauth";
+import { connectArgs, exchangeCode, isValidRealmId, QUICKBOOKS_STATE_COOKIE } from "@/lib/quickbooks-oauth";
 import { oauthEnabled, redirectUri } from "@/lib/oauth-config";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const realmId = params.get("realmId");
   if (!code) return fail("no_code");
   if (!realmId) return fail("no_realm_id");
+  // Checked before exchangeCode so a malformed realmId never spends the single-use code.
+  if (!isValidRealmId(realmId)) return fail("bad_realm_id");
 
   // A timeout or DNS failure is a connect-failed with the cookie cleared, not a 500.
   const token = await exchangeCode(config.quickbooksClientId!, secret, redirectUri(config, "quickbooks"), code).catch(

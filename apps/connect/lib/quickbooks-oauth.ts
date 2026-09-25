@@ -24,6 +24,13 @@ export const QUICKBOOKS_DEFAULTS = { interval: "1 hour", backfillDepth: "24 mont
 /** Kept in the lib file, not a route.ts: Next's App Router only allows HTTP-method exports there. */
 export const QUICKBOOKS_STATE_COOKIE = "quickbooks_oauth_state";
 
+/** `realmId` arrives unauthenticated on Intuit's own callback query string —
+ *  checked before the code exchange so a malformed value never spends the
+ *  single-use code against a realm the SQL layer will reject anyway. */
+export function isValidRealmId(realmId: string): boolean {
+  return /^[0-9]{1,32}$/.test(realmId);
+}
+
 export function authorizeUrl(clientId: string, redirectUri: string, state: string): string {
   const query = new URLSearchParams({
     client_id: clientId,
@@ -46,7 +53,13 @@ export function handleQuickbooksToken(status: number, body: unknown): Quickbooks
   const accessToken = typeof p?.access_token === "string" ? p.access_token.trim() : "";
   const refreshToken = typeof p?.refresh_token === "string" ? p.refresh_token.trim() : "";
   if (!accessToken || !refreshToken) return { ok: false, reason: "malformed" };
-  const expiresIn = typeof p?.expires_in === "number" && p.expires_in > 0 ? p.expires_in : 3600;
+  // Bounded so `new Date(Date.now() + expiresIn * 1000).toISOString()` downstream can never
+  // throw on an out-of-range value (Infinity, NaN, or a huge number past year 275760).
+  const rawExpiresIn = p?.expires_in;
+  const expiresIn = rawExpiresIn === undefined ? 3600 : rawExpiresIn;
+  if (typeof expiresIn !== "number" || !Number.isInteger(expiresIn) || expiresIn <= 0 || expiresIn > 86400 * 7) {
+    return { ok: false, reason: "malformed" };
+  }
   return { ok: true, accessToken, refreshToken, expiresIn };
 }
 
