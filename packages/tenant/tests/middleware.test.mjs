@@ -132,8 +132,8 @@ test("signed in to another client: signed out and sent to ?error=wrong-client", 
   assert.equal(location.pathname, "/login");
   assert.equal(location.searchParams.get("error"), "wrong-client");
   assert.ok(
-    calls.some((url) => url.includes("/auth/v1/logout")),
-    "the wrong-client session was dropped"
+    calls.some((url) => url.includes("/auth/v1/logout") && url.includes("scope=local")),
+    "the wrong-client session was dropped with local scope, not a global revoke"
   );
 });
 
@@ -158,8 +158,8 @@ test("no membership: the stale session is signed out before the redirect", async
   const response = await tenantMiddleware()(request("/dashboard", { cookie: sessionCookie({}) }));
   assert.equal(response.status, 307);
   assert.ok(
-    calls.some((url) => url.includes("/auth/v1/logout")),
-    "a session with no membership must be dropped, or it loops on every request"
+    calls.some((url) => url.includes("/auth/v1/logout") && url.includes("scope=local")),
+    "a session with no membership must be dropped locally (never global), or it loops on every request"
   );
   assert.ok(response.cookies.getAll().length >= 1, "the clear must ride the redirect");
 });

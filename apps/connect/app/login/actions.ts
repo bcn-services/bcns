@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@bcn-services/tenant";
 import { FINISH_PATH } from "@/lib/shopify-oauth";
+import { requestResetTarget } from "@/lib/auth-link";
+import { getConfig } from "@/lib/env";
 
 export async function signIn(form: FormData): Promise<void> {
   const supabase = createServerSupabase();
@@ -17,6 +19,22 @@ export async function signIn(form: FormData): Promise<void> {
   const next = form.get("next") === FINISH_PATH ? FINISH_PATH : null;
   if (error) redirect(next ? `/login?error=invalid&next=${encodeURIComponent(next)}` : "/login?error=invalid");
   redirect(next ?? "/");
+}
+
+/**
+ * The recovery email links to `${hubBaseUrl}/auth/confirm` (the template appends
+ * token_hash and type). That URL must be in Supabase's Redirect URLs list, or
+ * GoTrue falls back to the Site URL. The answer never depends on the email or on
+ * a Supabase error: see requestResetTarget.
+ */
+export async function requestReset(form: FormData): Promise<void> {
+  redirect(
+    await requestResetTarget(
+      createServerSupabase(),
+      String(form.get("email") ?? ""),
+      `${getConfig().hubBaseUrl}/auth/confirm`
+    )
+  );
 }
 
 export async function signOut(): Promise<void> {
