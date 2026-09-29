@@ -118,6 +118,8 @@ export async function setPasswordTarget(
   if (password !== confirm) return `${SET_PASSWORD_PATH}?error=mismatch`;
   if (password.length < MIN_PASSWORD_LENGTH) return `${SET_PASSWORD_PATH}?error=short`;
   const { error } = await supabase.auth.updateUser({ password });
+  // GoTrue's leaked/weak-password rejection (HIBP check) has its own code; anything else stays generic.
+  if ((error as { code?: string } | null)?.code === "weak_password") return `${SET_PASSWORD_PATH}?error=weak`;
   if (error) return `${SET_PASSWORD_PATH}?error=failed`;
   // A reset must evict other devices' sessions. The password is already changed, so a failure here is swallowed.
   try {

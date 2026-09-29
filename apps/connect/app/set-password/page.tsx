@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 const ERRORS: Record<string, string> = {
   mismatch: "Those passwords don't match.",
   short: `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
+  weak: "That password is too common or has appeared in a data breach. Choose a longer, less guessable one.",
   failed: "Couldn't save that password. Try a different one, or request a new link from the sign-in page.",
 };
 
