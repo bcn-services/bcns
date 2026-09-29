@@ -86,6 +86,10 @@ describe('invite-member', () => {
     expect(rec.memberships).toEqual([])
   })
 
+  it('the invite link lands on the hub confirm route, not /login', () => {
+    expect(INVITE_REDIRECT).toBe('https://connect.bcn-services.com/auth/confirm')
+  })
+
   it('happy path: invites with the hub redirect and adds the membership as a member', async () => {
     const { deps: d, rec } = deps()
     const res = await handle(post({ email: 'New@Acme.example' }), d)

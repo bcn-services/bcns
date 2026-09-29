@@ -59,7 +59,10 @@ export const config = {
   // check: start verifies Shopify's HMAC or requires an owner, callback verifies
   // HMAC + state + cookie and requires the state's owner, finish requires an owner.
   //
+  // auth/confirm$ is the invite / password-reset email landing: the visitor has no
+  // session until its verifyOtp call creates one (app/auth/confirm/route.ts).
+  //
   // The Meta and Monday routes are deliberately NOT excluded: they need a signed-in
   // owner, and the middleware bounce is the first half of that check.
-  matcher: ["/((?!api/health$|api/webhooks/|api/oauth/meta/data-deletion$|api/oauth/shopify/|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/health$|api/webhooks/|api/oauth/meta/data-deletion$|api/oauth/shopify/|auth/confirm$|_next/static|_next/image|favicon.ico).*)"],
 };

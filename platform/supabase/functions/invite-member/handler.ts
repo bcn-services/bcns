@@ -9,8 +9,8 @@
 
 import { json, requireOwner, type GuardDeps } from "../_shared/guard.ts";
 
-/** Where the invite email's link lands: the hub's sign-in page. */
-export const INVITE_REDIRECT = "https://connect.bcn-services.com/login";
+/** Where the invite email's link lands: the hub's token-verifying route, which ends on /set-password. */
+export const INVITE_REDIRECT = "https://connect.bcn-services.com/auth/confirm";
 
 /** Deliberately loose. GoTrue is the real validator; this only rejects nonsense. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

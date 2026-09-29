@@ -35,6 +35,9 @@ export const CONNECT_PUBLIC_ROUTES = [
   // Shopify install OAuth, reached before sign-in: start checks HMAC or an owner,
   // callback HMAC + state + cookie + owner, finish an owner.
   "api/oauth/shopify/",
+  // Invite / password-reset email landing: the visitor has no session yet. The route
+  // only calls verifyOtp on a single-use token_hash and redirects; it reads nothing else.
+  "auth/confirm$",
 ];
 
 export function tenantMiddleware(
@@ -98,13 +101,17 @@ export function tenantMiddleware(
     if (result.reason === "wrong-client") {
       // Signed in, but to someone else's tenant: drop the session so the next
       // sign-in starts clean instead of bouncing off this app forever.
-      await supabase.auth.signOut();
+      // scope "local": the default (global) revokes every device's refresh tokens. The shared
+      // .bcn-services.com cookie is still cleared on the redirect, so every app in THIS browser
+      // is signed out either way; local only spares the user's other devices and browsers.
+      await supabase.auth.signOut({ scope: "local" });
       return redirectTo(`${loginPath}?error=wrong-client`);
     }
     if (result.reason === "no-membership") {
       // Same reason: a signed-in user with no membership keeps a valid session,
       // so without signOut() every request would bounce off this redirect.
-      await supabase.auth.signOut();
+      // Local scope only, for the same reason as wrong-client above.
+      await supabase.auth.signOut({ scope: "local" });
       return redirectTo(`${loginPath}?error=no-membership`);
     }
     return redirectTo(loginPath);
