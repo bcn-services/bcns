@@ -801,8 +801,8 @@ Pulls (each is one `entity` in raw):
 
 | entity | query | incremental filter | external_id | source_updated_at |
 |---|---|---|---|---|
-| `order` | `orders(first:50, after, sortKey: UPDATED_AT, query)` | `updated_at:>=<since>` (backfill: `created_at:>=<backfill_from>`) | `Order.id` (GID) | `Order.updatedAt` |
-| `product` | `products(first:50, after, sortKey: UPDATED_AT, query)` | `updated_at:>=<since>` (backfill: no filter) | `Product.id` | `Product.updatedAt` |
+| `order` | `orders(first:50, after, sortKey: UPDATED_AT, query)` | `updated_at:>='<since>'` (backfill: `created_at:>='<backfill_from>'`; quoted — unquoted, Shopify splits the ISO time at its colons and matches nothing) | `Order.id` (GID) | `Order.updatedAt` |
+| `product` | `products(first:50, after, sortKey: UPDATED_AT, query)` | `updated_at:>='<since>'` (backfill: no filter) | `Product.id` | `Product.updatedAt` |
 | `payout` | `shopifyPaymentsAccount { payouts(first:100, after) }` | none on the API — page newest-first, stop at `issuedAt < since` | `ShopifyPaymentsPayout.id` | `issuedAt` |
 | `inventory_snapshot` | derived: sum of `variants.inventoryQuantity` over all products, **only when `daily_metrics` has no `(shopify, today, 'store', 'store', 'inventory_units')` row yet** (the worker passes `ctx.hasMetricToday('inventory_units')`; the metric upsert for this one metric is `on conflict do nothing`, so the first run of the local day wins) | — | `<YYYY-MM-DD>` | run time |
 | `sessions_day` | `shopifyqlQuery("FROM sessions SHOW sessions, conversion_rate TIMESERIES day SINCE <from> UNTIL today")` **only if `config.sessions_mode = 'shopifyql'`** | `SINCE <since − 2 days>` | `<YYYY-MM-DD>` | run time |
