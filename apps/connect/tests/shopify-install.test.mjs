@@ -14,6 +14,7 @@ import {
   FINISH_PATH,
   INSTALL_CLIENT_ID,
   INSTALL_TIMESTAMP_MAX_AGE_MS,
+  finishErrorCode,
   STATE_TTL_MS,
   hasActiveSubscription,
   isFreshInstallTimestamp,
@@ -588,4 +589,13 @@ test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the
   assert.equal(hubResult, null);
   assert.equal(hubApi.callCount(), 0);
   assert.equal(hubFetch.callCount(), 0);
+});
+
+// 20260929000100_connect_source_shop_guard.sql raises BCNS6 when another client
+// holds the shop with a live token; /finish must send that to its own copy.
+test("finishErrorCode maps the shop guard (BCNS6) to shop-in-use, anything else to connect-failed", () => {
+  assert.equal(finishErrorCode({ code: "BCNS6", message: "shop_in_use" }), "shop-in-use");
+  assert.equal(finishErrorCode({ code: "BCNS3", message: "validation" }), "connect-failed");
+  assert.equal(finishErrorCode({}), "connect-failed");
+  assert.equal(finishErrorCode(null), "connect-failed");
 });

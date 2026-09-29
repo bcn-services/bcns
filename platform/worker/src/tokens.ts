@@ -85,6 +85,9 @@ export async function probeAuthFailed(t: Tick): Promise<number> {
          updated_at = now()
        where client_id = $1 and source = $2`,
       [row.client_id, row.source, good, detail])
+    // A recovered credential takes its refresh-failure reason (run.ts refreshOne) off the hub card.
+    if (good) await sql(`update data.connector_schedule set last_error = null, last_error_at = null where client_id = $1 and source = $2`,
+      [row.client_id, row.source])
   }
   return ok
 }
