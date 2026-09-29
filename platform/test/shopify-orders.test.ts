@@ -53,3 +53,37 @@ describe('shopify drive() cursor', () => {
     expect(at).toBeLessThanOrEqual(after - 5 * 60_000)
   })
 })
+
+describe('shopify order search filter', () => {
+  // Shopify splits an unquoted ISO time at its colons and matches nothing; it reports that only in
+  // extensions.search warnings on a 200 (probe against bcns-data-dev, 2026-09-28).
+  const run = async (gen: (ctx: any) => AsyncIterable<any>, warn = false) => {
+    const qs: Record<string, string | null> = {}
+    const fetch = (async (_u: unknown, init?: RequestInit) => {
+      const b = JSON.parse(String(init?.body))
+      const entity = b.query.includes('orders(') ? 'order' : b.query.includes('products(') ? 'product' : null
+      if (entity) qs[entity] = b.variables.q
+      const data = b.query.includes('shop{') ? { shop: { currencyCode: 'USD', ianaTimezone: 'UTC' } }
+        : { orders: empty, products: empty, shopifyPaymentsAccount: { payouts: empty } }
+      const extensions = warn && entity === 'order' ? { search: [{ path: ['orders'], query: b.variables.q, warnings: [{ field: '45', message: 'Invalid search field for this query.', code: 'invalid_field' }] }] } : {}
+      return new Response(JSON.stringify({ data, extensions }))
+    }) as unknown as typeof globalThis.fetch
+    const ctx = { config: { shop: 'zz', currency: 'USD', store_timezone: 'UTC', sessions_mode: 'none' }, timezone: 'UTC',
+      token: { secret: 't' }, fetch, mergeConfig: async () => {}, hasMetricToday: async () => true } as any
+    for await (const _ of gen(ctx)) { /* drain */ }
+    return qs
+  }
+  const at = '2026-09-25T02:45:22.433Z'
+
+  it('quotes the incremental updated_at and backfill created_at times', async () => {
+    const inc = await run((ctx) => shopify.incremental(ctx, { order: { updated_at: at }, product: { updated_at: at } }))
+    expect(inc.order).toBe(`updated_at:>='${at}'`)
+    expect(inc.product).toBe(`updated_at:>='${at}'`)
+    const back = await run((ctx) => shopify.backfill(ctx, new Date(at), null))
+    expect(back.order).toBe(`created_at:>='${at}'`)
+  })
+
+  it('fails the run when Shopify reports a search warning instead of syncing an empty page', async () => {
+    await expect(run((ctx) => shopify.incremental(ctx, { order: { updated_at: at } }), true)).rejects.toThrow(/invalid_field: field 45/)
+  })
+})
