@@ -38,6 +38,9 @@ async function forwardShopRedact(
         "X-Shopify-Hmac-Sha256": hmacHeader,
         ...(webhookId ? { "X-Shopify-Webhook-Id": webhookId } : {}),
         ...(triggeredAt ? { "X-Shopify-Triggered-At": triggeredAt } : {}),
+        // This route only serves shop/redact; state it so the Edge Function's topic check passes
+        // even if a proxy stripped Shopify's own header.
+        "X-Shopify-Topic": "shop/redact",
       },
       // Forwarding the exact string handleGdprWebhook already verified the HMAC
       // over — this route already treats the body as text end to end (`.text()`

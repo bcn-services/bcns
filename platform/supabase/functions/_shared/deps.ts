@@ -145,7 +145,7 @@ export function mintDeps(request: Request): MintDeps {
 /**
  * shopify-shop-redact has no caller JWT (HMAC is the only auth), so unlike guardDeps' `as` client
  * this calls the RPC as the SERVICE ROLE — the one new grant that requires (migration
- * 20260924000100: `usage on schema api` + `execute on api.record_shop_redact` to service_role
+ * 20260924000300: `usage on schema api` + `execute on api.record_shop_redact` to service_role
  * only; still zero access to any `data` table, which is the wall this file's own comment
  * describes). The RPC itself is the narrow SECURITY DEFINER surface, not this client.
  */

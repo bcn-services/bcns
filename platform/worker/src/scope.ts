@@ -47,11 +47,18 @@ export async function rawPartitions(db: Db): Promise<string[]> {
 /**
  * One client+source's data.raw rows, chunked at 50k ctids per committed delete — mirrors
  * hard-delete.ts's own unscoped loop, since raw is the one table an active client can grow
- * without bound. Callers run this OUTSIDE any transaction (privacy.ts does, before its guarded
- * transaction): each chunk commits on its own, so a crash mid-loop just leaves fewer rows to
- * redo on the next pass — never a rollback of work already done.
+ * without bound. hard-delete.ts runs it outside any transaction (each chunk commits on its own);
+ * privacy.ts runs it inside its guarded transaction, after the locked re-check.
  */
-export async function deleteRawScoped(db: Db, clientId: string, source: string): Promise<void> {
+export async function deleteRawScoped(db: Db, clientId: string, source: string, opts: { chunked?: boolean } = {}): Promise<void> {
+  // Inside a transaction chunking gains nothing (deleted rows stay in the index until commit, so
+  // each chunk rescans them — quadratic): one delete per partition instead.
+  if (opts.chunked === false) {
+    for (const part of await rawPartitions(db)) {
+      await db.query(`delete from data.${part} where client_id = $1 and source = $2`, [clientId, source])
+    }
+    return
+  }
   for (const part of await rawPartitions(db)) {
     for (;;) {
       const r = await db.query(
@@ -67,7 +74,7 @@ export async function deleteRawScoped(db: Db, clientId: string, source: string):
 /**
  * Deletes one client's rows across DATA_TABLES's canonical tables only — never data.raw. A
  * source-scoped caller must chunk data.raw itself first via deleteRawScoped (privacy.ts does,
- * outside its transaction, before this runs); hard-delete.ts's unscoped path does its own
+ * in the same transaction, before this runs); hard-delete.ts's unscoped path does its own
  * separately-chunked raw deletion before this runs too. Raw is unbounded, so it is never a plain
  * DELETE here in either path.
  */

@@ -47,6 +47,7 @@ async function postShopRedact(deps) {
     "X-Shopify-Hmac-Sha256": sign(BODY),
     "X-Shopify-Webhook-Id": "wh-1",
     "X-Shopify-Triggered-At": new Date().toISOString(),
+    "X-Shopify-Topic": "shop/redact",
   };
   return gdprRoute(new Request("http://x/api", { method: "POST", headers, body: BODY }), "shop/redact", deps);
 }
@@ -97,6 +98,7 @@ test("shop/redact: a 2xx forward short-circuits before the operator email, and r
       assert.equal(init.body, BODY, "forwards the exact raw bytes the HMAC was checked over");
       assert.equal(init.headers["X-Shopify-Hmac-Sha256"], sign(BODY));
       assert.equal(init.headers["X-Shopify-Webhook-Id"], "wh-1");
+      assert.equal(init.headers["X-Shopify-Topic"], "shop/redact", "topic forwarded for the Edge Function's check");
     } finally {
       globalThis.fetch = realFetch;
     }

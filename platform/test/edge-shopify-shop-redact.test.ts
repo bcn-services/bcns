@@ -35,7 +35,7 @@ function deps(insertedOverride?: boolean): { deps: ShopRedactDeps; rec: Recorded
 function post(body: string, headers: Record<string, string> = {}): Request {
   return new Request('https://p.supabase.co/functions/v1/shopify-shop-redact', {
     method: 'POST',
-    headers,
+    headers: { 'X-Shopify-Topic': 'shop/redact', ...headers },
     body,
   })
 }
@@ -62,6 +62,20 @@ describe('shopify-shop-redact', () => {
     expect(res.status).toBe(200)
     expect(rec.inserts).toEqual([{ shop: SHOP, webhookId: 'wh-1' }])
     expect(rec.logs.at(-1)).toMatchObject({ event: 'shop_redact_queued', data: { inserted: false } })
+  })
+
+  it('a validly signed body under another topic is 400 and writes nothing', async () => {
+    const { deps: d, rec } = deps()
+    const body = JSON.stringify({ shop_domain: SHOP, customer: { id: 1 } })
+    for (const topic of ['customers/redact', 'customers/data_request', undefined]) {
+      const headers: Record<string, string> = { 'X-Shopify-Hmac-Sha256': sign(body), 'X-Shopify-Webhook-Id': 'wh-1' }
+      const req = post(body, headers)
+      if (topic) req.headers.set('X-Shopify-Topic', topic)
+      else req.headers.delete('X-Shopify-Topic')
+      const res = await handle(req, SECRET, d)
+      expect(res.status).toBe(400)
+    }
+    expect(rec.inserts).toEqual([])
   })
 
   it('an invalid HMAC is 401 and writes nothing', async () => {

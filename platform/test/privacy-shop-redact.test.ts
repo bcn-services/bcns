@@ -101,7 +101,7 @@ async function notificationFor(shop: string): Promise<{ payload: Record<string, 
 
 afterAll(async () => {
   if (made.length) {
-    for (const t of ['customers', 'connector_schedule', 'source_tokens']) {
+    for (const t of ['raw', 'customers', 'connector_schedule', 'source_tokens']) {
       await sql(`delete from data.${t} where client_id = any($1::uuid[])`, [made])
     }
     await sql(`delete from data.clients where id = any($1::uuid[])`, [made])
@@ -126,6 +126,26 @@ describe('shopRedact', () => {
     expect(await customerCount(client, 'shopify')).toBe(0)
     expect(await customerCount(client, 'monday')).toBe(1) // non-shopify rows untouched
     expect(await customerCount(other, 'shopify')).toBe(1) // other client untouched
+  })
+
+  it('deletes data.raw for only that client + shopify (not its monday rows, not another client)', async () => {
+    const shop = shopFor(randomUUID())
+    const client = await mkClient(shop)
+    const other = await mkClient(shopFor(randomUUID()))
+    const seed = (c: string, source: string) =>
+      sql(`insert into data.raw (client_id, source, entity, external_id, payload_hash, payload) values ($1, $2, 'order', 'r1', 'h', '{}'::jsonb)`, [c, source])
+    await seed(client, 'shopify')
+    await seed(client, 'monday')
+    await seed(other, 'shopify')
+    const rawCount = async (c: string, source: string) =>
+      Number((await sql<{ n: string }>(`select count(*) n from data.raw where client_id = $1 and source = $2`, [c, source])).rows[0].n)
+
+    await queueRequest(shop)
+    await shopRedact(mkTick())
+
+    expect(await rawCount(client, 'shopify')).toBe(0)
+    expect(await rawCount(client, 'monday')).toBe(1)
+    expect(await rawCount(other, 'shopify')).toBe(1)
   })
 
   it('escalates an unknown shop: needs_operator, nothing deleted', async () => {
@@ -196,6 +216,7 @@ describe('shopRedact', () => {
     const shop = shopFor(randomUUID())
     const now = new Date()
     const client = await mkClient(shop, { status: 'active', createdAt: now, lastRefreshedAt: now, expiresAt: new Date(Date.now() + HOUR) })
+    await sql(`insert into data.raw (client_id, source, entity, external_id, payload_hash, payload) values ($1, 'shopify', 'order', 'r1', 'h', '{}'::jsonb)`, [client])
     const id = await queueRequest(shop)
 
     const n = await shopRedact(mkTick())
@@ -205,6 +226,8 @@ describe('shopRedact', () => {
     expect(row.status).toBe('needs_operator')
     expect(row.error).toMatch(/still active or recently used/)
     expect(await customerCount(client, 'shopify')).toBe(1)
+    const raw = await sql<{ n: string }>(`select count(*) n from data.raw where client_id = $1`, [client])
+    expect(Number(raw.rows[0].n)).toBe(1) // escalation must leave raw untouched
   })
 
   it('B1: a replay after reconnect (active token, old created_at/last_refreshed_at) escalates', async () => {
