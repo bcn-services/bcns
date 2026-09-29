@@ -484,6 +484,15 @@ export function subscriptionOutcome(checked: SubscriptionCheckResult): "write" |
   return checked.active ? "write" : "plan_page";
 }
 
+/**
+ * The hub's `?error=` for a failed connect_source write. BCNS6 (`shop_in_use`) is
+ * the shop guard in 20260929000100_connect_source_shop_guard.sql: another client
+ * holds this shop with a live token.
+ */
+export function finishErrorCode(error: { code?: string } | null): "shop-in-use" | "connect-failed" {
+  return error?.code === "BCNS6" ? "shop-in-use" : "connect-failed";
+}
+
 /** Where every handshake ends; the only `next` the login page will follow. */
 export const FINISH_PATH = "/api/oauth/shopify/finish";
 

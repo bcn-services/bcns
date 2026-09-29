@@ -29,6 +29,7 @@ import {
   PENDING_COOKIE,
   SHOPIFY_DEFAULTS,
   SHOPIFY_TOKEN_KIND,
+  finishErrorCode,
   managedPricingRedirect,
   openPending,
   scheduleConfig,
@@ -50,9 +51,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const config = getConfig();
   const hub = config.hubBaseUrl;
-  const fail = (code: string) => {
+  const fail = (code: string, hubError: string = "connect-failed") => {
     console.warn(`[connect] shopify finish rejected (${code})`);
-    const response = NextResponse.redirect(`${hub}/?error=connect-failed`);
+    const response = NextResponse.redirect(`${hub}/?error=${hubError}`);
     response.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
     return response;
   };
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     p_expires_at: pending.expiresAt,
   });
   // `error.message` can echo a parameter value, and one of them is the token.
-  if (error) return fail(`write_failed:${error.code ?? "rpc"}`);
+  if (error) return fail(`write_failed:${error.code ?? "rpc"}`, finishErrorCode(error));
 
   const done = NextResponse.redirect(`${hub}/?connected=shopify`);
   done.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
