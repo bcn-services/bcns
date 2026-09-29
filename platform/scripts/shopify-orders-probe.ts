@@ -1,4 +1,4 @@
-// shopify-orders-probe --client <uuid>   READ-ONLY diagnostic for "worker syncs 0 Shopify orders".
+// shopify-orders-probe --client <uuid> [--since <iso>]   READ-ONLY diagnostic for "worker syncs 0 Shopify orders".
 // Loads the stored token the way run.ts does, then asks the Admin API four things with it:
 //   a. the worker's own Q_ORDERS, q=null          b. Q_ORDERS, q="test:true"
 //   c. ordersCount                                d. the token's granted scope handles
@@ -17,18 +17,32 @@ import { die, isMain, runMain } from './_lib.js'
 
 type Fetch = typeof globalThis.fetch
 const Q_ORDERS_5 = Q_ORDERS.replace(/orders\(first:\d+/, 'orders(first:5')
-const QUERIES = {
+const QUERIES: Record<string, { query: string; variables: Record<string, unknown> }> = {
   a_orders_q_null: { query: Q_ORDERS_5, variables: { after: null, q: null } },
   b_orders_q_test: { query: Q_ORDERS_5, variables: { after: null, q: 'test:true' } },
   c_orders_count: { query: '{ ordersCount { count precision } }', variables: {} },
   d_scopes: { query: '{ currentAppInstallation { accessScopes { handle } } }', variables: {} },
 }
 
+/** --since: Q_ORDERS with the worker's exact updated_at filter string, plus format variants of the same instant. */
+export function filterVariants(since: string): Record<string, { query: string; variables: Record<string, unknown> }> {
+  const t = new Date(since), sec = new Date(Math.floor(t.getTime() / 1000) * 1000)
+  const qs: Record<string, string> = {
+    e_updated_worker_format: `updated_at:>=${t.toISOString()}`,
+    f_updated_ms_zeroed: `updated_at:>=${sec.toISOString()}`,
+    g_updated_no_ms: `updated_at:>=${sec.toISOString().replace('.000Z', 'Z')}`,
+    h_updated_quoted: `updated_at:>='${t.toISOString()}'`,
+    i_created_backfill_format: `created_at:>=${t.toISOString()}`,
+  }
+  return Object.fromEntries(Object.entries(qs).map(([k, q]) => [k, { query: Q_ORDERS_5, variables: { after: null, q } }]))
+}
+
 /** One POST per query; returns only the whitelisted fields. Pure so the redaction is testable. */
 /** `marks`: label → ISO time. (a) then reports, per mark, how many orders were created/updated before it (counts only). */
-export async function probe(fetch: Fetch, shop: string, secret: string, marks: Record<string, string> = {}): Promise<Record<string, unknown>> {
+export async function probe(fetch: Fetch, shop: string, secret: string, marks: Record<string, string> = {}, since?: string): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {}
-  for (const [name, body] of Object.entries(QUERIES)) {
+  for (const [name, body] of Object.entries({ ...QUERIES, ...(since ? filterVariants(since) : {}) })) {
+    if (body.variables.q) out[`${name}_q`] = body.variables.q // the filter string sent, for reading the counts
     const r = await fetch(shopifyEndpoint(shop), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'X-Shopify-Access-Token': secret },
@@ -38,7 +52,7 @@ export async function probe(fetch: Fetch, shop: string, secret: string, marks: R
     const d = b?.data
     out[name] = {
       http: r.status,
-      ...(name.startsWith('a_') || name.startsWith('b_') ? { nodes_length: d?.orders?.nodes?.length ?? null, has_next: d?.orders?.pageInfo?.hasNextPage ?? null } : {}),
+      ...('after' in body.variables ? { nodes_length: d?.orders?.nodes?.length ?? null, has_next: d?.orders?.pageInfo?.hasNextPage ?? null } : {}),
       ...(name.startsWith('a_') ? { before: Object.fromEntries(Object.entries(marks).map(([k, t]) => {
         const nodes: any[] = d?.orders?.nodes ?? [], at = new Date(t)
         return [k, { updated: nodes.filter((n) => new Date(n.updatedAt) < at).length, created: nodes.filter((n) => new Date(n.createdAt) < at).length }]
@@ -53,7 +67,7 @@ export async function probe(fetch: Fetch, shop: string, secret: string, marks: R
 }
 
 export async function main(argv: string[]): Promise<void> {
-  const { values } = parseArgs({ args: argv, options: { client: { type: 'string' } } })
+  const { values } = parseArgs({ args: argv, options: { client: { type: 'string' }, since: { type: 'string' } } })
   if (!values.client) die('usage: shopify-orders-probe --client <uuid>')
   try {
     const token = await loadToken(values.client, 'shopify')
@@ -83,7 +97,7 @@ export async function main(argv: string[]): Promise<void> {
       marks[`run_${r.id}_start`] = new Date(t).toISOString()
       marks[`run_${r.id}_start_minus_5m`] = new Date(t - 5 * 60_000).toISOString()
     }
-    console.log(JSON.stringify(await probe(globalThis.fetch, config.shop, token.secret, marks), null, 2))
+    console.log(JSON.stringify(await probe(globalThis.fetch, config.shop, token.secret, marks, values.since), null, 2))
   } finally {
     await closePool()
   }
