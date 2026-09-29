@@ -11,11 +11,10 @@ import {
 } from "@bcn-services/ui";
 import { requireHub } from "@/lib/session";
 import { composeSources, type HealthRow } from "@/lib/sources";
-import { DATA_VIEWS, findView, sourceState, viewsFor } from "@/lib/data-views";
+import { DATA_VIEWS, composeDataPage, findView, viewsFor } from "@/lib/data-views";
 import { PAGE_SIZE, dataHref, fetchCounts30, fetchLast30, fetchMeta30, fetchPage, parseParams, toDataApi } from "@/lib/data-query";
 import { PINS_COOKIE, buildCatalog, parsePins, resolvePins } from "@/lib/data-stats";
 import { EXPORT_ROW_CAP, truncationNote } from "@/lib/data-csv";
-import { formatDateTime } from "@/lib/data-format";
 import { DataTable } from "./DataTable";
 import { StatsStrip } from "./StatsStrip";
 
@@ -55,7 +54,11 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   ]);
   const last30 = last30Result.totals;
   const cards = composeSources((health.data as HealthRow[] | null) ?? []);
-  const connected = cards.filter((c) => c.connected);
+  const wanted = first(searchParams.source);
+  // composeDataPage (lib/data-views.ts) decides the tabs, what to fetch, notices and empty copy.
+  const plan = composeDataPage(cards, { wanted });
+  // Sources with stored rows to show: connected ones, plus auth_failed ones (rows survive a broken token).
+  const connected = plan.dataCards;
   const connectedSources = connected.map((c) => c.source);
 
   const heading = (
@@ -67,29 +70,18 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
     />
   );
 
-  if (connected.length === 0) {
-    const waiting = cards.some((c) => c.status !== "none");
+  if (!plan.card) {
+    const copy = plan.emptyCopy!; // composeDataPage always sets emptyCopy when there is no active card
     return (
       <>
         {heading}
-        <EmptyState
-          title={waiting ? "Connected, first sync in progress" : "Not connected"}
-          message={
-            waiting
-              ? "Your data appears here after the first sync finishes. That starts within the hour."
-              : "Connect a source on the Sources page and its data will show up here."
-          }
-        />
+        <EmptyState title={copy.title} message={copy.message} />
       </>
     );
   }
 
-  // Tabs: every source with a health row. Connected ones show data; the rest say why they cannot yet.
-  const tabs = cards.filter((c) => c.status !== "none");
-  const wanted = first(searchParams.source);
-  // connected[0] exists (the empty case returned above); every source has at least one view.
-  const card = tabs.find((c) => c.source === wanted) ?? connected[0]!;
-  const state = sourceState(card);
+  // Tabs: every source with a health row. Data sources show rows; the rest say why they cannot yet.
+  const card = plan.card;
   const views = viewsFor(card.source);
   const cfg = findView(card.source, first(searchParams.view)) ?? views[0]!;
   const params = parseParams(searchParams);
@@ -98,7 +90,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const [counts, meta, result] = await Promise.all([
     fetchCounts30(api, DATA_VIEWS.filter((v) => connectedSources.includes(v.source)), now),
     connectedSources.includes("meta") ? fetchMeta30(api, now) : null,
-    state.kind === "ready" ? fetchPage(api, cfg, params) : null,
+    plan.fetchesPage ? fetchPage(api, cfg, params) : null,
   ]);
   const catalog = buildCatalog(connectedSources, { counts, last30, meta });
   const pinned = resolvePins(parsePins(cookies().get(PINS_COOKIE)?.value), catalog, connectedSources);
@@ -107,14 +99,17 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const link = (page: number) => dataHref("/data", { source: card.source, view: cfg.id, ...params, page });
   const filtered = Boolean(params.q || params.from || params.to);
   const exportHref = dataHref("/data/export", { source: card.source, view: cfg.id, ...params });
+  // Second pass now the row count is known: an empty unfiltered first page changes the copy.
+  const view = composeDataPage(cards, {
+    wanted,
+    activeEmpty: Boolean(result && !result.error && result.count === 0 && !filtered && params.page === 1),
+  });
 
   return (
     <>
       {heading}
 
-      <p className="text-sm text-muted-foreground">
-        {connected.map((c) => `${c.title} synced ${c.lastSuccessAt ? formatDateTime(c.lastSuccessAt) : "never"}`).join(" · ")}
-      </p>
+      <p className="text-sm text-muted-foreground">{view.syncLine}</p>
 
       <StatsStrip
         pinned={catalog.filter((s) => pinned.includes(s.id))}
@@ -123,8 +118,17 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
         returnTo={link(params.page)}
       />
 
+      {view.notices.map((n) => (
+        <p key={n.source} role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {n.text}{" "}
+          <Link href="/" className="underline underline-offset-4">
+            Go to Sources
+          </Link>
+        </p>
+      ))}
+
       <nav aria-label="Data sources" className="flex flex-wrap gap-2">
-        {tabs.map((c) => (
+        {view.tabs.map((c) => (
           <Link
             key={c.source}
             href={`/data?source=${c.source}`}
@@ -137,17 +141,8 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
         ))}
       </nav>
 
-      {state.kind !== "ready" || !result ? (
-        <EmptyState
-          title={state.kind === "ready" ? "Nothing to show" : state.message}
-          message={
-            state.kind === "pending"
-              ? "Your data appears here after the first sync finishes. That starts within the hour."
-              : state.kind === "reconnect"
-                ? "bcns lost access to this source. Reconnect it on the Sources page."
-                : undefined
-          }
-        />
+      {!view.fetchesPage || !result ? (
+        <EmptyState title={view.emptyCopy?.title ?? "Nothing to show"} message={view.emptyCopy?.message} />
       ) : (
         <>
           <nav aria-label={`${card.title} views`} className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border text-sm">
@@ -201,9 +196,11 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
               </div>
             </form>
             <div className="flex flex-col items-start gap-1 sm:items-end">
-              <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
-                Export CSV
-              </a>
+              {result.count > 0 ? (
+                <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
+                  Export CSV
+                </a>
+              ) : null}
               {result.count > EXPORT_ROW_CAP ? (
                 <p role="status" className="max-w-xs text-xs text-muted-foreground sm:text-right">
                   {truncationNote()}
@@ -227,14 +224,14 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
           ) : result.rows.length === 0 ? (
             <div role="status" className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card px-6 py-10 text-sm">
               <p className="font-medium">
-                {params.page > 1 ? "No rows on this page" : filtered ? "No rows match these filters" : "Nothing here yet"}
+                {params.page > 1 ? "No rows on this page" : filtered ? "No rows match these filters" : view.emptyCopy?.title ?? "Nothing here yet"}
               </p>
               <p className="text-muted-foreground">
                 {params.page > 1
                   ? "You are past the last page of results."
                   : filtered
                     ? "Try a wider date range or a different search."
-                    : "Rows show up here as bcns pulls in new data from this source."}
+                    : view.emptyCopy?.message ?? "Rows show up here as bcns pulls in new data from this source."}
               </p>
               {params.page > 1 || filtered ? (
                 <Link

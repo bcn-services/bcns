@@ -11,6 +11,7 @@
  * rows only) — never as a raw dump column.
  */
 
+import { formatDateTime } from "./data-format";
 import type { HubSource, SourceCard } from "./sources";
 
 export type ColType = "text" | "money" | "number" | "date" | "datetime" | "bytes" | "link" | "details";
@@ -321,4 +322,88 @@ export function sourceState(card: Pick<SourceCard, "connected" | "status">): Sou
   if (card.status === "none") return { kind: "none", message: "Not connected" };
   if (card.status === "auth_failed") return { kind: "reconnect", message: "Reconnect needed" };
   return { kind: "pending", message: "Connected, first sync in progress" };
+}
+
+/**
+ * Whether a source's tab reads stored rows. A reconnect source (auth_failed) keeps the
+ * rows it already pulled, so it is a data tab like a connected one; only the token is broken.
+ */
+export function hasStoredData(card: Pick<SourceCard, "connected" | "status">): boolean {
+  const kind = sourceState(card).kind;
+  return kind === "ready" || kind === "reconnect";
+}
+
+/**
+ * Notice above a reconnect source. `rows` is what the page knows about its stored rows:
+ * "some" (the table is on screen), "none" (unfiltered view is empty), "unknown" (another tab).
+ */
+export function reconnectNotice(title: string, rows: "some" | "none" | "unknown" = "some"): string {
+  const lost = `bcns lost access to ${title}.`;
+  if (rows === "some") return `${lost} Your stored data is below; reconnect on the Sources page to resume syncing.`;
+  if (rows === "none") return `${lost} Reconnect on the Sources page to sync your data.`;
+  return `${lost} Reconnect on the Sources page to resume syncing.`;
+}
+
+/**
+ * Empty-state copy for a source WITHOUT stored data (none / never_ran). auth_failed never
+ * reaches this: it has stored data by definition and its empty copy comes from composeDataPage.
+ */
+export function noDataCopy(card: Pick<SourceCard, "connected" | "status">): { title: string; message: string } {
+  const state = sourceState(card);
+  if (state.kind === "none") {
+    return { title: state.message, message: "Connect a source on the Sources page and its data will show up here." };
+  }
+  return { title: "Connected, first sync in progress", message: "Your data appears here after the first sync finishes. That starts within the hour." };
+}
+
+export interface DataPage {
+  /** Sources that read stored rows (connected + auth_failed). */
+  dataCards: SourceCard[];
+  /** One tab per source with a health row. */
+  tabs: SourceCard[];
+  /** The active tab; null when no source has stored data (page-level empty state). */
+  card: SourceCard | null;
+  /** Whether to query the active source's rows. */
+  fetchesPage: boolean;
+  /** "Shopify synced 2026-09-01 04:00 · Meta Ads never synced" */
+  syncLine: string;
+  /** One reconnect notice per auth_failed source that has stored data, not just the active tab. */
+  notices: { source: HubSource; text: string }[];
+  /** Copy for an active tab with nothing to show; null when the table renders. */
+  emptyCopy: { title: string; message: string } | null;
+}
+
+/**
+ * Everything /data decides from source health, as a pure function so tests cover the page's
+ * logic. `activeEmpty`: the active view's UNFILTERED first page has zero rows (known only
+ * after the fetch, so the page calls this twice).
+ */
+export function composeDataPage(
+  cards: readonly SourceCard[],
+  opts: { wanted?: string; activeEmpty?: boolean } = {}
+): DataPage {
+  const dataCards = cards.filter(hasStoredData);
+  const tabs = cards.filter((c) => c.status !== "none");
+  const card = tabs.find((c) => c.source === opts.wanted) ?? dataCards[0] ?? null;
+  const syncLine = dataCards
+    .map((c) => {
+      if (!c.lastSuccessAt) return `${c.title} never synced`;
+      return `${c.title} ${c.connected ? "synced" : "last synced"} ${formatDateTime(c.lastSuccessAt)}`;
+    })
+    .join(" · ");
+  const notices = dataCards
+    .filter((c) => c.status === "auth_failed")
+    .map((c) => ({
+      source: c.source,
+      text: reconnectNotice(c.title, c.source !== card?.source ? "unknown" : opts.activeEmpty ? "none" : "some"),
+    }));
+
+  let emptyCopy: DataPage["emptyCopy"] = null;
+  if (!card) emptyCopy = noDataCopy(tabs[0] ?? cards[0]!);
+  else if (!hasStoredData(card)) emptyCopy = noDataCopy(card);
+  else if (card.status === "auth_failed" && opts.activeEmpty) {
+    emptyCopy = { title: "No stored data", message: "bcns has no stored rows for this view. Reconnect the source to resume syncing." };
+  }
+
+  return { dataCards, tabs, card, fetchesPage: card !== null && hasStoredData(card), syncLine, notices, emptyCopy };
 }
