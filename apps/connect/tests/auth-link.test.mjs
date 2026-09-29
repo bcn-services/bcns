@@ -125,6 +125,12 @@ test("set-password: mismatch and short go back with an error, success goes to /"
   assert.equal(await setPasswordTarget(user(true, { message: "weak" }), GOOD, GOOD), "/set-password?error=failed");
 });
 
+test("set-password: GoTrue's weak_password code gets its own message, other errors stay generic", async () => {
+  const weak = { code: "weak_password", message: "Password is known to be weak and easy to guess" };
+  assert.equal(await setPasswordTarget(user(true, weak), GOOD, GOOD), "/set-password?error=weak");
+  assert.equal(await setPasswordTarget(user(true, { code: "same_password" }), GOOD, GOOD), "/set-password?error=failed");
+});
+
 test("the platform min length is not below config.toml's", () => {
   const toml = readFileSync(new URL("../../../platform/supabase/config.toml", import.meta.url), "utf8");
   const min = Number(toml.match(/^minimum_password_length\s*=\s*(\d+)/m)[1]);
