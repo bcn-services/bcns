@@ -50,7 +50,15 @@ export async function rawPartitions(db: Db): Promise<string[]> {
  * without bound. hard-delete.ts runs it outside any transaction (each chunk commits on its own);
  * privacy.ts runs it inside its guarded transaction, after the locked re-check.
  */
-export async function deleteRawScoped(db: Db, clientId: string, source: string): Promise<void> {
+export async function deleteRawScoped(db: Db, clientId: string, source: string, opts: { chunked?: boolean } = {}): Promise<void> {
+  // Inside a transaction chunking gains nothing (deleted rows stay in the index until commit, so
+  // each chunk rescans them — quadratic): one delete per partition instead.
+  if (opts.chunked === false) {
+    for (const part of await rawPartitions(db)) {
+      await db.query(`delete from data.${part} where client_id = $1 and source = $2`, [clientId, source])
+    }
+    return
+  }
   for (const part of await rawPartitions(db)) {
     for (;;) {
       const r = await db.query(

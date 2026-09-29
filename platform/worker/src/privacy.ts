@@ -32,16 +32,15 @@ interface ScheduleRow {
 type Guard = { action: 'delete'; clientId: string } | { action: 'escalate'; reason: string }
 
 /**
- * Resolves shop -> client and decides delete-vs-escalate. Read-only, so it is safe to call twice:
- * once against the pool before any raw delete (S1), and again against the transaction's client to
- * re-check state that may have moved while that chunked delete ran (a reconnect landing mid-delete,
- * say).
+ * Resolves shop -> client and decides delete-vs-escalate. Runs inside processOne's transaction and
+ * row-locks the schedule + token rows it reads (`for update`), so a reconnect (attach_source's
+ * upsert) blocks until the delete commits instead of landing between this check and the delete.
  */
 async function resolveGuard(db: Db, row: PendingRow): Promise<Guard> {
   if (row.shop === BRIDGE_SHOP) return { action: 'escalate', reason: 'sb-bridge shop: never auto-deleted' }
 
   const matches = await db.query<ScheduleRow>(
-    `select client_id, config from data.connector_schedule where source = 'shopify' and lower(config->>'shop') = lower($1)`,
+    `select client_id, config from data.connector_schedule where source = 'shopify' and lower(config->>'shop') = lower($1) for update`,
     [row.shop]
   )
   const n = matches.rowCount ?? 0
@@ -72,7 +71,7 @@ async function resolveGuard(db: Db, row: PendingRow): Promise<Guard> {
        and expires_at is not null
        and greatest(created_at, coalesce(last_refreshed_at, created_at), expires_at) < $2::timestamptz - interval '24 hours'
      ) as confirmed_dead
-     from data.source_tokens where client_id = $1 and source = 'shopify'`,
+     from data.source_tokens where client_id = $1 and source = 'shopify' for update`,
     [clientId, row.received_at]
   )
   if ((tokens.rowCount ?? 0) > 0 && !tokens.rows[0].confirmed_dead) {
@@ -122,7 +121,7 @@ async function processOne(row: PendingRow): Promise<boolean> {
       return true
     }
 
-    await deleteRawScoped(c, guard.clientId, 'shopify')
+    await deleteRawScoped(c, guard.clientId, 'shopify', { chunked: false })
     await deleteClientRows(c, guard.clientId, { source: 'shopify' })
     await c.query(`update data.privacy_requests set status = 'done', processed_at = now() where id = $1`, [row.id])
     return true

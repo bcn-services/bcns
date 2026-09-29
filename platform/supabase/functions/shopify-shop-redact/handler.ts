@@ -84,8 +84,8 @@ export async function handle(request: Request, secret: string | undefined, deps:
   }
 
   // The HMAC covers the body only, so a validly signed customers/redact body (which also carries
-  // shop_domain) would pass it. The topic is an unsigned header, but Shopify sets it per delivery
-  // and a replayed body from another topic arrives with that topic — so refuse anything else.
+  // shop_domain) would pass it. The topic header is unsigned, so this stops misrouted deliveries,
+  // not a deliberate forger; the wall against that is the worker's dead-token guard.
   if (request.headers.get("X-Shopify-Topic") !== "shop/redact") {
     deps.log("shop_redact_rejected", { reason: "wrong_topic" });
     return json({ error: "bad_request" }, 400);

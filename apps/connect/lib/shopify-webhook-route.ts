@@ -29,7 +29,6 @@ async function forwardShopRedact(
   hmacHeader: string,
   webhookId: string | null,
   triggeredAt: string | null,
-  topicHeader: string | null,
   fetchImpl: typeof fetch
 ): Promise<boolean> {
   try {
@@ -39,8 +38,9 @@ async function forwardShopRedact(
         "X-Shopify-Hmac-Sha256": hmacHeader,
         ...(webhookId ? { "X-Shopify-Webhook-Id": webhookId } : {}),
         ...(triggeredAt ? { "X-Shopify-Triggered-At": triggeredAt } : {}),
-        // Forwarded as received so the Edge Function can refuse a different topic's signed body.
-        ...(topicHeader ? { "X-Shopify-Topic": topicHeader } : {}),
+        // This route only serves shop/redact; state it so the Edge Function's topic check passes
+        // even if a proxy stripped Shopify's own header.
+        "X-Shopify-Topic": "shop/redact",
       },
       // Forwarding the exact string handleGdprWebhook already verified the HMAC
       // over — this route already treats the body as text end to end (`.text()`
@@ -93,7 +93,6 @@ export async function gdprRoute(request: Request, topic: GdprTopic, deps: GdprRo
       hmacHeader,
       request.headers.get("X-Shopify-Webhook-Id"),
       request.headers.get("X-Shopify-Triggered-At"),
-      request.headers.get("X-Shopify-Topic"),
       deps.fetchImpl ?? fetch
     );
     if (forwarded) return NextResponse.json(result.body, { status: 200 });

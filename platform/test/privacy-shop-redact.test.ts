@@ -216,6 +216,7 @@ describe('shopRedact', () => {
     const shop = shopFor(randomUUID())
     const now = new Date()
     const client = await mkClient(shop, { status: 'active', createdAt: now, lastRefreshedAt: now, expiresAt: new Date(Date.now() + HOUR) })
+    await sql(`insert into data.raw (client_id, source, entity, external_id, payload_hash, payload) values ($1, 'shopify', 'order', 'r1', 'h', '{}'::jsonb)`, [client])
     const id = await queueRequest(shop)
 
     const n = await shopRedact(mkTick())
@@ -225,6 +226,8 @@ describe('shopRedact', () => {
     expect(row.status).toBe('needs_operator')
     expect(row.error).toMatch(/still active or recently used/)
     expect(await customerCount(client, 'shopify')).toBe(1)
+    const raw = await sql<{ n: string }>(`select count(*) n from data.raw where client_id = $1`, [client])
+    expect(Number(raw.rows[0].n)).toBe(1) // escalation must leave raw untouched
   })
 
   it('B1: a replay after reconnect (active token, old created_at/last_refreshed_at) escalates', async () => {
