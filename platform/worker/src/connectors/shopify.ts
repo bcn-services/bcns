@@ -51,7 +51,7 @@ const ORDER_FIELDS = `id name createdAt updatedAt processedAt cancelledAt displa
   lineItems(first:25){nodes{id title sku quantity discountedTotalSet{shopMoney{amount}}}}
   refunds(first:10){id createdAt totalRefundedSet{shopMoney{amount currencyCode}}}`
 
-const Q_ORDERS = `query O($after:String,$q:String){orders(first:${PAGE_ORDERS},after:$after,sortKey:UPDATED_AT,query:$q){pageInfo{hasNextPage endCursor}nodes{${ORDER_FIELDS}}}}`
+export const Q_ORDERS = `query O($after:String,$q:String){orders(first:${PAGE_ORDERS},after:$after,sortKey:UPDATED_AT,query:$q){pageInfo{hasNextPage endCursor}nodes{${ORDER_FIELDS}}}}`
 const Q_PRODUCTS = `query P($after:String,$q:String){products(first:${PAGE_PRODUCTS},after:$after,sortKey:UPDATED_AT,query:$q){pageInfo{hasNextPage endCursor}nodes{id title handle status vendor productType updatedAt featuredMedia{preview{image{url}}}variants(first:100){nodes{id sku title price inventoryQuantity}}}}}`
 const Q_PAYOUTS = `query Y($after:String){shopifyPaymentsAccount{payouts(first:${PAGE_PAYOUTS},after:$after){pageInfo{hasNextPage endCursor}nodes{id issuedAt status transactionType net{amount currencyCode}summary{chargesGross{amount}}}}}}`
 const Q_SHOP = `query S{shop{currencyCode ianaTimezone}}`
@@ -145,13 +145,13 @@ async function* drive(ctx: RunContext, entities: string[], sinceFor: (e: string)
       const p = await fetchPage(ctx, entity, sinceFor(entity), from, after)
       after = p.after
       const entityDone = !p.hasNext
-      const watermark = p.raw.reduce((m, r) => (r.sourceUpdatedAt && r.sourceUpdatedAt > m ? r.sourceUpdatedAt : m), new Date(0))
+      const watermark = p.raw.reduce((m, r) => Math.max(m, r.sourceUpdatedAt?.getTime() ?? 0), 0)
+      // 5-minute overlap either way: Shopify's search index lags writes, so an empty page is not
+      // proof nothing changed up to now().
       yield {
         raw: p.raw,
         entity,
-        cursor: entityDone
-          ? (watermark.getTime() > 0 ? { updated_at: new Date(watermark.getTime() - 5 * 60_000).toISOString() } : { updated_at: new Date().toISOString() })
-          : { entity, after },
+        cursor: entityDone ? { updated_at: new Date((watermark || Date.now()) - 5 * 60_000).toISOString() } : { entity, after },
         entityDone,
         done: entityDone && lastEntity,
       }
