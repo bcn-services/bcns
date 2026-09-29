@@ -322,3 +322,32 @@ export function sourceState(card: Pick<SourceCard, "connected" | "status">): Sou
   if (card.status === "auth_failed") return { kind: "reconnect", message: "Reconnect needed" };
   return { kind: "pending", message: "Connected, first sync in progress" };
 }
+
+/**
+ * Whether a source's tab reads stored rows. A reconnect source (auth_failed) keeps the
+ * rows it already pulled, so it is a data tab like a connected one; only the token is broken.
+ */
+export function hasStoredData(card: Pick<SourceCard, "connected" | "status">): boolean {
+  const kind = sourceState(card).kind;
+  return kind === "ready" || kind === "reconnect";
+}
+
+/** Shown above a reconnect source's data (rows or not). */
+export function reconnectNotice(title: string): string {
+  return `bcns lost access to ${title}. Your stored data is below; reconnect on the Sources page to resume syncing.`;
+}
+
+/**
+ * Empty-state copy for a source with nothing to show. Never says "Connected" unless the
+ * connector really is waiting on its first pull.
+ */
+export function noDataCopy(card: Pick<SourceCard, "connected" | "status" | "title">): { title: string; message: string } {
+  const state = sourceState(card);
+  if (state.kind === "reconnect") {
+    return { title: state.message, message: `bcns lost access to ${card.title}. Reconnect it on the Sources page to resume syncing.` };
+  }
+  if (state.kind === "none") {
+    return { title: state.message, message: "Connect a source on the Sources page and its data will show up here." };
+  }
+  return { title: "Connected, first sync in progress", message: "Your data appears here after the first sync finishes. That starts within the hour." };
+}
