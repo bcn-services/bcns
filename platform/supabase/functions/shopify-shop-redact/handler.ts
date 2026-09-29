@@ -83,6 +83,14 @@ export async function handle(request: Request, secret: string | undefined, deps:
     return json({ error: "unauthorized" }, 401);
   }
 
+  // The HMAC covers the body only, so a validly signed customers/redact body (which also carries
+  // shop_domain) would pass it. The topic is an unsigned header, but Shopify sets it per delivery
+  // and a replayed body from another topic arrives with that topic — so refuse anything else.
+  if (request.headers.get("X-Shopify-Topic") !== "shop/redact") {
+    deps.log("shop_redact_rejected", { reason: "wrong_topic" });
+    return json({ error: "bad_request" }, 400);
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(new TextDecoder().decode(bodyBytes));

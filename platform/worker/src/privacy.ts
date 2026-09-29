@@ -105,31 +105,24 @@ async function escalate(c: pg.PoolClient, id: number, shop: string, reason: stri
 }
 
 /**
- * One row: a read-only guard check, then — only if it says delete — a chunked raw-partition
- * delete OUTSIDE any transaction (S1: raw is unbounded, so this must never hold one long-lived
- * transaction open), then a transaction that re-checks the guard under the privacy row's own lock
- * before touching the canonical tables and flipping status. Re-running is idempotent: a crash
- * after the raw chunks but before the final transaction leaves the row pending, and the next
- * tick's raw delete finds nothing left to chunk before repeating the (cheap) canonical delete.
+ * One row, one transaction: claim it, re-check the guard under the privacy row's lock, and only
+ * then delete — raw chunks first, then the canonical tables — and flip status. The delete runs
+ * after the locked re-check so a reconnect that landed since queueing can never lose its raw rows;
+ * a crash rolls the whole thing back and the next tick redoes it. Trade-off: raw's chunked
+ * delete now shares one transaction (a shop's shopify raw rows, not an unbounded table).
  */
 async function processOne(row: PendingRow): Promise<boolean> {
-  const first = await resolveGuard(pool(), row)
-
-  if (first.action === 'delete') {
-    await deleteRawScoped(pool(), first.clientId, 'shopify')
-  }
-
   return tx(async (c) => {
     if (!(await claimPending(c, row.id))) return false
 
-    // Re-check under the privacy row's lock: the raw delete above ran with no lock held, so state
-    // (a reconnect, say) may have moved since resolveGuard's first, unlocked read.
+    // Guard under the privacy row's lock: state (a reconnect, say) may have moved since queueing.
     const guard = await resolveGuard(c, row)
     if (guard.action === 'escalate') {
       await escalate(c, row.id, row.shop, guard.reason)
       return true
     }
 
+    await deleteRawScoped(c, guard.clientId, 'shopify')
     await deleteClientRows(c, guard.clientId, { source: 'shopify' })
     await c.query(`update data.privacy_requests set status = 'done', processed_at = now() where id = $1`, [row.id])
     return true
