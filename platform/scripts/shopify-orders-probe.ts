@@ -25,8 +25,8 @@ const QUERIES = {
 }
 
 /** One POST per query; returns only the whitelisted fields. Pure so the redaction is testable. */
-/** `orderCursor`: the stored incremental cursor; (a) then counts orders the worker's updated_at:>= filter would skip. */
-export async function probe(fetch: Fetch, shop: string, secret: string, orderCursor: string | null = null): Promise<Record<string, unknown>> {
+/** `marks`: label → ISO time. (a) then reports, per mark, how many orders were created/updated before it (counts only). */
+export async function probe(fetch: Fetch, shop: string, secret: string, marks: Record<string, string> = {}): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {}
   for (const [name, body] of Object.entries(QUERIES)) {
     const r = await fetch(shopifyEndpoint(shop), {
@@ -39,7 +39,10 @@ export async function probe(fetch: Fetch, shop: string, secret: string, orderCur
     out[name] = {
       http: r.status,
       ...(name.startsWith('a_') || name.startsWith('b_') ? { nodes_length: d?.orders?.nodes?.length ?? null, has_next: d?.orders?.pageInfo?.hasNextPage ?? null } : {}),
-      ...(name.startsWith('a_') && orderCursor ? { updated_before_order_cursor: (d?.orders?.nodes ?? []).filter((n: any) => new Date(n.updatedAt) < new Date(orderCursor)).length } : {}),
+      ...(name.startsWith('a_') ? { before: Object.fromEntries(Object.entries(marks).map(([k, t]) => {
+        const nodes: any[] = d?.orders?.nodes ?? [], at = new Date(t)
+        return [k, { updated: nodes.filter((n) => new Date(n.updatedAt) < at).length, created: nodes.filter((n) => new Date(n.createdAt) < at).length }]
+      })) } : {}),
       ...(name === 'c_orders_count' ? { orders_count: d?.ordersCount ?? null } : {}),
       ...(name === 'd_scopes' ? { scopes: (d?.currentAppInstallation?.accessScopes ?? []).map((s: any) => s.handle) } : {}),
       errors: b?.errors ?? null,
@@ -68,8 +71,19 @@ export async function main(argv: string[]): Promise<void> {
                                      (select count(*) from data.raw_latest where client_id = $1 and source = 'shopify' and entity = 'order') as raw_orders`, [values.client])
     console.log(JSON.stringify({ shop: config.shop, token_kind: token.kind, token_expires_in_min: minsLeft, token: tok.rows[0], schedule, synced: synced.rows[0], runs: runs.rows }, null, 2))
     if (minsLeft !== null && minsLeft <= 0) die('stored token is expired; wait for the next worker tick to refresh it, then re-run')
-    const orderCursor = schedule.incremental_cursor?.order?.updated_at ?? null
-    console.log(JSON.stringify(await probe(globalThis.fetch, config.shop, token.secret, orderCursor), null, 2))
+    // The connection's first runs: the ones that could have picked the orders up and didn't.
+    const first = await sql(`select id, mode, started_at, entity_rows->'order' as order_rows from data.connector_runs
+                             where client_id = $1 and source = 'shopify' order by id asc limit 12`, [values.client])
+    console.log(JSON.stringify({ first_runs: first.rows }, null, 2))
+    const marks: Record<string, string> = {}
+    const cur = schedule.incremental_cursor?.order?.updated_at
+    if (cur) marks.order_cursor = cur
+    for (const r of first.rows) {
+      const t = new Date(r.started_at).getTime()
+      marks[`run_${r.id}_start`] = new Date(t).toISOString()
+      marks[`run_${r.id}_start_minus_5m`] = new Date(t - 5 * 60_000).toISOString()
+    }
+    console.log(JSON.stringify(await probe(globalThis.fetch, config.shop, token.secret, marks), null, 2))
   } finally {
     await closePool()
   }

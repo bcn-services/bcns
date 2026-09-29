@@ -27,6 +27,7 @@ describe('shopify-orders-probe', () => {
     expect(out.c_orders_count.orders_count).toEqual({ count: 3, precision: 'EXACT' })
     expect(out.d_scopes.scopes).toEqual(['read_orders'])
     expect(out.a_orders_q_null.extensions).toEqual(ext)
+    expect(out.b_orders_q_test.before).toBeUndefined()
     for (const leak of ['shpua_secret123', 'buyer@example.com', 'Pat Buyer', '#1001', 'Order/1']) expect(text).not.toContain(leak)
   })
 })
