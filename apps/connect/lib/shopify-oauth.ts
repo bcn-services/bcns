@@ -476,7 +476,7 @@ export async function registerUninstallWebhook(
   const userErrors = body.data?.webhookSubscriptionCreate?.userErrors;
   if (!Array.isArray(userErrors)) return { ok: false, reason: "malformed" };
   const real = userErrors.filter(
-    (e) => !/already been taken/i.test(String((e as { message?: unknown })?.message ?? ""))
+    (e) => !/address.*already been taken/i.test(String((e as { message?: unknown })?.message ?? ""))
   );
   return real.length ? { ok: false, reason: "user_error" } : { ok: true };
 }

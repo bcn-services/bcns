@@ -104,6 +104,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const registered = await registerUninstallWebhook(pending.shop, pending.accessToken, hub);
     if (!registered.ok) {
       console.warn(`[connect] shopify uninstall webhook not registered (${registered.reason}) shop=${pending.shop}`);
+    } else {
+      console.info(`[connect] shopify uninstall webhook registered shop=${pending.shop}`);
     }
   }
 
