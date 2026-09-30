@@ -126,7 +126,8 @@ export function summarizeLast30(rows: readonly SummaryRow[] | null | undefined):
     const o = Number(row.orders);
     const r = Number(row.revenue_minor);
     if (Number.isFinite(o)) orders += o;
-    if (Number.isFinite(r)) byCurrency.set(row.currency ?? null, (byCurrency.get(row.currency ?? null) ?? 0) + r);
+    // A metrics-only day (no money rows) has revenue 0 and currency null; skip it or it shows as a bare "0.00 +".
+    if (Number.isFinite(r) && r !== 0) byCurrency.set(row.currency ?? null, (byCurrency.get(row.currency ?? null) ?? 0) + r);
   }
   return { orders, revenue: [...byCurrency].map(([currency, minor]) => ({ currency, minor })) };
 }

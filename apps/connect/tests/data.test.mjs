@@ -353,6 +353,9 @@ test("last 30 days: cutoff is today-30, sums per currency, tolerates no rows", (
   ]);
   assert.equal(s.orders, 6);
   assert.deepEqual(s.revenue, [{ currency: "USD", minor: 1500 }, { currency: "EUR", minor: 700 }]);
+  // metrics-only days (revenue 0, currency null) add no currency bucket
+  const m = summarizeLast30([{ orders: 0, revenue_minor: 0, currency: null }, { orders: 3, revenue_minor: 242610, currency: "USD" }]);
+  assert.deepEqual(m.revenue, [{ currency: "USD", minor: 242610 }]);
 });
 
 test("last 30 days: a failed read is reported as an error, never zeroed", async () => {
