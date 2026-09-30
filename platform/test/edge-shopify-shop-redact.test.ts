@@ -13,17 +13,22 @@ const sign = (body: string, secret = SECRET) => createHmac('sha256', secret).upd
 
 interface Recorded {
   inserts: Array<{ shop: string; webhookId: string }>
+  uninstalls: Array<{ shop: string; triggeredAt: string }>
   logs: Array<{ event: string; data: Record<string, unknown> }>
 }
 
 function deps(insertedOverride?: boolean): { deps: ShopRedactDeps; rec: Recorded } {
-  const rec: Recorded = { inserts: [], logs: [] }
+  const rec: Recorded = { inserts: [], uninstalls: [], logs: [] }
   return {
     rec,
     deps: {
       async recordShopRedact(shop, webhookId) {
         rec.inserts.push({ shop, webhookId })
         return { inserted: insertedOverride ?? true }
+      },
+      async recordAppUninstalled(shop, triggeredAt) {
+        rec.uninstalls.push({ shop, triggeredAt })
+        return { revoked: 1 }
       },
       log(event, data) {
         rec.logs.push({ event, data })
@@ -205,5 +210,49 @@ describe('shopify-shop-redact', () => {
     expect(serialized).not.toContain(SECRET)
     expect(serialized).not.toContain(header)
     expect(serialized).not.toContain(body)
+  })
+})
+
+// app/uninstalled rides the same function (rule 1.2.2). Its payload is the Shop object, so the
+// shop is `myshopify_domain`; the two topics must never be able to stand in for one another.
+describe('shopify-shop-redact: app/uninstalled', () => {
+  const AT = '2026-09-29T12:00:00Z'
+  const body = JSON.stringify({ id: 1, domain: 'acme.example', myshopify_domain: SHOP })
+  const uninstall = (b: string, headers: Record<string, string> = {}) =>
+    post(b, { 'X-Shopify-Topic': 'app/uninstalled', 'X-Shopify-Hmac-Sha256': sign(b), 'X-Shopify-Triggered-At': AT, ...headers })
+
+  it('a valid HMAC revokes for the shop in the SIGNED body, with the event time, and queues no redact', async () => {
+    const { deps: d, rec } = deps()
+    const res = await handle(uninstall(body, { 'X-Shopify-Shop-Domain': 'someone-else.myshopify.com' }), SECRET, d)
+    expect(res.status).toBe(200)
+    expect(rec.uninstalls).toEqual([{ shop: SHOP, triggeredAt: '2026-09-29T12:00:00.000Z' }])
+    expect(rec.inserts).toEqual([])
+    expect(rec.logs.at(-1)).toMatchObject({ event: 'app_uninstalled_recorded', data: { shop: SHOP, revoked: 1 } })
+  })
+
+  it('a bad HMAC is 401 and revokes nothing', async () => {
+    const { deps: d, rec } = deps()
+    const res = await handle(uninstall(body, { 'X-Shopify-Hmac-Sha256': sign(body, 'wrong') }), SECRET, d)
+    expect(res.status).toBe(401)
+    expect(rec.uninstalls).toEqual([])
+  })
+
+  it('a shop/redact body sent as app/uninstalled (and the reverse) is 400: each topic reads only its own field', async () => {
+    const { deps: d, rec } = deps()
+    const redactBody = JSON.stringify({ shop_domain: SHOP })
+    expect((await handle(uninstall(redactBody), SECRET, d)).status).toBe(400)
+    const asRedact = post(body, { 'X-Shopify-Hmac-Sha256': sign(body), 'X-Shopify-Webhook-Id': 'wh-1' })
+    expect((await handle(asRedact, SECRET, d)).status).toBe(400)
+    expect(rec.uninstalls).toEqual([])
+    expect(rec.inserts).toEqual([])
+  })
+
+  it('a missing or unparseable X-Shopify-Triggered-At is 400 and revokes nothing', async () => {
+    const { deps: d, rec } = deps()
+    expect((await handle(uninstall(body, { 'X-Shopify-Triggered-At': 'yesterday' }), SECRET, d)).status).toBe(400)
+    const none = uninstall(body)
+    none.headers.delete('X-Shopify-Triggered-At')
+    expect((await handle(none, SECRET, d)).status).toBe(400)
+    expect(rec.uninstalls).toEqual([])
   })
 })

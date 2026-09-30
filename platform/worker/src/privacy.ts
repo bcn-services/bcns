@@ -63,8 +63,14 @@ async function resolveGuard(db: Db, row: PendingRow): Promise<Guard> {
   // probeAuthFailed bumps it to now() on every hourly pass over a still-dead row, success or
   // failure, so "updated_at is recent" means only "the hourly probe ran," not "this token is
   // alive." A reconnect always sets status='active' without touching created_at/last_refreshed_at,
-  // so condition (a) below (status <> 'active') alone catches both a live reconnect and a replay
-  // of a captured webhook body queued after one.
+  // so condition (a) below (status <> 'active') catches a live reconnect and a replay of a
+  // captured shop/redact body queued after one.
+  //
+  // It is no longer sufficient alone against replay: api.record_app_uninstalled sets the token to
+  // 'revoked', so a replayed Shopify-signed app/uninstalled body can make a live token
+  // non-active. Reaching 'delete' by replay now needs custody of two Shopify-signed bodies for
+  // the same shop (app/uninstalled, then shop/redact) AND the 24h clause below to hold — the
+  // token unused, unrefreshed, and expired for a full day before the request. Accepted risk.
   const tokens = await db.query<{ confirmed_dead: boolean }>(
     `select (
        status <> 'active'

@@ -46,12 +46,12 @@ describe('api.record_shop_redact', () => {
     expect(error).not.toBeNull()
   })
 
-  it('N1: service_role can execute no function in schema api except record_shop_redact, and holds no table/view privileges there', async () => {
+  it('N1: service_role can execute no function in schema api except the two webhook RPCs, and holds no table/view privileges there', async () => {
     const executable = await sql<{ proname: string }>(
       `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'api' and has_function_privilege('service_role', p.oid, 'execute')`
     )
-    expect(executable.rows.map((r) => r.proname)).toEqual(['record_shop_redact'])
+    expect(executable.rows.map((r) => r.proname).sort()).toEqual(['record_app_uninstalled', 'record_shop_redact'])
 
     const tableGrants = await sql(
       `select table_name, privilege_type from information_schema.role_table_grants

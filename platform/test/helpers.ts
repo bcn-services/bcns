@@ -106,7 +106,7 @@ export const PNG_1x1 = Buffer.from(
  * every api RPC is JWT-tenant-scoped, which doesn't apply here; N1's own
  * rpc-record-shop-redact.test.ts covers this RPC's real access-control surface instead.
  */
-export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact'])
+export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled'])
 
 /**
  * One argument builder per api RPC, every id pointing at seeded `beta` rows. Used by the
@@ -135,6 +135,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   // rotates a real token row. The tenant itself is never an argument: connect_source
   // takes it from data.tenant_or_raise(), so there is nothing cross-tenant to pass.
   connect_source: { args: { p_source: 'shopify', p_kind: 'shopify_admin', p_secret: '', p_config: {}, p_interval: '1 hour', p_backfill_depth: '13 months' }, expect: 'BCNS3' },
+  // A read: one boolean about the caller's own tenant, no shop or client argument to aim elsewhere.
+  shopify_shop_mismatch: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */

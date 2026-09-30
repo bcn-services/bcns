@@ -44,9 +44,9 @@ The flow only worked when the merchant started from the hub's Connect button.
    action follows. After sign-in the route requires an **owner** and opens the cookie
    (`openPending`). A tenant-bound hand-off only binds to its own tenant. An install
    hand-off binds to the owner who signed in. For an install hand-off on the public
-   app, the route then reads whether this tenant already has a Shopify source
-   (`connector_health_v1`) before deciding whether the managed-pricing gate applies —
-   see below. Once past that, it calls `api.connect_source` and sends the browser to
+   app, the route first refuses a tenant already bound to a different shop
+   (`api.shopify_shop_mismatch`), then checks the shop's subscription — every time,
+   whether or not the tenant already has a Shopify source — see below. Once past that, it calls `api.connect_source` and sends the browser to
    `/?connected=shopify`.
 5. The login page tells the merchant what is going on. It also gives someone with no
    bcns account a way forward: email bcns, then open the app again from the Shopify admin.
@@ -67,13 +67,19 @@ in `finish/route.ts`, not `callback/route.ts`.** Root cause: `middleware.ts` sen
 both a first-time install AND an existing client's "Open app" click from the Shopify
 admin through the same install-initiated path (no tenant in the state) — a gate at
 `/callback` cannot tell those apart and would send every already-billed client to the
-$200 plan page. `/finish` can: signed in with a real tenant, it first reads whether
-this tenant already has a Shopify source (`connector_health_v1`); if one exists, this
-is an existing client re-binding and the gate is skipped entirely (behaves exactly as
-before this branch). Only when there is none does it query Admin GraphQL
-`currentAppInstallation.activeSubscriptions` with the merchant's own fresh token; no
-`ACTIVE` entry (or any error/timeout, ~5s time-box, or a DB error reading
-`connector_health_v1`) fails closed to Shopify's plan-selection page instead of the
+$200 plan page. `/finish` does not try to tell them apart either: it queries Admin
+GraphQL `currentAppInstallation.activeSubscriptions` with the merchant's own fresh
+token on every install-initiated finish. An existing client with an `ACTIVE`
+subscription passes straight through to the write; a lapsed one (or a reinstall after
+an uninstall) lands on the plan page like a first install. Before that check, a tenant
+already bound to a *different* shop is refused with `?error=shop-mismatch`
+(`api.shopify_shop_mismatch`, one boolean about the caller's own tenant) so it is never
+offered a charge for a shop `data.attach_source` would then refuse (BCNS7, still the
+authority); a failed read is the generic error page. The subscription check is retried
+once on a transient failure (timeout, network error, non-2xx) because `/callback`'s new
+grant has already killed an existing client's stored refresh token; no `ACTIVE` entry,
+a GraphQL error, a malformed body, or a second transient failure fails closed to
+Shopify's plan-selection page instead of the
 RPC write, deleting both the pending and the state cookies. The plan-selection URL is
 built from `storeHandleFromHost` (the store's admin handle, decoded from Shopify's
 `host` query param — sealed into the pending cookie at `/callback`, since a shop's

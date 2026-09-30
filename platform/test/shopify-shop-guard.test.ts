@@ -4,7 +4,7 @@
 // Needs the local stack (supabase start in platform/) with migrations applied.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { CLIENTS, clientWithToken, localKeys, mintJwt, pool, serviceClient, sql, SUPABASE_URL } from './helpers.js'
+import { anonClient, CLIENTS, clientWithToken, localKeys, mintJwt, pool, serviceClient, sql, SUPABASE_URL } from './helpers.js'
 import { closePool, type Tick } from '../worker/src/db.js'
 import { refreshTokens } from '../worker/src/tokens.js'
 import { computeHealth } from '../worker/src/health.js'
@@ -39,6 +39,8 @@ const connect = (token: string, shop: string) =>
 
 const tokenOf = async (client: string) =>
   (await sql(`select status, secret from data.source_tokens where client_id = $1 and source = 'shopify'`, [client])).rows[0]
+const scheduleOf = async (client: string) =>
+  (await sql<{ enabled: boolean; shop: string }>(`select enabled, config->>'shop' shop from data.connector_schedule where client_id = $1 and source = 'shopify'`, [client])).rows[0]
 const lastError = async (client: string) =>
   (await sql<{ last_error: string | null }>(`select last_error from data.connector_schedule where client_id = $1 and source = 'shopify'`, [client])).rows[0]?.last_error
 
@@ -89,6 +91,157 @@ describe('api.connect_source shop guard', () => {
 
     expect((await connect(b.token, shop)).error).toBeNull()
     expect((await tokenOf(b.client)).status).toBe('active')
+  })
+})
+
+describe('one tenant, one shop (BCNS7 shop_mismatch)', () => {
+  it('refuses a different shop for a client that already has one, and leaves the first connection untouched', async () => {
+    const first = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect((await connect(a.token, first)).error).toBeNull()
+    // Whatever the old token's status: a dead credential does not make the old shop's rows the new shop's.
+    await sql(`update data.source_tokens set status = 'auth_failed' where client_id = $1`, [a.client])
+
+    const { error } = await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)
+    expect(error?.code).toBe('BCNS7')
+    expect(error?.message).toBe('shop_mismatch')
+    expect(await scheduleOf(a.client)).toMatchObject({ shop: first })
+    expect((await tokenOf(a.client)).status).toBe('auth_failed')
+  })
+
+  it('does not lock out a client whose shopify source was erased (shop/redact deletes the schedule row)', async () => {
+    const a = await mkOwner()
+    expect((await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).error).toBeNull()
+    await sql(`delete from data.connector_schedule where client_id = $1 and source = 'shopify'`, [a.client])
+    await sql(`delete from data.source_tokens where client_id = $1 and source = 'shopify'`, [a.client])
+
+    expect((await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).error).toBeNull()
+  })
+})
+
+// api.shopify_shop_mismatch: the early form of BCNS7 the hub's /finish asks BEFORE Shopify's
+// plan page, so nobody approves a charge for a shop the write would then refuse.
+describe('api.shopify_shop_mismatch', () => {
+  const mismatch = (token: string, shop: string) => clientWithToken(token).rpc('shopify_shop_mismatch', { p_shop: shop })
+
+  it('is true only for a shop other than the caller\'s own; false for the same shop (any case) and for no source', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect(await mismatch(a.token, shop)).toMatchObject({ data: false, error: null })
+    expect((await connect(a.token, shop)).error).toBeNull()
+    expect(await mismatch(a.token, shop)).toMatchObject({ data: false, error: null })
+    expect(await mismatch(a.token, shop.toUpperCase())).toMatchObject({ data: false, error: null })
+    expect(await mismatch(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).toMatchObject({ data: true, error: null })
+  })
+
+  it('answers about the caller\'s own tenant only: another client holding a different shop is not a mismatch', async () => {
+    const a = await mkOwner()
+    const b = await mkOwner()
+    expect((await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).error).toBeNull()
+    expect(await mismatch(b.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).toMatchObject({ data: false, error: null })
+  })
+
+  it('agrees with attach_source: whenever it says true, connect_source raises BCNS7', async () => {
+    const a = await mkOwner()
+    const other = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    expect((await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).error).toBeNull()
+    expect((await mismatch(a.token, other)).data).toBe(true)
+    expect((await connect(a.token, other)).error?.code).toBe('BCNS7')
+  })
+
+  it('is owner-only: a member is BCNS2, anon and service_role are refused', async () => {
+    const a = await mkOwner()
+    const { data, error } = await serviceClient().auth.admin.createUser({
+      email: `sgm-${a.client.slice(0, 8)}@example.test`, password: 'password-sg', email_confirm: true })
+    if (error || !data.user) throw new Error(`createUser: ${error?.message}`)
+    users.push(data.user.id)
+    await sql(`insert into data.memberships (user_id, client_id, role) values ($1, $2, 'member')`, [data.user.id, a.client])
+    const member = await mintJwt(data.user.id, { client_id: a.client })
+    expect((await mismatch(member, 'x.myshopify.com')).error?.code).toBe('BCNS2')
+    expect((await anonClient().rpc('shopify_shop_mismatch', { p_shop: 'x.myshopify.com' })).error).not.toBeNull()
+    expect((await serviceClient().schema('api').rpc('shopify_shop_mismatch', { p_shop: 'x.myshopify.com' })).error).not.toBeNull()
+  })
+})
+
+// api.record_app_uninstalled (20260929000200): what the shopify-shop-redact Edge Function calls
+// as service_role for an app/uninstalled webhook it has HMAC-verified.
+describe('api.record_app_uninstalled', () => {
+  const uninstall = (shop: string, at: Date = new Date(Date.now() + 1000)) =>
+    serviceClient().schema('api').rpc('record_app_uninstalled', { p_shop: shop, p_triggered_at: at.toISOString() })
+
+  it('revokes the token and disables the schedule; a replay changes nothing', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect((await connect(a.token, shop)).error).toBeNull()
+
+    const first = await uninstall(shop)
+    expect(first.error).toBeNull()
+    expect(first.data).toBe(1)
+    const token = await sql(`select status, status_detail, updated_at from data.source_tokens where client_id = $1 and source = 'shopify'`, [a.client])
+    expect(token.rows[0]).toMatchObject({ status: 'revoked', status_detail: 'app uninstalled' })
+    expect(await scheduleOf(a.client)).toMatchObject({ enabled: false, shop })
+
+    const replay = await uninstall(shop)
+    expect(replay.error).toBeNull()
+    expect(replay.data).toBe(0)
+    const after = await sql(`select status, updated_at from data.source_tokens where client_id = $1 and source = 'shopify'`, [a.client])
+    expect(after.rows[0]).toEqual({ status: 'revoked', updated_at: token.rows[0].updated_at })
+    expect(await scheduleOf(a.client)).toMatchObject({ enabled: false })
+  })
+
+  it('an unknown shop is a clean 0, not an error', async () => {
+    const { data, error } = await uninstall(`sg-${randomUUID().slice(0, 8)}.myshopify.com`)
+    expect(error).toBeNull()
+    expect(data).toBe(0)
+  })
+
+  it('never touches a bridge-app row (config.app set), even for the same shop', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect((await connect(a.token, shop)).error).toBeNull()
+    await sql(`update data.connector_schedule set config = config || '{"app":"bcns-data"}'::jsonb where client_id = $1`, [a.client])
+
+    expect((await uninstall(shop)).data).toBe(0)
+    expect((await tokenOf(a.client)).status).toBe('active')
+    expect(await scheduleOf(a.client)).toMatchObject({ enabled: true })
+  })
+
+  it('reinstall after uninstall: connect_source makes the token active and re-enables the schedule', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect((await connect(a.token, shop)).error).toBeNull()
+    expect((await uninstall(shop)).data).toBe(1)
+
+    expect((await connect(a.token, shop)).error).toBeNull()
+    expect((await tokenOf(a.client)).status).toBe('active')
+    expect(await scheduleOf(a.client)).toMatchObject({ enabled: true, shop })
+  })
+
+  it('a late delivery of an OLDER uninstall does not revoke the reinstall that followed it', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect((await connect(a.token, shop)).error).toBeNull()
+
+    expect((await uninstall(shop, new Date(Date.now() - 60_000))).data).toBe(0)
+    expect((await tokenOf(a.client)).status).toBe('active')
+    expect(await scheduleOf(a.client)).toMatchObject({ enabled: true })
+  })
+
+  it('revokes an auth_failed token too, whatever its age (only an ACTIVE newer token is a reinstall)', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect((await connect(a.token, shop)).error).toBeNull()
+    await sql(`update data.source_tokens set status = 'auth_failed' where client_id = $1`, [a.client])
+
+    expect((await uninstall(shop, new Date(Date.now() - 60_000))).data).toBe(1)
+    expect((await tokenOf(a.client)).status).toBe('revoked')
+  })
+
+  it('is unreachable to anon and to a signed-in owner', async () => {
+    const a = await mkOwner()
+    const args = { p_shop: 'sg-nobody.myshopify.com', p_triggered_at: new Date().toISOString() }
+    expect((await anonClient().rpc('record_app_uninstalled', args)).error).not.toBeNull()
+    expect((await clientWithToken(a.token).rpc('record_app_uninstalled', args)).error).not.toBeNull()
   })
 })
 

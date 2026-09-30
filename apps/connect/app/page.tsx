@@ -114,7 +114,9 @@ export default async function SourcesPage({
                 ? "The connection could not be completed. Start again, or use Request connection."
                 : searchParams.error === "shop-in-use"
                   ? "This Shopify store is already connected to another bcns account. Sign in as that account's owner, then open bcns Connect from Shopify again."
-                  : "Something went wrong. Try again."}
+                  : searchParams.error === "shop-mismatch"
+                    ? "This bcns account is already connected to a different Shopify store, and one account connects one store. Email us to switch stores."
+                    : "Something went wrong. Try again."}
         </p>
       ) : null}
 

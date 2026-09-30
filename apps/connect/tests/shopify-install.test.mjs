@@ -342,16 +342,14 @@ test("storeHandleFromHost: decodes a handle that differs from the shop's own sub
   assert.equal(storeHandleFromHost("not-valid-base64url!!"), null);
 });
 
-test("managedPricingGate: gates only an install-initiated, public-app, not-already-connected pending", () => {
-  const install = { clientId: INSTALL_CLIENT_ID };
-  assert.equal(managedPricingGate(install, false), true);
-  // D.4: an existing client re-binding (already connected) must skip the gate.
-  assert.equal(managedPricingGate(install, true), false);
-  // D.3: the bridge app must skip the gate even when not yet connected.
-  assert.equal(managedPricingGate({ clientId: INSTALL_CLIENT_ID, app: ALT_APP }, false), false);
-  // D.1 / NIT C: a tenant-bound (hub-initiated) pending on the public app skips the gate.
-  assert.equal(managedPricingGate({ clientId: CLIENT }, false), false);
-  assert.equal(managedPricingGate({ clientId: CLIENT }, true), false);
+test("managedPricingGate: gates every install-initiated public-app pending; only the bridge app and a tenant-bound pending skip it", () => {
+  // Rule 1.2.2: there is no "already connected" exemption — an existing client's
+  // "Open app" and a reinstall take this same path and must be checked too.
+  assert.equal(managedPricingGate({ clientId: INSTALL_CLIENT_ID }), true);
+  // D.3: the bridge app is billed off-platform.
+  assert.equal(managedPricingGate({ clientId: INSTALL_CLIENT_ID, app: ALT_APP }), false);
+  // D.1 / NIT C: a tenant-bound (hub-initiated) pending skips the gate.
+  assert.equal(managedPricingGate({ clientId: CLIENT }), false);
 });
 
 test("subscriptionOutcome: only an active subscription writes; everything else goes to the plan page", () => {
@@ -469,35 +467,23 @@ test("finish: signed out keeps the hand-off and sends the merchant to sign in, t
 
 /* ------------------------------------------------------ managedPricingRedirect */
 
-/** A fake `api` implementing only the from().select().eq().limit() chain the gate reads. */
-function fakeApi(result) {
-  let calls = 0;
-  const api = {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          limit: () => {
-            calls++;
-            return Promise.resolve(result);
-          },
-        }),
-      }),
-    }),
-  };
-  api.callCount = () => calls;
-  return api;
-}
-
 /** A fake fail() matching the route's own: records the code, returns a distinguishable response. */
 function fakeFail() {
   const codes = [];
-  const fail = (code) => {
+  const fail = (code, hubError = "connect-failed") => {
     codes.push(code);
-    return NextResponse.redirect(`${HUB}/?error=connect-failed`);
+    return NextResponse.redirect(`${HUB}/?error=${hubError}`);
   };
   fail.codes = codes;
   return fail;
 }
+
+/** The gate's one RPC (api.shopify_shop_mismatch), answered from a fixed result. */
+function fakeApi(result = { data: false, error: null }) {
+  const calls = [];
+  return { calls, rpc: async (fn, args) => (calls.push([fn, args]), result) };
+}
+const NO_MISMATCH = fakeApi();
 
 /** A subscription-check fetch that never calls the network module — just answers the GraphQL POST. */
 function subscriptionFetch(active) {
@@ -515,19 +501,12 @@ function subscriptionFetch(active) {
 
 const INSTALL_PENDING = { ...TOKEN, clientId: INSTALL_CLIENT_ID };
 
-test("managedPricingRedirect: already connected -> null, no fetch", async () => {
-  const api = fakeApi({ data: [{ source: "shopify" }], error: null });
-  const fetchImpl = subscriptionFetch(true);
-  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
-  assert.equal(result, null);
-  assert.equal(api.callCount(), 1);
-  assert.equal(fetchImpl.callCount(), 0);
-});
-
-test("managedPricingRedirect: not connected, no active subscription -> redirect to the plan page, pending cookie deleted, fetch called once", async () => {
-  const api = fakeApi({ data: [], error: null });
+// Whether the tenant already has THIS shop cannot change the answer (rule 1.2.2 —
+// a reinstall, or an existing client whose subscription lapsed, must see the plan
+// page); the one database question the gate asks is whether it has a DIFFERENT one.
+test("managedPricingRedirect: install-initiated, no active subscription -> redirect to the plan page, pending cookie deleted, fetch called once", async () => {
   const fetchImpl = subscriptionFetch(false);
-  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
   assert.equal(result.status, 307);
   // INSTALL_PENDING inherits TOKEN.storeHandle (null), so planSelectionUrl falls back to the shop URL.
   assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK);
@@ -535,67 +514,208 @@ test("managedPricingRedirect: not connected, no active subscription -> redirect 
   assert.equal(fetchImpl.callCount(), 1);
 });
 
-test("managedPricingRedirect: not connected, active subscription -> null", async () => {
-  const api = fakeApi({ data: [], error: null });
+test("managedPricingRedirect: install-initiated, active subscription -> null (write), and the subscription WAS checked", async () => {
   const fetchImpl = subscriptionFetch(true);
-  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
   assert.equal(result, null);
   assert.equal(fetchImpl.callCount(), 1);
 });
 
-test("managedPricingRedirect: a health-read DB error fails to the generic error page, never gates on it", async () => {
-  const api = fakeApi({ data: null, error: { message: "connection reset" } });
-  const fetchImpl = subscriptionFetch(true);
-  const fail = fakeFail();
-  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
-  assert.equal(result.headers.get("location"), `${HUB}/?error=connect-failed`);
-  assert.deepEqual(fail.codes, ["health_read"]);
-  assert.equal(fetchImpl.callCount(), 0, "must never reach the subscription check on a DB error");
-});
+// SHOPIFY_APP_HANDLE only builds the plan-page URL, so it is only required when
+// that redirect is: an existing client's "Open app" click must not depend on it.
+test("managedPricingRedirect: an unset plan handle fails only when the plan page is needed; an active subscription still writes", async () => {
+  const active = subscriptionFetch(true);
+  const okFail = fakeFail();
+  assert.equal(await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: undefined, fail: okFail, fetchImpl: active }), null);
+  assert.deepEqual(okFail.codes, []);
+  assert.equal(active.callCount(), 1);
 
-test("managedPricingRedirect: an unconfigured plan handle fails with plan_handle_unconfigured", async () => {
-  const api = fakeApi({ data: [], error: null });
-  const fetchImpl = subscriptionFetch(true);
+  const none = subscriptionFetch(false);
   const fail = fakeFail();
-  const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: undefined, fail, fetchImpl });
+  const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: undefined, fail, fetchImpl: none });
   assert.equal(result.headers.get("location"), `${HUB}/?error=connect-failed`);
   assert.deepEqual(fail.codes, ["plan_handle_unconfigured"]);
-  assert.equal(fetchImpl.callCount(), 0);
+  assert.equal(none.callCount(), 1);
 });
 
-test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the gate entirely -- no api call, no fetch", async () => {
-  const bridgeApi = fakeApi({ data: [], error: null });
+// A tenant bound to shop X installing from shop Y must be refused BEFORE it can
+// approve a charge: no subscription call, no plan page. data.attach_source's
+// BCNS7 stays the authority; this is the same answer, asked early.
+test("managedPricingRedirect: a tenant bound to a different shop is refused with shop-mismatch before any fetch or plan redirect", async () => {
+  for (const active of [false, true]) {
+    const fetchImpl = subscriptionFetch(active);
+    const fail = fakeFail();
+    const api = fakeApi({ data: true, error: null });
+    const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
+    assert.equal(result.headers.get("location"), `${HUB}/?error=shop-mismatch`);
+    assert.deepEqual(fail.codes, ["shop_mismatch"]);
+    assert.equal(fetchImpl.callCount(), 0);
+    assert.deepEqual(api.calls, [["shopify_shop_mismatch", { p_shop: SHOP }]]);
+  }
+});
+
+test("managedPricingRedirect: a failed or non-boolean mismatch read is the generic error page -- never the plan page, never the write", async () => {
+  const reads = {
+    "rpc error": { data: null, error: { code: "PGRST202" } },
+    "error with stale data": { data: false, error: { code: "57014" } },
+    "null data": { data: null, error: null },
+    "non-boolean data": { data: "false", error: null },
+  };
+  for (const [name, read] of Object.entries(reads)) {
+    for (const active of [false, true]) {
+      const fetchImpl = subscriptionFetch(active);
+      const fail = fakeFail();
+      const result = await managedPricingRedirect({ api: fakeApi(read), pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
+      assert.equal(result?.headers.get("location"), `${HUB}/?error=connect-failed`, name);
+      assert.deepEqual(fail.codes, ["shop_check"], name);
+      assert.equal(fetchImpl.callCount(), 0, name);
+    }
+  }
+});
+
+test("managedPricingRedirect: the same shop (no mismatch) proceeds to the subscription check", async () => {
+  const fetchImpl = subscriptionFetch(true);
+  const api = fakeApi({ data: false, error: null });
+  assert.equal(await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl }), null);
+  assert.equal(api.calls.length, 1);
+  assert.equal(fetchImpl.callCount(), 1);
+});
+
+// /callback's new grant has already killed an existing client's stored refresh
+// token, so one blip must not throw the fresh token away. Retried once, only for
+// failures that say nothing about the subscription, and still fail-closed.
+function sequenceFetch(...steps) {
+  let calls = 0;
+  const fetchImpl = async () => {
+    const step = steps[Math.min(calls++, steps.length - 1)];
+    if (step instanceof Error) throw step;
+    return new Response(typeof step.body === "string" ? step.body : JSON.stringify(step.body), { status: step.status });
+  };
+  fetchImpl.callCount = () => calls;
+  return fetchImpl;
+}
+const ACTIVE_BODY = { data: { currentAppInstallation: { activeSubscriptions: [{ status: "ACTIVE" }] } } };
+const NONE_BODY = { data: { currentAppInstallation: { activeSubscriptions: [] } } };
+const timeoutError = () => Object.assign(new Error("timed out"), { name: "TimeoutError" });
+const TRANSIENT = {
+  http_error: () => ({ status: 503, body: "unavailable" }),
+  network_error: () => new Error("ECONNRESET"),
+  timeout: timeoutError,
+};
+
+test("managedPricingRedirect: a transient check failure is retried once -- then active writes (2 fetches), twice transient is the plan page (2 fetches)", async () => {
+  for (const [name, transient] of Object.entries(TRANSIENT)) {
+    const recovers = sequenceFetch(transient(), { status: 200, body: ACTIVE_BODY });
+    assert.equal(await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: recovers }), null, name);
+    assert.equal(recovers.callCount(), 2, name);
+
+    const stays = sequenceFetch(transient(), transient(), { status: 200, body: ACTIVE_BODY });
+    const fail = fakeFail();
+    const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl: stays });
+    assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
+    assert.deepEqual(fail.codes, [], name);
+    assert.equal(stays.callCount(), 2, `${name}: exactly one retry`);
+  }
+});
+
+test("managedPricingRedirect: a definitive answer is never retried -- none_active, graphql_error and malformed are the plan page after exactly 1 fetch", async () => {
+  const definitive = {
+    none_active: { status: 200, body: NONE_BODY },
+    graphql_error: { status: 200, body: { errors: [{ message: "throttled" }] } },
+    malformed: { status: 200, body: { data: {} } },
+  };
+  for (const [name, first] of Object.entries(definitive)) {
+    // A retry would find ACTIVE and write: the count AND the outcome both catch one.
+    const fetchImpl = sequenceFetch(first, { status: 200, body: ACTIVE_BODY });
+    const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+    assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
+    assert.equal(fetchImpl.callCount(), 1, name);
+  }
+});
+
+test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the gate entirely -- no fetch, no rpc", async () => {
   const bridgeFetch = subscriptionFetch(false);
+  const skippedApi = fakeApi({ data: true, error: null });
   const bridgeResult = await managedPricingRedirect({
-    api: bridgeApi,
+    api: skippedApi,
     pending: { ...INSTALL_PENDING, app: ALT_APP },
     appHandle: APP_HANDLE,
     fail: fakeFail(),
     fetchImpl: bridgeFetch,
   });
   assert.equal(bridgeResult, null);
-  assert.equal(bridgeApi.callCount(), 0);
   assert.equal(bridgeFetch.callCount(), 0);
 
-  const hubApi = fakeApi({ data: [], error: null });
   const hubFetch = subscriptionFetch(false);
   const hubResult = await managedPricingRedirect({
-    api: hubApi,
+    api: skippedApi,
     pending: { ...TOKEN, clientId: CLIENT },
     appHandle: APP_HANDLE,
     fail: fakeFail(),
     fetchImpl: hubFetch,
   });
   assert.equal(hubResult, null);
-  assert.equal(hubApi.callCount(), 0);
   assert.equal(hubFetch.callCount(), 0);
+  assert.deepEqual(skippedApi.calls, []);
 });
 
-// 20260929000100_connect_source_shop_guard.sql raises BCNS6 when another client
-// holds the shop with a live token; /finish must send that to its own copy.
-test("finishErrorCode maps the shop guard (BCNS6) to shop-in-use, anything else to connect-failed", () => {
+// data.attach_source raises BCNS6 when another client holds the shop with a live
+// token and BCNS7 when this client is already bound to a different shop; /finish
+// must send each to its own copy.
+test("finishErrorCode maps BCNS6 to shop-in-use, BCNS7 to shop-mismatch, anything else to connect-failed", () => {
   assert.equal(finishErrorCode({ code: "BCNS6", message: "shop_in_use" }), "shop-in-use");
+  assert.equal(finishErrorCode({ code: "BCNS7", message: "shop_mismatch" }), "shop-mismatch");
   assert.equal(finishErrorCode({ code: "BCNS3", message: "validation" }), "connect-failed");
   assert.equal(finishErrorCode({}), "connect-failed");
   assert.equal(finishErrorCode(null), "connect-failed");
+});
+
+/* ----------------- rule 1.2.2 gaps: real subscription check, and route wiring */
+
+// The install-initiated finish must send EVERYTHING that is not a confirmed ACTIVE
+// subscription to the plan page — including a lapsed plan on a tenant that already
+// has a Shopify source (which the route no longer even looks up) and every way the
+// check itself can fail. Driven through the real hasActiveSubscription.
+const rawFetch = (status, body) => async () =>
+  new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+const subs = (...statuses) => ({ data: { currentAppInstallation: { activeSubscriptions: statuses.map((status) => ({ status })) } } });
+
+test("managedPricingRedirect: every non-ACTIVE outcome of the real subscription check lands on the plan page", async () => {
+  const cases = {
+    "no subscriptions": rawFetch(200, subs()),
+    "only a CANCELLED/FROZEN/PENDING charge": rawFetch(200, subs("CANCELLED", "FROZEN", "PENDING")),
+    "http 500": rawFetch(500, "boom"),
+    "graphql errors": rawFetch(200, { errors: [{ message: "throttled" }] }),
+    "malformed body": rawFetch(200, { data: {} }),
+    "not json": rawFetch(200, "<html>"),
+    "network error": async () => { throw new Error("ECONNRESET"); },
+  };
+  for (const [name, fetchImpl] of Object.entries(cases)) {
+    const fail = fakeFail();
+    const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
+    assert.equal(result?.status, 307, name);
+    assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK, name);
+    assert.deepEqual(fail.codes, [], `${name}: a check failure is the plan page, not the generic error page`);
+  }
+  // One ACTIVE among others writes.
+  assert.equal(
+    await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: rawFetch(200, subs("CANCELLED", "ACTIVE")) }),
+    null
+  );
+});
+
+test("finish route wiring: subscription gate runs before the connect_source write, with no source-exists read; BCNS errors go through finishErrorCode", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+  const route = read("../app/api/oauth/shopify/finish/route.ts");
+  const gate = route.indexOf("managedPricingRedirect({");
+  const write = route.indexOf('rpc("connect_source"');
+  assert.ok(gate > 0 && write > gate, "managedPricingRedirect must be called before the connect_source rpc");
+  assert.match(route, /if \(gated\) return gated;/);
+  assert.doesNotMatch(route, /connector_health_v1|alreadyConnected/, "no already-connected exemption may come back");
+  assert.match(route, /finishErrorCode\(error\)/);
+  // The hub shows the shop-mismatch copy, and the uninstall webhook is public and delegates.
+  assert.match(read("../app/page.tsx"), /searchParams\.error === "shop-mismatch"[\s\S]{0,300}one account connects one store/);
+  assert.match(read("../app/api/webhooks/shopify/app-uninstalled/route.ts"), /appUninstalledRoute\(request\)/);
+  assert.ok(read("../middleware.ts").includes("api/webhooks/"), "middleware matcher must leave /api/webhooks/ (Shopify sends no cookie) unauthenticated");
 });
