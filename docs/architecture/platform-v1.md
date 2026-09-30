@@ -192,6 +192,104 @@ fold in when this starts:
 - Source card sorting/ordering. Now five cards, so this may no longer be worth doing.
 - General UX/visual pass on the hub once it has real traffic to learn from.
 
+### 10. Next pass: self-service sign-up, Connect visual tuning, SB tuning (scoped, nothing built)
+
+Drafted 2026-09-29, rulings added 2026-09-30. **Nothing here is built.** Sign-up and Shopify
+policy are decided by Nate (marked "Decided"); what is still open is listed under "Open questions".
+Statements marked "inference" were not read from code.
+
+#### 10a. Owner self-service sign-up and account creation
+
+What exists today (read from `origin/main`):
+- A client row is created only by `platform/scripts/onboard.ts`, run by Nate: it inserts
+  `data.clients` (status default `active`, `egress_quota_bytes` 20 GB), makes a smoke user and
+  attaches sources. Shopify and QuickBooks are refused there (OAuth only).
+- An owner is created only by `platform/scripts/add-member.ts --owner`. The `invite-member` Edge
+  Function (`platform/supabase/functions/invite-member/`) lets an existing owner add `member`-role
+  people to their own client, landing on `/auth/confirm` then `/set-password`. It cannot create a
+  client or an owner.
+- `data.memberships.user_id` is the primary key, so one user belongs to one client.
+- A stranger at `connect.bcn-services.com` reaches only `/login` (sign-in and forgot-password;
+  no sign-up route; the page offers only a mailto to bcns). A valid password with no membership
+  bounces to "Ask bcns for an invite".
+- Local `platform/supabase/config.toml` has email `enable_signup = true`; that is the local stack,
+  not hosted. Hosted, observed 2026-09-29 in the Supabase dashboard (project
+  `cnsxbglhredokjbvudfd`): "Allow new users to sign up" is OFF and "Confirm email" is ON. Self-service
+  sign-up needs that toggle turned on (or an invite or admin-created path). Hosted wizard step for Nate.
+- Hosted mail, observed 2026-09-29: custom SMTP is OFF and the built-in mailer is limited to
+  2 emails per hour. Any sign-up or invite flow at volume needs custom SMTP first (Resend, sender
+  on `bcn-services.com`). Hosted wizard step for Nate.
+- Shopify-channel installs bill through Shopify managed pricing (`managedPricingRedirect`,
+  `apps/connect/lib/shopify-oauth.ts`), not Stripe, but still need an existing workspace and a
+  signed-in owner at `/api/oauth/shopify/finish`. Since the billing gate merged, a tenant that
+  already holds a Shopify source is refused when installing on a different shop. With no
+  account-creation path, a Shopify reviewer or an App Store merchant has no bcns account and no
+  way to make one. That is a second reason for self-service (one shop = one live tenant still holds).
+- Existing cost and abuse levers: `data.clients.status` (`active` / `paused` / `churned`),
+  `egress_quota_bytes`, `OAUTH_APPROVED_SOURCES` on the droplet, the "Request connection" email.
+  There is no trial or plan column and no per-client source limit.
+
+**Decided (Nate, 2026-09-30): sign-up ships with billing deferred.** A new owner signs up and gets an
+account in a pending state. No Stripe, no card, no charge. bcns approves and activates the account
+by hand. Stripe billing is a later item that waits on an EIN and a business bank account; when it
+lands, the approve step becomes "payment succeeded". (The alternatives weighed were a free trial
+with automatic activation, and waiting for Stripe before shipping any sign-up.)
+
+Scope: a `/signup` page on the hub (email, business name, password); Supabase email confirmation;
+on confirm, one database function creates the `data.clients` row and the owner membership in one
+transaction, with a slug derived from the name and de-duplicated. The service role is needed for
+that, so it runs in an Edge Function, not on the droplet. New workspaces start `paused` (an
+existing status value) and show a "pending" page. A Resend email to Nate per confirmed sign-up
+(reuse `lib/request-connection.ts`) and one approve script. One migration plus one Edge Function.
+Out of scope: billing UI, plan tiers, self-service Shopify shop binding, several workspaces per
+user, account deletion.
+
+Nate-only steps: `supabase db push --workdir platform`; Edge Function deploy; Supabase Auth
+dashboard (turn on sign-ups, keep email confirmation on, redirect allowlist); custom SMTP via Resend
+before any volume; hand-check that a confirmed stranger lands on the pending page and reads
+nothing else.
+
+Shopify policy rulings (Nate, 2026-09-30; the doc has no Shopify policy section, so they sit here):
+- `read_reports` scope: kept.
+- Rule 1.2.1: hub-initiated connects stay Stripe-billed, outside Shopify billing; the wording on the hub is softened in a separate PR.
+- Rule 2.3.1: the manual shop-domain field on the hub is hidden from merchants, in a separate PR.
+
+Follow-ups from the Shopify billing work (verified in this run, 2026-09-30):
+- Nothing ends hub access when a Shopify paid period ends: the Partner API end time is only logged. Needs a stored `paid_until`, a worker or cron re-check and a migration. Accepted as a gap for now by Nate.
+- After a paid period ends, the plan page behaviour is untested.
+- The hub source card shows "Connected" after an uninstall (`apps/connect/lib/health.ts` has no revoked state).
+- The worker `run.ts` revoked-to-`auth_failed` guard branch needs a rebase.
+- Stale comment at `apps/connect/lib/env.ts:40-44`.
+
+#### 10b. Connect visual tuning (chunk 9, promoted from "not scoped")
+
+Scope unchanged from the draft. Chunk 9 waited on 0-8 finishing and on real usage; this pass
+starts it. Two of its items are already done (dead cards removed 2026-09-19); card ordering is
+likely moot at five cards. Surfaces a pass would touch in `apps/connect`: `app/login`,
+`app/set-password`, `app/page.tsx` (source cards, health tones, egress line), `app/data/` (page,
+`DataTable`, `StatsStrip`), `app/team`, `app/access` (+ `MintForm`), `app/nav.tsx`,
+`app/layout.tsx`, `app/globals.css`, plus the new sign-up and pending pages so they ship already
+tuned. Shared tokens live in `packages/ui`, which `apps/web` also uses; inference: either check the
+marketing site is visually unchanged or scope token changes to the app.
+Input needed from Nate: design direction. He has design-direction material to bring (not read here).
+Out of scope: new features, connector logic, Shopify listing assets.
+
+#### 10c. SB tuning (`apps/sb`)
+
+The tuning list was not captured from Nate during this run; not started. Known so far:
+- The home "Financial Information" card needs Shopify AND Meta by design; not a bug.
+- Revenue currency symbol, sync-time timezone, export 503 and Inventory budget shipped in the F2 follow-ups (#81).
+
+#### Open questions (Nate)
+
+1. What may a pending account do before activation: read-only demo data, or nothing at all (no sources connected)?
+2. When do you turn on hosted sign-ups and set up Resend SMTP (both hosted wizard steps, both needed before sign-up goes live)?
+3. Sign-up fields and identity: business email only? Should a Shopify-installed merchant skip the pending state, since Shopify's plan gate already proves payment?
+4. Should one user be able to belong to several clients (agencies, accountants)? Today no; changing it is a migration.
+5. Chunk 9 timing: before or after Meta and Monday submission? Connect or SB first?
+6. What design-direction material will you bring, and should the marketing site's look change too, since `packages/ui` is shared?
+7. SB tuning list: to be captured from the owner; not started.
+
 ## Order and parallelism
 
 0 → 1 serial and verification-heavy. 3 starts once 1's layout exists; 4 and 6 after 3. 2 is Nate steps plus script edits, in parallel with 1. 4b after 4, in parallel with 5, and blocks nothing. 5's partner-dashboard steps start day 1 (Nate); its code follows 4's skeleton. 7 after 2 and 4. 8 last. 9 waits on all of 0–8 and is not scheduled. A first orchestrate session realistically lands 0, 1, 3 and the hub skeleton, with every hosted step queued as a wizard.
