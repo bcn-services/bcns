@@ -79,12 +79,16 @@ filters out, but Shopify still treats the store as paid until the period ends an
 plan page offers nothing to approve. So on a definitive `none_active` (only then)
 `/finish` asks the Partner API `activeSubscription(appId:, shopId:)` (`paidThrough`):
 **inside the paid period the store reconnects; after it, the plan page.** A free trial
-is not a paid period: a trial has no `currentBillingCycle`, and `trialEndsAt` is
-ignored (#84), so a reinstall during a trial goes to the plan page. That check needs
+is not a paid period: `trialEndsAt` is ignored (#84), and the code assumes a trial has
+a null `currentBillingCycle` (`shopify-oauth.ts:505-508`, "Shopify documents ...", per
+Shopify docs, not confirmed against a live Partner API trial response), so a reinstall
+during a trial goes to the plan page. That check needs
 `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID` and `SHOPIFY_APP_GID`
 (`apps/connect/DEPLOY.md`); with any unset, or on any failure of the Partner call, it
-fails closed to the plan page. A reviewer who reinstalls inside the paid period
-therefore sees no charge screen — Shopify's own design. Before the subscription check, a tenant
+fails closed to the plan page. A reviewer who reinstalls inside the paid period,
+with the three Partner values set, therefore sees no charge screen; with any unset
+they land on the plan page, which offers nothing to approve
+(`shopify-oauth.ts:849-851`). Before the subscription check, a tenant
 already bound to a *different* shop is refused with `?error=shop-mismatch`
 (`api.shopify_shop_mismatch`, one boolean about the caller's own tenant) so it is never
 offered a charge for a shop `data.attach_source` would then refuse (BCNS7, still the
@@ -98,7 +102,12 @@ built from `storeHandleFromHost` (the store's admin handle, decoded from Shopify
 `host` query param — sealed into the pending cookie at `/callback`, since a shop's
 permanent domain is not reliably its admin handle) and falls back to the shop domain
 only when `host` was absent. Until the subscription is confirmed (ACTIVE, or paid
-through), nothing is written: no token, no source row. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is
+through), nothing is written: no new token, no source row. For an EXISTING client
+this is not free: `/callback` has already exchanged the code, and per the comment at
+`shopify-oauth.ts:789-792` that new grant killed the refresh token stored from before,
+so a fresh token that is dropped "breaks a live, paying connection within the hour".
+A client sent to the plan page stays in that state until they approve a plan and
+reconnect (inference from that comment; not reproduced live). The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is
 provably unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on
 the return trip is never trusted — only the query result is.
 
@@ -121,7 +130,8 @@ has nothing to approve. With the three Partner values
 set, `/finish` sees the future `currentBillingCycle.endTime` and connects the store;
 the hub logs `shopify finish paid through <ISO>`. With any of them unset, or once
 the period has ended, the store lands on the plan page instead. This is Shopify's
-own behaviour, not a hub shortcut (`managedPricingRedirect`,
+own behaviour (per Shopify docs and staff posts, and the owner's observation of the plan page; not
+reproduced in this repo), not a hub shortcut (`managedPricingRedirect`,
 `apps/connect/lib/shopify-oauth.ts:848-860`).
 
 **Known limitation: access after period end.** Nothing ends access when a paid
@@ -241,7 +251,7 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 |---|---|---|
 | `customers/data_request` | `/api/webhooks/shopify/customers-data-request` | Recorded, the operator is emailed with a 30-day deadline, 200 returned. |
 | `customers/redact` | `/api/webhooks/shopify/customers-redact` | Recorded, the operator is emailed with a 30-day deadline to erase that customer's rows, 200 returned. |
-| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Recorded, the operator is emailed with a 48-hour deadline to erase the shop's data, 200 returned. Deletion is manual within that 48 hours — automating it needs a way to bind the request to a real shop that a caller without the webhook's HMAC secret can't forge; see `docs/architecture/retention-30d-shop-redact.md` for why the smallest automatic path doesn't clear that bar yet. |
+| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Automated (shipped): the hub forwards the HMAC-verified request to the `shopify-shop-redact` Edge Function, which re-verifies the HMAC, queues a `data.privacy_requests` row, and returns 200. The worker then deletes that client's `source = 'shopify'` rows (`platform/worker/src/privacy.ts`, `apps/connect/lib/shopify-webhooks.ts:24-35`; `docs/architecture/retention-30d-shop-redact.md`). If the forward fails, the operator is emailed with a 48-hour deadline and erases by hand. The worker hands a request to the operator instead of deleting for the bridge shop, an ambiguous match, or a token not confirmed dead. |
 
 ---
 
@@ -353,10 +363,18 @@ Don't include the Access page unless §2's AI-tools check passes.
    - **Shopify-initiated, with the plan active:** the uninstall above cancelled the
      plan, so this case means approving it again, or, inside the paid period with the
      Partner values set, no charge screen. Open a private window and install it
-     from the Partners "Test your app" link (or the dev store's app listing). You
-     should see the consent screen, then — since the dev store should have the $200/mo
-     plan active from step 1b — the bcns sign-in page with the Shopify message. Sign in
-     as the reviewer owner. You should land on `/?connected=shopify`.
+     from the Partners "Test your app" link (or the dev store's app listing). The
+     order is fixed, because the subscription check runs at `/finish`, after sign-in
+     (`shopify-oauth.ts:848-867`):
+     - Outside a paid period: consent screen, then the bcns sign-in page with the
+       Shopify message (sign in as the reviewer owner), then Shopify's plan page;
+       approve the $200/mo plan from step 1b, then reopen the app through the
+       in-admin app link (last bullet below), which reruns OAuth; you land on
+       `/?connected=shopify`.
+     - Inside a paid period, with `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID`
+       and `SHOPIFY_APP_GID` all set (`:848-860`): consent screen, sign-in, then
+       `/?connected=shopify` with no approval step. With any of the three unset, this
+       is the outside-a-paid-period path and ends on a plan page with nothing to approve.
    - **Shopify-initiated, with no plan active:** cancel/decline the dev store's
      subscription first, then repeat the install. You should land on Shopify's own
      plan-selection page (`admin.shopify.com/store/.../charges/bcns-connect/pricing_plans`),
@@ -374,7 +392,9 @@ Don't include the Access page unless §2's AI-tools check passes.
      lands on the plan page, by design.
    - **A new dev-store install with the plan cancelled:** uninstall, cancel/decline the
      subscription, then install fresh. You should land on the bcns sign-in page first,
-     and only after signing in does it redirect to Shopify's plan-selection page.
+     and only after signing in does it redirect to Shopify's plan-selection page. On a
+     store still inside a paid period, with the three Partner values set, the install
+     connects instead of reaching the plan page (see "Reinstall inside a paid period", §1).
    - **After approving the plan, Shopify's return must reopen the app through the
      in-admin app link (signed query), not `application_url` directly** — a bare
      `application_url` return has no `hmac`, hits the login wall, and never reaches
