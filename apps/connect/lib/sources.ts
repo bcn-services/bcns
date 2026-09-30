@@ -5,8 +5,8 @@
  * no Supabase, no env, no clock reads beyond what the caller passes in. That
  * is what makes tests/sources.test.mjs possible without a database.
  *
- * "Connected" is deliberately defined as "a connector_health_v1 row exists and
- * has actually run". `data.source_tokens` is the real secret store and has no
+ * "Connected" is deliberately defined as "a connector_health_v1 row exists" (a row
+ * means attached and not revoked; never_ran is connected but not yet synced). `data.source_tokens` is the real secret store and has no
  * api view on purpose, so the hub can never read it — health is the only
  * signal a member is allowed to see.
  */
@@ -45,6 +45,8 @@ export interface SourceCard {
   /** Title case for the card heading. */
   title: string;
   connected: boolean;
+  /** never_ran: token active + schedule enabled, first sync not yet done. Card shows "First sync pending". */
+  pending: boolean;
   status: HealthStatus | "none";
   /** Human label for the Badge. */
   label: string;
@@ -68,7 +70,7 @@ const STATES: Record<HealthStatus | "none", { label: string; tone: Tone }> = {
   stale: { label: "Stale", tone: "warn" },
   auth_failed: { label: "Reconnect needed", tone: "error" },
   error: { label: "Error", tone: "error" },
-  never_ran: { label: "Awaiting first pull", tone: "idle" },
+  never_ran: { label: "Connected", tone: "ok" },
   none: { label: "Not connected", tone: "idle" },
 };
 
@@ -101,13 +103,12 @@ export function composeSources(rows: readonly HealthRow[] | null | undefined): S
     return {
       source,
       title: TITLES[source],
-      // never_ran is a row that exists but has never pulled: the card says
-      // "Awaiting first pull", and `connected` below still counts it as not
-      // yet connected — there is no data flowing to show a control for.
-      // auth_failed is "connected but broken": the card's own label says Reconnect
-      // needed, and the page hides the Connect form on any connected card — so
-      // counting it as connected leaves that card with no control at all.
-      connected: status !== "none" && status !== "never_ran" && status !== "auth_failed",
+      // Row exists = attached and not revoked (attach_source writes it never_ran;
+      // revoke deletes it), so never_ran is
+      // connected, just not yet synced. auth_failed is "connected but broken": the
+      // page hides the Connect form on connected cards, so it stays not connected.
+      connected: status !== "none" && status !== "auth_failed",
+      pending: status === "never_ran",
       status,
       label,
       tone,

@@ -318,7 +318,7 @@ export type SourceState =
  * reconnect rather than promising a sync. No row at all -> Not connected.
  */
 export function sourceState(card: Pick<SourceCard, "connected" | "status">): SourceState {
-  if (card.connected) return { kind: "ready" };
+  if (card.connected && card.status !== "never_ran") return { kind: "ready" };
   if (card.status === "none") return { kind: "none", message: "Not connected" };
   if (card.status === "auth_failed") return { kind: "reconnect", message: "Reconnect needed" };
   return { kind: "pending", message: "Connected, first sync in progress" };
