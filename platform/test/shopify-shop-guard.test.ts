@@ -119,6 +119,50 @@ describe('one tenant, one shop (BCNS7 shop_mismatch)', () => {
   })
 })
 
+// api.shopify_shop_mismatch: the early form of BCNS7 the hub's /finish asks BEFORE Shopify's
+// plan page, so nobody approves a charge for a shop the write would then refuse.
+describe('api.shopify_shop_mismatch', () => {
+  const mismatch = (token: string, shop: string) => clientWithToken(token).rpc('shopify_shop_mismatch', { p_shop: shop })
+
+  it('is true only for a shop other than the caller\'s own; false for the same shop (any case) and for no source', async () => {
+    const shop = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    const a = await mkOwner()
+    expect(await mismatch(a.token, shop)).toMatchObject({ data: false, error: null })
+    expect((await connect(a.token, shop)).error).toBeNull()
+    expect(await mismatch(a.token, shop)).toMatchObject({ data: false, error: null })
+    expect(await mismatch(a.token, shop.toUpperCase())).toMatchObject({ data: false, error: null })
+    expect(await mismatch(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).toMatchObject({ data: true, error: null })
+  })
+
+  it('answers about the caller\'s own tenant only: another client holding a different shop is not a mismatch', async () => {
+    const a = await mkOwner()
+    const b = await mkOwner()
+    expect((await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).error).toBeNull()
+    expect(await mismatch(b.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).toMatchObject({ data: false, error: null })
+  })
+
+  it('agrees with attach_source: whenever it says true, connect_source raises BCNS7', async () => {
+    const a = await mkOwner()
+    const other = `sg-${randomUUID().slice(0, 8)}.myshopify.com`
+    expect((await connect(a.token, `sg-${randomUUID().slice(0, 8)}.myshopify.com`)).error).toBeNull()
+    expect((await mismatch(a.token, other)).data).toBe(true)
+    expect((await connect(a.token, other)).error?.code).toBe('BCNS7')
+  })
+
+  it('is owner-only: a member is BCNS2, anon and service_role are refused', async () => {
+    const a = await mkOwner()
+    const { data, error } = await serviceClient().auth.admin.createUser({
+      email: `sgm-${a.client.slice(0, 8)}@example.test`, password: 'password-sg', email_confirm: true })
+    if (error || !data.user) throw new Error(`createUser: ${error?.message}`)
+    users.push(data.user.id)
+    await sql(`insert into data.memberships (user_id, client_id, role) values ($1, $2, 'member')`, [data.user.id, a.client])
+    const member = await mintJwt(data.user.id, { client_id: a.client })
+    expect((await mismatch(member, 'x.myshopify.com')).error?.code).toBe('BCNS2')
+    expect((await anonClient().rpc('shopify_shop_mismatch', { p_shop: 'x.myshopify.com' })).error).not.toBeNull()
+    expect((await serviceClient().schema('api').rpc('shopify_shop_mismatch', { p_shop: 'x.myshopify.com' })).error).not.toBeNull()
+  })
+})
+
 // api.record_app_uninstalled (20260929000200): what the shopify-shop-redact Edge Function calls
 // as service_role for an app/uninstalled webhook it has HMAC-verified.
 describe('api.record_app_uninstalled', () => {

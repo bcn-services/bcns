@@ -12,6 +12,11 @@
 --    whose shop/redact ran has no schedule row left (worker privacy.ts deletes it),
 --    so it is not locked out. An operator who really is moving a tenant to another
 --    shop deletes the old source first.
+--    api.shopify_shop_mismatch lets /finish ask the same question BEFORE it sends an
+--    install to Shopify's plan page, so a second-shop install is refused before the
+--    merchant can approve a charge for it. It answers one boolean about the caller's
+--    own client (tenant from the JWT, owner only) — never a shop, a token or a
+--    client id. attach_source's check stays the authority; this is the early exit.
 --
 -- 2. data.attach_source re-enables the schedule on reconnect. An uninstall (3) is
 --    the one thing in the codebase that sets enabled = false, and a reinstall must
@@ -134,3 +139,22 @@ $$;
 -- allow-list — record_shop_redact and, now, this.
 revoke all on function api.record_app_uninstalled(text, timestamptz) from public, anon, authenticated, service_role;
 grant execute on function api.record_app_uninstalled(text, timestamptz) to service_role;
+
+-- The early form of attach_source's BCNS7 check, same predicate. Tenant from the
+-- JWT, owner only, like api.connect_source.
+create function api.shopify_shop_mismatch(p_shop text)
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+declare tenant uuid := data.tenant_or_raise();
+begin
+  if data.active_client_role() is distinct from 'owner' then
+    raise exception using errcode = 'BCNS2', message = 'forbidden_role';
+  end if;
+  return exists (
+    select 1 from data.connector_schedule s
+    where s.source = 'shopify' and s.client_id = tenant
+      and lower(s.config->>'shop') <> lower(p_shop)
+  );
+end $$;
+
+revoke all on function api.shopify_shop_mismatch(text) from public, anon, service_role;
+grant execute on function api.shopify_shop_mismatch(text) to authenticated;
