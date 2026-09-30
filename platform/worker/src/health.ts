@@ -3,7 +3,7 @@ import { envNum, envStr, sql } from './db.js'
 import type { Tick } from './db.js'
 import { fullListEntities } from './connectors/index.js'
 
-/** One statement; `is distinct from` keeps status_since stable across ticks (§5.5). */
+/** A delete of revoked sources' rows, then one upsert statement; `is distinct from` keeps status_since stable across ticks (§5.5). */
 export async function computeHealth(_t: Tick): Promise<number> {
   // Heals a revoke that raced a tick: an uninstalled source must read Not connected.
   await sql(

@@ -5,8 +5,8 @@
  * no Supabase, no env, no clock reads beyond what the caller passes in. That
  * is what makes tests/sources.test.mjs possible without a database.
  *
- * "Connected" is deliberately defined as "a connector_health_v1 row exists and
- * has actually run". `data.source_tokens` is the real secret store and has no
+ * "Connected" is deliberately defined as "a connector_health_v1 row exists" (a row
+ * means attached and not revoked; never_ran is connected but not yet synced). `data.source_tokens` is the real secret store and has no
  * api view on purpose, so the hub can never read it — health is the only
  * signal a member is allowed to see.
  */
@@ -103,8 +103,8 @@ export function composeSources(rows: readonly HealthRow[] | null | undefined): S
     return {
       source,
       title: TITLES[source],
-      // A health row exists only while the token is active and the schedule enabled
-      // (attach_source writes it never_ran; revoke deletes it), so never_ran is
+      // Row exists = attached and not revoked (attach_source writes it never_ran;
+      // revoke deletes it), so never_ran is
       // connected, just not yet synced. auth_failed is "connected but broken": the
       // page hides the Connect form on connected cards, so it stays not connected.
       connected: status !== "none" && status !== "auth_failed",

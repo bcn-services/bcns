@@ -138,7 +138,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
             className={buttonVariants({ variant: c.source === card.source ? "default" : "outline", size: "sm" })}
           >
             {c.title}
-            {c.connected ? null : <Badge className="px-2 py-0">{c.label}</Badge>}
+            {c.connected && !c.pending ? null : <Badge className="px-2 py-0">{c.pending ? "Awaiting first pull" : c.label}</Badge>}
           </Link>
         ))}
       </nav>

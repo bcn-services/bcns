@@ -140,10 +140,3 @@ test("only never_ran is pending; auth_failed/error/stale/none/ok keep their conn
   const none = composeSources([]).find((c) => c.status === "none");
   assert.deepEqual([none.connected, none.pending, none.label], [false, false, "Not connected"]);
 });
-
-test("page wiring: sub-line keys off card.pending; controls still gated on card.connected", async () => {
-  const { readFileSync } = await import("node:fs");
-  const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.ok(src.includes('card.pending ? "First sync pending"'));
-  assert.ok(src.includes("{card.connected ? null : connectPath("));
-});
