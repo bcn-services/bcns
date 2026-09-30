@@ -47,3 +47,5 @@ out/
 # Claude Code worktree scratch dirs
 .claude/worktrees/
 SHOP_REDACT_NOTES.md
+.claude/dev-team/*-report.md
+!.claude/dev-team/team-memory.md

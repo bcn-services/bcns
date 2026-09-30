@@ -565,6 +565,26 @@ export const PENDING_COOKIE = "shopify_pending";
 /** Long enough to sign in; an owner with no account yet reopens the app from Shopify. */
 export const PENDING_TTL_MS = 15 * 60 * 1000;
 
+/**
+ * Non-secret companion to PENDING_COOKIE: just the shop domain, outliving it, so
+ * an expired hand-off can still say which store to start again for. Public app
+ * only (the bridge app has a different handle). No token, no tenant.
+ */
+export const LAST_SHOP_COOKIE = "shopify_last_shop";
+export const LAST_SHOP_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * "Start again" after an expired hand-off: Shopify's own app-open URL for the
+ * shop. Shopify then re-signs the app URL and middleware runs the normal
+ * install-initiated path, so the billing gate and shop refusal at /finish apply
+ * unchanged. Null for anything that is not a real shop domain: no free-text
+ * shop entry anywhere (App Store rule 2.3.1).
+ */
+export function reopenAppUrl(shop: unknown, appHandle: string | undefined): string | null {
+  const normalized = normalizeShop(shop);
+  return normalized && appHandle ? `https://${normalized}/admin/apps/${appHandle}` : null;
+}
+
 export interface PendingConnection {
   /** The tenant the state named, or INSTALL_CLIENT_ID for an install-initiated handshake. */
   clientId: string;

@@ -13,6 +13,7 @@ import {
   csvCell,
   csvField,
   formatCell,
+  formatDateTime,
   formatMoney,
   guardFormula,
   moneyMajorString,
@@ -337,7 +338,7 @@ test("cells: money column reads its row's currency; details is pretty JSON; link
   assert.equal(formatCell(col, { total_spent_minor: 250000, currency: "USD" }), "$2,500.00");
   assert.equal(formatCell({ key: "is_done", label: "Done", type: "text" }, { is_done: true }), "Yes");
   assert.equal(formatCell({ key: "bytes", label: "Size", type: "bytes" }, { bytes: 1536 }), "1.5 KB");
-  assert.equal(formatCell({ key: "d", label: "D", type: "datetime" }, { d: "2026-09-16T04:00:59Z" }), "2026-09-16 04:00");
+  assert.equal(formatCell({ key: "d", label: "D", type: "datetime" }, { d: "2026-09-16T04:00:59Z" }), "2026-09-16 04:00 UTC");
   assert.equal(safeHref("https://x.test/a"), "https://x.test/a");
   assert.equal(safeHref("javascript:alert(1)"), null);
 });
@@ -690,4 +691,10 @@ test("source: the export route and page read only through the signed-in session"
   assert.match(code["app/data/export/route.ts"], /import \{[^}]*\bmemberSession\b[^}]*\} from "@\/lib\/session"/);
   assert.match(code["app/data/export/route.ts"], /await memberSession\(\)/);
   assert.match(code["app/data/page.tsx"], /await requireHub\(\)/);
+});
+
+test("formatDateTime labels its zone: UTC by default, the client's zone with its short name when given, UTC on a bad zone", () => {
+  assert.equal(formatDateTime("2026-09-16T04:00:59Z"), "2026-09-16 04:00 UTC");
+  assert.equal(formatDateTime("2026-09-16T04:00:59Z", "America/New_York"), "2026-09-16 00:00 EDT");
+  assert.equal(formatDateTime("2026-09-16T04:00:59Z", "Not/AZone"), "2026-09-16 04:00 UTC");
 });

@@ -63,11 +63,27 @@ export function formatNumber(value: unknown): string {
   return n === null ? "" : new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n);
 }
 
-/** `YYYY-MM-DD HH:MM` in UTC, matching the Sources page. Unparseable input comes back as-is. */
-export function formatDateTime(value: unknown): string {
+/**
+ * `YYYY-MM-DD HH:MM UTC`, or in `timeZone` (an IANA name, e.g. the client's) with its short
+ * name ("EDT"). An invalid zone falls back to UTC. Unparseable input comes back as-is.
+ */
+export function formatDateTime(value: unknown, timeZone: string = "UTC"): string {
   if (typeof value !== "string" || !value) return "";
   const at = new Date(value);
-  return Number.isNaN(at.getTime()) ? value : at.toISOString().replace("T", " ").slice(0, 16);
+  if (Number.isNaN(at.getTime())) return value;
+  const utc = `${at.toISOString().replace("T", " ").slice(0, 16)} UTC`;
+  if (timeZone === "UTC") return utc;
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone, hourCycle: "h23", timeZoneName: "short",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+      }).formatToParts(at).map((p) => [p.type, p.value])
+    );
+    return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} ${parts.timeZoneName}`;
+  } catch {
+    return utc;
+  }
 }
 
 function formatDate(value: unknown): string {

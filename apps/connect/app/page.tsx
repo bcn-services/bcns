@@ -15,6 +15,8 @@ import { loadClient, requireHub } from "@/lib/session";
 import { mailtoLink } from "@/lib/request-connection";
 import { getConfig } from "@/lib/env";
 import { connectPath } from "@/lib/oauth-config";
+import { reopenAppUrl } from "@/lib/shopify-oauth";
+import { formatDateTime } from "@/lib/data-format";
 import {
   composeSources,
   egressLine,
@@ -33,20 +35,21 @@ const TONE: Record<Tone, string> = {
   idle: "border-border bg-muted text-muted-foreground",
 };
 
-function when(iso: string | null): string {
+function when(iso: string | null, timeZone?: string | null): string {
   if (!iso) return "never";
-  const at = new Date(iso);
-  return Number.isNaN(at.getTime()) ? "never" : at.toISOString().replace("T", " ").slice(0, 16);
+  return Number.isNaN(new Date(iso).getTime()) ? "never" : formatDateTime(iso, timeZone ?? undefined);
 }
 
 export default async function SourcesPage({
   searchParams,
 }: {
-  searchParams: { requested?: string; email?: string; error?: string; connected?: string };
+  searchParams: { requested?: string; email?: string; error?: string; connected?: string; shop?: string };
 }) {
   const { api, membership } = await requireHub();
   const client = await loadClient();
   const config = getConfig();
+  // Only Shopify's own app-open URL for a validated shop: never a typed-in domain (rule 2.3.1).
+  const restartUrl = searchParams.error === "connect-expired" ? reopenAppUrl(searchParams.shop, config.shopifyAppHandle) : null;
 
   const [health, egress] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
@@ -101,7 +104,7 @@ export default async function SourcesPage({
       ) : null}
       {searchParams.connected ? (
         <p className="rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
-          {searchParams.connected} is connected. The first pull starts within the hour.
+          {cards.find((c) => c.source === searchParams.connected)?.title ?? searchParams.connected} is connected. The first pull starts within the hour.
         </p>
       ) : null}
       {searchParams.error ? (
@@ -114,9 +117,23 @@ export default async function SourcesPage({
                 ? "The connection could not be completed. Start again, or use Request connection."
                 : searchParams.error === "shop-in-use"
                   ? "This Shopify store is already connected to another bcns account. Sign in as that account's owner, then open bcns Connect from Shopify again."
-                  : searchParams.error === "shop-mismatch"
-                    ? "This bcns account is already connected to a different Shopify store, and one account connects one store. Email us to switch stores."
-                    : "Something went wrong. Try again."}
+                  : searchParams.error === "connect-expired"
+                    ? "Your Shopify connection timed out before sign-in finished (it is held for 15 minutes), so nothing was saved."
+                    : searchParams.error === "shop-mismatch"
+                      ? "This bcns account is already connected to a different Shopify store, and one account connects one store. Email us to switch stores."
+                      : "Something went wrong. Try again."}
+          {searchParams.error === "connect-expired" ? (
+            restartUrl ? (
+              <>
+                {" "}
+                <a href={restartUrl} className="font-medium underline underline-offset-4">
+                  Start again
+                </a>
+              </>
+            ) : (
+              " Open bcns Connect from your Shopify admin again."
+            )
+          ) : null}
         </p>
       ) : null}
 
@@ -126,7 +143,7 @@ export default async function SourcesPage({
             <CardHeader className="flex-row items-start justify-between space-y-0 gap-3">
               <div>
                 <CardTitle>{card.title}</CardTitle>
-                <CardDescription>Last success: {when(card.lastSuccessAt)}</CardDescription>
+                <CardDescription>Last success: {when(card.lastSuccessAt, client?.timezone)}</CardDescription>
               </div>
               <Badge className={cn("shrink-0", TONE[card.tone])}>{card.label}</Badge>
             </CardHeader>

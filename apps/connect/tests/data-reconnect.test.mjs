@@ -34,7 +34,7 @@ test("auth_failed + rows: active tab, page fetched, notice says the stored data 
   assert.equal(page.notices.length, 1);
   assert.match(page.notices[0].text, /bcns lost access to Shopify\. Your stored data is below; reconnect on the Sources page to resume syncing\./);
   assert.equal(page.emptyCopy, null);
-  assert.equal(page.syncLine, "Shopify last synced 2026-09-20 04:00");
+  assert.equal(page.syncLine, "Shopify last synced 2026-09-20 04:00 UTC");
 });
 
 test("auth_failed + zero unfiltered rows: 'No stored data', notice does not claim data is below", () => {
@@ -86,13 +86,13 @@ test("no health rows: 'Not connected', no tabs", () => {
 
 test("sync line: 'never synced' when no success yet, never 'last synced never'", () => {
   const page = composeDataPage(cardsOf(row("shopify", "auth_failed"), row("meta", "ok", { last_success_at: "2026-09-01T04:00:00Z" })), {});
-  assert.equal(page.syncLine, "Shopify never synced · Meta Ads synced 2026-09-01 04:00");
+  assert.equal(page.syncLine, "Shopify never synced · Meta Ads synced 2026-09-01 04:00 UTC");
   assert.doesNotMatch(page.syncLine, /never$|last synced never/);
 });
 
 test("page.tsx routes through composeDataPage, hides Export CSV at zero rows, and no longer gates on connected", () => {
   const src = readFileSync(new URL("../app/data/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /composeDataPage\(cards, \{ wanted \}\)/);
+  assert.match(src, /composeDataPage\(cards, \{ wanted, timezone \}\)/);
   assert.match(src, /plan\.fetchesPage \? fetchPage/);
   assert.match(src, /view\.notices\.map/);
   assert.match(src, /view\.syncLine/);

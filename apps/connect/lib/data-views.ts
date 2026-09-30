@@ -380,7 +380,7 @@ export interface DataPage {
  */
 export function composeDataPage(
   cards: readonly SourceCard[],
-  opts: { wanted?: string; activeEmpty?: boolean } = {}
+  opts: { wanted?: string; activeEmpty?: boolean; timezone?: string } = {}
 ): DataPage {
   const dataCards = cards.filter(hasStoredData);
   const tabs = cards.filter((c) => c.status !== "none");
@@ -388,7 +388,7 @@ export function composeDataPage(
   const syncLine = dataCards
     .map((c) => {
       if (!c.lastSuccessAt) return `${c.title} never synced`;
-      return `${c.title} ${c.connected ? "synced" : "last synced"} ${formatDateTime(c.lastSuccessAt)}`;
+      return `${c.title} ${c.connected ? "synced" : "last synced"} ${formatDateTime(c.lastSuccessAt, opts.timezone)}`;
     })
     .join(" · ");
   const notices = dataCards
