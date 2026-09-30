@@ -822,7 +822,7 @@ test("paidThrough: asks the Partner API for this app and shop, with the partner 
   assert.equal(init.redirect, "error");
   assert.equal(init.headers["X-Shopify-Access-Token"], PARTNER.token);
   const body = JSON.parse(init.body);
-  assert.equal(body.query, "query($appId:ID!,$shopId:ID!){activeSubscription(appId:$appId,shopId:$shopId){trialEndsAt currentBillingCycle{endTime}}}");
+  assert.equal(body.query, "query($appId:ID!,$shopId:ID!){activeSubscription(appId:$appId,shopId:$shopId){currentBillingCycle{endTime}}}");
   assert.deepEqual(body.variables, { appId: PARTNER.appGid, shopId: SHOP_GID });
 
   // What fetch does with a 3xx: rejects under redirect "error", follows (token and all) otherwise.
@@ -842,10 +842,10 @@ test("paidThrough: paid only with a zoned ISO endTime still in the future; every
     ["bad_end_time", { status: 200, body: cycle("2026-10-25T16:29:00") }], // no zone: Date.parse would read local time
     ["bad_end_time", { status: 200, body: cycle("2026-10-25") }],
     ["bad_end_time", { status: 200, body: cycle("Sun, 25 Oct 2026 16:29:00 GMT") }],
-    ["bad_end_time", { status: 200, body: trial(null) }], // neither a cycle nor a trial end
-    ["period_ended", { status: 200, body: trial("2026-09-29T00:00:00Z") }],
-    ["bad_end_time", { status: 200, body: trial("2026-10-10T00:00:00") }],
-    // A present cycle wins over the trial end, even a later one.
+    // A free trial is never a paid period, even with its end still in the future.
+    ["bad_end_time", { status: 200, body: trial("2026-10-10T00:00:00Z") }],
+    ["bad_end_time", { status: 200, body: trial(null) }],
+    // An ended cycle is not rescued by a later trial end.
     ["period_ended", { status: 200, body: { data: { activeSubscription: { trialEndsAt: "2026-12-01T00:00:00Z", currentBillingCycle: { endTime: "2026-09-01T00:00:00Z" } } } } }],
     ["malformed", { status: 200, body: { data: {} } }],
     ["graphql_error", { status: 200, body: { errors: [{ message: "access denied" }] } }],
@@ -861,9 +861,7 @@ test("paidThrough: paid only with a zoned ISO endTime still in the future; every
   }
   // An explicit offset is a zone too.
   assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: cycle("2026-10-25T18:29:00.5+02:00") }), NOW), { paid: true, until: "2026-10-25T16:29:00.500Z" });
-  // In a free trial there is no cycle; the trial end stands in for it.
-  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: trial("2026-10-10T00:00:00Z") }), NOW), { paid: true, until: "2026-10-10T00:00:00.000Z" });
-  // A present cycle wins over the trial end, even an earlier trial end.
+  // A present cycle is what counts, whatever the trial end says.
   const both = { data: { activeSubscription: { trialEndsAt: "2026-09-01T00:00:00Z", currentBillingCycle: { endTime: "2026-10-25T16:29:00Z" } } } };
   assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: both }), NOW), { paid: true, until: "2026-10-25T16:29:00.000Z" });
 });
@@ -877,10 +875,6 @@ test("managedPricingRedirect: none_active but the Partner API says paid through 
   assert.equal(JSON.parse(fetchImpl.calls[0].init.body).query, ADMIN_SUBSCRIPTIONS_QUERY);
   assert.deepEqual(JSON.parse(fetchImpl.calls[2].init.body).variables, { appId: PARTNER.appGid, shopId: SHOP_GID });
   assert.deepEqual(lines, [`[connect] shopify finish paid through 2026-10-25T16:29:00.000Z shop=${SHOP}`]);
-  // A reinstall during a free trial writes the same way, logging the trial end.
-  const [trialResult, trialLines] = await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_BODY }], { status: 200, body: trial("2026-10-10T00:00:00Z") })));
-  assert.equal(trialResult, null);
-  assert.deepEqual(trialLines, [`[connect] shopify finish paid through 2026-10-10T00:00:00.000Z shop=${SHOP}`]);
   // A paid store does not need the plan handle: nothing is redirected.
   const noHandle = fakeFail();
   assert.equal(await gate(gateFetch([{ status: 200, body: NONE_BODY }], PAID), { appHandle: undefined, fail: noHandle }), null);
@@ -893,8 +887,7 @@ test("managedPricingRedirect: none_active and the Partner API does not confirm a
     ["period_ended", { status: 200, body: cycle("2026-09-01T00:00:00Z") }],
     ["bad_end_time", { status: 200, body: cycle("not a date") }],
     ["bad_end_time", { status: 200, body: cycle("2026-10-25T16:29:00") }],
-    ["period_ended", { status: 200, body: trial("2026-09-29T00:00:00Z") }],
-    ["bad_end_time", { status: 200, body: trial(null) }],
+    ["bad_end_time", { status: 200, body: trial("2026-10-10T00:00:00Z") }], // a free trial, still running, is not paid
     ["timeout", timeoutError()],
     ["network_error", new Error("ECONNRESET")],
     ["http_401", { status: 401, body: "unauthorized" }],

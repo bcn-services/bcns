@@ -458,7 +458,7 @@ export async function shopGid(shop: string, accessToken: string, fetchImpl: type
 const PARTNER_API_VERSION = "2026-07";
 
 const PAID_THROUGH_QUERY =
-  "query($appId:ID!,$shopId:ID!){activeSubscription(appId:$appId,shopId:$shopId){trialEndsAt currentBillingCycle{endTime}}}";
+  "query($appId:ID!,$shopId:ID!){activeSubscription(appId:$appId,shopId:$shopId){currentBillingCycle{endTime}}}";
 
 /** An ISO timestamp with an explicit zone; Date.parse reads a zone-less one as local time. */
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
@@ -502,8 +502,10 @@ export type PaidThroughResult =
  * token is org-wide and rides in a custom header, so it never follows a
  * redirect anywhere (fetch rejects, which is `network_error`).
  *
- * A merchant still in a free trial has no `currentBillingCycle` (Shopify
- * documents it as null during a trial), so `trialEndsAt` stands in for it.
+ * A free trial is deliberately NOT a paid period: `currentBillingCycle` is null
+ * during a trial, and `trialEndsAt` is ignored. A trial means nothing was paid,
+ * and nothing ends access at the period end yet, so a cancelled trial that
+ * counted here could keep syncing indefinitely. That reinstall goes to the plan page.
  */
 export async function paidThrough(
   shopGid: string,
@@ -531,7 +533,7 @@ export async function paidThrough(
   if (!response.ok) return { paid: false, reason: `http_${response.status}` };
   const body = (await response.json().catch(() => null)) as
     | {
-        data?: { activeSubscription?: { trialEndsAt?: unknown; currentBillingCycle?: { endTime?: unknown } | null } | null };
+        data?: { activeSubscription?: { currentBillingCycle?: { endTime?: unknown } | null } | null };
         errors?: unknown[];
       }
     | null;
@@ -539,7 +541,7 @@ export async function paidThrough(
   const subscription = body.data?.activeSubscription;
   if (subscription === null) return { paid: false, reason: "no_subscription" };
   if (typeof subscription !== "object") return { paid: false, reason: "malformed" };
-  const endTime = subscription.currentBillingCycle?.endTime ?? subscription.trialEndsAt;
+  const endTime = subscription.currentBillingCycle?.endTime;
   const end = typeof endTime === "string" && ISO_WITH_ZONE.test(endTime) ? Date.parse(endTime) : NaN;
   if (Number.isNaN(end)) return { paid: false, reason: "bad_end_time" };
   return end > now ? { paid: true, until: new Date(end).toISOString() } : { paid: false, reason: "period_ended" };
