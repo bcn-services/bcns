@@ -890,7 +890,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Fees and billing",
           body: [
-            "bcns Connect is $200 a month with no setup fee, billed by bcns. Deluxe builds and AI consulting are billed per their Order Form.",
+            "bcns Connect is $200 a month with no setup fee. Deluxe builds and AI consulting are billed per their Order Form.",
             "You're responsible for any taxes on top of the listed price. If a payment fails, we may suspend the Services until it's resolved.",
             "If we change our pricing, we'll give you reasonable advance notice before the new price takes effect.",
           ],

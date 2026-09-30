@@ -21,6 +21,8 @@
  * channels. A card for them could never leave "Not connected / Request connection",
  * so they are deliberately not listed here (platform-v1 §9, dropped 2026-09-19).
  */
+import { normalizeShop } from "./shopify-oauth";
+
 export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive", "quickbooks"] as const;
 
 export type HubSource = (typeof HUB_SOURCES)[number];
@@ -158,4 +160,26 @@ export function egressLine(row: EgressRow | null | undefined): string | null {
   if (!row) return null;
   const line = `${formatBytes(row.bytes_used)} of ${formatBytes(row.quota_bytes)} used this month`;
   return row.exceeded ? `${line} — quota exceeded` : line;
+}
+
+export type ShopifyControl =
+  | { kind: "form"; shop: string; label: string }
+  | { kind: "reconnect-in-shopify" }
+  | { kind: "install"; url: string | null };
+
+/**
+ * The Shopify card's control. Merchants never type a shop domain (App Store 2.3.1):
+ * a hub-initiated form only for an operator's explicit ?shop= query; a stored source
+ * reconnects via Shopify admin (keeps the managed-pricing gate); no row installs from the App Store.
+ */
+export function shopifyControl(
+  card: Pick<SourceCard, "status">,
+  shop: string | undefined,
+  error: string | undefined,
+  appHandle: string | null | undefined,
+): ShopifyControl {
+  const valid = error ? null : normalizeShop(shop);
+  if (valid) return { kind: "form", shop: valid, label: `${card.status === "none" ? "Connect" : "Reconnect"} ${valid}` };
+  if (card.status !== "none") return { kind: "reconnect-in-shopify" };
+  return { kind: "install", url: appHandle ? `https://apps.shopify.com/${appHandle}` : null };
 }
