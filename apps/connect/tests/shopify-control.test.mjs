@@ -26,3 +26,15 @@ test("page.tsx has no text input named shop; Non-Shopify forms still POST", () =
 test("web terms no longer say billed by bcns", () => {
   assert.doesNotMatch(readFileSync(new URL("../../web/lib/content.ts", import.meta.url), "utf8"), /billed by bcns/);
 });
+test("page.tsx: hidden shop input, Shopify branch under owner+connectPath gate, Request connection fallback, no typed-domain copy", () => {
+  const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(src, /<input type="hidden" name="shop" value=\{ctl\.shop\} \/>/);
+  assert.equal((src.match(/name="shop"/g) ?? []).length, 1);
+  assert.doesNotMatch(src, /<input[^>]*name="shop"[^>]*type="(text|search|url)"|<input(?![^>]*type="hidden")[^>]*name="shop"/);
+  const gate = src.indexOf('connectPath(config, card.source) && membership.role === "owner"');
+  const shopify = src.indexOf("<ShopifyControlView");
+  const fallback = src.indexOf("requestConnectionAction}>");
+  assert.ok(gate > 0 && gate < shopify && shopify < fallback, "Shopify control must sit inside the owner+connectPath branch, before the Request connection fallback");
+  assert.doesNotMatch(src, /(type|enter|paste)[^"\n]{0,20}(shop|store) (domain|name)/i);
+  assert.doesNotMatch(src, /Enter your (shop|store)/i);
+});
