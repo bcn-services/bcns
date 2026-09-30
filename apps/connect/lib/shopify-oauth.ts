@@ -459,19 +459,22 @@ export function planSelectionUrl(shop: string, appHandle: string, storeHandle: s
 
 /**
  * Whether a Shopify-initiated hand-off (install-initiated, `clientId ===
- * INSTALL_CLIENT_ID`) on the PUBLIC app needs the managed-pricing gate before
- * /finish writes it. Excludes the bridge app (SB, `app === ALT_APP`) and — the
- * W6a follow-up fix — an EXISTING client re-binding: `middleware.ts` sends
- * both a first-time install AND an existing client's "Open app" click from the
- * Shopify admin through this same install-initiated path, so gating on
- * `clientId` alone would send every real, already-billed client to the $200
- * plan page. `alreadyConnected` is the caller's read of whether this tenant
- * already has a Shopify source (a DB read, so it lives in the route, not
- * here). Pure and exhaustively unit-testable — every other branch in this
- * decision already lives in this file for the same reason.
+ * INSTALL_CLIENT_ID`) on the PUBLIC app needs the managed-pricing check before
+ * /finish writes it. Excludes only the bridge app (SB, `app === ALT_APP`) and a
+ * tenant-bound (hub-initiated) pending, which are billed off-platform.
+ *
+ * Deliberately NOT excluded: a tenant that already has a Shopify source.
+ * `middleware.ts` sends both a first-time install AND an existing client's
+ * "Open app" click through this same install-initiated path, and an earlier
+ * version skipped the check for the latter. That let a reinstall (Shopify
+ * cancels the subscription on uninstall; our source row stays) and a second
+ * shop through without ever seeing the plan page (App Store rule 1.2.2). An
+ * existing paying client has an ACTIVE subscription, so the check passes them
+ * straight to the write anyway. Pure and exhaustively unit-testable — every
+ * other branch in this decision already lives in this file for the same reason.
  */
-export function managedPricingGate(pending: { clientId: string; app?: string }, alreadyConnected: boolean): boolean {
-  return pending.clientId === INSTALL_CLIENT_ID && pending.app !== ALT_APP && !alreadyConnected;
+export function managedPricingGate(pending: { clientId: string; app?: string }): boolean {
+  return pending.clientId === INSTALL_CLIENT_ID && pending.app !== ALT_APP;
 }
 
 /**
@@ -485,12 +488,16 @@ export function subscriptionOutcome(checked: SubscriptionCheckResult): "write" |
 }
 
 /**
- * The hub's `?error=` for a failed connect_source write. BCNS6 (`shop_in_use`) is
- * the shop guard in 20260929000100_connect_source_shop_guard.sql: another client
- * holds this shop with a live token.
+ * The hub's `?error=` for a failed connect_source write. Both codes are raised
+ * by data.attach_source (20260929000200_shopify_uninstall_shop_mismatch.sql):
+ * BCNS6 (`shop_in_use`) — another client holds this shop with a live token;
+ * BCNS7 (`shop_mismatch`) — this client is already bound to a different shop,
+ * which a connect must never silently replace.
  */
-export function finishErrorCode(error: { code?: string } | null): "shop-in-use" | "connect-failed" {
-  return error?.code === "BCNS6" ? "shop-in-use" : "connect-failed";
+export function finishErrorCode(error: { code?: string } | null): "shop-in-use" | "shop-mismatch" | "connect-failed" {
+  if (error?.code === "BCNS6") return "shop-in-use";
+  if (error?.code === "BCNS7") return "shop-mismatch";
+  return "connect-failed";
 }
 
 /** Where every handshake ends; the only `next` the login page will follow. */
@@ -564,51 +571,30 @@ export function openPending(
 }
 
 /**
- * The narrow shape /finish's connector_health_v1 existence check needs from
- * `session.api` — deliberately not the full Supabase schema type, so a test
- * can satisfy it with a plain fake instead of a real client.
- */
-export interface HealthCheckApi {
-  from(table: string): {
-    select(columns: string): {
-      eq(column: string, value: string): {
-        limit(count: number): PromiseLike<{ data: unknown[] | null; error: { message?: string } | null }>;
-      };
-    };
-  };
-}
-
-/**
  * The whole managed-pricing decision for one /finish request, extracted out of
- * the route so it is testable without a server or a database (route.ts just
- * calls this and returns whatever it gets back). `null` means "proceed to the
- * write"; anything else is what the route should return instead.
+ * the route so it is testable without a server (route.ts just calls this and
+ * returns whatever it gets back). `null` means "proceed to the write"; anything
+ * else is what the route should return instead.
+ *
+ * No database read: whether the tenant already has a Shopify source no longer
+ * matters (see managedPricingGate). A tenant installing a DIFFERENT shop is
+ * refused by the write itself (BCNS7, finishErrorCode) — after this check, so
+ * such an install can be shown the plan page before it is refused; no api view
+ * exposes the tenant's current shop to check it any earlier.
  *
  * `fail` is the route's own fail() closure (builds the generic error redirect
  * and clears the pending cookie) — passed in rather than duplicated here, and
  * trivially fakeable in a test.
  */
 export async function managedPricingRedirect(params: {
-  api: HealthCheckApi;
   pending: PendingConnection;
   appHandle: string | undefined;
   fail: (code: string) => NextResponse;
   fetchImpl?: typeof fetch;
 }): Promise<NextResponse | null> {
-  const { api, pending, appHandle, fail, fetchImpl = fetch } = params;
+  const { pending, appHandle, fail, fetchImpl = fetch } = params;
 
-  // Only an install-initiated pending on the public app can possibly need the
-  // gate — skip the DB round trip entirely for a tenant-bound or bridge finish.
-  if (pending.clientId !== INSTALL_CLIENT_ID || pending.app === ALT_APP) return null;
-
-  const existing = await api.from("connector_health_v1").select("source").eq("source", "shopify").limit(1);
-  // A DB error here must NOT read as "no source found": that would gate an
-  // existing, already-connected, paying client to the $200 plan page on a mere
-  // read hiccup. Fail closed to the generic error page instead.
-  if (existing.error) return fail("health_read");
-  const alreadyConnected = Array.isArray(existing.data) && existing.data.length > 0;
-
-  if (!managedPricingGate(pending, alreadyConnected)) return null;
+  if (!managedPricingGate(pending)) return null;
   if (!appHandle) return fail("plan_handle_unconfigured");
 
   const checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
