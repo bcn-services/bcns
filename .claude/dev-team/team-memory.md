@@ -135,3 +135,10 @@ TEAM Render case-study screenshots with next/image (PLAN item 8) — risk: loud,
 - **What worked:** mutation checks per item; stacking on #80 via ff-only.
 - **What failed:** none. Brief said 4 DB tests fail; actually 17 files. store_timezone not in any api view (used clients.timezone).
 - **Remember next run:** packages/tenant/dist must be built before connect tests; root lint fails on pnpm 9/11 mismatch (baseline); monitors return instantly, wait via background until-loop.
+
+## 2026-09-30 13:45 — dev-team-auto — hub Shopify card: no typed shop domain (2.3.1) + billing wording
+- **Outcome:** DONE — 1 attempt — caution: yes — team: dt-engineer sonnet/high, dt-qa sonnet/high, dt-review sonnet/high — branch fix/hub-shopify-app-store-install, commit 1cc395b, PR #86
+- **What happened:** Pure `shopifyControl` in lib/sources.ts picks install link / "reopen from Shopify admin" / hidden-`?shop=` operator form; free-text input gone; Terms dropped "billed by bcns". The orchestrator fixed the engineer's deviation (Shopify had escaped the owner+connectPath gate, dropping Request connection).
+- **What worked:** Prescribing the design after proving the hub cannot read the stored shop (no api view exposes connector_schedule.config) and that hub-initiated connects skip managedPricingGate, so a public-app reconnect must go through Shopify admin.
+- **What failed:** The brief's premise of "hub billed-directly copy" was false: apps/connect had none. The only merchant-facing claim was the apps/web Terms at content.ts:893.
+- **Remember next run:** The tenant package is `@bcn-services/tenant`, not `@bcns/tenant`. A hub Reconnect button for a stored shop needs a new api view/RPC exposing connector_schedule.config->>'shop' (a migration); `api.shopify_shop_mismatch(p_shop)` can test "is the stored shop X" without exposing it.

@@ -277,23 +277,28 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 ## 6. Reviewer instructions (paste into "Testing instructions")
 
 > bcns Connect is not embedded. After you approve the install, the app opens at
-> connect.bcn-services.com in the same tab.
+> connect.bcn-services.com in the same tab. Use your own development or test store.
 >
-> 1. Install bcns Connect on the development store **bcns-data-dev.myshopify.com** (or your own
->    test store) from the listing and approve the read-only permissions.
-> 2. Shopify redirects you to bcns. When it asks you to sign in, use:
+> 1. Install bcns Connect on your store from the listing and approve the read-only permissions.
+> 2. Shopify redirects you to the bcns Connect sign-in page. Sign in with:
 >    Email: `TODO(Nate): reviewer email` · Password: `TODO(Nate): reviewer password`.
 >    This account owns a test workspace set up for review.
-> 3. After sign-in you land on **Sources**. A green banner reads "shopify is connected. The first
->    pull starts within the hour." The Shopify card lists the store as a source.
-> 4. Within the hour the Shopify card shows a "Last success" time. Click **Your data** in the
->    top bar to see that store's orders, customers and products. It has
->    search, a date filter and CSV export, and the top of the page shows the last 30 days of
->    orders and revenue.
-> 5. To test the privacy webhooks, uninstall the app from the store admin. `shop/redact` is
->    acknowledged with HTTP 200.
+> 3. Shopify then shows the $200/month plan page. On a development store it reads "Free to
+>    test". Approve the plan.
+> 4. You land on connect.bcn-services.com, on Sources. A green banner reads "Shopify is
+>    connected. The first pull starts within the hour." The Shopify card shows Connected and
+>    your store domain. The first sync runs within the hour, so Your data fills in after that.
+> 5. To test uninstall and the privacy webhooks, uninstall the app from the Shopify admin.
+>    Shopify sends `app/uninstalled`, and bcns revokes the stored token and stops syncing
+>    within seconds. The Sources card then shows Not connected, with an "Install bcns Connect
+>    from the Shopify App Store" link. About 48 hours later Shopify sends `shop/redact`, which
+>    deletes the store's data from bcns.
 >
-> The app only reads data. It never changes products, orders or customers.
+> The review account holds one Shopify store at a time. If you install on a second store while
+> the first is still connected, the app refuses and asks you to uninstall from the first store.
+>
+> The app only reads data. It never changes products, orders or customers. For help, write to
+> nseluga@bcn-services.com or see https://bcn-services.com.
 
 **TODO(Nate): before submitting, create the reviewer account.** It needs its own client
 (tenant). Never use SB or any real client. Give it one **owner** member (`platform/scripts/onboard.ts`,
@@ -324,10 +329,14 @@ Don't include the Access page unless §2's AI-tools check passes.
 
 ## 8. Known review risks this PR does not change
 
-- **Typing in a store domain.** When a merchant starts from the hub, the Sources page
-  Shopify card asks for `your-store.myshopify.com` (`apps/connect/app/page.tsx:154`).
-  Installs from Shopify never show this field, and a connected card hides it. Once the
-  listing is live, replace the field with a link to the listing.
+- The Sources page has no field for a store domain (rule 2.3.1). With no Shopify source
+  stored, the Shopify card links to the App Store listing ("Install bcns Connect from the
+  Shopify App Store"). With a stored source, it tells the merchant to open bcns Connect from
+  the Shopify admin to reconnect. A hidden `shop` input appears only when the page is opened
+  with an explicit `?shop=` query, which only an operator does
+  (`apps/connect/lib/sources.ts:165-185`, `apps/connect/app/page.tsx:158-186`).
+- Rule 2.2.3 is treated as not applicable: `embedded = false` (`apps/connect/shopify.app.toml:26`)
+  and the hub loads no App Bridge.
 - **Opening the app from the Shopify admin runs OAuth again.** Shopify skips the
   consent screen for scopes already granted. `connect_source` updates the existing
   token row, so the token is refreshed. `/finish` also re-checks the subscription
