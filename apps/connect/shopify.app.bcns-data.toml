@@ -1,25 +1,28 @@
 # sb-bridge: remove after SB migrates to bcns Connect
 #
-# Shopify app configuration for "bcns-data" (Dev Dashboard app 422420021249), the
-# custom-distribution app locked to saunaboy-2.myshopify.com. SB connects through it
-# until bcns Connect (shopify.app.toml) passes App Store review. Same scopes and
-# install flow as bcns Connect; the only redirect is the hub callback, and [webhooks]
-# holds only api_version (CLI 4.8.0 requires the table): no subscriptions and no
-# compliance URLs, since custom apps need none and the webhook routes verify with
-# bcns Connect's secret only.
+# Shopify app configuration for "bcns-data-2" (Dev Dashboard app 429656047617), the
+# custom-distribution app locked to fa8a00-11.myshopify.com (SB). It replaced
+# bcns-data (422420021249) on 2026-09-29, whose multi-store install link could not
+# be refreshed; the file keeps its name so --config bcns-data still resolves.
+# SB connects through it until bcns Connect (shopify.app.toml) passes App Store
+# review. Same scopes and install flow as bcns Connect; the only redirect is the hub
+# callback, and [webhooks] holds only api_version (CLI 4.8.0 requires the table): no
+# subscriptions and no compliance URLs, since custom apps need none and the webhook
+# routes verify with bcns Connect's secret only.
 #
-# Deploy from ~/bcns with (sb-shopify-bridge-wizard.sh stage 1):
+# Matches the active version bcns-data-2-2, which was set in the Dev Dashboard. To
+# change it, edit here and deploy from ~/bcns:
 #   pnpm dlx @shopify/cli@4.8.0 app deploy --path apps/connect --config bcns-data
-# --config takes the name between "shopify.app." and ".toml".
+# --config takes the name between "shopify.app." and ".toml". Always pass it: without
+# it the CLI deploys shopify.app.toml (bcns Connect).
 
-client_id = "e93f9b329725e3aa357f936b871da139"
-name = "bcns-data"
+client_id = "a806948335f634ba45b229e12813a95a"
+name = "bcns-data-2"
 application_url = "https://connect.bcn-services.com"
 embedded = false
 
 [access_scopes]
-# The same eight as shopify.app.toml and SHOPIFY_SCOPES. bcns-data-4 has seven
-# (no read_shopify_payments_accounts); deploying this adds it.
+# The same eight as shopify.app.toml and SHOPIFY_SCOPES.
 scopes = "read_all_orders,read_customers,read_inventory,read_orders,read_products,read_reports,read_shopify_payments_accounts,read_shopify_payments_payouts"
 use_legacy_install_flow = true
 

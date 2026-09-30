@@ -244,31 +244,37 @@ finish() {
 #
 # sb-bridge: remove after SB migrates to bcns Connect
 #
-# Points SB (saunaboy-2) at the bcns-data custom app until bcns Connect passes
-# review. Run AFTER the chunk5-sb-shopify-bridge PR is merged and both the hub and
-# the worker deploys are green: the old code ignores the ALT vars on the hub and
-# refreshes a bcns-data token with bcns Connect's pair on the worker.
+# Points SB (fa8a00-11) at the custom app bcns-data-2 until bcns Connect passes
+# review: sets SHOPIFY_ALT_* on the hub and the worker, then connects SB.
+# bcns-data-2 (429656047617, single-store custom distribution) replaced bcns-data
+# (422420021249) on 2026-09-29: the old app's multi-store Plus-org install link
+# could not be refreshed. config.app = 'bcns-data' is still the marker; it only
+# means "use the SHOPIFY_ALT_* pair", so the swap needed no code change.
 #
 # Run from ~/bcns in Terminal.app or iTerm (not a Claude `!` command):
 #   bash sb-shopify-bridge-wizard.sh
+#
+# Re-set recipe: re-run this wizard. The secret stays re-fetchable from the Dev
+# Dashboard (bcns-data-2 → Settings → Client secret) and lives in Secret Manager.
 
-TOTAL_STAGES=4
-TOTAL_MINUTES=20
+set +x   # never trace: the secret passes through printf below
+
+TOTAL_STAGES=3
+TOTAL_MINUTES=15
 
 # The secret is NEVER written to disk here. ENV_FILE points outside the repo so
 # ask's re-run defaults cannot create or read a .env inside a git tree.
 ENV_FILE="${HOME}/.bcns-sb-bridge-wizard.env"
 
 HUB="https://connect.bcn-services.com"
-ALT_SHOP="saunaboy-2.myshopify.com"
-# bcns-data (Dev Dashboard app 422420021249). Public — committed in shopify.app.bcns-data.toml.
-ALT_CLIENT_ID="e93f9b329725e3aa357f936b871da139"
+ALT_SHOP="fa8a00-11.myshopify.com"             # permanent domain, NOT the saunaboy-2 admin handle
+ALT_CLIENT_ID="a806948335f634ba45b229e12813a95a" # bcns-data-2, public
+ALT_APP_ID=429656047617
 PROJECT=bcns-leads
 REGION=us-east4
 JOB=bcns-data-worker
 RUNTIME="bcns-data-worker@${PROJECT}.iam.gserviceaccount.com"
 ALT_SECRET_NAME=SHOPIFY_ALT_CLIENT_SECRET
-CLI_VERSION="4.8.0"
 
 # -n: never forward this script's stdin to the remote (see w3-oauth-wizard.sh dssh).
 dssh() { ssh -n -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$DROPLET_SSH" "$@"; }
@@ -276,95 +282,87 @@ dssh() { ssh -n -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$DROPLET_S
 dssh_stdin() { ssh -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$DROPLET_SSH" "$@"; }
 hub_pid() { dssh 'systemctl show -p MainPID --value bcns-app@connect' | tr -d '[:space:]'; }
 
-# Hub on bcns-data but worker not: an SB connect in that window mints a token the
-# worker cannot refresh. Any exit between stage 2 and the end of stage 3 says so.
+# Hub on the new ALT pair but worker on the old one: an SB connect in that window
+# mints a token the worker cannot refresh. Any exit between the two says so.
 HUB_SET=0; WORKER_SET=0
 on_exit() {
   (( HUB_SET == 1 && WORKER_SET == 0 )) || return 0
-  printf '\n%s⚠ THE HUB HAS THE ALT VARS BUT THE WORKER DOES NOT%s\n' "$RED" "$RESET"
-  printf '  Re-run this wizard, or roll the hub back before SB connects:\n\n'
-  printf '    ssh -i %s %s '\''sed -i "/^SHOPIFY_ALT_/d" /srv/connect/env && sudo -n systemctl restart bcns-app@connect'\''\n\n' \
-    "${SSH_KEY:-$HOME/.ssh/id_ed25519_bcns}" "${DROPLET_SSH:-<droplet>}"
+  printf '\n%s⚠ THE HUB HAS THE NEW ALT VARS BUT THE WORKER DOES NOT%s\n' "$RED" "$RESET"
+  printf '  Re-run this script before SB connects. Do NOT connect SB until it finishes.\n\n'
 }
 trap on_exit EXIT
 
-[[ -f apps/connect/shopify.app.bcns-data.toml ]] || {
-  warn "run this from ~/bcns (apps/connect/shopify.app.bcns-data.toml not found here)."; exit 1; }
-
-banner "SB Shopify bridge — connect saunaboy-2 through bcns-data"
+banner "SB Shopify bridge — connect fa8a00-11 through bcns-data-2"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
-stage "Deploy the bcns-data app config (8 scopes, hub redirect)" 5
-say "bcns-data-4 has 7 scopes and no hub redirect. This cuts bcns-data-5 from"
-say "apps/connect/shopify.app.bcns-data.toml. bcns Connect is not touched."
-warn "Always pass --config: without it the CLI deploys shopify.app.toml (bcns Connect)."
-say "Run this in ANOTHER terminal, from ~/bcns:"
-printf '\n    %spnpm dlx @shopify/cli@%s app deploy --path apps/connect --config bcns-data%s\n\n' "$BOLD" "$CLI_VERSION" "$RESET"
-step "Sign in as the bcns Partner org when the CLI asks."
-step "Check the app it names is bcns-data (client id ${ALT_CLIENT_ID}), not bcns Connect."
-step "Read the diff: the only changes should be +read_shopify_payments_accounts,"
-step "  the redirect set to ${HUB}/api/oauth/shopify/callback, and application_url."
-step "Confirm the release."
-pause "Deployed? Press Enter to read it back."
-open_url "https://dev.shopify.com/dashboard/235106100/apps/422420021249/versions"
-step "The newest version is Active and lists 8 scopes and the hub redirect."
-while :; do
-  ask ALT_VERSION "Active version name (e.g. bcns-data-5):"
-  [[ "${ALT_VERSION}" =~ ^bcns-data-[0-9]+$ && "${ALT_VERSION}" != "bcns-data-4" ]] && break
-  warn "got $(printf '%q' "${ALT_VERSION}") — type the Active name, e.g. bcns-data-5 (bcns-data-4 means the deploy did not release)."
-done
-say "active: ${ALT_VERSION}"
-pause
-
-# ── 2 ─────────────────────────────────────────────────────────────────────
-stage "Hub — add the three ALT vars and restart" 5
+stage "Hub — replace the three ALT vars and restart" 6
 ask DROPLET_SSH "Droplet ssh target [root@146.190.138.141]:"
 DROPLET_SSH="${DROPLET_SSH:-root@146.190.138.141}"
 ask SSH_KEY "Private key for it [~/.ssh/id_ed25519_bcns]:"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519_bcns}"
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
+write_env DROPLET_SSH "$DROPLET_SSH"; write_env SSH_KEY "$SSH_KEY"
 [[ -f "$SSH_KEY" ]] || { warn "no such key: $SSH_KEY"; exit 1; }
 WHO="$(dssh 'id -un' 2>/dev/null | tr -d '[:space:]' || true)"
 [[ -n "$WHO" ]] || { warn "ssh ${DROPLET_SSH} with ${SSH_KEY} failed."; exit 1; }
 say "ssh ok, logged in as: ${WHO}"
-say "Env keys on the droplet now (names only):"
-dssh 'grep -oE "^[A-Z_]+=" /srv/connect/env | tr -d "="' || { warn "could not read /srv/connect/env"; exit 1; }
+say "ALT keys on the droplet now (names; SHOP and CLIENT_ID values are public):"
+dssh 'grep -E "^SHOPIFY_ALT_(SHOP|CLIENT_ID)=" /srv/connect/env; grep -oE "^SHOPIFY_ALT_CLIENT_SECRET=" /srv/connect/env' || note "(none)"
 echo
-open_url "https://dev.shopify.com/dashboard/235106100/apps/422420021249/settings"
-step "bcns-data → Settings → Client secret: use the COPY button."
+open_url "https://dev.shopify.com/dashboard/235106100/apps/${ALT_APP_ID}/settings"
+step "bcns-data-2 (NOT bcns-data) → Settings → Client secret: use the COPY button."
 warn "Do not click Show. Nothing reads the secret but this prompt; it is not echoed or saved."
-ask_secret ALT_SECRET "Paste the bcns-data client secret:"
+ALT_SECRET=""
+read -rsp "  ${BOLD}Paste the bcns-data-2 client secret:${RESET} " ALT_SECRET || _stdin_died
+printf '\n'
+pbcopy </dev/null 2>/dev/null || true   # clear the clipboard copy of the secret
+ALT_SECRET="${ALT_SECRET//[[:space:]]/}" # worker envStr does not trim
 [[ -n "$ALT_SECRET" ]] || { warn "the secret is required."; exit 1; }
 [[ "$ALT_SECRET" == shpss_* ]] || warn "that does not start with shpss_ — check you copied the secret."
 
-PID_BEFORE="$(hub_pid)"
+PID_BEFORE="$(hub_pid || true)"
 say "hub pid before: ${PID_BEFORE:-none}"
-confirm "Write SHOPIFY_ALT_SHOP / _CLIENT_ID / _CLIENT_SECRET to /srv/connect/env and restart the hub?" \
+confirm "Replace SHOPIFY_ALT_SHOP / _CLIENT_ID / _CLIENT_SECRET in /srv/connect/env and restart the hub?" \
   || { say "nothing changed."; exit 0; }
-# Idempotent: drop any earlier ALT lines, then append all three. The secret rides stdin.
-HUB_SET=1   # set before the write: a half-finished write still needs the rollback hint
+HUB_SET=1
+# Stage stdin first (an ssh drop leaves env untouched), keep the FIRST backup only,
+# then build env.tmp = env minus old ALT lines + new three, and swap atomically.
+# The secret rides stdin.
 printf 'SHOPIFY_ALT_SHOP=%s\nSHOPIFY_ALT_CLIENT_ID=%s\nSHOPIFY_ALT_CLIENT_SECRET=%s\n' \
   "$ALT_SHOP" "$ALT_CLIENT_ID" "$ALT_SECRET" |
-  dssh_stdin 'sed -i "/^SHOPIFY_ALT_/d" /srv/connect/env && cat >> /srv/connect/env \
-    && sudo -n systemctl restart bcns-app@connect && sleep 2 && systemctl is-active bcns-app@connect'
-PID_AFTER="$(hub_pid)"
+  dssh_stdin 'set -e; umask 077; cd /srv/connect
+    cat > env.new
+    [ "$(grep -c "^SHOPIFY_ALT_" env.new)" = 3 ] || { echo "staged file incomplete, env untouched" >&2; rm -f env.new; exit 1; }
+    [ -e env.bak-sb-rotate ] || cp -p env env.bak-sb-rotate
+    { grep -v "^SHOPIFY_ALT_" env || true; } > env.tmp
+    [ -z "$(tail -c1 env.tmp)" ] || echo >> env.tmp
+    cat env.new >> env.tmp
+    chown --reference=env env.tmp; chmod --reference=env env.tmp
+    mv env.tmp env; rm -f env.new
+    sudo -n systemctl restart bcns-app@connect; sleep 2; systemctl is-active bcns-app@connect'
+PID_AFTER="$(hub_pid || true)"
 say "hub pid after:  ${PID_AFTER:-none}"
 if [[ -z "$PID_AFTER" || "$PID_AFTER" == 0 || "$PID_AFTER" == "$PID_BEFORE" ]]; then
   warn "no NEW pid — the hub did not restart onto the new env. Stopping."; exit 1
 fi
-say "ALT vars in the RUNNING process (names only):"
-dssh "tr '\\0' '\\n' < /proc/${PID_AFTER}/environ | grep -oE '^SHOPIFY_ALT_[A-Z_]+='" || warn "none found"
-note "expected: SHOPIFY_ALT_SHOP=, SHOPIFY_ALT_CLIENT_ID=, SHOPIFY_ALT_CLIENT_SECRET="
+say "ALT vars in the RUNNING process (SHOP/CLIENT_ID values, secret name only):"
+RUNNING_ENV="$(dssh "tr '\\0' '\\n' < /proc/${PID_AFTER}/environ | grep -E '^SHOPIFY_ALT_(SHOP|CLIENT_ID)=' ; tr '\\0' '\\n' < /proc/${PID_AFTER}/environ | grep -oE '^SHOPIFY_ALT_CLIENT_SECRET=' ; true")"
+printf '%s\n' "$RUNNING_ENV" | sed 's/^/    /'
+for want in "SHOPIFY_ALT_SHOP=${ALT_SHOP}" "SHOPIFY_ALT_CLIENT_ID=${ALT_CLIENT_ID}" "SHOPIFY_ALT_CLIENT_SECRET="; do
+  grep -qxF "$want" <<<"$RUNNING_ENV" || { warn "running hub is missing: ${want}  — stopping before the worker."; exit 1; }
+done
+say "${GREEN}✓ all three ALT vars live on the hub${RESET}"
+note "first-run env kept at /srv/connect/env.bak-sb-rotate (holds the previous secret — delete once SB syncs)."
 pause
 
-# ── 3 ─────────────────────────────────────────────────────────────────────
-stage "Worker — the same three vars on the Cloud Run job" 4
+# ── 2 ─────────────────────────────────────────────────────────────────────
+stage "Worker — new secret version + the two public vars" 4
 command -v gcloud >/dev/null 2>&1 || { warn "gcloud is not installed."; exit 1; }
 note "account: $(gcloud config get-value account 2>/dev/null || echo '(none)')"
 gcloud run jobs describe "$JOB" --project "$PROJECT" --region "$REGION" --format='value(metadata.name)' >/dev/null || {
-  warn "gcloud cannot read ${JOB} — see platform/scripts/shopify-worker-creds.sh stage 1 for the fixes."; exit 1; }
-confirm "Store ${ALT_SECRET_NAME} in Secret Manager and attach the three vars to ${JOB}?" \
-  || { warn "worker unchanged — a bcns-data token will fail to refresh within the hour."; exit 1; }
+  warn "gcloud cannot read ${JOB} (try: gcloud auth login)."; exit 1; }
+confirm "Add a new ${ALT_SECRET_NAME} version and point ${JOB} at bcns-data-2?" \
+  || { warn "worker unchanged — do NOT connect SB until this runs."; exit 1; }
 if gcloud secrets describe "$ALT_SECRET_NAME" --project "$PROJECT" >/dev/null 2>&1; then
   printf '%s' "$ALT_SECRET" | gcloud secrets versions add "$ALT_SECRET_NAME" --project "$PROJECT" --data-file=- >/dev/null
   note "added a new version of ${ALT_SECRET_NAME}."
@@ -376,7 +374,7 @@ fi
 unset ALT_SECRET
 gcloud secrets add-iam-policy-binding "$ALT_SECRET_NAME" --project "$PROJECT" \
   --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor >/dev/null
-# --update-* merges; --set-* would wipe the job's other env.
+# --update-* merges; --set-* would wipe the job's other env. :latest picks up the new version.
 gcloud run jobs update "$JOB" --project "$PROJECT" --region "$REGION" \
   --update-env-vars "SHOPIFY_ALT_SHOP=${ALT_SHOP},SHOPIFY_ALT_CLIENT_ID=${ALT_CLIENT_ID}" \
   --update-secrets "${ALT_SECRET_NAME}=${ALT_SECRET_NAME}:latest" >/dev/null
@@ -387,20 +385,18 @@ WORKER_SET=1
 note "deploy-worker.yml only swaps the image, so these survive the next deploy."
 pause
 
-# ── 4 ─────────────────────────────────────────────────────────────────────
-stage "Connect saunaboy-2" 6
-say "Before you click: Declan grants your saunaboy-2 collaborator account"
-say "'Apps and channels → Manage and install apps and channels'."
-step "Sign in at ${HUB} (your owner login for tenant sb)."
-step "On the Shopify card enter ${ALT_SHOP} and press Connect. Or open directly:"
-printf '\n    %s%s/api/oauth/shopify/start?shop=%s%s\n\n' "$BOLD" "$HUB" "$ALT_SHOP" "$RESET"
-step "Shopify shows bcns-data's consent screen with 8 scopes. Approve."
-step "You land on ${HUB}/?connected=shopify. The card fills on the next worker tick."
-note "fallback: add Declan as owner (platform/scripts/add-member.ts --slug sb --owner) and he clicks."
-note "on connect-failed, watch: ssh -i ${SSH_KEY} ${DROPLET_SSH} 'journalctl -u bcns-app@connect -f -n 0'"
-if confirm "Open the start URL now?"; then open_url "${HUB}/api/oauth/shopify/start?shop=${ALT_SHOP}"; fi
+# ── 3 ─────────────────────────────────────────────────────────────────────
+stage "Connect SB" 5
+say "A custom app must be installed from its install link first: the hub's Connect"
+say "alone shows 'The installation link for this app is invalid' until it is."
+step "Sign in at ${HUB} as an sb owner, enter ${ALT_SHOP} on the Shopify card, press Connect."
+step "Within 15 minutes, in the same browser: Partners → bcns-data-2 → Distribution → open the install link."
+open_url "https://partners.shopify.com/5179321/apps/${ALT_APP_ID}/distribution"
+step "The grant says 'exclusive to your store'. Install. You land on ${HUB}/?connected=shopify."
+note "already installed: Connect alone completes (an installed app auto-approves)."
+note "on connect-failed: ssh -i ${SSH_KEY} ${DROPLET_SSH} 'journalctl -u bcns-app@connect --since \"10 min ago\" | grep -i reject'"
 pause "Connected? Press Enter."
 
 finish
-say "SB is on bcns-data. config.app = bcns-data marks it; the worker refreshes by that marker."
-say "Retirement order is in the PR body: hub ALT vars off → SB reconnects → Declan uninstalls → worker ALT vars off → delete code."
+say "SB is on bcns-data-2. The card fills on the next worker tick (≤ 10 min)."
+say "Retirement order: hub ALT vars off → SB reconnects on bcns Connect → uninstall bcns-data-2 → worker ALT vars off → delete sb-bridge code."
