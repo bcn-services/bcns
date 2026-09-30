@@ -44,6 +44,16 @@ export interface HubConfig {
    */
   shopifyAppHandle?: string;
   /**
+   * Partner API access for the paid-period check (lib/shopify-oauth.ts,
+   * paidThrough): a Partner API client token with "Manage apps" only (server-only
+   * secret), the Partner organization id, and the app's `gid://shopify/App/<n>`.
+   * Any of the three unset = no Partner call; a reinstall inside a paid period
+   * lands on Shopify's plan page, as before.
+   */
+  shopifyPartnerApiToken?: string;
+  shopifyPartnerOrgId?: string;
+  shopifyAppGid?: string;
+  /**
    * Edge Function URL for `shopify-shop-redact` (docs/architecture/retention-30d-shop-redact.md).
    * Unset, unreachable, timed out, or a non-2xx response = gdprRoute falls back to the operator
    * email exactly as before — this is an upgrade path, not a hard dependency.
@@ -82,6 +92,9 @@ export function getConfig(): HubConfig {
       .filter(Boolean),
     hubBaseUrl: (readEnv("HUB_BASE_URL") ?? HUB_BASE_URL).replace(/\/+$/, ""),
     shopifyAppHandle: readEnv("SHOPIFY_APP_HANDLE"),
+    shopifyPartnerApiToken: readEnv("SHOPIFY_PARTNER_API_TOKEN"),
+    shopifyPartnerOrgId: readEnv("SHOPIFY_PARTNER_ORG_ID"),
+    shopifyAppGid: readEnv("SHOPIFY_APP_GID"),
     shopRedactFunctionUrl: readEnv("SHOP_REDACT_FUNCTION_URL"),
 
     // sb-bridge: remove after SB migrates to bcns Connect

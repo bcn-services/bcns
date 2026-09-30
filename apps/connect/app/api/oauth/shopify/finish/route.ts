@@ -13,8 +13,10 @@
  * install-initiated path (clientId === INSTALL_CLIENT_ID); every one of those on
  * the public app is checked for an ACTIVE subscription, with the merchant's own
  * fresh token, before anything is written. An existing paying client has one and
- * passes; a first install, a reinstall (Shopify cancels the subscription on
- * uninstall) and a not-yet-approved charge all land on Shopify's plan page. A
+ * passes; a first install, a lapsed plan and a not-yet-approved charge all land
+ * on Shopify's plan page. A reinstall inside a period already paid for (Shopify
+ * cancels the subscription on uninstall but offers nothing to approve until the
+ * period ends) is let through by the Partner API check, when configured. A
  * tenant already bound to a DIFFERENT shop is refused before that, so it is never
  * offered a charge for a shop the write would refuse (BCNS7). The
  * bridge app (SB, `app === ALT_APP`) and any tenant-bound (hub-initiated) pending
@@ -88,7 +90,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!opened.ok) return opened.reason === "expired" ? expired("expired") : fail(opened.reason);
   const { pending } = opened;
 
-  const gated = await managedPricingRedirect({ api: session.api, pending, appHandle: config.shopifyAppHandle, fail });
+  const gated = await managedPricingRedirect({
+    api: session.api,
+    pending,
+    appHandle: config.shopifyAppHandle,
+    partner: { token: config.shopifyPartnerApiToken, orgId: config.shopifyPartnerOrgId, appGid: config.shopifyAppGid },
+    fail,
+  });
   if (gated) return gated;
 
   // p_refresh_secret and p_expires_at are what make the connection renewable

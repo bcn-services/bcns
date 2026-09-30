@@ -425,6 +425,126 @@ export async function hasActiveSubscription(
   return active ? { active: true } : { active: false, reason: "none_active" };
 }
 
+/**
+ * The shop's `gid://shopify/Shop/<n>`, which paidThrough below needs. Its own
+ * request, asked only after a `none_active`, so a field-level error on `shop`
+ * can never turn a paying client's ACTIVE check into a failure. Null on any
+ * failure or on anything that is not a Shop GID; never throws.
+ */
+export async function shopGid(shop: string, accessToken: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  try {
+    const response = await fetchImpl(`https://${shop}/admin/api/${ADMIN_API_VERSION}/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+      body: JSON.stringify({ query: "query{shop{id}}" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json().catch(() => null)) as { data?: { shop?: { id?: unknown } }; errors?: unknown[] } | null;
+    if (!body || (Array.isArray(body.errors) && body.errors.length)) return null;
+    const id = body.data?.shop?.id;
+    return typeof id === "string" && /^gid:\/\/shopify\/Shop\/\d+$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Partner API version for paidThrough below. Endpoint, header and version per
+ * shopify.dev/docs/api/partner; the query per
+ * shopify.dev/docs/apps/launch/billing/shopify-app-pricing.
+ */
+const PARTNER_API_VERSION = "2026-07";
+
+const PAID_THROUGH_QUERY =
+  "query($appId:ID!,$shopId:ID!){activeSubscription(appId:$appId,shopId:$shopId){trialEndsAt currentBillingCycle{endTime}}}";
+
+/** An ISO timestamp with an explicit zone; Date.parse reads a zone-less one as local time. */
+const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/** A Partner API client with "Manage apps" only, the Partner org id, and the app's `gid://shopify/App/<n>`. */
+export interface PartnerConfig {
+  token: string;
+  orgId: string;
+  appGid: string;
+}
+
+export type PaidThroughResult =
+  | { paid: true; until: string }
+  | {
+      paid: false;
+      reason:
+        | `http_${number}`
+        | "graphql_error"
+        | "malformed"
+        | "no_subscription"
+        | "bad_end_time"
+        | "period_ended"
+        | "timeout"
+        | "network_error";
+    };
+
+/**
+ * Whether a shop with no ACTIVE subscription is still inside a period it has
+ * already paid for. An uninstall moves the subscription to CANCELLED and
+ * `activeSubscriptions` above then filters it out, but Shopify keeps treating
+ * the store as paid until the billing cycle ends and its plan page offers
+ * nothing to approve — so a reinstall sent there loops. The Partner API's
+ * `activeSubscription` is Shopify's named check: it keeps returning the
+ * subscription until `currentBillingCycle.endTime`, and null once there is none.
+ *
+ * Fails closed: anything but a subscription whose `endTime` parses and is still
+ * in the future is "not paid". The reason codes exist so the log says which
+ * assumption was wrong (the bare HTTP status tells a bad token from a bad org
+ * id). Never throws, and never returns Shopify's message text or the token;
+ * `until` is our own ISO rendering of the parsed time. `redirect: "error"`: the
+ * token is org-wide and rides in a custom header, so it never follows a
+ * redirect anywhere (fetch rejects, which is `network_error`).
+ *
+ * A merchant still in a free trial has no `currentBillingCycle` (Shopify
+ * documents it as null during a trial), so `trialEndsAt` stands in for it.
+ */
+export async function paidThrough(
+  shopGid: string,
+  partner: PartnerConfig,
+  fetchImpl: typeof fetch = fetch,
+  now: number = Date.now()
+): Promise<PaidThroughResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(
+      `https://partners.shopify.com/${encodeURIComponent(partner.orgId)}/api/${PARTNER_API_VERSION}/graphql.json`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": partner.token },
+        body: JSON.stringify({ query: PAID_THROUGH_QUERY, variables: { appId: partner.appGid, shopId: shopGid } }),
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(5_000),
+      }
+    );
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    return { paid: false, reason: timedOut ? "timeout" : "network_error" };
+  }
+  if (!response.ok) return { paid: false, reason: `http_${response.status}` };
+  const body = (await response.json().catch(() => null)) as
+    | {
+        data?: { activeSubscription?: { trialEndsAt?: unknown; currentBillingCycle?: { endTime?: unknown } | null } | null };
+        errors?: unknown[];
+      }
+    | null;
+  if (!body || (Array.isArray(body.errors) && body.errors.length)) return { paid: false, reason: "graphql_error" };
+  const subscription = body.data?.activeSubscription;
+  if (subscription === null) return { paid: false, reason: "no_subscription" };
+  if (typeof subscription !== "object") return { paid: false, reason: "malformed" };
+  const endTime = subscription.currentBillingCycle?.endTime ?? subscription.trialEndsAt;
+  const end = typeof endTime === "string" && ISO_WITH_ZONE.test(endTime) ? Date.parse(endTime) : NaN;
+  if (Number.isNaN(end)) return { paid: false, reason: "bad_end_time" };
+  return end > now ? { paid: true, until: new Date(end).toISOString() } : { paid: false, reason: "period_ended" };
+}
+
 export const UNINSTALL_WEBHOOK_PATH = "/api/webhooks/shopify/app-uninstalled";
 
 const UNINSTALL_WEBHOOK_MUTATION =
@@ -526,7 +646,8 @@ export function planSelectionUrl(shop: string, appHandle: string, storeHandle: s
  * cancels the subscription on uninstall; our source row stays) and a second
  * shop through without ever seeing the plan page (App Store rule 1.2.2). An
  * existing paying client has an ACTIVE subscription, so the check passes them
- * straight to the write anyway. Pure and exhaustively unit-testable — every
+ * straight to the write anyway (and a reinstall inside a period already paid
+ * for is let through by paidThrough, see managedPricingRedirect). Pure and exhaustively unit-testable — every
  * other branch in this decision already lives in this file for the same reason.
  */
 export function managedPricingGate(pending: { clientId: string; app?: string }): boolean {
@@ -652,7 +773,7 @@ export function openPending(
  * returns whatever it gets back). `null` means "proceed to the write"; anything
  * else is what the route should return instead.
  *
- * Three steps, in this order, each for a reason:
+ * Four steps, in this order, each for a reason:
  *
  *  1. Shop mismatch (api.shopify_shop_mismatch, one boolean about the caller's
  *     own tenant). A tenant already bound to a DIFFERENT shop is refused here,
@@ -668,7 +789,14 @@ export function openPending(
  *     over a blip breaks a live, paying connection within the hour. A definitive
  *     answer (none_active, graphql_error, malformed) is not retried, and a second
  *     transient failure still fails closed to the plan page.
- *  3. The plan-page redirect. SHOPIFY_APP_HANDLE is only needed to build that
+ *  3. Only on a definitive `none_active`, and only with all three Partner values
+ *     set: shopGid (a second Admin call), then paidThrough. A store uninstalled
+ *     and reinstalled inside a period it already paid for has no ACTIVE
+ *     subscription, yet Shopify's plan page has nothing for it to approve — so
+ *     it writes instead of looping there. Neither is asked after an ACTIVE
+ *     answer or a failed check, and every failure of either is the plan page,
+ *     as before.
+ *  4. The plan-page redirect. SHOPIFY_APP_HANDLE is only needed to build that
  *     URL, so it is only required here: an existing client's "Open app" click
  *     with an active subscription must not fail on an unset handle.
  *
@@ -692,9 +820,12 @@ export async function managedPricingRedirect(params: {
   pending: PendingConnection;
   appHandle: string | undefined;
   fail: (code: string, hubError?: string) => NextResponse;
+  /** Optional as a whole and per field: any of the three unset = no Partner call. */
+  partner?: Partial<PartnerConfig>;
   fetchImpl?: typeof fetch;
+  now?: number;
 }): Promise<NextResponse | null> {
-  const { api, pending, appHandle, fail, fetchImpl = fetch } = params;
+  const { api, pending, appHandle, fail, fetchImpl = fetch, now = Date.now() } = params;
 
   if (!managedPricingGate(pending)) return null;
 
@@ -711,8 +842,23 @@ export async function managedPricingRedirect(params: {
   // branch that carries `.reason`, for the log line below.
   if (subscriptionOutcome(checked) === "write" || checked.active) return null;
 
+  let why: string = checked.reason;
+  if (checked.reason === "none_active") {
+    const { token, orgId, appGid } = params.partner ?? {};
+    if (!token || !orgId || !appGid) why += "; partner: unconfigured";
+    else {
+      const gid = await shopGid(pending.shop, pending.accessToken, fetchImpl);
+      const paid = gid ? await paidThrough(gid, { token, orgId, appGid }, fetchImpl, now) : null;
+      if (paid?.paid) {
+        console.info(`[connect] shopify finish paid through ${paid.until} shop=${pending.shop}`);
+        return null;
+      }
+      why += `; partner: ${paid ? paid.reason : "no_shop_id"}`;
+    }
+  }
+
   if (!appHandle) return fail("plan_handle_unconfigured");
-  console.warn(`[connect] shopify finish sent to Shopify's plan page (${checked.reason}) shop=${pending.shop}`);
+  console.warn(`[connect] shopify finish sent to Shopify's plan page (${why}) shop=${pending.shop}`);
   const toPlan = NextResponse.redirect(planSelectionUrl(pending.shop, appHandle, pending.storeHandle));
   toPlan.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
   toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
