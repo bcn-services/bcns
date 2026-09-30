@@ -24,6 +24,7 @@ import {
   PENDING_TTL_MS,
   openPending,
   planSelectionUrl,
+  registerUninstallWebhook,
   sealPending,
   signState,
   storeHandleFromHost,
@@ -392,6 +393,50 @@ test("hasActiveSubscription: the GraphQL query drops the unused `test` field and
   const body = JSON.parse(seen.body);
   assert.match(body.query, /activeSubscriptions\{id name status\}/);
   assert.doesNotMatch(body.query, /\btest\b/);
+});
+
+test("registerUninstallWebhook: subscribes the shop to APP_UNINSTALLED at the hub's route, with the merchant's token, uncached", async () => {
+  let url, init;
+  const result = await registerUninstallWebhook(SHOP, "shpat_x", HUB, async (u, i) => {
+    url = u;
+    init = i;
+    return new Response(JSON.stringify({ data: { webhookSubscriptionCreate: { userErrors: [] } } }), { status: 200 });
+  });
+  assert.deepEqual(result, { ok: true });
+  assert.match(url, new RegExp(`^https://${SHOP}/admin/api/[0-9-]+/graphql\\.json$`));
+  assert.equal(init.headers["X-Shopify-Access-Token"], "shpat_x");
+  assert.equal(init.cache, "no-store");
+  const body = JSON.parse(init.body);
+  assert.match(body.query, /webhookSubscriptionCreate\(topic:\$topic,webhookSubscription:\$sub\)/);
+  assert.deepEqual(body.variables, { topic: "APP_UNINSTALLED", sub: { uri: `${HUB}/api/webhooks/shopify/app-uninstalled` } });
+});
+
+test("registerUninstallWebhook: a repeat registration is success; a real userError and every transport failure are not, and none throws", async () => {
+  const withBody = (body, status = 200) => async () => new Response(JSON.stringify(body), { status });
+  const userErrors = (...messages) => ({ data: { webhookSubscriptionCreate: { userErrors: messages.map((message) => ({ field: ["webhookSubscription", "uri"], message })) } } });
+  const run = (fetchImpl) => registerUninstallWebhook(SHOP, "shpat_x", HUB, fetchImpl);
+  assert.deepEqual(await run(withBody(userErrors("Address for this topic has already been taken"))), { ok: true });
+  assert.deepEqual(await run(withBody(userErrors("Address is not allowed"))), { ok: false, reason: "user_error" });
+  assert.deepEqual(await run(withBody(userErrors("Address for this topic has already been taken", "Address is not allowed"))), { ok: false, reason: "user_error" });
+  assert.deepEqual(await run(withBody({}, 401)), { ok: false, reason: "http_error" });
+  assert.deepEqual(await run(withBody({ errors: [{ message: "boom" }] })), { ok: false, reason: "graphql_error" });
+  assert.deepEqual(await run(withBody({ data: {} })), { ok: false, reason: "malformed" });
+  assert.deepEqual(await run(async () => { throw new DOMException("timed out", "TimeoutError"); }), { ok: false, reason: "timeout" });
+  assert.deepEqual(await run(async () => { throw new Error("ECONNRESET shpat_x"); }), { ok: false, reason: "network_error" });
+});
+
+test("finish route wiring: the uninstall webhook is registered after the write, public app only, and a failure only warns", async () => {
+  const { readFileSync } = await import("node:fs");
+  const route = readFileSync(new URL("../app/api/oauth/shopify/finish/route.ts", import.meta.url), "utf8");
+  const write = route.indexOf('rpc("connect_source"');
+  const register = route.indexOf("registerUninstallWebhook(pending.shop");
+  const done = route.indexOf("?connected=shopify");
+  assert.ok(write > 0 && register > write && done > register, "register after the connect_source write and before the success redirect");
+  assert.match(route, /if \(pending\.app !== ALT_APP\) \{\s+const registered = await registerUninstallWebhook\(/, "the bridge app must not be subscribed");
+  // A failed registration warns with the reason and shop, and never returns fail() (the token is already stored).
+  const block = route.slice(register, done);
+  assert.match(block, /if \(!registered\.ok\) \{\s+console\.warn\(`[^`]*\$\{registered\.reason\}[^`]*shop=\$\{pending\.shop\}`\);\s+\}/);
+  assert.doesNotMatch(block, /fail\(|accessToken\}|refreshToken/);
 });
 
 test("callback: a network failure during exchange redirects generically, deletes the state cookie, and logs only the error name and shop", async () => {
