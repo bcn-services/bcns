@@ -14,7 +14,9 @@
  * the public app is checked for an ACTIVE subscription, with the merchant's own
  * fresh token, before anything is written. An existing paying client has one and
  * passes; a first install, a reinstall (Shopify cancels the subscription on
- * uninstall) and a not-yet-approved charge all land on Shopify's plan page. The
+ * uninstall) and a not-yet-approved charge all land on Shopify's plan page. A
+ * tenant already bound to a DIFFERENT shop is refused before that, so it is never
+ * offered a charge for a shop the write would refuse (BCNS7). The
  * bridge app (SB, `app === ALT_APP`) and any tenant-bound (hub-initiated) pending
  * are never gated — untouched, no network call, straight to the RPC as before.
  * The whole decision is lib/shopify-oauth.ts's `managedPricingRedirect`,
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!opened.ok) return fail(opened.reason);
   const { pending } = opened;
 
-  const gated = await managedPricingRedirect({ pending, appHandle: config.shopifyAppHandle, fail });
+  const gated = await managedPricingRedirect({ api: session.api, pending, appHandle: config.shopifyAppHandle, fail });
   if (gated) return gated;
 
   // p_refresh_secret and p_expires_at are what make the connection renewable

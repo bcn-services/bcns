@@ -576,37 +576,69 @@ export function openPending(
  * returns whatever it gets back). `null` means "proceed to the write"; anything
  * else is what the route should return instead.
  *
- * No database read: whether the tenant already has a Shopify source no longer
- * matters (see managedPricingGate). A tenant installing a DIFFERENT shop is
- * refused by the write itself (BCNS7, finishErrorCode) — after this check, so
- * such an install can be shown the plan page before it is refused; no api view
- * exposes the tenant's current shop to check it any earlier.
+ * Three steps, in this order, each for a reason:
  *
- * `fail` is the route's own fail() closure (builds the generic error redirect
- * and clears the pending cookie) — passed in rather than duplicated here, and
- * trivially fakeable in a test.
+ *  1. Shop mismatch (api.shopify_shop_mismatch, one boolean about the caller's
+ *     own tenant). A tenant already bound to a DIFFERENT shop is refused here,
+ *     before it can be shown a plan page and approve a charge for a shop the
+ *     write would then refuse (BCNS7 — data.attach_source stays the authority).
+ *     A failed read is the generic error page: falling through could charge and
+ *     then refuse, and skipping to the write would skip the subscription check.
+ *     Whether the tenant has the SAME shop already changes nothing (see
+ *     managedPricingGate).
+ *  2. The subscription check, retried once when the failure is transient.
+ *     /callback has already exchanged the code, and that new grant killed the
+ *     refresh token stored for an existing client — so dropping this fresh token
+ *     over a blip breaks a live, paying connection within the hour. A definitive
+ *     answer (none_active, graphql_error, malformed) is not retried, and a second
+ *     transient failure still fails closed to the plan page.
+ *  3. The plan-page redirect. SHOPIFY_APP_HANDLE is only needed to build that
+ *     URL, so it is only required here: an existing client's "Open app" click
+ *     with an active subscription must not fail on an unset handle.
+ *
+ * `fail` is the route's own fail() closure (builds the error redirect and clears
+ * the pending cookie) — passed in rather than duplicated here, and trivially
+ * fakeable in a test.
  */
+/** Failures of the subscription check that say nothing about the subscription itself. */
+const TRANSIENT_CHECK_FAILURES: ReadonlySet<string> = new Set(["timeout", "network_error", "http_error"]);
+
+/** The one RPC the gate makes; structural so a test can fake it without a Supabase client. */
+export interface ShopMismatchApi {
+  rpc(
+    fn: "shopify_shop_mismatch",
+    args: { p_shop: string }
+  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+}
+
 export async function managedPricingRedirect(params: {
+  api: ShopMismatchApi;
   pending: PendingConnection;
   appHandle: string | undefined;
-  fail: (code: string) => NextResponse;
+  fail: (code: string, hubError?: string) => NextResponse;
   fetchImpl?: typeof fetch;
 }): Promise<NextResponse | null> {
-  const { pending, appHandle, fail, fetchImpl = fetch } = params;
+  const { api, pending, appHandle, fail, fetchImpl = fetch } = params;
 
   if (!managedPricingGate(pending)) return null;
-  if (!appHandle) return fail("plan_handle_unconfigured");
 
-  const checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
-  // subscriptionOutcome is the pure "write vs plan_page" decision; the
-  // `!checked.active` re-check exists only so TS narrows `checked` to the
-  // branch that carries `.reason`, for the log line below.
-  if (subscriptionOutcome(checked) === "plan_page" && !checked.active) {
-    console.warn(`[connect] shopify finish sent to Shopify's plan page (${checked.reason}) shop=${pending.shop}`);
-    const toPlan = NextResponse.redirect(planSelectionUrl(pending.shop, appHandle, pending.storeHandle));
-    toPlan.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
-    toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
-    return toPlan;
+  const mismatch = await api.rpc("shopify_shop_mismatch", { p_shop: pending.shop });
+  if (mismatch.error || typeof mismatch.data !== "boolean") return fail("shop_check");
+  if (mismatch.data) return fail("shop_mismatch", "shop-mismatch");
+
+  let checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
+  if (!checked.active && TRANSIENT_CHECK_FAILURES.has(checked.reason)) {
+    checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
   }
-  return null;
+  // subscriptionOutcome is the pure "write vs plan_page" decision; the
+  // `checked.active` re-check exists only so TS narrows `checked` to the
+  // branch that carries `.reason`, for the log line below.
+  if (subscriptionOutcome(checked) === "write" || checked.active) return null;
+
+  if (!appHandle) return fail("plan_handle_unconfigured");
+  console.warn(`[connect] shopify finish sent to Shopify's plan page (${checked.reason}) shop=${pending.shop}`);
+  const toPlan = NextResponse.redirect(planSelectionUrl(pending.shop, appHandle, pending.storeHandle));
+  toPlan.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
+  toPlan.cookies.delete({ name: "shopify_oauth_state", path: "/api/oauth/shopify" });
+  return toPlan;
 }
