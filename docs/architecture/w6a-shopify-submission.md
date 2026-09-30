@@ -70,8 +70,17 @@ admin through the same install-initiated path (no tenant in the state) — a gat
 $200 plan page. `/finish` does not try to tell them apart either: it queries Admin
 GraphQL `currentAppInstallation.activeSubscriptions` with the merchant's own fresh
 token on every install-initiated finish. An existing client with an `ACTIVE`
-subscription passes straight through to the write; a lapsed one (or a reinstall after
-an uninstall) lands on the plan page like a first install. Before that check, a tenant
+subscription passes straight through to the write; a lapsed one lands on the plan page
+like a first install. A reinstall after an uninstall depends on the billing period:
+the uninstall moves the subscription to `CANCELLED`, which `activeSubscriptions`
+filters out, but Shopify still treats the store as paid until the period ends and its
+plan page offers nothing to approve. So on `none_active` (only then) `/finish` asks
+the Partner API `activeSubscription(appId:, shopId:)` (`paidThrough`): **inside the
+paid period the store reconnects; after it, the plan page.** That check needs
+`SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID` and `SHOPIFY_APP_GID`
+(`apps/connect/DEPLOY.md`); with any unset, or on any failure of the Partner call, it
+fails closed to the plan page. A reviewer who reinstalls inside the paid period
+therefore sees no charge screen — Shopify's own design. Before the subscription check, a tenant
 already bound to a *different* shop is refused with `?error=shop-mismatch`
 (`api.shopify_shop_mismatch`, one boolean about the caller's own tenant) so it is never
 offered a charge for a shop `data.attach_source` would then refuse (BCNS7, still the

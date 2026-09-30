@@ -32,6 +32,19 @@ Connect differs from a client app in exactly two ways:
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://cnsxbglhredokjbvudfd.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | platform anon key (Supabase `get_publishable_keys`) |
 | `RESEND_API_KEY` | optional — "Request connection" emails |
+| `SHOPIFY_PARTNER_API_TOKEN` | optional, **secret** — Partner API client token, "Manage apps" only (Partner dashboard → Settings → Partner API clients). Set it on the droplet by hand; never paste it into chat or a commit |
+| `SHOPIFY_PARTNER_ORG_ID` | optional — Partner organization id (`5179321` per `docs/architecture/w6a-shopify-submission.md`; confirm against the Partner dashboard URL) |
+| `SHOPIFY_APP_GID` | optional — `gid://shopify/App/425274376193` (app id per the `shopify.app.toml` header; confirm) |
+
+The three `SHOPIFY_PARTNER_*` / `SHOPIFY_APP_GID` vars work only as a set: with
+any one unset the hub makes no Partner API call, and a store that reinstalls
+inside a billing period it already paid for is sent to Shopify's plan page (which
+offers it nothing to approve). With all three set, that reinstall reconnects, and
+the log says `shopify finish paid through <date>`; a refusal logs
+`(none_active; partner: <reason>)`. The reason is a fixed code: `unconfigured`,
+`no_shop_id`, `http_<status>` (a bad token or org id), `graphql_error` (most likely
+the app GID or a missing permission), `malformed`, `no_subscription`,
+`bad_end_time`, `period_ended`, `timeout` or `network_error`.
 
 **Never** `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL` in this file. The hub
 has no code path that reads either, and the service-role key would defeat the
