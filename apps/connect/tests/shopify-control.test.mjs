@@ -10,6 +10,7 @@ test("valid ?shop= and no error: hidden-input form; Reconnect when a row exists"
 });
 test("error or invalid shop falls through", () => {
   assert.equal(shopifyControl({ status: "none" }, SHOP, "connect-failed", "h").kind, "install");
+  assert.equal(shopifyControl({ status: "none" }, SHOP, "connect-expired", "h").kind, "install");
   assert.equal(shopifyControl({ status: "never_ran" }, "evil.com", undefined, "h").kind, "reconnect-in-shopify");
 });
 test("stored row: reconnect in Shopify; no row: install link or plain text", () => {

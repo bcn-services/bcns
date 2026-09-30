@@ -96,8 +96,8 @@ test("the state cookie lives exactly as long as the state", () => {
 
 test("the hub posts Connect for Meta and Monday, and keeps Shopify's GET", () => {
   const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /method="POST"/);
-  assert.match(page, /method="GET"/);
+  assert.match(page, /<form action=\{connectPath\(config, card\.source\)!\} method="POST"/);
+  assert.match(page, /<form action=\{action\} method="GET"/);
 });
 
 /* ------------------------------------------------------- end of /callback */
