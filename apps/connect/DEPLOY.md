@@ -46,6 +46,11 @@ the log says `shopify finish paid through <date>`; a refusal logs
 the app GID or a missing permission), `malformed`, `no_subscription`,
 `bad_end_time`, `period_ended`, `timeout` or `network_error`.
 
+The token's backup is the macOS keychain item `bcns-shopify-partner-api-token`
+(`security find-generic-password -s bcns-shopify-partner-api-token -w`). To re-set
+it, put that value back on the `SHOPIFY_PARTNER_API_TOKEN=` line and restart
+`bcns-app@connect`.
+
 **Never** `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL` in this file. The hub
 has no code path that reads either, and the service-role key would defeat the
 RLS that is the entire tenant boundary.
