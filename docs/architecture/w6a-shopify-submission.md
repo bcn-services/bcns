@@ -80,9 +80,9 @@ plan page offers nothing to approve. So on a definitive `none_active` (only then
 `/finish` asks the Partner API `activeSubscription(appId:, shopId:)` (`paidThrough`):
 **inside the paid period the store reconnects; after it, the plan page.** A free trial
 is not a paid period: `trialEndsAt` is ignored (#84), and the code assumes a trial has
-a null `currentBillingCycle` (`shopify-oauth.ts:505-508`, "Shopify documents ...", per
-Shopify docs, not confirmed against a live Partner API trial response), so a reinstall
-during a trial goes to the plan page. That check needs
+a null `currentBillingCycle` (`shopify-oauth.ts:505-508`; the test helper at
+`shopify-install.test.mjs:751` says Shopify documents this), not confirmed against a
+live Partner API trial response, so a reinstall during a trial goes to the plan page. That check needs
 `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID` and `SHOPIFY_APP_GID`
 (`apps/connect/DEPLOY.md`); with any unset, or on any failure of the Partner call, it
 fails closed to the plan page. A reviewer who reinstalls inside the paid period,
@@ -130,8 +130,14 @@ has nothing to approve. With the three Partner values
 set, `/finish` sees the future `currentBillingCycle.endTime` and connects the store;
 the hub logs `shopify finish paid through <ISO>`. With any of them unset, or once
 the period has ended, the store lands on the plan page instead. This is Shopify's
-own behaviour (per Shopify docs and staff posts, and the owner's observation of the plan page; not
-reproduced in this repo), not a hub shortcut (`managedPricingRedirect`,
+own behaviour, not a hub shortcut: observed in a live check on the dev store
+bcns-data-dev on 2026-09-30 (after uninstall and reinstall, the plan page showed the
+plan as "Current", "Subscription expires October 25, 2026", with no select or approve
+control, and a Partner API call the same day still returned the cancelled subscription
+with `currentBillingCycle` ending 2026-10-25T02:38:50Z), and consistent with Shopify
+staff forum posts (community.shopify.dev/t/33979 and /t/36547: an uninstall cancels the
+subscription at once and the merchant keeps access to the end of the paid cycle). Not
+stated in an official Shopify doc page we have found (`managedPricingRedirect`,
 `apps/connect/lib/shopify-oauth.ts:848-860`).
 
 **Known limitation: access after period end.** Nothing ends access when a paid
@@ -251,7 +257,7 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 |---|---|---|
 | `customers/data_request` | `/api/webhooks/shopify/customers-data-request` | Recorded, the operator is emailed with a 30-day deadline, 200 returned. |
 | `customers/redact` | `/api/webhooks/shopify/customers-redact` | Recorded, the operator is emailed with a 30-day deadline to erase that customer's rows, 200 returned. |
-| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Automated (shipped): the hub forwards the HMAC-verified request to the `shopify-shop-redact` Edge Function, which re-verifies the HMAC, queues a `data.privacy_requests` row, and returns 200. The worker then deletes that client's `source = 'shopify'` rows (`platform/worker/src/privacy.ts`, `apps/connect/lib/shopify-webhooks.ts:24-35`; `docs/architecture/retention-30d-shop-redact.md`). If the forward fails, the operator is emailed with a 48-hour deadline and erases by hand. The worker hands a request to the operator instead of deleting for the bridge shop, an ambiguous match, or a token not confirmed dead. |
+| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Automated (shipped): the hub forwards the HMAC-verified request to the `shopify-shop-redact` Edge Function, which re-verifies the HMAC, queues a `data.privacy_requests` row, and returns 200. The worker then deletes that client's `source = 'shopify'` rows (`platform/worker/src/privacy.ts`, `apps/connect/lib/shopify-webhooks.ts:24-35`; `docs/architecture/retention-30d-shop-redact.md`). A request still pending after 3 failed attempts or 24 hours is escalated to the operator (`privacy.ts:138-153`). If the forward fails, the operator is emailed with a 48-hour deadline and erases by hand. The worker hands a request to the operator instead of deleting for the bridge shop, an ambiguous match, or a token not confirmed dead. |
 
 ---
 

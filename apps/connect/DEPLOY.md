@@ -52,8 +52,8 @@ the app GID or a missing permission), `malformed`, `no_subscription`,
 `bcns-data` app's. A reinstall during a free trial is deliberately not covered:
 a trial means nothing was paid, and `trialEndsAt` is ignored, so it goes to the plan
 page. The logged reason is `bad_end_time` if the Partner API returns the trial
-subscription (its `currentBillingCycle` is expected to be null, per Shopify docs; not
-confirmed against a live Partner API trial response), or `no_subscription` if it returns
+subscription (its `currentBillingCycle` is expected to be null, per the code's assumption (the
+test comment cites Shopify documentation); not confirmed live), or `no_subscription` if it returns
 none.
 The check costs a reinstall two extra calls (the
 shop's id from the Admin API, then the Partner API), 5 s timeout each; a client
