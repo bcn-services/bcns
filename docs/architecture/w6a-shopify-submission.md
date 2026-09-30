@@ -277,23 +277,26 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 ## 6. Reviewer instructions (paste into "Testing instructions")
 
 > bcns Connect is not embedded. After you approve the install, the app opens at
-> connect.bcn-services.com in the same tab.
+> connect.bcn-services.com in the same tab. Use your own development or test store.
 >
-> 1. Install bcns Connect on the development store **bcns-data-dev.myshopify.com** (or your own
->    test store) from the listing and approve the read-only permissions.
-> 2. Shopify redirects you to bcns. When it asks you to sign in, use:
+> 1. Install bcns Connect on your store from the listing and approve the read-only permissions.
+> 2. Shopify redirects you to the bcns Connect sign-in page. Sign in with:
 >    Email: `TODO(Nate): reviewer email` · Password: `TODO(Nate): reviewer password`.
 >    This account owns a test workspace set up for review.
-> 3. After sign-in you land on **Sources**. A green banner reads "shopify is connected. The first
->    pull starts within the hour." The Shopify card lists the store as a source.
-> 4. Within the hour the Shopify card shows a "Last success" time. Click **Your data** in the
->    top bar to see that store's orders, customers and products. It has
->    search, a date filter and CSV export, and the top of the page shows the last 30 days of
->    orders and revenue.
-> 5. To test the privacy webhooks, uninstall the app from the store admin. `shop/redact` is
->    acknowledged with HTTP 200.
+> 3. Shopify then shows the $200/month plan page. On a development store it reads "Free to
+>    test". Approve the plan.
+> 4. You land on connect.bcn-services.com, on **Sources**. A green banner reads "shopify is
+>    connected", and the Shopify card lists your store as a source.
+> 5. To test uninstall and the privacy webhooks, uninstall the app from the Shopify admin.
+>    Shopify sends `app/uninstalled`, and bcns revokes the stored token and stops syncing
+>    within seconds. About 48 hours later Shopify sends `shop/redact`, which deletes the
+>    store's data from bcns.
 >
-> The app only reads data. It never changes products, orders or customers.
+> The review account holds one Shopify store at a time. If you install on a second store while
+> the first is still connected, the app refuses and asks you to uninstall from the first store.
+>
+> The app only reads data. It never changes products, orders or customers. For help, write to
+> nseluga@bcn-services.com or see https://bcn-services.com.
 
 **TODO(Nate): before submitting, create the reviewer account.** It needs its own client
 (tenant). Never use SB or any real client. Give it one **owner** member (`platform/scripts/onboard.ts`,
