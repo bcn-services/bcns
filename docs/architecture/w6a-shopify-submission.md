@@ -88,6 +88,16 @@ only when `host` was absent. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded an
 provably unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on
 the return trip is never trusted — only the query result is.
 
+**Uninstall.** After the write, `/finish` subscribes that one shop to `app/uninstalled`
+(`registerUninstallWebhook`, Admin GraphQL `webhookSubscriptionCreate` with the
+merchant's token). It is shop-specific, not a `[[webhooks.subscriptions]]` entry in
+`shopify.app.toml`: `shopify app deploy` refuses app-wide subscriptions while
+`use_legacy_install_flow = true`. The webhook revokes the shop's token and disables its
+schedule (`/api/webhooks/shopify/app-uninstalled` → `shopify-shop-redact` →
+`api.record_app_uninstalled`). A failed registration only warns; the gate above does not
+depend on it, and the next connect registers again. A shop connected before this shipped
+has no subscription until its next connect.
+
 **Needs one live check before Submit (step 3 below).** The unit tests cover every branch
 that runs without a database. The sign-in round trip and the RPC write only run on the
 live hub.

@@ -116,6 +116,7 @@ export async function gdprRoute(request: Request, topic: GdprTopic, deps: GdprRo
  * app/uninstalled (App Store rule 1.2.2). Same checks as gdprRoute — secret,
  * freshness, HMAC over the raw bytes — then the Edge Function revokes the shop's
  * token and disables its schedule; the hub itself has no credential that could.
+ * Shopify only calls this for a shop /finish subscribed (registerUninstallWebhook).
  *
  * Unlike the privacy webhooks this does NOT swallow a failed forward: there is
  * no operator-email fallback that would do the revoke, so a non-2xx is the

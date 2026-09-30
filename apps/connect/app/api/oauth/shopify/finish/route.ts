@@ -27,6 +27,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/env";
 import { currentMembership, requireOwner } from "@/lib/session";
 import {
+  ALT_APP,
   FINISH_PATH,
   PENDING_COOKIE,
   SHOPIFY_DEFAULTS,
@@ -34,6 +35,7 @@ import {
   finishErrorCode,
   managedPricingRedirect,
   openPending,
+  registerUninstallWebhook,
   scheduleConfig,
 } from "@/lib/shopify-oauth";
 import { oauthEnabled } from "@/lib/oauth-config";
@@ -92,6 +94,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   });
   // `error.message` can echo a parameter value, and one of them is the token.
   if (error) return fail(`write_failed:${error.code ?? "rpc"}`, finishErrorCode(error));
+
+  // After the write, so only a shop this tenant now holds is subscribed, and
+  // never blocking it: the token is already stored, and rule 1.2.2 does not
+  // depend on this webhook (the gate above checks the subscription on every
+  // install). A failure only delays the revoke; the next connect registers again.
+  // Public app only — the revoke ignores bridge-app rows.
+  if (pending.app !== ALT_APP) {
+    const registered = await registerUninstallWebhook(pending.shop, pending.accessToken, hub);
+    if (!registered.ok) {
+      console.warn(`[connect] shopify uninstall webhook not registered (${registered.reason}) shop=${pending.shop}`);
+    } else {
+      console.info(`[connect] shopify uninstall webhook registered shop=${pending.shop}`);
+    }
+  }
 
   const done = NextResponse.redirect(`${hub}/?connected=shopify`);
   done.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });

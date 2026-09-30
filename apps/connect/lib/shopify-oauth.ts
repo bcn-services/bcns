@@ -425,6 +425,62 @@ export async function hasActiveSubscription(
   return active ? { active: true } : { active: false, reason: "none_active" };
 }
 
+export const UNINSTALL_WEBHOOK_PATH = "/api/webhooks/shopify/app-uninstalled";
+
+const UNINSTALL_WEBHOOK_MUTATION =
+  "mutation($topic:WebhookSubscriptionTopic!,$sub:WebhookSubscriptionInput!){" +
+  "webhookSubscriptionCreate(topic:$topic,webhookSubscription:$sub){userErrors{field message}}}";
+
+export type UninstallWebhookResult =
+  | { ok: true }
+  | { ok: false; reason: "http_error" | "graphql_error" | "malformed" | "user_error" | "timeout" | "network_error" };
+
+/**
+ * Subscribes ONE shop to app/uninstalled, with the merchant's own token. It is
+ * shop-specific because Shopify refuses an app-wide `[[webhooks.subscriptions]]`
+ * in shopify.app.toml while `use_legacy_install_flow = true`, which this app
+ * needs (the hub drives OAuth itself). The subscription dies with the install,
+ * so every connect registers it again.
+ *
+ * Shopify answers a repeat registration (same topic and address) with a
+ * userError saying the address "has already been taken"; that is success.
+ * Never throws, and never returns Shopify's message text.
+ */
+export async function registerUninstallWebhook(
+  shop: string,
+  accessToken: string,
+  hubBaseUrl: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<UninstallWebhookResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://${shop}/admin/api/${ADMIN_API_VERSION}/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+      body: JSON.stringify({
+        query: UNINSTALL_WEBHOOK_MUTATION,
+        variables: { topic: "APP_UNINSTALLED", sub: { uri: `${hubBaseUrl}${UNINSTALL_WEBHOOK_PATH}` } },
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    return { ok: false, reason: timedOut ? "timeout" : "network_error" };
+  }
+  if (!response.ok) return { ok: false, reason: "http_error" };
+  const body = (await response.json().catch(() => null)) as
+    | { data?: { webhookSubscriptionCreate?: { userErrors?: unknown } }; errors?: unknown[] }
+    | null;
+  if (!body || (Array.isArray(body.errors) && body.errors.length)) return { ok: false, reason: "graphql_error" };
+  const userErrors = body.data?.webhookSubscriptionCreate?.userErrors;
+  if (!Array.isArray(userErrors)) return { ok: false, reason: "malformed" };
+  const real = userErrors.filter(
+    (e) => !/address.*already been taken/i.test(String((e as { message?: unknown })?.message ?? ""))
+  );
+  return real.length ? { ok: false, reason: "user_error" } : { ok: true };
+}
+
 /**
  * Decodes Shopify's `host` query param — base64url of
  * `admin.shopify.com/store/<handle>` — into the store's admin handle.
