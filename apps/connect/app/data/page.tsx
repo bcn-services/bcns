@@ -9,7 +9,7 @@ import {
   buttonVariants,
   cn,
 } from "@bcn-services/ui";
-import { requireHub } from "@/lib/session";
+import { loadClient, requireHub } from "@/lib/session";
 import { composeSources, type HealthRow } from "@/lib/sources";
 import { DATA_VIEWS, composeDataPage, findView, viewsFor } from "@/lib/data-views";
 import { PAGE_SIZE, dataHref, fetchCounts30, fetchLast30, fetchMeta30, fetchPage, parseParams, toDataApi } from "@/lib/data-query";
@@ -45,6 +45,7 @@ function EmptyState({ title, message }: { title: string; message?: string }) {
 
 export default async function DataPage({ searchParams }: { searchParams: SearchParams }) {
   const { api: schema } = await requireHub();
+  const timezone = (await loadClient())?.timezone ?? undefined;
   const api = toDataApi(schema);
 
   const now = new Date();
@@ -56,7 +57,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const cards = composeSources((health.data as HealthRow[] | null) ?? []);
   const wanted = first(searchParams.source);
   // composeDataPage (lib/data-views.ts) decides the tabs, what to fetch, notices and empty copy.
-  const plan = composeDataPage(cards, { wanted });
+  const plan = composeDataPage(cards, { wanted, timezone });
   // Sources with stored rows to show: connected ones, plus auth_failed ones (rows survive a broken token).
   const connected = plan.dataCards;
   const connectedSources = connected.map((c) => c.source);
@@ -102,6 +103,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   // Second pass now the row count is known: an empty unfiltered first page changes the copy.
   const view = composeDataPage(cards, {
     wanted,
+    timezone,
     activeEmpty: Boolean(result && !result.error && result.count === 0 && !filtered && params.page === 1),
   });
 

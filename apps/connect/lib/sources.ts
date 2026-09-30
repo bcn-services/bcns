@@ -120,6 +120,8 @@ export interface ClientRow {
   slug?: string | null;
   /** Added by 20260916000100_clients_app_url.sql. Absent on an older database. */
   app_url?: string | null;
+  /** clients.timezone (IANA); the owner confirms it equals the store's (DESIGN.md U2). */
+  timezone?: string | null;
 }
 
 /**

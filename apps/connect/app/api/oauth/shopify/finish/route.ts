@@ -29,11 +29,13 @@ import { currentMembership, requireOwner } from "@/lib/session";
 import {
   ALT_APP,
   FINISH_PATH,
+  LAST_SHOP_COOKIE,
   PENDING_COOKIE,
   SHOPIFY_DEFAULTS,
   SHOPIFY_TOKEN_KIND,
   finishErrorCode,
   managedPricingRedirect,
+  normalizeShop,
   openPending,
   registerUninstallWebhook,
   scheduleConfig,
@@ -58,12 +60,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     console.warn(`[connect] shopify finish rejected (${code})`);
     const response = NextResponse.redirect(`${hub}/?error=${hubError}`);
     response.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
+    // Kept only for the expiry page's "Start again"; any other outcome ends the flow.
+    if (hubError !== "connect-expired") response.cookies.delete({ name: LAST_SHOP_COOKIE, path: "/api/oauth/shopify" });
     return response;
   };
 
   if (!oauthEnabled(config, "shopify")) return fail("unavailable");
   const sealed = request.cookies.get(PENDING_COOKIE)?.value;
-  if (!sealed) return fail("no_pending");
+  // The cookie is gone after its 15 minutes (or the browser dropped it): say so,
+  // and carry the shop from the companion cookie so the page can offer "start again".
+  const expired = (code: string) => {
+    const shop = normalizeShop(request.cookies.get(LAST_SHOP_COOKIE)?.value);
+    const response = fail(code, "connect-expired");
+    if (shop) response.headers.set("location", `${hub}/?error=connect-expired&shop=${encodeURIComponent(shop)}`);
+    return response;
+  };
+  if (!sealed) return expired("no_pending");
 
   // Keep the cookie and come back here after sign-in.
   if (!(await currentMembership())) {
@@ -73,7 +85,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const session = await requireOwner("/");
 
   const opened = openPending(sealed, config.shopifyClientSecret!, session.membership.clientId);
-  if (!opened.ok) return fail(opened.reason);
+  if (!opened.ok) return opened.reason === "expired" ? expired("expired") : fail(opened.reason);
   const { pending } = opened;
 
   const gated = await managedPricingRedirect({ api: session.api, pending, appHandle: config.shopifyAppHandle, fail });
@@ -111,5 +123,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const done = NextResponse.redirect(`${hub}/?connected=shopify`);
   done.cookies.delete({ name: PENDING_COOKIE, path: "/api/oauth/shopify" });
+  done.cookies.delete({ name: LAST_SHOP_COOKIE, path: "/api/oauth/shopify" });
   return done;
 }

@@ -28,6 +28,8 @@ import { requireOwner } from "@/lib/session";
 import {
   FINISH_PATH,
   INSTALL_CLIENT_ID,
+  LAST_SHOP_COOKIE,
+  LAST_SHOP_TTL_MS,
   PENDING_COOKIE,
   PENDING_TTL_MS,
   SHOPIFY_TOKEN_PATH,
@@ -177,5 +179,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     path: "/api/oauth/shopify",
     maxAge: PENDING_TTL_MS / 1000,
   });
+  if (!app) {
+    done.cookies.set(LAST_SHOP_COOKIE, shop, {
+      httpOnly: true,
+      secure: hub.startsWith("https://"),
+      sameSite: "lax",
+      path: "/api/oauth/shopify",
+      maxAge: LAST_SHOP_TTL_MS / 1000,
+    });
+  }
   return done;
 }

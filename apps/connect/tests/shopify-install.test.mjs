@@ -499,7 +499,36 @@ test("finish: Next's RSC self-fetch after sign-in does nothing", async () => {
 test("finish: no hand-off cookie is a failure, not a write", async () => {
   const { GET } = await import("../app/api/oauth/shopify/finish/route.ts");
   const res = await GET(new NextRequest(`${HUB}${FINISH_PATH}`));
-  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
+  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-expired`);
+});
+
+test("finish: an expired hand-off says so and carries the shop for one-click start again; billing/tenant gates untouched", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/finish/route.ts");
+  // Cookie gone (browser dropped it after 15 min), companion shop cookie still there.
+  let res = await GET(new NextRequest(`${HUB}${FINISH_PATH}`, { headers: { cookie: `shopify_last_shop=${SHOP}` } }));
+  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-expired&shop=${SHOP}`);
+  // Cookie present but past its exp (needs a session to get that far; signed out it goes to /login as before).
+  // No companion cookie, or a junk one: expired error with no shop, never an unvalidated value.
+  res = await GET(new NextRequest(`${HUB}${FINISH_PATH}`, { headers: { cookie: `shopify_last_shop=evil.example.com/x` } }));
+  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-expired`);
+  const { reopenAppUrl } = await import("../lib/shopify-oauth.ts");
+  assert.equal(reopenAppUrl(SHOP, APP_HANDLE), `https://${SHOP}/admin/apps/${APP_HANDLE}`);
+  assert.equal(reopenAppUrl("evil.example.com", APP_HANDLE), null);
+  assert.equal(reopenAppUrl(SHOP, undefined), null);
+});
+
+test("callback: the public app sets the non-secret shop companion cookie, the bridge app does not", async () => {
+  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
+  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
+  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, host: INSTALL_HOST, timestamp: "1700000000" }), SECRET);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = tokenExchangeOnly();
+  try {
+    const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
+    assert.equal(res.cookies.get("shopify_last_shop")?.value, SHOP);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test("finish: signed out keeps the hand-off and sends the merchant to sign in, then back", async () => {
