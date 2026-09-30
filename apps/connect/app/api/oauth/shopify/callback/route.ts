@@ -15,8 +15,8 @@
  *
  * Managed pricing (W6a follow-up) is NOT gated here. `middleware.ts` sends both
  * a first-time install AND an existing client's "Open app" click through this
- * same install-initiated path, and only /finish knows whether this tenant
- * already has a Shopify source — see finish/route.ts's own step list.
+ * same install-initiated path, and /finish checks the subscription for every
+ * one of them once an owner is signed in — see finish/route.ts's header.
  *
  * Nothing before step 6 touches the network and nothing here touches the
  * database, so a forged callback costs an HMAC comparison and a redirect.

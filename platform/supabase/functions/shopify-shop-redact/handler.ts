@@ -96,7 +96,11 @@ export async function handle(request: Request, secret: string | undefined, deps:
 
   // The HMAC covers the body only, so a validly signed customers/redact body (which also carries
   // shop_domain) would pass it. The topic header is unsigned, so this stops misrouted deliveries,
-  // not a deliberate forger; the wall against that is the worker's dead-token guard.
+  // not a deliberate forger. The worker's dead-token guard (privacy.ts) is no longer a wall on
+  // its own: a replayed signed app/uninstalled body can now make a live token non-active, which
+  // is half of that guard. Deleting a shop's data by replay therefore needs custody of two
+  // Shopify-signed bodies for the same shop (an app/uninstalled and a shop/redact) and still has
+  // to get past the guard's 24h clause. Accepted risk.
   const topic = request.headers.get("X-Shopify-Topic");
   if (topic !== "shop/redact" && topic !== "app/uninstalled") {
     deps.log("shop_redact_rejected", { reason: "wrong_topic" });
