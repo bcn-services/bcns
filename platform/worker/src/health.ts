@@ -12,6 +12,7 @@ export async function computeHealth(_t: Tick): Promise<number> {
        from data.connector_schedule s
        join data.clients c on c.id = s.client_id and c.status = 'active'
        left join data.source_tokens tk on (tk.client_id, tk.source) = (s.client_id, s.source)
+       where s.enabled and tk.status is distinct from 'revoked'
      ), last_run as (
        select distinct on (client_id, source) client_id, source, status, entity_rows
        from data.connector_runs where finished_at is not null and mode <> 'renormalize'

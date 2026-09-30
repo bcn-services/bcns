@@ -145,7 +145,7 @@ export default async function SourcesPage({
             <CardHeader className="flex-row items-start justify-between space-y-0 gap-3">
               <div>
                 <CardTitle>{card.title}</CardTitle>
-                <CardDescription>Last success: {when(card.lastSuccessAt, client?.timezone)}</CardDescription>
+                <CardDescription>{card.pending ? "First sync pending" : `Last success: ${when(card.lastSuccessAt, client?.timezone)}`}</CardDescription>
               </div>
               <Badge className={cn("shrink-0", TONE[card.tone])}>{card.label}</Badge>
             </CardHeader>

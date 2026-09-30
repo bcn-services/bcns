@@ -31,13 +31,16 @@ test("a source with no health row reads as Not connected", () => {
   assert.equal(shopify.lastSuccessAt, null);
 });
 
-test("never_ran is a row that exists but has not pulled: not yet connected, labeled Awaiting first pull", () => {
+test("never_ran (token active, schedule enabled, no run yet) is Connected with a pending first sync", () => {
   const cards = composeSources([
     { source: "meta", status: "never_ran", last_success_at: null, last_error: null },
   ]);
   const meta = cards.find((c) => c.source === "meta");
-  assert.equal(meta.connected, false);
-  assert.equal(meta.label, "Awaiting first pull");
+  assert.equal(meta.connected, true);
+  assert.equal(meta.pending, true);
+  assert.equal(meta.tone, "ok");
+  assert.equal(meta.status, "never_ran");
+  assert.equal(meta.label, "Connected");
 });
 
 test("auth_failed is not connected, so the card keeps its Connect form", () => {
@@ -120,4 +123,27 @@ test("egressLine reads as usage, and says so when the quota is blown", () => {
     "1.0 GB of 10.0 GB used this month"
   );
   assert.ok(egressLine({ bytes_used: 11, quota_bytes: 10, exceeded: true }).endsWith("quota exceeded"));
+});
+
+test("only never_ran is pending; auth_failed/error/stale/none/ok keep their connected flag and labels", () => {
+  const rows = ["ok", "stale", "auth_failed", "error", "never_ran"].map((status, i) => ({
+    source: HUB_SOURCES[i], status, last_success_at: null, last_error: null,
+  }));
+  const cards = composeSources(rows);
+  const by = Object.fromEntries(cards.map((c) => [c.status, c]));
+  const exp = { ok: [true, "Connected"], stale: [true, "Stale"], auth_failed: [false, "Reconnect needed"], error: [true, "Error"], never_ran: [true, "Connected"] };
+  for (const [s, [connected, label]] of Object.entries(exp)) {
+    assert.equal(by[s].connected, connected, s);
+    assert.equal(by[s].label, label, s);
+    assert.equal(by[s].pending, s === "never_ran", s);
+  }
+  const none = composeSources([]).find((c) => c.status === "none");
+  assert.deepEqual([none.connected, none.pending, none.label], [false, false, "Not connected"]);
+});
+
+test("page wiring: sub-line keys off card.pending; controls still gated on card.connected", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.ok(src.includes('card.pending ? "First sync pending"'));
+  assert.ok(src.includes("{card.connected ? null : connectPath("));
 });
