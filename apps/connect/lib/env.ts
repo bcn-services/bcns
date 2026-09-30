@@ -47,6 +47,9 @@ export interface HubConfig {
    * Edge Function URL for `shopify-shop-redact` (docs/architecture/retention-30d-shop-redact.md).
    * Unset, unreachable, timed out, or a non-2xx response = gdprRoute falls back to the operator
    * email exactly as before — this is an upgrade path, not a hard dependency.
+   *
+   * The same function also takes app/uninstalled (appUninstalledRoute), which has no
+   * email fallback: unset or failing there is a non-2xx, so Shopify retries.
    */
   shopRedactFunctionUrl?: string;
 

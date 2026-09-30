@@ -9,12 +9,15 @@
  *    shopify-hmac.ts) must agree with this app's verifyWebhookHmac on shared
  *    vectors — two independently-run checks that silently diverged would be
  *    worse than one, not better.
+ * 4. app/uninstalled (rule 1.2.2) forwards through the same function, but a
+ *    failed forward is a non-2xx: nothing else would do the revoke, so Shopify
+ *    must retry.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { verifyWebhookHmac } from "../lib/shopify-oauth.ts";
-import { gdprRoute } from "../lib/shopify-webhook-route.ts";
+import { appUninstalledRoute, gdprRoute } from "../lib/shopify-webhook-route.ts";
 // Zero-import, WebCrypto-only file — safe to pull in from here (see its own
 // header comment for why the reverse direction does not work).
 import { verifyShopifyHmac } from "../../../platform/supabase/functions/_shared/shopify-hmac.ts";
@@ -208,6 +211,79 @@ test("shop/redact: a bad HMAC 401s before any forward is attempted", async () =>
     };
     const res = await gdprRoute(new Request("http://x/api", { method: "POST", headers, body: BODY }), "shop/redact", { fetchImpl: fwd.fetchImpl });
     assert.equal(res.status, 401);
+    assert.equal(fwd.calls.length, 0);
+  });
+});
+
+/* ------------------------------------------------------- app/uninstalled */
+
+// Shopify's app/uninstalled payload is the Shop object: myshopify_domain, no shop_domain.
+const UNINSTALL_BODY = JSON.stringify({ id: 1, name: "Acme", domain: "acme.example", myshopify_domain: SHOP });
+
+function postUninstall(deps, overrides = {}) {
+  const headers = {
+    "X-Shopify-Hmac-Sha256": sign(UNINSTALL_BODY),
+    "X-Shopify-Webhook-Id": "wh-u1",
+    "X-Shopify-Triggered-At": new Date().toISOString(),
+    "X-Shopify-Topic": "app/uninstalled",
+    ...overrides,
+  };
+  return appUninstalledRoute(new Request("http://x/api", { method: "POST", headers, body: UNINSTALL_BODY }), deps);
+}
+
+const UNINSTALL_ENV = { SHOPIFY_CLIENT_SECRET: SECRET, SHOP_REDACT_FUNCTION_URL: FN_URL };
+
+test("app/uninstalled: a verified delivery is forwarded byte-for-byte with its topic and triggered-at, and returns 200", async () => {
+  await withEnv(UNINSTALL_ENV, async () => {
+    const fwd = recorder(new Response(null, { status: 200 }));
+    const triggeredAt = new Date().toISOString();
+    const res = await postUninstall({ fetchImpl: fwd.fetchImpl }, { "X-Shopify-Triggered-At": triggeredAt });
+    assert.equal(res.status, 200);
+    assert.equal(fwd.calls.length, 1);
+    const { url, init } = fwd.calls[0];
+    assert.equal(url, FN_URL);
+    assert.equal(init.body, UNINSTALL_BODY);
+    assert.equal(init.headers["X-Shopify-Hmac-Sha256"], sign(UNINSTALL_BODY));
+    assert.equal(init.headers["X-Shopify-Topic"], "app/uninstalled");
+    assert.equal(init.headers["X-Shopify-Triggered-At"], triggeredAt);
+  });
+});
+
+test("app/uninstalled: a bad HMAC 401s before any forward is attempted", async () => {
+  await withEnv(UNINSTALL_ENV, async () => {
+    const fwd = recorder(new Response(null, { status: 200 }));
+    const res = await postUninstall({ fetchImpl: fwd.fetchImpl }, { "X-Shopify-Hmac-Sha256": sign(UNINSTALL_BODY, "wrong") });
+    assert.equal(res.status, 401);
+    assert.equal(fwd.calls.length, 0);
+  });
+});
+
+test("app/uninstalled: a stale or missing X-Shopify-Triggered-At 401s before any forward", async () => {
+  await withEnv(UNINSTALL_ENV, async () => {
+    const fwd = recorder(new Response(null, { status: 200 }));
+    const stale = new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString(); // window is 72h
+    assert.equal((await postUninstall({ fetchImpl: fwd.fetchImpl }, { "X-Shopify-Triggered-At": stale })).status, 401);
+    assert.equal((await postUninstall({ fetchImpl: fwd.fetchImpl }, { "X-Shopify-Triggered-At": "" })).status, 401);
+    assert.equal(fwd.calls.length, 0);
+  });
+});
+
+test("app/uninstalled: no SHOPIFY_CLIENT_SECRET is a 401, never a forward", async () => {
+  await withEnv({ SHOPIFY_CLIENT_SECRET: "", SHOP_REDACT_FUNCTION_URL: FN_URL }, async () => {
+    const fwd = recorder(new Response(null, { status: 200 }));
+    assert.equal((await postUninstall({ fetchImpl: fwd.fetchImpl })).status, 401);
+    assert.equal(fwd.calls.length, 0);
+  });
+});
+
+test("app/uninstalled: a failed forward is a non-2xx so Shopify retries — non-2xx, network error, and URL unset", async () => {
+  await withEnv(UNINSTALL_ENV, async () => {
+    assert.equal((await postUninstall({ fetchImpl: recorder(new Response(null, { status: 500 })).fetchImpl })).status, 502);
+    assert.equal((await postUninstall({ fetchImpl: async () => { throw new Error("ECONNREFUSED"); } })).status, 502);
+  });
+  await withEnv({ SHOPIFY_CLIENT_SECRET: SECRET, SHOP_REDACT_FUNCTION_URL: "" }, async () => {
+    const fwd = recorder(new Response(null, { status: 200 }));
+    assert.equal((await postUninstall({ fetchImpl: fwd.fetchImpl })).status, 503);
     assert.equal(fwd.calls.length, 0);
   });
 });
