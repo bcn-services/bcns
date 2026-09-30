@@ -61,8 +61,10 @@ The delete calls now pass that path.
 
 **Managed-pricing follow-up (branch `shopify-managed-pricing`).** bcns Connect is
 public unlisted: hub-initiated connects stay billed off-platform (Stripe, no
-subscription check), but a Shopify-initiated install with no tenant yet needs an
-ACTIVE managed-pricing subscription before the shop is bound to one. **The gate lives
+subscription check), but every Shopify-initiated finish on the public app (a first
+install, a reinstall or an "Open app" click) needs an ACTIVE managed-pricing
+subscription before anything is written (`managedPricingGate`,
+`apps/connect/lib/shopify-oauth.ts:655`). **The gate lives
 in `finish/route.ts`, not `callback/route.ts`.** Root cause: `middleware.ts` sends
 both a first-time install AND an existing client's "Open app" click from the Shopify
 admin through the same install-initiated path (no tenant in the state) — a gate at
@@ -74,13 +76,19 @@ subscription passes straight through to the write; a lapsed one lands on the pla
 like a first install. A reinstall after an uninstall depends on the billing period:
 the uninstall moves the subscription to `CANCELLED`, which `activeSubscriptions`
 filters out, but Shopify still treats the store as paid until the period ends and its
-plan page offers nothing to approve. So on `none_active` (only then) `/finish` asks
-the Partner API `activeSubscription(appId:, shopId:)` (`paidThrough`): **inside the
-paid period the store reconnects; after it, the plan page.** That check needs
+plan page offers nothing to approve. So on a definitive `none_active` (only then)
+`/finish` asks the Partner API `activeSubscription(appId:, shopId:)` (`paidThrough`):
+**inside the paid period the store reconnects; after it, the plan page.** A free trial
+is not a paid period: `trialEndsAt` is ignored (#84), and the code assumes a trial has
+a null `currentBillingCycle` (`shopify-oauth.ts:505-508`; the test helper at
+`shopify-install.test.mjs:751` says Shopify documents this), not confirmed against a
+live Partner API trial response, so a reinstall during a trial goes to the plan page. That check needs
 `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID` and `SHOPIFY_APP_GID`
 (`apps/connect/DEPLOY.md`); with any unset, or on any failure of the Partner call, it
-fails closed to the plan page. A reviewer who reinstalls inside the paid period
-therefore sees no charge screen — Shopify's own design. Before the subscription check, a tenant
+fails closed to the plan page. A reviewer who reinstalls inside the paid period,
+with the three Partner values set, therefore sees no charge screen; with any unset
+they land on the plan page, which offers nothing to approve
+(`shopify-oauth.ts:849-851`). Before the subscription check, a tenant
 already bound to a *different* shop is refused with `?error=shop-mismatch`
 (`api.shopify_shop_mismatch`, one boolean about the caller's own tenant) so it is never
 offered a charge for a shop `data.attach_source` would then refuse (BCNS7, still the
@@ -93,7 +101,13 @@ RPC write, deleting both the pending and the state cookies. The plan-selection U
 built from `storeHandleFromHost` (the store's admin handle, decoded from Shopify's
 `host` query param — sealed into the pending cookie at `/callback`, since a shop's
 permanent domain is not reliably its admin handle) and falls back to the shop domain
-only when `host` was absent. The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is
+only when `host` was absent. Until the subscription is confirmed (ACTIVE, or paid
+through), nothing is written: no new token, no source row. For an EXISTING client
+this is not free: `/callback` has already exchanged the code, and per the comment at
+`shopify-oauth.ts:789-792` that new grant killed the refresh token stored from before,
+so a fresh token that is dropped "breaks a live, paying connection within the hour".
+A client sent to the plan page stays in that state until they approve a plan and
+reconnect (inference from that comment; not reproduced live). The bridge app (SB, `SHOPIFY_ALT_*`) is excluded and is
 provably unaffected (`apps/connect/tests/shopify-install.test.mjs`). `plan_handle` on
 the return trip is never trusted — only the query result is.
 
@@ -103,9 +117,32 @@ merchant's token). It is shop-specific, not a `[[webhooks.subscriptions]]` entry
 `shopify.app.toml`: `shopify app deploy` refuses app-wide subscriptions while
 `use_legacy_install_flow = true`. The webhook revokes the shop's token and disables its
 schedule (`/api/webhooks/shopify/app-uninstalled` → `shopify-shop-redact` →
-`api.record_app_uninstalled`). A failed registration only warns; the gate above does not
+`api.record_app_uninstalled`); the uninstall itself deletes no rows
+(`data.revoke_shopify_install`, `20260929000200_shopify_uninstall_shop_mismatch.sql`).
+A failed registration only warns; the gate above does not
 depend on it, and the next connect registers again. A shop connected before this shipped
 has no subscription until its next connect.
+
+**Reinstall inside a paid period.** A store that uninstalls and reinstalls before its
+paid billing period ends sees no charge screen. Shopify cancels the subscription on
+uninstall but keeps the store paid until the period ends, and its plan page then
+has nothing to approve. With the three Partner values
+set, `/finish` sees the future `currentBillingCycle.endTime` and connects the store;
+the hub logs `shopify finish paid through <ISO>`. With any of them unset, or once
+the period has ended, the store lands on the plan page instead. This is Shopify's
+own behaviour, not a hub shortcut: observed in a live check on the dev store
+bcns-data-dev on 2026-09-30 (after uninstall and reinstall, the plan page showed the
+plan as "Current", "Subscription expires October 25, 2026", with no select or approve
+control, and a Partner API call the same day still returned the cancelled subscription
+with `currentBillingCycle` ending 2026-10-25T02:38:50Z), and consistent with Shopify
+staff forum posts (community.shopify.dev/t/33979 and /t/36547: an uninstall cancels the
+subscription at once and the merchant keeps access to the end of the paid cycle). Not
+stated in an official Shopify doc page we have found (`managedPricingRedirect`,
+`apps/connect/lib/shopify-oauth.ts:848-860`).
+
+**Known limitation: access after period end.** Nothing ends access when a paid
+period ends. The end time is only logged (`apps/connect/lib/shopify-oauth.ts:855`),
+and no code revokes a store's access when the period runs out. Not built.
 
 **Needs one live check before Submit (step 3 below).** The unit tests cover every branch
 that runs without a database. The sign-in round trip and the RPC write only run on the
@@ -161,7 +198,8 @@ App Store installs. In practice: the app is **public unlisted**, hub-initiated c
 who installs straight from Shopify with no active plan is redirected to Shopify's
 managed-pricing plan-selection page (`$200/mo`, `shopify-managed-pricing` branch,
 §1) rather than being connected unbilled. Pick the listing-form pricing option that
-matches "managed pricing" with that plan. This supersedes the earlier plan to request
+matches "managed pricing" with that plan. A reinstall inside an already-paid period
+reconnects without a charge screen (§1). This supersedes the earlier plan to request
 off-platform billing approval under 1.2.1; the managed-pricing plan is the answer to
 that requirement.
 
@@ -219,7 +257,7 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 |---|---|---|
 | `customers/data_request` | `/api/webhooks/shopify/customers-data-request` | Recorded, the operator is emailed with a 30-day deadline, 200 returned. |
 | `customers/redact` | `/api/webhooks/shopify/customers-redact` | Recorded, the operator is emailed with a 30-day deadline to erase that customer's rows, 200 returned. |
-| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Recorded, the operator is emailed with a 48-hour deadline to erase the shop's data, 200 returned. Deletion is manual within that 48 hours — automating it needs a way to bind the request to a real shop that a caller without the webhook's HMAC secret can't forge; see `docs/architecture/retention-30d-shop-redact.md` for why the smallest automatic path doesn't clear that bar yet. |
+| `shop/redact` | `/api/webhooks/shopify/shop-redact` | Automated (shipped): the hub forwards the HMAC-verified request to the `shopify-shop-redact` Edge Function, which re-verifies the HMAC, queues a `data.privacy_requests` row, and returns 200. The worker then deletes that client's `source = 'shopify'` rows (`platform/worker/src/privacy.ts`, `apps/connect/lib/shopify-webhooks.ts:24-35`; `docs/architecture/retention-30d-shop-redact.md`). A request still pending after 3 failed attempts or 24 hours is escalated to the operator (`privacy.ts:138-153`). If the forward fails, the operator is emailed with a 48-hour deadline and erases by hand. The worker hands a request to the operator instead of deleting for the bridge shop, an ambiguous match, or a token not confirmed dead. |
 
 ---
 
@@ -292,7 +330,9 @@ Don't include the Access page unless §2's AI-tools check passes.
   listing is live, replace the field with a link to the listing.
 - **Opening the app from the Shopify admin runs OAuth again.** Shopify skips the
   consent screen for scopes already granted. `connect_source` updates the existing
-  token row, so the only effect is a fresh token.
+  token row, so the token is refreshed. `/finish` also re-checks the subscription
+  on every open (§1): a client with an ACTIVE subscription passes straight through,
+  and one with none (and no paid period left) lands on Shopify's plan page.
 
 ---
 
@@ -308,7 +348,7 @@ Don't include the Access page unless §2's AI-tools check passes.
    `hasActiveSubscription` checks for and what the plan-selection page (§1) offers.
 1c. **Deploy `shopify.app.toml` so the `handle` field takes effect.** This branch adds
    a top-level `handle = "bcns-connect"` to `shopify.app.toml` (confirmed valid against
-   shopify.dev's CLI app-configuration reference), which the callback route reads via
+   shopify.dev's CLI app-configuration reference), which `/finish` reads via
    `SHOPIFY_APP_HANDLE` to build the plan-selection redirect. Confirm `bcns-connect`
    matches the handle shown in the Partner dashboard, then run
    `pnpm dlx @shopify/cli app deploy --path apps/connect` and release the new version
@@ -317,31 +357,50 @@ Don't include the Access page unless §2's AI-tools check passes.
    `/srv/connect/env` (value: the confirmed handle, e.g. `bcns-connect`), then restart
    the connect service. Unset = a Shopify-initiated install with no active subscription
    fails closed to the hub's generic error page instead of Shopify's plan page.
+1e. **Set the three Partner values if reinstalls in a paid period should reconnect.**
+   `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID` and `SHOPIFY_APP_GID` go in
+   `/srv/connect/env` as a set (see `apps/connect/DEPLOY.md`). With any unset, such a
+   reinstall lands on the plan page, which has nothing to approve.
 2. **Fill in the TODOs above.** The privacy policy page is the one that blocks
    submission. Also: the support email, the retention statement, and the reviewer
    account (its own tenant plus one owner, with a dashboard link that loads).
 3. **Test the install on bcns-data-dev yourself, signed out of the hub, through both
    entry paths.** Uninstall bcns Connect from bcns-data-dev.
-   - **Shopify-initiated, with the plan active:** open a private window and install it
-     from the Partners "Test your app" link (or the dev store's app listing). You
-     should see the consent screen, then — since the dev store should have the $200/mo
-     plan active from step 1b — the bcns sign-in page with the Shopify message. Sign in
-     as the reviewer owner. You should land on `/?connected=shopify`.
+   - **Shopify-initiated, with the plan active:** the uninstall above cancelled the
+     plan, so this case means approving it again, or, inside the paid period with the
+     Partner values set, no charge screen. Open a private window and install it
+     from the Partners "Test your app" link (or the dev store's app listing). The
+     order is fixed, because the subscription check runs at `/finish`, after sign-in
+     (`shopify-oauth.ts:848-867`):
+     - Outside a paid period: consent screen, then the bcns sign-in page with the
+       Shopify message (sign in as the reviewer owner), then Shopify's plan page;
+       approve the $200/mo plan from step 1b, then reopen the app through the
+       in-admin app link (last bullet below), which reruns OAuth; you land on
+       `/?connected=shopify`.
+     - Inside a paid period, with `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID`
+       and `SHOPIFY_APP_GID` all set (`:848-860`): consent screen, sign-in, then
+       `/?connected=shopify` with no approval step. With any of the three unset, this
+       is the outside-a-paid-period path and ends on a plan page with nothing to approve.
    - **Shopify-initiated, with no plan active:** cancel/decline the dev store's
      subscription first, then repeat the install. You should land on Shopify's own
      plan-selection page (`admin.shopify.com/store/.../charges/bcns-connect/pricing_plans`),
-     never on the bcns sign-in page or `/?connected=shopify`.
+     never on the bcns sign-in page or `/?connected=shopify`. This holds only outside a
+     paid period: inside one, with the Partner values set, the install connects
+     instead (see "Reinstall inside a paid period", §1).
    - **Hub-initiated (unaffected path):** from the hub's own Connect button (signed in
      as the reviewer owner), connect the same store. This never touches Shopify's
      billing at all and should behave exactly as before this branch.
    - **Existing client "Open app" from the Shopify admin:** with the dev store already
-     connected (from the case above) and its plan cancelled, click the app from the
+     connected (from the case above) and its plan ACTIVE, click the app from the
      Shopify admin (not a fresh install). You should land in the hub connected, never
      on Shopify's plan page — this is the case a gate at `/callback` would have
-     gotten wrong.
+     gotten wrong. With the plan cancelled and no paid period left, the same click
+     lands on the plan page, by design.
    - **A new dev-store install with the plan cancelled:** uninstall, cancel/decline the
      subscription, then install fresh. You should land on the bcns sign-in page first,
-     and only after signing in does it redirect to Shopify's plan-selection page.
+     and only after signing in does it redirect to Shopify's plan-selection page. On a
+     store still inside a paid period, with the three Partner values set, the install
+     connects instead of reaching the plan page (see "Reinstall inside a paid period", §1).
    - **After approving the plan, Shopify's return must reopen the app through the
      in-admin app link (signed query), not `application_url` directly** — a bare
      `application_url` return has no `hmac`, hits the login wall, and never reaches

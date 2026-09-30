@@ -32,12 +32,14 @@ Connect differs from a client app in exactly two ways:
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://cnsxbglhredokjbvudfd.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | platform anon key (Supabase `get_publishable_keys`) |
 | `RESEND_API_KEY` | optional — "Request connection" emails |
+| `SHOPIFY_APP_HANDLE` | optional — the app's URL slug (`bcns-connect`, the top-level `handle` in `shopify.app.toml`); builds Shopify's plan-page URL. Unset, a Shopify-initiated install with no ACTIVE subscription ends on the hub's generic error page (`plan_handle_unconfigured`) instead of Shopify's plan page |
 | `SHOPIFY_PARTNER_API_TOKEN` | optional, **secret** — Partner API client token, "Manage apps" only (Partner dashboard → Settings → Partner API clients). Set it on the droplet by hand; never paste it into chat or a commit |
 | `SHOPIFY_PARTNER_ORG_ID` | optional — Partner organization id (`5179321` per `docs/architecture/w6a-shopify-submission.md`; confirm against the Partner dashboard URL) |
 | `SHOPIFY_APP_GID` | optional — `gid://shopify/App/425274376193` (app id per the `shopify.app.toml` header; confirm) |
 
 The three `SHOPIFY_PARTNER_*` / `SHOPIFY_APP_GID` vars work only as a set: with
-any one unset the hub makes no Partner API call, and a store that reinstalls
+any one unset the hub makes no Partner API call (it is asked only after a definitive
+`none_active`, never for an ACTIVE or failed check), and a store that reinstalls
 inside a billing period it already paid for is sent to Shopify's plan page (which
 offers it nothing to approve). With all three set, that reinstall reconnects, and
 the log says `shopify finish paid through <date>`; a refusal logs
@@ -48,10 +50,25 @@ the app GID or a missing permission), `malformed`, `no_subscription`,
 
 `SHOPIFY_APP_GID` must be the PUBLIC app's GID (bcns Connect), never the bridge
 `bcns-data` app's. A reinstall during a free trial is deliberately not covered:
-a trial means nothing was paid, so it goes to the plan page (`bad_end_time`).
+a trial means nothing was paid, and `trialEndsAt` is ignored, so it goes to the plan
+page. The logged reason is `bad_end_time` if the Partner API returns the trial
+subscription (its `currentBillingCycle` is expected to be null, per the code's assumption (the
+test comment cites Shopify documentation); not confirmed live), or `no_subscription` if it returns
+none.
 The check costs a reinstall two extra calls (the
 shop's id from the Admin API, then the Partner API), 5 s timeout each; a client
 with an ACTIVE subscription makes neither.
+
+Known limitation: nothing ends access when the paid period ends. The end time is
+only logged, in `shopify finish paid through <date>`.
+
+A tenant already bound to a different shop is refused before any of this
+(`?error=shop-mismatch`, log `shopify finish rejected (shop_mismatch)`).
+
+Log lines to grep in `journalctl -u bcns-app@connect` for a failed install:
+`shopify finish rejected (<code>)`, `shopify finish sent to Shopify's plan page
+(<why>) shop=<shop>`, `shopify finish paid through <ISO> shop=<shop>`, and
+`shopify uninstall webhook registered` / `not registered (<reason>)`.
 
 The token's backup is the macOS keychain item `bcns-shopify-partner-api-token`
 (`security find-generic-password -s bcns-shopify-partner-api-token -w`). To re-set
