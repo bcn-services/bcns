@@ -329,10 +329,14 @@ Don't include the Access page unless §2's AI-tools check passes.
 
 ## 8. Known review risks this PR does not change
 
-- **Typing in a store domain.** When a merchant starts from the hub, the Sources page
-  Shopify card asks for `your-store.myshopify.com` (`apps/connect/app/page.tsx:154`).
-  Installs from Shopify never show this field, and a connected card hides it. Once the
-  listing is live, replace the field with a link to the listing.
+- The Sources page has no field for a store domain (rule 2.3.1). With no Shopify source
+  stored, the Shopify card links to the App Store listing ("Install bcns Connect from the
+  Shopify App Store"). With a stored source, it tells the merchant to open bcns Connect from
+  the Shopify admin to reconnect. A hidden `shop` input appears only when the page is opened
+  with an explicit `?shop=` query, which only an operator does
+  (`apps/connect/lib/sources.ts:165-185`, `apps/connect/app/page.tsx:158-186`).
+- Rule 2.2.3 is treated as not applicable: `embedded = false` (`apps/connect/shopify.app.toml:26`)
+  and the hub loads no App Bridge.
 - **Opening the app from the Shopify admin runs OAuth again.** Shopify skips the
   consent screen for scopes already granted. `connect_source` updates the existing
   token row, so the token is refreshed. `/finish` also re-checks the subscription
