@@ -211,9 +211,19 @@ What exists today (read from `origin/main` 27d2e29):
 - `data.memberships.user_id` is the primary key, so one user belongs to one client.
 - A stranger at `connect.bcn-services.com` reaches only `/login` (sign-in and forgot-password;
   no sign-up route). A valid password with no membership bounces to "Ask bcns for an invite".
-- Local `platform/supabase/config.toml` has email `enable_signup = true`. The hosted setting was
-  not read; inference: check it in the dashboard, since if it is open a stranger can already
-  create an empty auth user.
+- Local `platform/supabase/config.toml` has email `enable_signup = true`; that is the local stack,
+  not hosted. Hosted, observed 2026-09-29 in the Supabase dashboard (project
+  `cnsxbglhredokjbvudfd`): "Allow new users to sign up" is OFF and "Confirm email" is ON. So
+  strangers cannot create auth users today, and self-service sign-up needs that toggle turned on
+  (or an invite or admin-created path). Hosted wizard step for Nate.
+- Hosted mail, observed 2026-09-29: custom SMTP is OFF and the built-in mailer is limited to
+  2 emails per hour. Any sign-up or invite flow at volume needs custom SMTP first (Resend, sender
+  on `bcn-services.com`). Hosted wizard step for Nate.
+- There is no account-creation path at all today: the login page offers only a mailto to bcns.
+  After PR #80 (Shopify billing gate), a tenant that already holds a Shopify source is refused
+  when installing on a different shop. That is a second reason to build self-service account
+  creation: a Shopify reviewer or a merchant arriving from the App Store listing has no bcns
+  account and no way to make one (one shop = one live tenant still holds).
 - Shopify-channel installs already bill through Shopify managed pricing
   (`managedPricingRedirect`, `apps/connect/lib/shopify-oauth.ts`), not Stripe, but still need an
   existing workspace and a signed-in owner at `/api/oauth/shopify/finish`.
@@ -248,7 +258,8 @@ bank account.**
   without rework.
 
 Nate-only steps: `supabase db push --workdir platform`; Edge Function deploy; Supabase Auth
-dashboard (signups, email confirmation, redirect allowlist, email rate limit); hand-check that a
+dashboard (turn on sign-ups, keep email confirmation on, redirect allowlist); custom SMTP via Resend
+before any volume (built-in mailer: 2 emails/hour); hand-check that a
 confirmed stranger lands on the pending page and reads nothing else.
 
 Shopify policy follow-ups (all OPEN, not decided):
@@ -287,8 +298,8 @@ Creative Folder): what slows daily use? Nothing is scoped until the list arrives
 #### Open questions (Nate; most blocking first)
 
 1. Sign-up gate: option (a), (b) or (c)? Recommendation is (c).
-2. Is hosted Supabase Auth open to email sign-ups today? If so, strangers may already have empty
-   accounts.
+2. Hosted sign-ups are OFF and custom SMTP is OFF (observed 2026-09-29). Who turns on sign-ups
+   and sets up Resend SMTP, and when, relative to the option chosen in Q1?
 3. Sign-up fields and identity: business email only? Should a Shopify-installed merchant skip the
    pending queue, since Shopify's plan gate already proves payment?
 4. Should one user be able to belong to several clients (agencies, accountants)? Today no;
