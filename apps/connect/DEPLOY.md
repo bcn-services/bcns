@@ -46,6 +46,13 @@ the log says `shopify finish paid through <date>`; a refusal logs
 the app GID or a missing permission), `malformed`, `no_subscription`,
 `bad_end_time`, `period_ended`, `timeout` or `network_error`.
 
+`SHOPIFY_APP_GID` must be the PUBLIC app's GID (bcns Connect), never the bridge
+`bcns-data` app's. A reinstall during a free trial is covered too: Shopify
+documents `currentBillingCycle` as null during a trial, so the check uses
+`trialEndsAt` instead. The check costs a reinstall two extra calls (the
+shop's id from the Admin API, then the Partner API), 5 s timeout each; a client
+with an ACTIVE subscription makes neither.
+
 The token's backup is the macOS keychain item `bcns-shopify-partner-api-token`
 (`security find-generic-password -s bcns-shopify-partner-api-token -w`). To re-set
 it, put that value back on the `SHOPIFY_PARTNER_API_TOKEN=` line and restart

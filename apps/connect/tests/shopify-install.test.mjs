@@ -21,6 +21,7 @@ import {
   managedPricingGate,
   managedPricingRedirect,
   paidThrough,
+  shopGid,
   PENDING_COOKIE,
   PENDING_TTL_MS,
   openPending,
@@ -47,6 +48,7 @@ const INSTALL_HOST = "YWRtaW4uc2hvcGlmeS5jb20vc3RvcmUvYmNucy10ZXN0LXN0b3Jl"; // 
 const PLAN_URL = `https://admin.shopify.com/store/${STORE_HANDLE}/charges/${APP_HANDLE}/pricing_plans`;
 const PLAN_URL_FALLBACK = `https://${SHOP}/admin/charges/${APP_HANDLE}/pricing_plans`;
 const SHOP_GID = "gid://shopify/Shop/5678";
+const ADMIN_SUBSCRIPTIONS_QUERY = "query{currentAppInstallation{activeSubscriptions{id name status}}}";
 const ALT_SHOP = "sb-bridge-shop.myshopify.com";
 const ALT_SECRET = "alt-secret";
 const GRANTED_SCOPE =
@@ -370,14 +372,8 @@ test("hasActiveSubscription: true only with an ACTIVE entry; fails closed on htt
   );
   assert.deepEqual(
     await hasActiveSubscription(SHOP, "shpat_x", withBody({ data: { currentAppInstallation: { activeSubscriptions: [{ status: "PENDING" }] } } })),
-    { active: false, reason: "none_active", shopGid: null }
+    { active: false, reason: "none_active" }
   );
-  // The shop GID rides on none_active only, and only when it is a real Shop GID.
-  const noneWith = (shop) => withBody({ data: { currentAppInstallation: { activeSubscriptions: [] }, shop } });
-  assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", noneWith({ id: SHOP_GID })), { active: false, reason: "none_active", shopGid: SHOP_GID });
-  for (const bad of [{ id: "gid://shopify/App/1" }, { id: 42 }, { id: `${SHOP_GID}/x` }, null]) {
-    assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", noneWith(bad)), { active: false, reason: "none_active", shopGid: null });
-  }
   assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", withBody({}, 500)), { active: false, reason: "http_error" });
   assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", withBody({ errors: [{ message: "boom" }] })), { active: false, reason: "graphql_error" });
   assert.deepEqual(await hasActiveSubscription(SHOP, "shpat_x", withBody({ data: {} })), { active: false, reason: "malformed" });
@@ -399,7 +395,8 @@ test("hasActiveSubscription: the GraphQL query drops the unused `test` field and
   });
   assert.equal(seen.cache, "no-store");
   const body = JSON.parse(seen.body);
-  assert.equal(body.query, "query{currentAppInstallation{activeSubscriptions{id name status}} shop{id}}");
+  // Byte-identical to before the Partner check: nothing new rides on a paying client's fast path.
+  assert.equal(body.query, ADMIN_SUBSCRIPTIONS_QUERY);
   assert.doesNotMatch(body.query, /\btest\b/);
 });
 
@@ -745,26 +742,35 @@ test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the
 
 // An uninstall cancels the subscription, so the Admin check says none_active, yet
 // Shopify's plan page has nothing to approve until the period ends. Only then, and
-// only with all three Partner values, is the Partner API asked.
+// only with all three Partner values, is the shop's id fetched and the Partner API asked.
 const PARTNER = { token: "prtapi_partner_secret", orgId: "5179321", appGid: "gid://shopify/App/1234" };
 const PARTNER_URL = "https://partners.shopify.com/5179321/api/2026-07/graphql.json";
+const ADMIN_URL = `https://${SHOP}/admin/api/2026-07/graphql.json`;
 const NOW = Date.parse("2026-09-30T17:00:00Z");
-const NONE_WITH_SHOP = { data: { currentAppInstallation: { activeSubscriptions: [] }, shop: { id: SHOP_GID } } };
-const cycle = (endTime) => ({ data: { activeSubscription: { cancelAtEndOfCycle: true, currentBillingCycle: { endTime } } } });
+const cycle = (endTime) => ({ data: { activeSubscription: { currentBillingCycle: { endTime } } } });
+/** A free trial: Shopify documents currentBillingCycle as null until it ends. */
+const trial = (trialEndsAt) => ({ data: { activeSubscription: { trialEndsAt, currentBillingCycle: null } } });
 const PAID = { status: 200, body: cycle("2026-10-25T16:29:00Z") };
+const SHOP_ID_OK = { status: 200, body: { data: { shop: { id: SHOP_GID } } } };
 
-/** Admin steps in order (as sequenceFetch), one fixed Partner step; records which host each call hit. */
-function gateFetch(adminSteps, partnerStep) {
+/**
+ * Admin subscription steps in order (as sequenceFetch), one fixed shop-id step and
+ * one fixed Partner step; records which of the three each call was.
+ */
+function gateFetch(adminSteps, partnerStep, shopStep = SHOP_ID_OK) {
   const calls = [];
   const admin = sequenceFetch(...adminSteps);
+  const shop = sequenceFetch(shopStep);
   const partner = sequenceFetch(partnerStep);
   const fetchImpl = async (url, init) => {
-    const isPartner = String(url).startsWith("https://partners.shopify.com/");
-    calls.push({ url: String(url), init, isPartner });
-    return isPartner ? partner(url, init) : admin(url, init);
+    const kind = String(url).startsWith("https://partners.shopify.com/")
+      ? "partner"
+      : JSON.parse(init.body).query === "query{shop{id}}" ? "shop" : "admin";
+    calls.push({ url: String(url), init, kind });
+    return { admin, shop, partner }[kind](url, init);
   };
   fetchImpl.calls = calls;
-  fetchImpl.partnerCalls = () => calls.filter((c) => c.isPartner).length;
+  fetchImpl.kinds = () => calls.map((c) => c.kind);
   return fetchImpl;
 }
 const gate = (fetchImpl, over = {}) =>
@@ -782,7 +788,28 @@ async function withLogs(fn) {
   }
 }
 
-test("paidThrough: asks the Partner API for this app and shop, with the partner token, uncached", async () => {
+test("shopGid: its own `query{shop{id}}` to the shop with the merchant token, uncached; null on any failure or a non-Shop GID, never throws", async () => {
+  let url, init;
+  assert.equal(await shopGid(SHOP, "shpat_x", async (u, i) => ([url, init] = [u, i], new Response(JSON.stringify(SHOP_ID_OK.body)))), SHOP_GID);
+  assert.equal(url, ADMIN_URL);
+  assert.equal(JSON.parse(init.body).query, "query{shop{id}}");
+  assert.equal(init.headers["X-Shopify-Access-Token"], "shpat_x");
+  assert.equal(init.cache, "no-store");
+  const bad = {
+    "http 500": { status: 500, body: "boom" },
+    "graphql error": { status: 200, body: { errors: [{ message: "access denied" }], data: { shop: { id: SHOP_GID } } } },
+    "an App GID": { status: 200, body: { data: { shop: { id: "gid://shopify/App/1" } } } },
+    "a suffixed GID": { status: 200, body: { data: { shop: { id: `${SHOP_GID}/x` } } } },
+    "a number": { status: 200, body: { data: { shop: { id: 5678 } } } },
+    "no shop": { status: 200, body: { data: { shop: null } } },
+    "not json": { status: 200, body: "<html>" },
+    timeout: timeoutError(),
+    "network error": new Error("ECONNRESET"),
+  };
+  for (const [name, step] of Object.entries(bad)) assert.equal(await shopGid(SHOP, "shpat_x", sequenceFetch(step)), null, name);
+});
+
+test("paidThrough: asks the Partner API for this app and shop, with the partner token, uncached, never following a redirect", async () => {
   let url, init;
   const result = await paidThrough(SHOP_GID, PARTNER, async (u, i) => {
     [url, init] = [u, i];
@@ -792,72 +819,102 @@ test("paidThrough: asks the Partner API for this app and shop, with the partner 
   assert.equal(url, PARTNER_URL);
   assert.equal(init.method, "POST");
   assert.equal(init.cache, "no-store");
+  assert.equal(init.redirect, "error");
   assert.equal(init.headers["X-Shopify-Access-Token"], PARTNER.token);
   const body = JSON.parse(init.body);
-  assert.match(body.query, /activeSubscription\(appId:\$appId,shopId:\$shopId\)\{cancelAtEndOfCycle currentBillingCycle\{endTime\}\}/);
+  assert.equal(body.query, "query($appId:ID!,$shopId:ID!){activeSubscription(appId:$appId,shopId:$shopId){trialEndsAt currentBillingCycle{endTime}}}");
   assert.deepEqual(body.variables, { appId: PARTNER.appGid, shopId: SHOP_GID });
-});
 
-test("paidThrough: paid only with a parseable endTime still in the future; every other answer has its own reason and none throws", async () => {
-  const cases = {
-    no_subscription: { status: 200, body: { data: { activeSubscription: null } } },
-    period_ended: { status: 200, body: cycle("2026-09-30T16:59:59Z") },
-    bad_end_time: { status: 200, body: cycle("soon") },
-    malformed: { status: 200, body: { data: {} } },
-    graphql_error: { status: 200, body: { errors: [{ message: "access denied" }] } },
-    http_401: { status: 401, body: "unauthorized" },
-    http_404: { status: 404, body: "not found" },
-    http_503: { status: 503, body: "unavailable" },
-    timeout: timeoutError(),
-    network_error: new Error("ECONNRESET"),
+  // What fetch does with a 3xx: rejects under redirect "error", follows (token and all) otherwise.
+  const redirecting = async (_u, i) => {
+    if (i.redirect === "error") throw new TypeError("fetch failed");
+    return new Response(JSON.stringify(PAID.body), { status: 200 });
   };
-  for (const [reason, step] of Object.entries(cases)) {
-    assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch(step), NOW), { paid: false, reason }, reason);
-  }
-  // Exactly `now` is over; a missing endTime and a non-JSON 200 are not "paid" either.
-  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: cycle("2026-09-30T17:00:00Z") }), NOW), { paid: false, reason: "period_ended" });
-  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: { data: { activeSubscription: {} } } }), NOW), { paid: false, reason: "bad_end_time" });
-  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: "<html>" }), NOW), { paid: false, reason: "graphql_error" });
+  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, redirecting, NOW), { paid: false, reason: "network_error" });
 });
 
-test("managedPricingRedirect: none_active but the Partner API says paid through a future date -> null (write), 2 fetches, one log line with the date", async () => {
-  const fetchImpl = gateFetch([{ status: 200, body: NONE_WITH_SHOP }], PAID);
+test("paidThrough: paid only with a zoned ISO endTime still in the future; every other answer has its own reason and none throws", async () => {
+  const cases = [
+    ["no_subscription", { status: 200, body: { data: { activeSubscription: null } } }],
+    ["period_ended", { status: 200, body: cycle("2026-09-30T16:59:59Z") }],
+    ["period_ended", { status: 200, body: cycle("2026-09-30T17:00:00Z") }], // exactly `now` is over
+    ["bad_end_time", { status: 200, body: cycle("soon") }],
+    ["bad_end_time", { status: 200, body: cycle("2026-10-25T16:29:00") }], // no zone: Date.parse would read local time
+    ["bad_end_time", { status: 200, body: cycle("2026-10-25") }],
+    ["bad_end_time", { status: 200, body: cycle("Sun, 25 Oct 2026 16:29:00 GMT") }],
+    ["bad_end_time", { status: 200, body: trial(null) }], // neither a cycle nor a trial end
+    ["period_ended", { status: 200, body: trial("2026-09-29T00:00:00Z") }],
+    ["bad_end_time", { status: 200, body: trial("2026-10-10T00:00:00") }],
+    // A present cycle wins over the trial end, even a later one.
+    ["period_ended", { status: 200, body: { data: { activeSubscription: { trialEndsAt: "2026-12-01T00:00:00Z", currentBillingCycle: { endTime: "2026-09-01T00:00:00Z" } } } } }],
+    ["malformed", { status: 200, body: { data: {} } }],
+    ["graphql_error", { status: 200, body: { errors: [{ message: "access denied" }] } }],
+    ["graphql_error", { status: 200, body: "<html>" }],
+    ["http_401", { status: 401, body: "unauthorized" }],
+    ["http_404", { status: 404, body: "not found" }],
+    ["http_503", { status: 503, body: "unavailable" }],
+    ["timeout", timeoutError()],
+    ["network_error", new Error("ECONNRESET")],
+  ];
+  for (const [reason, step] of cases) {
+    assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch(step), NOW), { paid: false, reason }, `${reason}: ${JSON.stringify(step.body)}`);
+  }
+  // An explicit offset is a zone too.
+  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: cycle("2026-10-25T18:29:00.5+02:00") }), NOW), { paid: true, until: "2026-10-25T16:29:00.500Z" });
+  // In a free trial there is no cycle; the trial end stands in for it.
+  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: trial("2026-10-10T00:00:00Z") }), NOW), { paid: true, until: "2026-10-10T00:00:00.000Z" });
+  // A present cycle wins over the trial end, even an earlier trial end.
+  const both = { data: { activeSubscription: { trialEndsAt: "2026-09-01T00:00:00Z", currentBillingCycle: { endTime: "2026-10-25T16:29:00Z" } } } };
+  assert.deepEqual(await paidThrough(SHOP_GID, PARTNER, sequenceFetch({ status: 200, body: both }), NOW), { paid: true, until: "2026-10-25T16:29:00.000Z" });
+});
+
+test("managedPricingRedirect: none_active but the Partner API says paid through a future date -> null (write): subscriptions, shop id, Partner = 3 fetches", async () => {
+  const fetchImpl = gateFetch([{ status: 200, body: NONE_BODY }], PAID);
   const [result, lines] = await withLogs(() => gate(fetchImpl));
   assert.equal(result, null);
-  assert.deepEqual(fetchImpl.calls.map((c) => c.url), [`https://${SHOP}/admin/api/2026-07/graphql.json`, PARTNER_URL]);
-  assert.deepEqual(JSON.parse(fetchImpl.calls[1].init.body).variables, { appId: PARTNER.appGid, shopId: SHOP_GID });
+  assert.deepEqual(fetchImpl.kinds(), ["admin", "shop", "partner"]);
+  assert.deepEqual(fetchImpl.calls.map((c) => c.url), [ADMIN_URL, ADMIN_URL, PARTNER_URL]);
+  assert.equal(JSON.parse(fetchImpl.calls[0].init.body).query, ADMIN_SUBSCRIPTIONS_QUERY);
+  assert.deepEqual(JSON.parse(fetchImpl.calls[2].init.body).variables, { appId: PARTNER.appGid, shopId: SHOP_GID });
   assert.deepEqual(lines, [`[connect] shopify finish paid through 2026-10-25T16:29:00.000Z shop=${SHOP}`]);
+  // A reinstall during a free trial writes the same way, logging the trial end.
+  const [trialResult, trialLines] = await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_BODY }], { status: 200, body: trial("2026-10-10T00:00:00Z") })));
+  assert.equal(trialResult, null);
+  assert.deepEqual(trialLines, [`[connect] shopify finish paid through 2026-10-10T00:00:00.000Z shop=${SHOP}`]);
   // A paid store does not need the plan handle: nothing is redirected.
   const noHandle = fakeFail();
-  assert.equal(await gate(gateFetch([{ status: 200, body: NONE_WITH_SHOP }], PAID), { appHandle: undefined, fail: noHandle }), null);
+  assert.equal(await gate(gateFetch([{ status: 200, body: NONE_BODY }], PAID), { appHandle: undefined, fail: noHandle }), null);
   assert.deepEqual(noHandle.codes, []);
 });
 
 test("managedPricingRedirect: none_active and the Partner API does not confirm a paid period -> plan page, nothing thrown, reason in the log", async () => {
-  const cases = {
-    no_subscription: { status: 200, body: { data: { activeSubscription: null } } },
-    period_ended: { status: 200, body: cycle("2026-09-01T00:00:00Z") },
-    bad_end_time: { status: 200, body: cycle("not a date") },
-    timeout: timeoutError(),
-    network_error: new Error("ECONNRESET"),
-    http_401: { status: 401, body: "unauthorized" },
-    graphql_error: { status: 200, body: { errors: [{ message: "access denied" }] } },
-    malformed: { status: 200, body: {} },
-  };
-  for (const [reason, step] of Object.entries(cases)) {
-    const fetchImpl = gateFetch([{ status: 200, body: NONE_WITH_SHOP }], step);
+  const cases = [
+    ["no_subscription", { status: 200, body: { data: { activeSubscription: null } } }],
+    ["period_ended", { status: 200, body: cycle("2026-09-01T00:00:00Z") }],
+    ["bad_end_time", { status: 200, body: cycle("not a date") }],
+    ["bad_end_time", { status: 200, body: cycle("2026-10-25T16:29:00") }],
+    ["period_ended", { status: 200, body: trial("2026-09-29T00:00:00Z") }],
+    ["bad_end_time", { status: 200, body: trial(null) }],
+    ["timeout", timeoutError()],
+    ["network_error", new Error("ECONNRESET")],
+    ["http_401", { status: 401, body: "unauthorized" }],
+    ["graphql_error", { status: 200, body: { errors: [{ message: "access denied" }] } }],
+    ["malformed", { status: 200, body: {} }],
+  ];
+  for (const [reason, step] of cases) {
+    const fetchImpl = gateFetch([{ status: 200, body: NONE_BODY }], step);
     const fail = fakeFail();
     const [result, lines] = await withLogs(() => gate(fetchImpl, { fail }));
     assert.equal(result?.status, 307, reason);
     assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK, reason);
     assert.equal(result.cookies.get(PENDING_COOKIE).value, "", reason);
     assert.deepEqual(fail.codes, [], reason);
-    assert.equal(fetchImpl.partnerCalls(), 1, `${reason}: the Partner call is not retried`);
+    assert.deepEqual(fetchImpl.kinds(), ["admin", "shop", "partner"], `${reason}: the Partner call is not retried`);
     assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (none_active; partner: ${reason}) shop=${SHOP}`], reason);
   }
 });
 
-test("managedPricingRedirect: Partner config unset (whole or any one value) or no shop GID -> plan page with NO Partner fetch", async () => {
+test("managedPricingRedirect: Partner config unset (whole or any one value) -> plan page with no shop-id or Partner fetch", async () => {
   const partial = {
     "no config": undefined,
     "no token": { ...PARTNER, token: undefined },
@@ -866,77 +923,95 @@ test("managedPricingRedirect: Partner config unset (whole or any one value) or n
   };
   for (const [name, partner] of Object.entries(partial)) {
     // A Partner call would find PAID and write: the count AND the outcome both catch one.
-    const fetchImpl = gateFetch([{ status: 200, body: NONE_WITH_SHOP }], PAID);
+    const fetchImpl = gateFetch([{ status: 200, body: NONE_BODY }], PAID);
     const [result, lines] = await withLogs(() => gate(fetchImpl, { partner }));
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
-    assert.equal(fetchImpl.calls.length, 1, name);
-    assert.match(lines[0], /\(none_active; partner: unconfigured\)/, name);
+    assert.deepEqual(fetchImpl.kinds(), ["admin"], name);
+    assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (none_active; partner: unconfigured) shop=${SHOP}`], name);
   }
-  const noGid = gateFetch([{ status: 200, body: NONE_BODY }], PAID);
-  const [result, lines] = await withLogs(() => gate(noGid));
-  assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK);
-  assert.equal(noGid.calls.length, 1);
-  assert.match(lines[0], /\(none_active; partner: no_shop_id\)/);
 });
 
-test("managedPricingRedirect: the Partner API is asked only after a definitive none_active -- never when ACTIVE, after a failed check, or for an ungated pending", async () => {
+test("managedPricingRedirect: a failed or malformed shop-id call -> plan page as no_shop_id, and no Partner call", async () => {
+  const shopSteps = {
+    "http 500": { status: 500, body: "boom" },
+    "graphql error": { status: 200, body: { errors: [{ message: "access denied" }] } },
+    "not a Shop GID": { status: 200, body: { data: { shop: { id: "gid://shopify/App/1" } } } },
+    "no shop": { status: 200, body: { data: {} } },
+    timeout: timeoutError(),
+  };
+  for (const [name, shopStep] of Object.entries(shopSteps)) {
+    const fetchImpl = gateFetch([{ status: 200, body: NONE_BODY }], PAID, shopStep);
+    const [result, lines] = await withLogs(() => gate(fetchImpl));
+    assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
+    assert.deepEqual(fetchImpl.kinds(), ["admin", "shop"], name);
+    assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (none_active; partner: no_shop_id) shop=${SHOP}`], name);
+  }
+});
+
+test("managedPricingRedirect: the shop id and the Partner API are asked only after a definitive none_active -- never when ACTIVE, after a failed check, or for an ungated pending", async () => {
   // Every Partner step here would say PAID, so a stray call also changes the outcome.
   const active = gateFetch([{ status: 200, body: ACTIVE_BODY }], PAID);
   assert.equal(await gate(active), null);
-  assert.deepEqual([active.calls.length, active.partnerCalls()], [1, 0]);
+  assert.deepEqual(active.kinds(), ["admin"]);
+  assert.equal(JSON.parse(active.calls[0].init.body).query, ADMIN_SUBSCRIPTIONS_QUERY);
 
   for (const [name, transient] of Object.entries(TRANSIENT)) {
-    const twice = gateFetch([transient(), transient(), { status: 200, body: NONE_WITH_SHOP }], PAID);
+    const twice = gateFetch([transient(), transient(), { status: 200, body: NONE_BODY }], PAID);
     const [result, lines] = await withLogs(() => gate(twice));
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
-    assert.deepEqual([twice.calls.length, twice.partnerCalls()], [2, 0], name);
+    assert.deepEqual(twice.kinds(), ["admin", "admin"], name);
     // Not even considered: the log carries the Admin reason alone, as before.
     assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (${name}) shop=${SHOP}`], name);
   }
-  for (const [name, body] of Object.entries({ graphql_error: { errors: [{ message: "throttled" }] }, malformed: { data: { shop: { id: SHOP_GID } } } })) {
+  for (const [name, body] of Object.entries({ graphql_error: { errors: [{ message: "throttled" }] }, malformed: { data: {} } })) {
     const definitive = gateFetch([{ status: 200, body }], PAID);
     const [result, lines] = await withLogs(() => gate(definitive));
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
-    assert.deepEqual([definitive.calls.length, definitive.partnerCalls()], [1, 0], name);
+    assert.deepEqual(definitive.kinds(), ["admin"], name);
     assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (${name}) shop=${SHOP}`], name);
   }
   // A transient blip then none_active is still a definitive none_active: asked once.
-  const blip = gateFetch([TRANSIENT.timeout(), { status: 200, body: NONE_WITH_SHOP }], PAID);
+  const blip = gateFetch([TRANSIENT.timeout(), { status: 200, body: NONE_BODY }], PAID);
   assert.equal((await withLogs(() => gate(blip)))[0], null);
-  assert.deepEqual([blip.calls.length, blip.partnerCalls()], [3, 1]);
+  assert.deepEqual(blip.kinds(), ["admin", "admin", "shop", "partner"]);
 
   const skippedApi = fakeApi({ data: true, error: null });
   for (const pending of [{ ...INSTALL_PENDING, app: ALT_APP }, { ...TOKEN, clientId: CLIENT }]) {
-    const none = gateFetch([{ status: 200, body: NONE_WITH_SHOP }], PAID);
+    const none = gateFetch([{ status: 200, body: NONE_BODY }], PAID);
     assert.equal(await gate(none, { api: skippedApi, pending }), null);
     assert.equal(none.calls.length, 0);
   }
   assert.deepEqual(skippedApi.calls, []);
 });
 
-test("managedPricingRedirect: neither token, nor Shopify's or fetch's message text, reaches a log line or the response", async () => {
+test("managedPricingRedirect: neither token, nor Shopify's or fetch's message text, reaches a log line, the response, or the other host", async () => {
   const LEAK = "leaky-message-text";
-  const steps = {
-    paid: PAID,
-    "graphql error": { status: 200, body: { errors: [{ message: `${LEAK} ${PARTNER.token}` }] } },
-    "http 401": { status: 401, body: `${LEAK} ${PARTNER.token}` },
-    "fetch throws": new Error(`${LEAK} ${PARTNER.token} ${INSTALL_PENDING.accessToken}`),
-    "junk endTime": { status: 200, body: cycle(`${LEAK} ${PARTNER.token}`) },
+  const tokens = `${LEAK} ${PARTNER.token} ${INSTALL_PENDING.accessToken}`;
+  const cases = {
+    paid: [PAID],
+    "partner graphql error": [{ status: 200, body: { errors: [{ message: tokens }] } }],
+    "partner http 401": [{ status: 401, body: tokens }],
+    "partner fetch throws": [new Error(tokens)],
+    "junk endTime": [{ status: 200, body: cycle(tokens) }],
+    "shop id fetch throws": [PAID, new Error(tokens)],
+    "shop id graphql error": [PAID, { status: 200, body: { errors: [{ message: tokens }] } }],
   };
-  for (const [name, step] of Object.entries(steps)) {
-    const [result, lines] = await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_WITH_SHOP }], step)));
+  for (const [name, [partnerStep, shopStep]] of Object.entries(cases)) {
+    const fetchImpl = gateFetch([{ status: 200, body: NONE_BODY }], partnerStep, shopStep);
+    const [result, lines] = await withLogs(() => gate(fetchImpl));
     const seen = [...lines, result?.headers.get("location") ?? "", result?.headers.get("set-cookie") ?? ""].join("\n");
     assert.equal(lines.length, 1, name);
     for (const secret of [PARTNER.token, INSTALL_PENDING.accessToken, INSTALL_PENDING.refreshToken, LEAK]) {
       assert.ok(!seen.includes(secret), `${name}: ${secret} leaked`);
     }
+    // The partner token goes to partners.shopify.com only; the merchant token to the shop only.
+    for (const call of fetchImpl.calls) {
+      const sent = JSON.stringify([call.url, call.init]);
+      const host = new URL(call.url).host;
+      assert.equal(sent.includes(PARTNER.token), host === "partners.shopify.com", `${name}: partner token vs ${host}`);
+      assert.equal(sent.includes(INSTALL_PENDING.accessToken), host === SHOP, `${name}: merchant token vs ${host}`);
+    }
   }
-  // The partner token goes to partners.shopify.com only; the merchant token to the shop only.
-  const fetchImpl = gateFetch([{ status: 200, body: NONE_WITH_SHOP }], PAID);
-  await withLogs(() => gate(fetchImpl));
-  const [adminCall, partnerCall] = fetchImpl.calls;
-  assert.ok(!JSON.stringify([adminCall.url, adminCall.init]).includes(PARTNER.token));
-  assert.ok(!JSON.stringify([partnerCall.url, partnerCall.init]).includes(INSTALL_PENDING.accessToken));
 });
 
 test("finish route wiring: the three Partner values are read from env and handed to the gate", async () => {
@@ -945,16 +1020,23 @@ test("finish route wiring: the three Partner values are read from env and handed
   assert.match(route, /partner: \{ token: config\.shopifyPartnerApiToken, orgId: config\.shopifyPartnerOrgId, appGid: config\.shopifyAppGid \}/);
   const { getConfig } = await import("../lib/env.ts");
   const names = { SHOPIFY_PARTNER_API_TOKEN: " tok ", SHOPIFY_PARTNER_ORG_ID: "5179321", SHOPIFY_APP_GID: "gid://shopify/App/1" };
-  assert.equal(getConfig().shopifyPartnerApiToken, undefined);
-  Object.assign(process.env, names);
+  // Whatever this machine exports, restored after.
+  const saved = Object.fromEntries(Object.keys(names).map((name) => [name, process.env[name]]));
   try {
+    for (const name of Object.keys(names)) delete process.env[name];
+    const unset = getConfig();
+    assert.deepEqual([unset.shopifyPartnerApiToken, unset.shopifyPartnerOrgId, unset.shopifyAppGid], [undefined, undefined, undefined]);
+    Object.assign(process.env, names);
     const config = getConfig();
     assert.deepEqual(
       [config.shopifyPartnerApiToken, config.shopifyPartnerOrgId, config.shopifyAppGid],
       ["tok", "5179321", "gid://shopify/App/1"]
     );
   } finally {
-    for (const name of Object.keys(names)) delete process.env[name];
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 });
 
