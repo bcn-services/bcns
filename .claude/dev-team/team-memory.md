@@ -142,3 +142,9 @@ TEAM Render case-study screenshots with next/image (PLAN item 8) — risk: loud,
 - **What worked:** Prescribing the design after proving the hub cannot read the stored shop (no api view exposes connector_schedule.config) and that hub-initiated connects skip managedPricingGate, so a public-app reconnect must go through Shopify admin.
 - **What failed:** The brief's premise of "hub billed-directly copy" was false: apps/connect had none. The only merchant-facing claim was the apps/web Terms at content.ts:893.
 - **Remember next run:** The tenant package is `@bcn-services/tenant`, not `@bcns/tenant`. A hub Reconnect button for a stored shop needs a new api view/RPC exposing connector_schedule.config->>'shop' (a migration); `api.shopify_shop_mismatch(p_shop)` can test "is the stored shop X" without exposing it.
+## 2026-09-30 — dev-team-auto — hub Sources card Connected before first sync
+- **Outcome:** DONE — 2 attempts — caution: no (spawned with full team) — team: dt-engineer sonnet/high, dt-qa sonnet/high, dt-review sonnet/high — branch fix/hub-card-connected-pending
+- **What happened:** api.connector_health_v1 exposes neither token status nor schedule.enabled (tokens unreachable from api), so the fix is hub never_ran->Connected plus a migration seeding a never_ran health row on attach_source and deleting it on uninstall, plus a worker filter.
+- **What worked:** mutation check by swapping in origin/main's sources.ts; review caught the worker-filter freeze/race and the missing backfill.
+- **What failed:** review Important x3 (no backfill, revoke race, operator-disabled freeze) fixed in attempt 2; attempt-2 fixes not re-QA'd (small, read by orchestrator). DB/worker SQL never executed (no live DB).
+- **Remember next run:** health rows come only from worker computeHealth; any "derive state from tokens" fix must live in data.* functions or the worker. 21 connect tests fail without a built packages/tenant/dist (baseline).

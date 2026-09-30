@@ -5,6 +5,10 @@ import { fullListEntities } from './connectors/index.js'
 
 /** One statement; `is distinct from` keeps status_since stable across ticks (§5.5). */
 export async function computeHealth(_t: Tick): Promise<number> {
+  // Heals a revoke that raced a tick: an uninstalled source must read Not connected.
+  await sql(
+    `delete from data.connector_health h using data.source_tokens tk
+     where (tk.client_id, tk.source) = (h.client_id, h.source) and tk.status = 'revoked'`)
   const r = await sql(
     `with sched as (
        select s.client_id, s.source, s.interval, s.last_run_at, s.last_success_at, s.last_error,
@@ -12,7 +16,7 @@ export async function computeHealth(_t: Tick): Promise<number> {
        from data.connector_schedule s
        join data.clients c on c.id = s.client_id and c.status = 'active'
        left join data.source_tokens tk on (tk.client_id, tk.source) = (s.client_id, s.source)
-       where s.enabled and tk.status is distinct from 'revoked'
+       where tk.status is distinct from 'revoked'
      ), last_run as (
        select distinct on (client_id, source) client_id, source, status, entity_rows
        from data.connector_runs where finished_at is not null and mode <> 'renormalize'

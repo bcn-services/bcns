@@ -102,3 +102,7 @@ begin
   select count(*) into n from hit;
   return n;
 end $$;
+
+-- One-time backfill: drop health rows of already-revoked tokens (uninstalls before this migration).
+delete from data.connector_health h using data.source_tokens tk
+where (tk.client_id, tk.source) = (h.client_id, h.source) and tk.status = 'revoked';
