@@ -23,6 +23,7 @@ import {
   egressLine,
   type EgressRow,
   type HealthRow,
+  type ShopifyControl,
   type Tone,
 } from "@/lib/sources";
 
@@ -154,44 +155,26 @@ export default async function SourcesPage({
                   {card.lastError}
                 </p>
               ) : null}
-              {card.connected ? null : card.source === "shopify" ? (
-                (() => {
-                  const ctl = shopifyControl(card, searchParams.shop, searchParams.error, config.shopifyAppHandle);
-                  if (ctl.kind === "form" && connectPath(config, "shopify") && membership.role === "owner") {
-                    return (
-                      <form action={connectPath(config, "shopify")!} method="GET" className="flex gap-2">
-                        <input type="hidden" name="shop" value={ctl.shop} />
-                        <Button type="submit" variant="outline" size="sm">
-                          {ctl.label}
-                        </Button>
-                      </form>
-                    );
-                  }
-                  if (ctl.kind === "install") {
-                    return (
-                      <p className="text-sm text-muted-foreground">
-                        {ctl.url ? (
-                          <a href={ctl.url} className="font-medium text-primary underline underline-offset-4">
-                            Install bcns Connect from the Shopify App Store
-                          </a>
-                        ) : (
-                          "Install bcns Connect from the Shopify App Store"
-                        )}
-                      </p>
-                    );
-                  }
-                  if (ctl.kind === "reconnect-in-shopify") {
-                    return <p className="text-sm text-muted-foreground">Open bcns Connect from your Shopify admin to reconnect.</p>;
-                  }
-                  return null;
-                })()
-              ) : connectPath(config, card.source) && membership.role === "owner" ? (
-                /** Meta and Monday are POST so a third-party page cannot force a reconnect (W5b #3). Owners only (api.connect_source is owner-gated). */
-                <form action={connectPath(config, card.source)!} method="POST" className="flex gap-2">
-                  <Button type="submit" variant="outline" size="sm">
-                    Connect
-                  </Button>
-                </form>
+              {card.connected ? null : connectPath(config, card.source) && membership.role === "owner" ? (
+                /**
+                 * Self-serve: the source's app is approved and configured. Owners only
+                 * (api.connect_source is owner-gated in the database). Shopify never
+                 * shows a shop-domain field (App Store rule 2.3.1): see shopifyControl.
+                 * Meta and Monday are POST so a third-party page cannot force a
+                 * reconnect (W5b #3).
+                 */
+                card.source === "shopify" ? (
+                  <ShopifyControlView
+                    ctl={shopifyControl(card, searchParams.shop, searchParams.error, config.shopifyAppHandle)}
+                    action={connectPath(config, "shopify")!}
+                  />
+                ) : (
+                  <form action={connectPath(config, card.source)!} method="POST" className="flex gap-2">
+                    <Button type="submit" variant="outline" size="sm">
+                      Connect
+                    </Button>
+                  </form>
+                )
               ) : (
                 /* Unapproved, unconfigured, or a non-owner: chunk 4 behaviour, unchanged. */
                 <form action={requestConnectionAction}>
@@ -206,5 +189,34 @@ export default async function SourcesPage({
         ))}
       </div>
     </>
+  );
+}
+
+/** The Shopify card's control; which one is decided by shopifyControl (lib/sources.ts). */
+function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: string }) {
+  if (ctl.kind === "form") {
+    // Operator path: an explicit ?shop= query, sent as a hidden field, never typed.
+    return (
+      <form action={action} method="GET" className="flex gap-2">
+        <input type="hidden" name="shop" value={ctl.shop} />
+        <Button type="submit" variant="outline" size="sm">
+          {ctl.label}
+        </Button>
+      </form>
+    );
+  }
+  if (ctl.kind === "reconnect-in-shopify") {
+    return <p className="text-sm text-muted-foreground">Open bcns Connect from your Shopify admin to reconnect.</p>;
+  }
+  return (
+    <p className="text-sm text-muted-foreground">
+      {ctl.url ? (
+        <a href={ctl.url} className="font-medium text-primary underline underline-offset-4">
+          Install bcns Connect from the Shopify App Store
+        </a>
+      ) : (
+        "Install bcns Connect from the Shopify App Store"
+      )}
+    </p>
   );
 }
