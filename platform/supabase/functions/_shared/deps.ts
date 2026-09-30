@@ -148,6 +148,7 @@ export function mintDeps(request: Request): MintDeps {
  * 20260924000300: `usage on schema api` + `execute on api.record_shop_redact` to service_role
  * only; still zero access to any `data` table, which is the wall this file's own comment
  * describes). The RPC itself is the narrow SECURITY DEFINER surface, not this client.
+ * api.record_app_uninstalled (20260929000200) is the second and only other such grant.
  */
 export function shopRedactDeps(): ShopRedactDeps {
   return {
@@ -158,6 +159,14 @@ export function shopRedactDeps(): ShopRedactDeps {
       });
       if (error) throw new Error(`record_shop_redact: ${error.message}`);
       return { inserted: data === true };
+    },
+    async recordAppUninstalled(shop, triggeredAt) {
+      const { data, error } = await admin().schema("api").rpc("record_app_uninstalled", {
+        p_shop: shop,
+        p_triggered_at: triggeredAt,
+      });
+      if (error) throw new Error(`record_app_uninstalled: ${error.message}`);
+      return { revoked: typeof data === "number" ? data : 0 };
     },
     // Shop + webhook id + outcome only — never the payload, the HMAC header, or the secret.
     log(event, data) {
