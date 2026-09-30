@@ -285,12 +285,14 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 >    This account owns a test workspace set up for review.
 > 3. Shopify then shows the $200/month plan page. On a development store it reads "Free to
 >    test". Approve the plan.
-> 4. You land on connect.bcn-services.com, on **Sources**. A green banner reads "shopify is
->    connected", and the Shopify card lists your store as a source.
+> 4. You land on connect.bcn-services.com, on Sources. A green banner reads "Shopify is
+>    connected. The first pull starts within the hour." The Shopify card shows Connected and
+>    your store domain. The first sync runs within the hour, so Your data fills in after that.
 > 5. To test uninstall and the privacy webhooks, uninstall the app from the Shopify admin.
 >    Shopify sends `app/uninstalled`, and bcns revokes the stored token and stops syncing
->    within seconds. About 48 hours later Shopify sends `shop/redact`, which deletes the
->    store's data from bcns.
+>    within seconds. The Sources card then shows Not connected, with an "Install bcns Connect
+>    from the Shopify App Store" link. About 48 hours later Shopify sends `shop/redact`, which
+>    deletes the store's data from bcns.
 >
 > The review account holds one Shopify store at a time. If you install on a second store while
 > the first is still connected, the app refuses and asks you to uninstall from the first store.
