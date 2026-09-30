@@ -106,7 +106,7 @@ export const PNG_1x1 = Buffer.from(
  * every api RPC is JWT-tenant-scoped, which doesn't apply here; N1's own
  * rpc-record-shop-redact.test.ts covers this RPC's real access-control surface instead.
  */
-export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact'])
+export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled'])
 
 /**
  * One argument builder per api RPC, every id pointing at seeded `beta` rows. Used by the
