@@ -192,6 +192,112 @@ fold in when this starts:
 - Source card sorting/ordering. Now five cards, so this may no longer be worth doing.
 - General UX/visual pass on the hub once it has real traffic to learn from.
 
+### 10. Next pass: self-service sign-up, Connect visual tuning, SB tuning (draft, nothing built)
+
+Drafted 2026-09-29. **Nothing here is built and nothing is decided.** Every decision below is
+marked "Open — Nate to decide"; recommendations are labelled as recommendations. Statements
+marked "inference" were not read from code.
+
+#### 10a. Owner self-service sign-up and account creation
+
+What exists today (read from `origin/main` 27d2e29):
+- A client row is created only by `platform/scripts/onboard.ts`, run by Nate: it inserts
+  `data.clients` (status default `active`, `egress_quota_bytes` 20 GB), makes a smoke user and
+  attaches sources. Shopify and QuickBooks are refused there (OAuth only).
+- An owner is created only by `platform/scripts/add-member.ts --owner`. The `invite-member` Edge
+  Function (`platform/supabase/functions/invite-member/`) lets an existing owner add `member`-role
+  people to their own client, landing on `/auth/confirm` then `/set-password`. It cannot create a
+  client or an owner.
+- `data.memberships.user_id` is the primary key, so one user belongs to one client.
+- A stranger at `connect.bcn-services.com` reaches only `/login` (sign-in and forgot-password;
+  no sign-up route). A valid password with no membership bounces to "Ask bcns for an invite".
+- Local `platform/supabase/config.toml` has email `enable_signup = true`. The hosted setting was
+  not read; inference: check it in the dashboard, since if it is open a stranger can already
+  create an empty auth user.
+- Shopify-channel installs already bill through Shopify managed pricing
+  (`managedPricingRedirect`, `apps/connect/lib/shopify-oauth.ts`), not Stripe, but still need an
+  existing workspace and a signed-in owner at `/api/oauth/shopify/finish`.
+- Existing cost and abuse levers: `data.clients.status` (`active` / `paused` / `churned`),
+  `egress_quota_bytes`, `OAUTH_APPROVED_SOURCES` on the droplet, and the "Request connection"
+  email. There is no trial or plan column and no per-client source limit.
+
+Scope (smallest version): a `/signup` page on the hub (email, business name, password); Supabase
+email confirmation; on confirm, one database function creates the `data.clients` row and the owner
+membership in one transaction, with a slug derived from the name and de-duplicated. The service
+role is needed for that, so it runs in an Edge Function, not on the droplet. New workspaces start
+`paused` (an existing status value) and see only a "pending" page. One migration plus one Edge
+Function.
+Out of scope: billing UI, plan tiers, self-service Shopify shop binding (one shop = one live
+tenant), several workspaces per user, account deletion.
+
+**Open — Nate to decide: what gates a new account while Stripe waits on an EIN and a business
+bank account.**
+- (a) Ship sign-up, billing deferred. Auto-activate on email confirm, capped by a small trial
+  (for example one source, 30 days, then `paused`). About 2 days of build. Fastest to strangers;
+  free accounts consume worker runs, rows and review time before any revenue, and the abuse
+  controls have to be built and tuned.
+- (b) Wait for Stripe. Nothing to build now. One clean launch and no free tier to police, but no
+  sign-up for weeks and nothing learned from strangers. The bank account also gates Meta
+  business verification.
+- (c) Sign-up creates a pending account that Nate approves by hand. About 1 day of build: `paused`
+  default, a Resend email to Nate per confirmed sign-up (reuse `lib/request-connection.ts`), one
+  approve script. Zero runaway cost and it captures leads; Nate is the bottleneck at volume
+  (inference: acceptable at current lead flow).
+- **Recommendation (not a decision): (c).** The abuse control is already a column, it costs
+  nothing while paused, and when Stripe arrives the approve step becomes "payment succeeded"
+  without rework.
+
+Nate-only steps: `supabase db push --workdir platform`; Edge Function deploy; Supabase Auth
+dashboard (signups, email confirmation, redirect allowlist, email rate limit); hand-check that a
+confirmed stranger lands on the pending page and reads nothing else.
+
+Shopify policy follow-ups (all OPEN, not decided):
+- Rule 2.3.1, a manual shop-domain field on the hub: ruling pending, Nate.
+- Rule 1.2.1, hub-initiated connects outside Shopify billing: ruling pending, Nate.
+- `read_reports` scope: ruling pending, Nate.
+
+#### 10b. Connect visual tuning (chunk 9, promoted from "not scoped")
+
+Chunk 9 waited on 0-8 finishing and on real usage; this pass proposes starting it. Two of its
+items are already done (dead cards removed 2026-09-19); card ordering is likely moot at five cards.
+Surfaces a pass would touch in `apps/connect`: `app/login`, `app/set-password`, `app/page.tsx`
+(source cards, health tones, egress line), `app/data/` (page, `DataTable`, `StatsStrip`),
+`app/team`, `app/access` (+ `MintForm`), `app/nav.tsx`, `app/layout.tsx`, `app/globals.css`, plus
+the new sign-up and pending pages so they ship already tuned. Shared tokens live in
+`packages/ui`, which `apps/web` also uses; inference: either check the marketing site is visually
+unchanged or scope token changes to the app.
+Input needed from Nate: design direction. He has design-direction material to bring (not read
+here).
+Out of scope: new features, connector logic, Shopify listing assets.
+**Open — Nate to decide:** timing (Q5) and the design material and marketing-site effect (Q6).
+
+#### 10c. SB tuning (`apps/sb`) — placeholder
+
+**Nate's list: pending.** Known so far:
+- The home "Financial Information" card needs Shopify AND Meta by design; not a bug.
+- Revenue currency symbol, sync-time timezone, export 503 and Inventory budget are handled in the
+  separate F2 follow-ups PR and are not part of this pass.
+
+Questions that draw the list out, per page: **home** (panels: Financial Information, Content
+Library, Recent Activity, Daily Financial Report, Shopify, Meta Ads, Monday, Meet): what to add,
+remove, reorder, retitle or recolour? **/financials** (Daily Breakdown, Manual Entries): which
+columns, ranges, exports or manual-entry fields feel wrong? **/library** (Downloads tray, sets,
+Creative Folder): what slows daily use? Nothing is scoped until the list arrives.
+
+#### Open questions (Nate; most blocking first)
+
+1. Sign-up gate: option (a), (b) or (c)? Recommendation is (c).
+2. Is hosted Supabase Auth open to email sign-ups today? If so, strangers may already have empty
+   accounts.
+3. Sign-up fields and identity: business email only? Should a Shopify-installed merchant skip the
+   pending queue, since Shopify's plan gate already proves payment?
+4. Should one user be able to belong to several clients (agencies, accountants)? Today no;
+   changing it is a migration.
+5. Chunk 9 timing: before or after Meta and Monday submission? Connect or SB first?
+6. What design-direction material will you bring, and should the marketing site's look change
+   too, since `packages/ui` is shared?
+7. The SB tuning list, per page (questions under 10c).
+
 ## Order and parallelism
 
 0 → 1 serial and verification-heavy. 3 starts once 1's layout exists; 4 and 6 after 3. 2 is Nate steps plus script edits, in parallel with 1. 4b after 4, in parallel with 5, and blocks nothing. 5's partner-dashboard steps start day 1 (Nate); its code follows 4's skeleton. 7 after 2 and 4. 8 last. 9 waits on all of 0–8 and is not scheduled. A first orchestrate session realistically lands 0, 1, 3 and the hub skeleton, with every hosted step queued as a wizard.
