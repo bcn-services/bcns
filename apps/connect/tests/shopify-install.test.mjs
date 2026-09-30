@@ -555,3 +555,53 @@ test("finishErrorCode maps BCNS6 to shop-in-use, BCNS7 to shop-mismatch, anythin
   assert.equal(finishErrorCode({}), "connect-failed");
   assert.equal(finishErrorCode(null), "connect-failed");
 });
+
+/* ----------------- rule 1.2.2 gaps: real subscription check, and route wiring */
+
+// The install-initiated finish must send EVERYTHING that is not a confirmed ACTIVE
+// subscription to the plan page — including a lapsed plan on a tenant that already
+// has a Shopify source (which the route no longer even looks up) and every way the
+// check itself can fail. Driven through the real hasActiveSubscription.
+const rawFetch = (status, body) => async () =>
+  new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+const subs = (...statuses) => ({ data: { currentAppInstallation: { activeSubscriptions: statuses.map((status) => ({ status })) } } });
+
+test("managedPricingRedirect: every non-ACTIVE outcome of the real subscription check lands on the plan page", async () => {
+  const cases = {
+    "no subscriptions": rawFetch(200, subs()),
+    "only a CANCELLED/FROZEN/PENDING charge": rawFetch(200, subs("CANCELLED", "FROZEN", "PENDING")),
+    "http 500": rawFetch(500, "boom"),
+    "graphql errors": rawFetch(200, { errors: [{ message: "throttled" }] }),
+    "malformed body": rawFetch(200, { data: {} }),
+    "not json": rawFetch(200, "<html>"),
+    "network error": async () => { throw new Error("ECONNRESET"); },
+  };
+  for (const [name, fetchImpl] of Object.entries(cases)) {
+    const fail = fakeFail();
+    const result = await managedPricingRedirect({ pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
+    assert.equal(result?.status, 307, name);
+    assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK, name);
+    assert.deepEqual(fail.codes, [], `${name}: a check failure is the plan page, not the generic error page`);
+  }
+  // One ACTIVE among others writes.
+  assert.equal(
+    await managedPricingRedirect({ pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: rawFetch(200, subs("CANCELLED", "ACTIVE")) }),
+    null
+  );
+});
+
+test("finish route wiring: subscription gate runs before the connect_source write, with no source-exists read; BCNS errors go through finishErrorCode", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+  const route = read("../app/api/oauth/shopify/finish/route.ts");
+  const gate = route.indexOf("managedPricingRedirect({");
+  const write = route.indexOf('rpc("connect_source"');
+  assert.ok(gate > 0 && write > gate, "managedPricingRedirect must be called before the connect_source rpc");
+  assert.match(route, /if \(gated\) return gated;/);
+  assert.doesNotMatch(route, /connector_health_v1|alreadyConnected/, "no already-connected exemption may come back");
+  assert.match(route, /finishErrorCode\(error\)/);
+  // The hub shows the shop-mismatch copy, and the uninstall webhook is public and delegates.
+  assert.match(read("../app/page.tsx"), /searchParams\.error === "shop-mismatch"[\s\S]{0,300}one account connects one store/);
+  assert.match(read("../app/api/webhooks/shopify/app-uninstalled/route.ts"), /appUninstalledRoute\(request\)/);
+  assert.ok(read("../middleware.ts").includes("api/webhooks/"), "middleware matcher must leave /api/webhooks/ (Shopify sends no cookie) unauthenticated");
+});
