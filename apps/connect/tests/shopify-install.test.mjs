@@ -887,15 +887,18 @@ test("managedPricingRedirect: the Partner API is asked only after a definitive n
 
   for (const [name, transient] of Object.entries(TRANSIENT)) {
     const twice = gateFetch([transient(), transient(), { status: 200, body: NONE_WITH_SHOP }], PAID);
-    const [result] = await withLogs(() => gate(twice));
+    const [result, lines] = await withLogs(() => gate(twice));
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
     assert.deepEqual([twice.calls.length, twice.partnerCalls()], [2, 0], name);
+    // Not even considered: the log carries the Admin reason alone, as before.
+    assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (${name}) shop=${SHOP}`], name);
   }
   for (const [name, body] of Object.entries({ graphql_error: { errors: [{ message: "throttled" }] }, malformed: { data: { shop: { id: SHOP_GID } } } })) {
     const definitive = gateFetch([{ status: 200, body }], PAID);
-    const [result] = await withLogs(() => gate(definitive));
+    const [result, lines] = await withLogs(() => gate(definitive));
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
     assert.deepEqual([definitive.calls.length, definitive.partnerCalls()], [1, 0], name);
+    assert.deepEqual(lines, [`[connect] shopify finish sent to Shopify's plan page (${name}) shop=${SHOP}`], name);
   }
   // A transient blip then none_active is still a definitive none_active: asked once.
   const blip = gateFetch([TRANSIENT.timeout(), { status: 200, body: NONE_WITH_SHOP }], PAID);
