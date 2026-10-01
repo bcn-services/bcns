@@ -1071,7 +1071,7 @@ Per claimed row:
    - *auth* — Meta `error.code = 190` or `error.type = 'OAuthException'` with subcode 458–467, Google
      `invalid_grant`/401, Shopify HTTP 401 or `errors[].extensions.code = 'ACCESS_DENIED'`, Monday
      `USER_UNAUTHORIZED` → `status = 'auth_failed'`, `source_tokens.status = 'auth_failed'`,
-     `status_detail`.
+     `status_detail` (never over a `revoked` row: an uninstall wins).
    - *everything else* → `status = 'error'`.
    Then `connector_schedule.last_error = redact(message)` (drop query strings, strip
    `access_token=[^&\s]*`, `shpat_\w+`, `Bearer \S+`, `Authorization`/`X-Shopify-Access-Token`
@@ -1089,7 +1089,8 @@ that finds nothing due exits in < 2 s.
 `select … from data.source_tokens where status = 'active' and expires_at is not null and expires_at <
 now() + interval '10 minutes' for update skip locked` → for each, the connector's `refreshToken()`
 inside that transaction; success updates `secret, expires_at, last_refreshed_at`; failure sets
-`status = 'auth_failed', status_detail`. Only `google_oauth_refresh` has an `expires_at`; the others
+`status = 'auth_failed', status_detail`. Neither write touches a row revoked since the select: an
+uninstall wins. Only `google_oauth_refresh` has an `expires_at`; the others
 are skipped by the predicate. A 1-hour token is therefore refreshed ~24×/day, never per tick, and
 never by two executions at once (D20). A run that finds `expires_at < now()` (the housekeeping lease
 was held elsewhere) calls the same locked routine for its own row before its first request.

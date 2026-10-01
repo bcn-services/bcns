@@ -467,6 +467,25 @@ describe('worker', () => {
     expect((await failedRefresh('active')).status).toBe('auth_failed')
   })
 
+  // The success path too: a revoke landing after the due-select must not flip back to 'active'.
+  it('revoked_survives_successful_refresh', async () => {
+    const c = await mkClient([{ source: 'shopify' }])
+    await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = 'rt-old',
+               status = 'revoked', status_detail = 'app uninstalled' where client_id = $1`, [c])
+    Object.assign(process.env, { SHOPIFY_CLIENT_ID: 'cid-1', SHOPIFY_CLIENT_SECRET: 'csecret-1' })
+    const fetch = stub(url => url.endsWith('/admin/oauth/access_token')
+      ? json({ access_token: 'at-new', expires_in: 3600, refresh_token: 'rt-new' }) : {})
+    try {
+      const t = mkTick(fetch)
+      // the refresh really succeeded, so only the guard on the success UPDATE decides
+      expect(await refreshOne(await contextFor(t, c, 'shopify'), connectors.shopify)).toBe('at-new')
+    } finally {
+      delete process.env.SHOPIFY_CLIENT_ID
+      delete process.env.SHOPIFY_CLIENT_SECRET
+    }
+    expect(await tokenState(c)).toEqual({ status: 'revoked', status_detail: 'app uninstalled' })
+  })
+
   it('worker_isolation', async () => {
     await due(CLIENTS.acme, 'shopify'); await due(CLIENTS.acme, 'meta'); await due(CLIENTS.beta, 'shopify')
 
