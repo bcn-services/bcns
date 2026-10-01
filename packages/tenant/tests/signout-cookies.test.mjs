@@ -1,8 +1,15 @@
 /**
  * signout-cookies.test.mjs — what a sign-out leaves in the browser, driven
- * through the real tenantMiddleware (the production path that calls
+ * through the real tenantMiddleware (the path that calls
  * supabase.auth.signOut() and writes the cleared cookies with `...shared`).
  * Real @supabase/ssr client, stubbed fetch, no network.
+ *
+ * Coverage gap (stated, not hidden): this drives the middleware's wrong-client
+ * signOut (local scope). The user-initiated global-scope sign-out in
+ * apps/connect and apps/sb goes through createServerSupabase (src/index.ts),
+ * which needs a Next request scope and is not driven here. Both paths share
+ * cookieOptions, which is what (a) pins. Only the 3-chunk session cookie is
+ * covered, not an unchunked one or the code-verifier cookie.
  *
  * Guards: (a) every cleared auth cookie carries Domain=.bcn-services.com, or the
  * browser keeps the shared cookie and the other apps stay signed in;

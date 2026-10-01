@@ -1,6 +1,6 @@
 name: deploy-app
 
-# Ships client apps (apps/<slug>) to the droplet as bcns-app@<slug>.
+# Ships the platform apps (apps/<slug>) to the droplet as bcns-app@<slug>.
 # Ported from bcns-client-sb's deploy.yml (docs/architecture/platform-v1.md chunk 1):
 # the migrate job is gone — the platform (platform/supabase) owns the schema, so every
 # app here is shared-platform mode. Build → rsync standalone → activate + health-check
