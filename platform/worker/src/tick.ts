@@ -9,6 +9,7 @@ import { purge, thumbnails } from './media.js'
 import { renormalize } from './renormalize.js'
 import { shopRedact } from './privacy.js'
 import { revokeDisconnected } from './disconnect.js'
+import { paidPeriods } from './paid-period.js'
 
 export interface TickOpts {
   taskIndex?: number
@@ -88,6 +89,7 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
     await step('revokeDisconnected', () => revokeDisconnected(t))
     // Before claimAndRun, so a client whose grace ran out is not synced one more time.
     await step('pauseLapsed', () => pauseLapsed(t))
+    await step('paidPeriods', () => paidPeriods(t))
   }
 
   await step('claimAndRun', () => claimAndRun(t))
