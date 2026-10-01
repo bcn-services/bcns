@@ -1,6 +1,6 @@
 # ADR: Hosted-Web Business & Delivery Model
 
-- **Status:** Accepted
+- **Status:** Superseded by [`platform-v1.md`](platform-v1.md) (2026-09-15); body kept as the record of the 2026-07-18 decision. Where they disagree (repo model, delivery stack), `platform-v1.md` wins.
 - **Date:** 2026-07-18 (model-migration session)
 - **Supersedes:** the Part II "monorepo, one repo for all client apps; separate repos rejected" decision (see [Repo model](#repo-model-one-repo-per-client-business) below)
 

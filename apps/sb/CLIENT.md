@@ -26,10 +26,10 @@ layer; it never writes back to those systems.
   There's no AI summary and no chat assistant. A daily briefing of tasks to do
   comes in the next version.
 
-## Layout and visual (decided 2026-09-12, not built yet)
+## Layout and visual (decided 2026-09-12; shell and pages built, see `DESIGN.md`)
 
-- **No sidebar or tab bar.** The home view (Overview) is the one page. Remove
-  `.app-nav` from `app/layout.tsx`.
+- **No sidebar or tab bar.** The home view (Overview) is the one page
+  (`.app-nav` is gone from `app/layout.tsx` and `globals.css`).
 - **Service buttons link out.** "View Shopify Dashboard", "View Ads Manager",
   "Open Monday.com", "Join Meeting" and the like open that service's own site.
   The dashboard doesn't rebuild those services' pages.
@@ -59,7 +59,7 @@ layer; it never writes back to those systems.
 
 | Decision | Choice | Where it lands |
 | --- | --- | --- |
-| Data source | **shared** (bcns-data platform, client `sb`) | Repo var `DATA_SOURCE=shared` (set). `supabase/` deleted. Data is read only through `lib/data.ts`. At deploy, `/srv/sb/env` holds the platform URL and anon key, plus `HEALTH_EMAIL`/`HEALTH_PASSWORD` = `smoke+sb@bcn-services.com` (keychain `bcns-smoke-sb`). |
+| Data source | **shared** (bcns platform, client `sb`) | `DATA_SOURCE=shared` in `/srv/sb/env` (`lib/data.ts` returns null otherwise; `deploy-app.yml` sets none). No `supabase/` directory. Data is read only through `lib/data.ts`. At deploy, `/srv/sb/env` holds the platform URL and anon key, plus `HEALTH_EMAIL`/`HEALTH_PASSWORD` = `smoke+sb@bcn-services.com` (keychain `bcns-smoke-sb`). |
 | Shape | **app only in v1** (decided 2026-09-15): no agent loop, no agent user, nothing on a timer. The Daily Financial Report is computed on each page load. `agent/` and `scripts/briefing.ts` stay in the repo, unused. | No `AGENT_*` in `/srv/sb/env` |
 | AI feature | **off in v1** (agreed with Declan 2026-09-15). The next version's task briefing would turn it on: BYOK, capped at a monthly ceiling SB approves. | `AI_ENABLED` unset and no `ANTHROPIC_API_KEY` in `/srv/sb/env` |
 | Storage backend | **platform media RPCs** (data-client `media.*`) | `lib/storage.ts` stays `null` (note added) |
@@ -70,10 +70,11 @@ layer; it never writes back to those systems.
 - **Shopify connection method:** an OAuth app install (callback) or
   client-credentials token refresh in the connector. Legacy `shpat_` custom
   apps can't be created anymore, and SaunaBoy isn't in the bcns org.
-- **The add-source script:** bcns-data `onboard` can't re-run, so adding a
-  source to `sb` needs a new script.
+- **Adding sources to `sb`:** `platform/scripts/add-source.ts` exists (it gates on
+  the worker's connector registry; Shopify and QuickBooks are OAuth-only).
+  Which of those SB's sources actually go through it is not recorded here.
 - **Declan's inputs:** Meta partner access + act_id, Monday access and boards,
   a Meet notes sample, the Drive folder to index, confirmation of the live
   Shopify store, brand assets, and the team login list.
-- **Infra:** droplet `/srv/sb/env`, repo var `CLIENT_SLUG`, DNS, UptimeRobot
-  (see `DEPLOY.md`).
+- **Infra:** droplet `/srv/sb/env`, DNS, UptimeRobot (see `DEPLOY.md`; `CLIENT_SLUG`
+  was a per-repo variable and is not used by `deploy-app.yml`).

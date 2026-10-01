@@ -105,7 +105,7 @@ exactly the items below — one view migration, no new table, no new RPC, no OAu
   render. Download link branches: `api.download_url` for `source='upload'` (existing rows keep
   working), `attributes.web_view_link` for `source='drive'`.
 - `apps/connect/lib/sources.ts`: add `drive` to `HUB_SOURCES` (lists 6 of 7 `data.source` values today).
-  (Superseded 2026-09-19: `HUB_SOURCES` is now the five connectors only — see §9.)
+  (Superseded 2026-09-19: `HUB_SOURCES` is now the connectors only, six of them — see §9.)
 - Leave in place: the `media` bucket and its policies (the Drive connector writes thumbs there),
   `api.register_upload` and `data.register_media` (still the service-role import path for
   `scripts/import-media`), `egress_quota_bytes`/`egress_ledger`/`download_tickets` (download
@@ -167,6 +167,7 @@ If Declan sends credentials before chunk 1 lands: deploy the frozen `bcns-client
 - Sign in at the hub → open SB → no second login; sign out propagates.
 - Independence drill: stop the hub unit; every `bcn-services.com` route still serves.
 - Worker tick green after the first post-merge deploy; RLS forbidden-read green on `main`.
+- Status 2026-10-01: the hosted gates above (sign-in to SB with no second login, independence drill, post-merge worker tick) are **not yet proven on the hosted stack**. Open PR `docs/v1-layout-chunk8` (unmerged) covers only this repo's CLAUDE.md/README and the `hosted-web-model.md` status; the os updates (`hosting-reference.md`, client READMEs, memory) and repo archiving are not started.
 - Docs: this repo's CLAUDE.md rewritten for the layout; `hosted-web-model.md` marked superseded; `hosting-reference.md`, os client READMEs, and the "bcns-data is bcns Connect" memory updated; repos archived.
 
 ### 9. Final UX + visual polish pass on `apps/connect` (deferred, not scoped)
@@ -178,18 +179,18 @@ fold in when this starts:
   and can never leave the "Not connected / Request connection" state that pattern implies.~~
   **DONE 2026-09-19** (`chore/drop-upload-source-card`). Not a UX treatment in the end — a
   deletion. Both cards were dead: `platform/worker/src/connectors/index.ts` types `Source` as
-  exactly the five real connectors, `data.connector_health` rows are only ever derived from a
+  exactly the real connectors (the five that existed then; QuickBooks has since been added), `data.connector_health` rows are only ever derived from a
   `data.connector_schedule` row, and `platform/scripts/add-source.ts` gates on that same
   registry — so neither source could ever get a health row. Chunk 4b then removed the last app
   path writing `source='upload'`, which is what made the note above stale the day after it was
-  written. `HUB_SOURCES` in `apps/connect/lib/sources.ts` is now the five connectors only;
-  that file carries the reasoning so it is not re-added. **Do not re-add either card.**
+  written. `HUB_SOURCES` in `apps/connect/lib/sources.ts` is the connectors only (six as of 2026-10-01: Shopify,
+  Meta, Monday, Meet, Drive, QuickBooks); that file carries the reasoning so it is not re-added. **Do not re-add either card.**
   `data.source` keeps both enum values — existing `source='upload'` media rows and
   `scripts/import-media` still rely on them; only the hub cards are gone.
 - ~~Dashboard's source card doesn't belong grouped with real connectors — give it its own spot.~~
   **DONE 2026-09-19**, by the same deletion. "Open your dashboard" already had its own spot:
   `dashboardUrl()` + `apps/connect/app/page.tsx`, which never depended on `HUB_SOURCES`.
-- Source card sorting/ordering. Now five cards, so this may no longer be worth doing.
+- Source card sorting/ordering. Now six cards (Shopify, Meta, Monday, Meet, Drive, QuickBooks); may not be worth doing.
 - General UX/visual pass on the hub once it has real traffic to learn from.
 
 ### 10. Next pass: self-service sign-up, Connect visual tuning, SB tuning (scoped, nothing built)
@@ -257,15 +258,14 @@ Shopify policy rulings (Nate, 2026-09-30; the doc has no Shopify policy section,
 Follow-ups from the Shopify billing work (verified in this run, 2026-09-30):
 - Nothing ends hub access when a Shopify paid period ends: the Partner API end time is only logged. Needs a stored `paid_until`, a worker or cron re-check and a migration. Accepted as a gap for now by Nate.
 - After a paid period ends, the plan page behaviour is untested.
-- The hub source card shows "Connected" after an uninstall (`apps/connect/lib/health.ts` has no revoked state).
-- The worker `run.ts` revoked-to-`auth_failed` guard branch needs a rebase.
-- Stale comment at `apps/connect/lib/env.ts:40-44`.
+- The worker revoked-to-`auth_failed` guard: no such branch exists; it is being written fresh on `fix/worker-revoked-guard` (open PR, unmerged).
+- Stale comment at `apps/connect/lib/env.ts:38-45` (the `shopifyAppHandle` doc block).
 
 #### 10b. Connect visual tuning (chunk 9, promoted from "not scoped")
 
 Scope unchanged from the draft. Chunk 9 waited on 0-8 finishing and on real usage; this pass
 starts it. Two of its items are already done (dead cards removed 2026-09-19); card ordering is
-likely moot at five cards. Surfaces a pass would touch in `apps/connect`: `app/login`,
+likely moot at six cards. Surfaces a pass would touch in `apps/connect`: `app/login`,
 `app/set-password`, `app/page.tsx` (source cards, health tones, egress line), `app/data/` (page,
 `DataTable`, `StatsStrip`), `app/team`, `app/access` (+ `MintForm`), `app/nav.tsx`,
 `app/layout.tsx`, `app/globals.css`, plus the new sign-up and pending pages so they ship already
@@ -278,7 +278,23 @@ Out of scope: new features, connector logic, Shopify listing assets.
 
 The tuning list was not captured from Nate during this run; not started. Known so far:
 - The home "Financial Information" card needs Shopify AND Meta by design; not a bug.
-- Revenue currency symbol, sync-time timezone, export 503 and Inventory budget shipped in the F2 follow-ups (#81).
+- Revenue currency symbol, sync-time timezone, export 503 and Inventory budget: earlier text here said these shipped in #81. That was wrong: #81 ("F2 follow-ups", merged) changed no file under `apps/sb` (checked with `gh pr view 81 --json files`). Status of these four on `main` is unverified; the audit-bug fixes for `apps/sb` are in open PR `fix/sb-audit-bugs`.
+
+#### Overnight run 2026-10-01 (PRs open, unmerged)
+
+Nothing below is merged, deployed or db-pushed. Each branch is an open PR (or a draft) waiting on Nate.
+
+- Open PRs: `feat/signup-pending`, `fix/worker-revoked-guard`, `chore/hygiene-comments-sso-tests`, `fix/platform-test-flake-seed`, `fix/sb-audit-bugs`, `docs/v1-layout-chunk8`, `chore/quickbooks-worker-env`, `feat/site-signin-button`.
+- Drafts: `feat/shopify-paid-period-end`, `draft/site-services-sections`, `draft/legal-acceptance-wording`.
+
+Rulings made by recommendation (Nate may overrule):
+- Sign-up adds a new `pending` client status. A pending owner signs in to a pending-only page. Ships dark behind `SIGNUP_ENABLED`.
+- The paid-period fix is a held draft. "Ending access" is the same state as an uninstall; data is kept.
+- `SHOPIFY_APP_HANDLE` unset: documentation only, no code default.
+- Sign-up abuse control is server-side; no captcha.
+- Google External "Trusted" app: console steps only. Hub Google OAuth is a new build and has not started.
+- SB's `EXPECTED_CLIENT_ID` exemption stays.
+- Chunk 9 hub visuals are owned by another window.
 
 #### Open questions (Nate)
 

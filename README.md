@@ -1,13 +1,14 @@
 # bcns
 
 Platform monorepo for **bcns** — a software studio that builds custom software
-for local small businesses. This repo holds the marketing site and the shared
-packages. **Client apps do not live here** — each client business gets its own
-repo generated from the standalone
-[`bcns-app-template`](https://github.com/nseluga/bcns-app-template) Template
-Repository, consuming the shared packages by version. See
+for local small businesses. One repo holds the marketing site, the Connect hub,
+the MCP server, the client apps, the shared packages, the data platform
+(Supabase migrations, Edge Functions, connector worker) and the droplet
+scripts. Plan, chunks and verification gates:
+[`docs/architecture/platform-v1.md`](docs/architecture/platform-v1.md). The
+earlier one-repo-per-client model in
 [`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
-for the delivery model and rationale.
+is superseded.
 
 ---
 
@@ -15,13 +16,24 @@ for the delivery model and rationale.
 
 ```
 bcns/
-├─ apps/              # Platform-owned apps only (not client apps)
-│  └─ web/            # The landing website (Next.js App Router + TS + Tailwind)
+├─ apps/
+│  ├─ web/            # Marketing site (Next.js App Router + TS + Tailwind), deployed on Vercel
+│  ├─ connect/        # Hub: connect.bcn-services.com (sign-in, sources + health, team, access)
+│  ├─ mcp/            # MCP server: mcp.bcn-services.com (plain Node, not Next)
+│  ├─ sb/             # SB Command Center, the first Deluxe client app
+│  └─ _template/      # Stamp for the next Deluxe app (scripts/new-app.sh <slug> <port>)
 ├─ packages/
 │  ├─ ui/             # Shared React component library (@bcn-services/ui)
 │  ├─ config/         # Shared tsconfig / ESLint / Tailwind / Prettier (@bcn-services/config)
-│  └─ app-core/       # @bcn-services/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client + AI opt-in gate, health probe, webhook hygiene, storage interface
-├─ package.json       # Root scripts + workspace dev dependencies
+│  ├─ app-core/       # @bcn-services/app-core: pricing & seat-billing math, subscription-state (provision/suspend), BYOK Anthropic client + AI opt-in gate, health probe, webhook hygiene, storage interface
+│  ├─ data-client/    # @bcn-services/data-client: typed access to the platform's api.*_v1 views and RPCs
+│  └─ tenant/         # @bcn-services/tenant: session-cookie helpers, membership middleware, EXPECTED_CLIENT_ID pin
+├─ platform/          # Former bcns-data: supabase/ (migrations, Edge Functions), worker/, scripts/, test/, docs/
+├─ infra/             # Shared droplet as code: bootstrap, onboard-client.sh, systemd unit, backups, ports.txt
+├─ docs/architecture/ # ADRs and chunk plans
+├─ scripts/           # new-app.sh (stamps apps/<slug> from apps/_template)
+├─ .github/workflows/ # deploy-app.yml, deploy-worker.yml, platform-ci.yml
+├─ package.json       # Root scripts + workspace dev dependencies (packageManager pnpm@9.15.0)
 ├─ pnpm-workspace.yaml
 ├─ turbo.json         # Turborepo task pipeline
 ├─ .nvmrc             # Node version (22)
@@ -57,14 +69,17 @@ bcns/
 pnpm install
 ```
 
+The root pins `pnpm@9.15.0`. On a machine with pnpm 11, bare `pnpm lint` / `pnpm typecheck` work (pnpm 11 switches versions itself); `corepack pnpm lint` fails there because turbo's child process runs the PATH pnpm 11 under corepack. See `CLAUDE.md` -> Commands.
+
 ## Develop
 
 ```bash
 pnpm dev
 ```
 
-Runs the landing site at **http://localhost:3000**. (Turbo runs the `dev` task;
-only `apps/web` has one.)
+Turbo runs every app's `dev` task; the marketing site is pinned to
+**http://localhost:3000**. To run just one app: `pnpm --filter @bcn-services/<name> dev`.
+Do not run `pnpm build` while `pnpm dev` is up (it corrupts the dev server).
 
 ## Build
 
@@ -105,13 +120,13 @@ cp apps/web/.env.example apps/web/.env.local
 
 ## Deploy (Vercel free tier)
 
-The only recurring cost is a domain — no databases or paid services.
+For the marketing site, the only recurring cost is a domain — no databases or paid services (the platform has its own hosting costs).
 
 This is a pnpm monorepo, so the deploy hinges on one project setting:
 
 **Project → Settings → Build & Deployment → Root Directory = `apps/web`**
 
-**Platform-v1 (2026-09-15):** the repo is now a workspace with `apps/sb`, `platform/`, `packages/data-client`. Vercel keeps Root Directory = `apps/web` and uses two settings so unrelated pushes neither build nor break the site: Build Command `turbo run build --filter=@bcn-services/web...` (the package name — `web` or the old `@nseluga/web` make turbo exit 1) and Ignored Build Step `git diff --quiet HEAD^ HEAD -- :/apps/web :/packages/ui :/packages/config :/packages/app-core :/package.json :/pnpm-lock.yaml`. `apps/web/__tests__/isolation.test.mjs` asserts the site imports nothing from `apps/*`, `platform/` or `packages/{data-client,tenant}`.
+**Platform-v1 (2026-09-15):** the repo is a workspace with the hub, MCP server and client apps (`apps/connect`, `apps/mcp`, `apps/sb`), `platform/` and `packages/{data-client,tenant}`; only `apps/web` goes to Vercel (the rest deploy to the droplet via `deploy-app.yml`). Vercel keeps Root Directory = `apps/web` and uses two settings so unrelated pushes neither build nor break the site: Build Command `turbo run build --filter=@bcn-services/web...` (the package name — `web` or the old `@nseluga/web` make turbo exit 1) and Ignored Build Step `git diff --quiet HEAD^ HEAD -- :/apps/web :/packages/ui :/packages/config :/packages/app-core :/package.json :/pnpm-lock.yaml`. `apps/web/__tests__/isolation.test.mjs` asserts the site imports nothing from `apps/*`, `platform/` or `packages/{data-client,tenant}`.
 
 Leave everything else on auto-detect. Vercel reads the Next.js preset from
 `apps/web`, and because "Include files outside the Root Directory" is on by
@@ -138,22 +153,18 @@ lean.)
 
 ---
 
-## Adding a client app later
+## Adding a client app
 
-Client apps are **not** added to this monorepo. Each new client business gets
-**its own repo**, generated from the
-[`bcns-app-template`](https://github.com/nseluga/bcns-app-template) Template
-Repository — preferably via the `/new-client-repo` Claude Code skill (see
-`SETUP.md`). See
-[`docs/architecture/hosted-web-model.md`](docs/architecture/hosted-web-model.md)
-for the full delivery model and rationale.
+Client apps live in this repo as `apps/<slug>`. From the root:
 
-1. Generate a new repo from `bcns-app-template` — pre-wired to the hosting
-   stack and shared packages.
-2. Consume the shared packages **by version** (normal dependencies, not
-   `workspace:*`): `@bcn-services/ui`, `@bcn-services/config`, and `@bcn-services/app-core`.
-3. Propagate shared improvements by publishing a new package version and bumping
-   it in each client repo — no copy-paste per app.
+```bash
+./scripts/new-app.sh <slug> <port>   # stamps apps/_template, writes CLIENT.md, registers the port in infra/ports.txt
+```
 
-`apps/` in this repo holds only the platform's own app (`apps/web`). DeLuca's
-lives in its own repo, `bcns-client-delucas`.
+(or the `/new-client-app` Claude Code skill). Then add the slug to
+`.github/workflows/deploy-app.yml` (both `on.push.paths` and
+`strategy.matrix.slug`) and onboard the droplet with `infra/onboard-client.sh`.
+Apps consume the shared packages as `workspace:*` and read data through
+`@bcn-services/data-client` as the signed-in user. Legacy one-off builds
+(Technology Associates, l2detailz, DeLuca's) keep their own repos. See
+[`docs/architecture/platform-v1.md`](docs/architecture/platform-v1.md).

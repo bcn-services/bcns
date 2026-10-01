@@ -148,3 +148,55 @@ TEAM Render case-study screenshots with next/image (PLAN item 8) — risk: loud,
 - **What worked:** mutation check by swapping in origin/main's sources.ts; review caught the worker-filter freeze/race and the missing backfill.
 - **What failed:** review Important x3 (no backfill, revoke race, operator-disabled freeze) fixed in attempt 2; attempt-2 fixes not re-QA'd (small, read by orchestrator). DB/worker SQL not run by the team (no live DB); platform-ci run 36790593713 applied it and passed the regression suite (278), but no test asserts the new seed/delete/backfill/worker-skip behaviour.
 - **Remember next run:** health rows come only from worker computeHealth; any "derive state from tokens" fix must live in data.* functions or the worker. 21 connect tests fail without a built packages/tenant/dist (baseline).
+
+## 2026-10-01 — dev-team-auto — P10 marketing site services restructure (DRAFT PR #95)
+- **Outcome:** DONE — 1 attempt — caution: no — team: dt-ui sonnet/high, dt-qa sonnet/high, dt-review opus/high — branch draft/site-services-sections, commit ec6314a
+- **What happened:** Added an OfferIntro lead block per offer on /services (content.offers, new component, new test, CONTENT.md synced). QA PASS with screenshots, opus review 0C/0I/5M, four minors applied inline and delta-checked, draft PR opened, CI green.
+- **What worked:** Probing the premise first showed three blocks already existed, so only a lead block was needed. Tests that read sources and content via the glob test script ran with no list edit.
+- **What failed:** none. The brief's baseline (76) was off by one (75 actual).
+- **Remember next run:** rm -rf apps/web/.next before web tests, or b3-copy-wiring and past-work-card-links fail on a stale .next. The web test script is a glob, so new .mjs tests run automatically. CI excludes web tests. A sonnet QA can also take the before/after screenshots using a temp detached worktree of origin/main on port 3151.
+
+## 2026-10-01 — dev-team-auto — P8 marketing site Sign in button
+- **Outcome:** DONE — 1 attempt — caution: no — team: dt-ui sonnet/high, dt-qa sonnet/high (x2), dt-review opus/high (brief-mandated) — feat/site-signin-button, 61ace4c (PR #93)
+- **What happened:** The header Sign in link became an outline button in the desktop nav and the mobile menu. Opus review found one Important: the md-width header might overflow. Fixed with a smaller nav gap, and delta QA measured 768 to 1280 and 375.
+- **What worked:** Header measurements at md widths and a Tab-key focus check over the Chrome debugging port. A source-level test that reads the header file and lib/site.ts.
+- **What failed:** The first QA pass checked only 375 and 1280 and missed the md-width risk the review caught. The first test pinned six class names, which would break on the editorial redesign.
+- **Remember next run:** For header layout changes, check 768-820px, not just 375 and 1280. a2-fix-verification passes on a clean tree.
+
+## 2026-10-01 — dev-team-auto — P6 chunk 8 docs (repo docs for merged layout)
+- **Outcome:** DONE — 1 attempt (+2 fix passes) — caution: no — team: dt-engineer sonnet/high, dt-qa sonnet/high, dt-review opus/high — docs/v1-layout-chunk8, 470075a (PR #92)
+- **What happened:** Engineer rewrote 7 docs from the tree/workflows; QA fact-check FAILed on a duplicated front-matter block and a wrong script path; review found 2 Important (over-claimed PR scope, web-only conventions read as monorepo-wide) and 8 Minor; all applied.
+- **What worked:** fact-check QA against the real workflows/ports/sources; running the check script after each pass.
+- **What failed:** item premise "corepack pnpm lint works" was false on pnpm 11 machines; engineer's fix left stale echoes that only the reviewer caught; sed -i on macOS needs '' (BSD).
+- **Remember next run:** docs under apps/sb/** or apps/connect/** trigger deploy-app (restarts hub/SB/MCP) — put docs elsewhere when a restart is unwanted; scope convention docs per app (web=Tailwind, sb/_template=plain CSS); "present tense" docs need a stale-echo sweep of sibling surfaces.
+
+## 2026-10-01 — dev-team-auto — P3 hygiene (stale comments, env docs, workflow header, SSO cookie tests)
+- **Outcome:** DONE — 1 attempt — caution: no — team: dt-engineer sonnet/high, dt-qa sonnet/high, dt-review opus/high — branch chore/hygiene-comments-sso-tests, commit 0dc2ddc, PR #91
+- **What happened:** Comment/doc fixes plus a new packages/tenant sign-out cookie test driven through the real tenantMiddleware with a stubbed fetch. QA PASS, review PASS with one Important (overclaiming test header), fixed inline.
+- **What worked:** Probing every SHOPIFY_APP_HANDLE reader first; mutation checks on cp backups; filtering the workflow diff for non-# lines.
+- **What failed:** none. First `git push` was rejected (PAT lacks workflow scope).
+- **Remember next run:** A branch touching .github/workflows must be pushed with `GITHUB_TOKEN= git push` (keyring token has the workflow scope). packages/tenant tests are a hard-coded list in package.json. apps/sb has 2 pre-existing failures (agent.test.mjs, shared-mode.test.mjs).
+
+## 2026-10-01 — dev-team-auto — P7 QuickBooks worker env wiring
+- **Outcome:** DONE — 1 attempt — caution: no — team: dt-engineer sonnet/high, dt-qa sonnet/high, dt-review opus/high — chore/quickbooks-worker-env, de5e833, PR #90, CI green
+- **What happened:** Probed the premise first. Job env and secrets are applied only at job create; deploy-worker's `jobs update` never touches them. A missing secret ref would break the create, so QuickBooks became its own opt-in step 6b using `--update-*`.
+- **What worked:** A fake-gcloud stub on PATH under `env -i`, driving the real script with piped y/n answers. QA mutated copies of the script, never the live file.
+- **What failed:** Nothing blocking. Review: 4 Minor applied, 1 pre-existing Important in step 6 parked. Reviewer edited STANDARDS.md despite being no-edit; reverted — revert unrequested repo edits after review.
+- **Remember next run:** gcp-setup.sh job env/secrets are create-time only; new vars need their own opt-in `--update-*` step. Never `--set-*` on a live job. Gate a step needing a not-yet-existing secret behind exists-checks and skip-with-message.
+
+## 2026-10-01 — dev-team-auto — P4 platform test flake + seed typo (PR #96), P5 SB audit fixes (PR #97)
+- **Outcome:** both DONE — caution: no — team: dt-engineer sonnet/high, dt-qa sonnet/high, dt-review opus/high — 0380f7a, f1b7b73
+- **Remember next run:** Run a nested vitest via `process.execPath` + `node_modules/vitest/vitest.mjs`, not a bare `pnpm` (no corepack in the child). `data.messages.kind` is unconstrained text, so a seed typo is silent. apps/sb tests need packages/tenant and data-client built or 3 files fail; DESIGN.md copy is locked by qa-library tests. On a machine too starved to run the local stack, platform-ci `test` on the PR is the database evidence; it can flake on a Docker rate limit at "start local stack" (`gh run rerun --failed`).
+
+## 2026-10-01 — dev-team-auto — P2 worker: revoked token never overwritten (PR #98), P9 paid-period end (local branch, held)
+- **Outcome:** P2 DONE, P9 parked unpushed — caution: yes — team: dt-engineer opus/high, dt-qa opus/high, dt-review opus/high — 2656ce0; feat/shopify-paid-period-end ad52348
+- **What happened:** P2 put `and status <> 'revoked'` on three token UPDATEs (the review added the successful-refresh one). P9 stores the paid-through date and lets the worker end access; its database tests never ran.
+- **What failed:** No usable local database all night (half-migrated stack on an 8 GB machine under load). Under auto mode an agent's `git push` of a new feature branch and of throwaway `mutation/*` branches was refused; neither was routed around.
+- **Remember next run:** In worker.test.ts a fixture left revoked must have its client churned, or health_one_row fails. Keep decision logic pure (`decide()`), so most mutation checks run without a database. A mutation check that needs CI is handed to Nate as a patch file plus a wizard step, not pushed by an agent. vitest prints passing test names in a failed job's log, so a mutation counts as red only on a ` FAIL ` line naming the test.
+
+## 2026-10-01 — dev-team-auto — P1 owner self-service sign-up, dark (PR #99)
+- **Outcome:** DONE — 2 attempts — caution: yes — team: dt-analyze sonnet/high, dt-engineer opus/high, dt-qa opus/high, dt-review opus/high — feat/signup-pending, 459a889
+- **What happened:** Hub `/signup` → public `signup` Edge Function → `api.signup_create_client` (pending client + owner, capped 10/hour) → `/pending` until bcns activates by hand. Review returned CHANGES (2 Important); fix pass, delta QA PASS, delta review APPROVE.
+- **What worked:** Pure handler with injected deps, so most mutation checks ran with no database. Proving the switch-off case by test (login page differs only by the gated link).
+- **What failed:** The first build gated only the hub page: a `--no-verify-jwt` function is live the moment it deploys. The hosted steps missed the "Confirm signup" template and the SMTP gate.
+- **Remember next run:** A public Edge Function needs its own secret gate; a hub env switch does not keep it dark. GoTrue checks duplicate addresses before password strength, so answering 400 on `weak_password` leaks whether an address exists. A notice keyed on `verifyOtp type=email` needs an `email_confirmed_at` freshness check. The "Confirm signup" template must link `token_hash` with `type=email` to reach `/auth/confirm`. A new enum value goes in its own migration file.
