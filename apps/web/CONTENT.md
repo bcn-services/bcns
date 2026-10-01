@@ -46,7 +46,7 @@ interface and the component.
 | Page | URL | Content keys used |
 |------|-----|-------------------|
 | Home | `/` | `hero`, `buildingBlocks`, `navCards`, `contactSection`, `pageMeta.home` |
-| Services | `/services` | `useCases` (page head + Deluxe grid), `connect`, `aiConsult`, `howItWorks`, `contactSection`, `pageMeta.services` |
+| Services | `/services` | `useCases` (page head + Deluxe grid), `offers` (lead block per offer), `connect`, `aiConsult`, `howItWorks`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
@@ -340,11 +340,50 @@ tuple.
 
 ---
 
+## Offers (`siteContent.offers`) — /services
+
+One lead block per offer, rendered above that offer's steps or grid by
+`OfferIntro`. `items` is a fixed tuple of 3, in page order: bcns Connect,
+Deluxe builds, AI consulting. Each block carries a heading, a one-paragraph
+description, who it is for, the price, and a CTA that links to `/#contact`.
+Audience is small businesses, never "local". No Standard or Advanced tiers.
+
+### items[n].id
+- **Field:** `offers.items[n].id`
+- **Purpose:** Anchor id on /services: `connect`, `deluxe`, `ai-consult`. Do not change; the hero CTA links to `#connect`.
+
+### items[n].title
+- **Field:** `offers.items[n].title`
+- **Purpose:** Section heading: the product name
+- **Length:** 1-3 words
+
+### items[n].description
+- **Field:** `offers.items[n].description`
+- **Purpose:** One paragraph on what it is. Reuses the matching `buildingBlocks` sentence.
+- **Length:** 1-2 sentences, ≤160 chars
+
+### items[n].audience
+- **Field:** `offers.items[n].audience`
+- **Purpose:** Who it is for. Starts "For small businesses" or "For small business owners".
+- **Length:** 1 sentence, ≤110 chars
+
+### items[n].price
+- **Field:** `offers.items[n].price`
+- **Purpose:** Price line. Must match `pricing.tiers`: Connect `$200 / month, no setup fee`; Deluxe `From $5,000 setup + $300 / month on top of Connect`; AI consulting `$1,000 / day`.
+- **Length:** ≤60 chars
+
+### items[n].cta
+- **Field:** `offers.items[n].cta`
+- **Purpose:** Button label, links to `/#contact`
+- **Length:** 2-5 words
+
+---
+
 ## Connect (`siteContent.connect`) — /services
 
 How bcns Connect works, as three steps with the monthly rate as the numeric
 anchor. Same shape as `aiConsult` (`AiConsultContent`) and rendered by the
-same component with `id="connect"` (the hero's secondary CTA links here).
+same component with `id="connect-steps"`. The `connect` anchor now sits on the `offers` lead block above it (the hero's secondary CTA links to `/services#connect`).
 Describe the finished product, the end vision, in the owner's words: tools
 they recognise, never how the connection works underneath.
 

@@ -72,6 +72,20 @@ export interface AiConsultContent {
   steps: [AiConsultStep, AiConsultStep, AiConsultStep];
 }
 
+export interface OfferItem {
+  /** Anchor id on /services: connect, deluxe, ai-consult. */
+  id: string;
+  title: string;
+  description: string;
+  audience: string;
+  price: string;
+  cta: string;
+}
+
+export interface OffersContent {
+  items: [OfferItem, OfferItem, OfferItem];
+}
+
 export interface ContactHighlightItem {
   title: string;
   description: string;
@@ -234,6 +248,7 @@ export interface SiteContent {
   hero: HeroContent;
   buildingBlocks: HowItWorksContent;
   howItWorks: HowItWorksContent;
+  offers: OffersContent;
   connect: AiConsultContent;
   useCases: UseCasesContent;
   aiConsult: AiConsultContent;
@@ -316,6 +331,41 @@ export const siteContent: SiteContent = {
         title: "The build",
         description:
           "We connect your tools and build anything you asked for on top, then let you test it and refine it until it's right. Once launched, we host it, maintain it and support your needs so you can focus on your business.",
+      },
+    ],
+  },
+
+  offers: {
+    items: [
+      {
+        id: "connect",
+        title: "bcns Connect",
+        description:
+          "Every tool your business runs on, connected in one organized place. Ready for your team, the AI tools you choose, or anything you build next.",
+        audience:
+          "For small businesses whose customers, orders, money and files are spread across many tools.",
+        price: "$200 / month, no setup fee",
+        cta: "Get connected",
+      },
+      {
+        id: "deluxe",
+        title: "Deluxe builds",
+        description:
+          "An AI agent, an app, a dashboard, anything really. Custom built on top of Connect around how your business already works.",
+        audience:
+          "For small businesses with a specific pain point that off-the-shelf software does not fix.",
+        price: "From $5,000 setup + $300 / month on top of Connect",
+        cta: "Talk about a build",
+      },
+      {
+        id: "ai-consult",
+        title: "AI consulting",
+        description:
+          "One day spent on your business. We find where AI actually helps, build it with you, and get your team using it.",
+        audience:
+          "For small business owners and teams who want to use AI and are not sure where to start.",
+        price: "$1,000 / day",
+        cta: "Ask about a consult day",
       },
     ],
   },
