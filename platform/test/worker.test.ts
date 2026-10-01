@@ -413,8 +413,14 @@ describe('worker', () => {
   // neither auth_failed write may then turn 'revoked' back into a reconnectable 'auth_failed'.
   const dead401 = stub(url => url.includes('api.monday.com') || url.endsWith('/admin/oauth/access_token')
     ? json({ error: 'invalid_token', error_description: 'token revoked' }, 401) : {})
-  const tokenState = async (c: string) => (await sql<{ status: string; status_detail: string | null }>(
-    `select status, status_detail from data.source_tokens where client_id = $1`, [c])).rows[0]
+  // Churns the fixture after reading: computeHealth gives a revoked source no health row,
+  // so an active client left with one would break health_one_row's per-client count.
+  const tokenState = async (c: string) => {
+    const r = (await sql<{ status: string; status_detail: string | null }>(
+      `select status, status_detail from data.source_tokens where client_id = $1`, [c])).rows[0]
+    await sql(`update data.clients set status = 'churned' where id = $1`, [c])
+    return r
+  }
 
   /** runOne with a 401 from the connector, token row already `status` (the race: set after claim). */
   async function failedRun(status: 'active' | 'revoked') {
