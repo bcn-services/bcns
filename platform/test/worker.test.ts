@@ -3,12 +3,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { CLIENTS, localKeys, pool, sql, SUPABASE_URL } from './helpers.js'
 import { closePool, type Tick } from '../worker/src/db.js'
-import { claim, runOne, type ScheduleRow } from '../worker/src/run.js'
+import { claim, contextFor, refreshOne, runOne, type ScheduleRow } from '../worker/src/run.js'
 import { tick, type TickResult } from '../worker/src/tick.js'
 import { refreshTokens } from '../worker/src/tokens.js'
 import { alerts, computeHealth } from '../worker/src/health.js'
 import { renormalize } from '../worker/src/renormalize.js'
-import type { Source } from '../worker/src/connectors/index.js'
+import { connectors, type Source } from '../worker/src/connectors/index.js'
 
 const KIND: Record<Source, string> = {
   shopify: 'shopify_admin', meta: 'meta_system_user', monday: 'monday_personal', meet: 'google_oauth_refresh', drive: 'google_oauth_refresh',
@@ -407,6 +407,58 @@ describe('worker', () => {
     expect(t.status).toBe('active')
     expect(t.status_detail).toBeNull()
     expect(t.secret).toBe('at-revived')
+  })
+
+  // An uninstall (data.revoke_shopify_install) can land after claim()/refreshTokens picked the row:
+  // neither auth_failed write may then turn 'revoked' back into a reconnectable 'auth_failed'.
+  const dead401 = stub(url => url.includes('api.monday.com') || url.endsWith('/admin/oauth/access_token')
+    ? json({ error: 'invalid_token', error_description: 'token revoked' }, 401) : {})
+  const tokenState = async (c: string) => (await sql<{ status: string; status_detail: string | null }>(
+    `select status, status_detail from data.source_tokens where client_id = $1`, [c])).rows[0]
+
+  /** runOne with a 401 from the connector, token row already `status` (the race: set after claim). */
+  async function failedRun(status: 'active' | 'revoked') {
+    const c = await mkClient([{ source: 'monday' }])
+    const t = mkTick(dead401)
+    await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1`, [c, t.owner])
+    await sql(`update data.source_tokens set status = $2::data.token_status, status_detail = 'app uninstalled' where client_id = $1`, [c, status])
+    const row = (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1`, [c])).rows[0]
+    await runOne(t, row)
+    const run = (await sql<{ status: string }>(`select status from data.connector_runs where client_id = $1`, [c])).rows[0]
+    expect(run.status).toBe('auth_failed') // the failure really was auth-class, so only the guard decides
+    return tokenState(c)
+  }
+
+  /** refreshOne on an expiring shopify row already `status`, refresh endpoint answers 401. */
+  async function failedRefresh(status: 'active' | 'revoked') {
+    const c = await mkClient([{ source: 'shopify' }])
+    await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = 'rt-old',
+               status = $2::data.token_status, status_detail = 'app uninstalled' where client_id = $1`, [c, status])
+    Object.assign(process.env, { SHOPIFY_CLIENT_ID: 'cid-1', SHOPIFY_CLIENT_SECRET: 'csecret-1' })
+    try {
+      const t = mkTick(dead401)
+      expect(await refreshOne(await contextFor(t, c, 'shopify'), connectors.shopify)).toBeNull()
+    } finally {
+      delete process.env.SHOPIFY_CLIENT_ID
+      delete process.env.SHOPIFY_CLIENT_SECRET
+    }
+    return tokenState(c)
+  }
+
+  it('revoked_survives_failed_run', async () => {
+    expect(await failedRun('revoked')).toEqual({ status: 'revoked', status_detail: 'app uninstalled' })
+  })
+
+  it('active_becomes_auth_failed_on_failed_run', async () => {
+    expect((await failedRun('active')).status).toBe('auth_failed')
+  })
+
+  it('revoked_survives_failed_refresh', async () => {
+    expect(await failedRefresh('revoked')).toEqual({ status: 'revoked', status_detail: 'app uninstalled' })
+  })
+
+  it('active_becomes_auth_failed_on_failed_refresh', async () => {
+    expect((await failedRefresh('active')).status).toBe('auth_failed')
   })
 
   it('worker_isolation', async () => {
