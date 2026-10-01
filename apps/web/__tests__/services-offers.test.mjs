@@ -26,6 +26,11 @@ test("/services renders all three offers; CTA links to /#contact; ids unique", (
   assert.equal((page.match(/<OfferIntro /g) ?? []).length, 3);
   assert.ok(intro.includes('href="/#contact"') && intro.includes("id={id}"));
   assert.ok(!page.includes('id="connect"') && !page.includes('id="ai-consult"'));
+  // An AiConsult without an id prop falls back to id="ai-consult" and would duplicate the intro's.
+  assert.equal(
+    (page.match(/<AiConsult [^>]*id="[a-z-]+-steps"/g) ?? []).length,
+    (page.match(/<AiConsult /g) ?? []).length,
+  );
 });
 
 test("offers copy has no Standard/Advanced/local", () => {
@@ -33,6 +38,12 @@ test("offers copy has no Standard/Advanced/local", () => {
   assert.doesNotMatch(text, /standard|advanced|\blocal\b/i);
 });
 
-test("CONTENT.md documents offers", () => {
-  assert.ok(readFileSync(resolve(root, "CONTENT.md"), "utf8").includes("siteContent.offers"));
+test("CONTENT.md documents offers and their prices", () => {
+  const md = readFileSync(resolve(root, "CONTENT.md"), "utf8");
+  assert.ok(md.includes("siteContent.offers"));
+  for (const o of items) assert.ok(md.includes(o.price), `CONTENT.md missing price for ${o.id}`);
+});
+
+test("offer descriptions match buildingBlocks", () => {
+  items.forEach((o, i) => assert.equal(o.description, siteContent.buildingBlocks.items[i].description));
 });

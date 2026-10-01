@@ -74,7 +74,7 @@ export interface AiConsultContent {
 
 export interface OfferItem {
   /** Anchor id on /services: connect, deluxe, ai-consult. */
-  id: string;
+  id: "connect" | "deluxe" | "ai-consult";
   title: string;
   description: string;
   audience: string;
