@@ -1,12 +1,13 @@
 name: deploy-app
 
-# Ships one client app (apps/<slug>) to the droplet as bcns-app@<slug>.
+# Ships the platform apps (apps/<slug>) to the droplet as bcns-app@<slug>.
 # Ported from bcns-client-sb's deploy.yml (docs/architecture/platform-v1.md chunk 1):
 # the migrate job is gone — the platform (platform/supabase) owns the schema, so every
 # app here is shared-platform mode. Build → rsync standalone → activate + health-check
 # with rollback, unchanged from the SB pipeline.
 #
-# push: any app whose files changed gets its own matrix leg.
+# push: every matching push deploys all of sb, connect and mcp (the matrix is fixed;
+#   the paths filter below only decides whether the workflow runs, not which legs).
 # workflow_dispatch: pass the slug to redeploy one app on demand.
 
 on:

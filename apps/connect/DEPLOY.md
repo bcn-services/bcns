@@ -32,7 +32,7 @@ Connect differs from a client app in exactly two ways:
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://cnsxbglhredokjbvudfd.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | platform anon key (Supabase `get_publishable_keys`) |
 | `RESEND_API_KEY` | optional — "Request connection" emails |
-| `SHOPIFY_APP_HANDLE` | optional — the app's URL slug (`bcns-connect`, the top-level `handle` in `shopify.app.toml`); builds Shopify's plan-page URL. Unset, a Shopify-initiated install with no ACTIVE subscription ends on the hub's generic error page (`plan_handle_unconfigured`) instead of Shopify's plan page |
+| `SHOPIFY_APP_HANDLE` | optional — the app's URL slug (`bcns-connect`, the top-level `handle` in `shopify.app.toml`); builds Shopify's plan-page URL. **Must be set on the droplet** (no code default). Unset: `/finish` answers `plan_handle_unconfigured` (a Shopify-initiated install with no ACTIVE subscription ends on the hub's generic error page instead of Shopify's plan page) AND the hub page's reopen link (`reopenAppUrl`) and Shopify card install link (`shopifyControl`) are absent |
 | `SHOPIFY_PARTNER_API_TOKEN` | optional, **secret** — Partner API client token, "Manage apps" only (Partner dashboard → Settings → Partner API clients). Set it on the droplet by hand; never paste it into chat or a commit |
 | `SHOPIFY_PARTNER_ORG_ID` | optional — Partner organization id (`5179321` per `docs/architecture/w6a-shopify-submission.md`; confirm against the Partner dashboard URL) |
 | `SHOPIFY_APP_GID` | optional — `gid://shopify/App/425274376193` (app id per the `shopify.app.toml` header; confirm) |

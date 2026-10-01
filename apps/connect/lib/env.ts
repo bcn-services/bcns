@@ -37,10 +37,13 @@ export interface HubConfig {
   hubBaseUrl: string;
   /**
    * The `handle` field in shopify.app.toml (W6a follow-up). Next has no
-   * access to the toml at runtime, so the callback route reads its own copy
-   * here to build the managed-pricing plan-selection redirect. Unset =
-   * a Shopify-initiated install with no active subscription fails closed to
-   * the hub's error page instead of Shopify's plan page.
+   * access to the toml at runtime, so the hub keeps its own copy here. Read by:
+   * the /finish route (finish/route.ts -> shopify-oauth.ts, builds the
+   * managed-pricing plan-selection redirect; unset = `plan_handle_unconfigured`,
+   * a Shopify-initiated install with no active subscription fails closed to the
+   * hub's error page), and the hub page (app/page.tsx: `reopenAppUrl` and, via
+   * lib/sources.ts, the Shopify card's install link; unset = both are absent).
+   * The OAuth callback route does not read it.
    */
   shopifyAppHandle?: string;
   /**
