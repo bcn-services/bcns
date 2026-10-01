@@ -33,7 +33,7 @@ export function SiteHeader() {
             <a
               href={siteConfig.signIn.href}
               rel="noopener"
-              className="rounded-sm text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="lift-button rounded-lg border border-border bg-transparent px-[1.375rem] py-[0.6875rem] text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {siteConfig.signIn.label}
             </a>
@@ -66,7 +66,7 @@ export function SiteHeader() {
               <a
                 href={siteConfig.signIn.href}
                 rel="noopener"
-                className="block rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                className="lift-button mt-1 block rounded-lg border border-border bg-transparent px-5 py-2.5 text-center text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {siteConfig.signIn.label}
               </a>
