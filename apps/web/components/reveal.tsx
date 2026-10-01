@@ -78,7 +78,7 @@ export function Reveal<T extends React.ElementType = "div">({
       // never show 15% of itself, so a fractional threshold leaves the tallest
       // sections (pricing tiers, case-study bodies, the consult steps on a
       // phone) stuck at opacity-0 forever. Any pixel entering is enough.
-      { threshold: 0, rootMargin: "0px 0px -8% 0px" }
+      { threshold: 0, rootMargin: "0px 0px 25% 0px" }
     );
     observer.observe(node);
     return () => observer.disconnect();

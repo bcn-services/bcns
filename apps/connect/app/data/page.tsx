@@ -1,14 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  SectionHeading,
-  buttonVariants,
-  cn,
-} from "@bcn-services/ui";
+import { cn } from "@bcn-services/ui";
 import { loadClient, requireHub } from "@/lib/session";
 import { composeSources, type HealthRow } from "@/lib/sources";
 import { DATA_VIEWS, composeDataPage, findView, viewsFor } from "@/lib/data-views";
@@ -26,20 +18,21 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const FIELD = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const LABEL = "flex flex-col gap-1 text-sm font-medium text-foreground";
+const LABEL = "field";
+const BTN = "btn";
+const BTN_OUT = "btn btn-out";
+const BTN_OUT_SM = "btn btn-out btn-sm";
+const BTN_GHOST = "btn btn-ghost";
 
 function EmptyState({ title, message }: { title: string; message?: string }) {
   return (
-    <Card>
-      <CardContent role="status" className="flex flex-col items-start gap-3 pt-6">
-        <p className="font-medium">{title}</p>
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-        <Link href="/" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Go to Sources
-        </Link>
-      </CardContent>
-    </Card>
+    <div role="status" className="empty">
+      <p>{title}</p>
+      {message ? <p>{message}</p> : null}
+      <Link href="/" className={BTN_OUT_SM}>
+        Go to Sources
+      </Link>
+    </div>
   );
 }
 
@@ -63,12 +56,12 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const connectedSources = connected.map((c) => c.source);
 
   const heading = (
-    <SectionHeading
-      as="h1"
-      align="left"
-      title="Your data"
-      description="Search, filter and export what bcns has pulled into your workspace."
-    />
+    <div>
+      <h1 className="page-title">
+        Your <b>data</b>
+      </h1>
+      <p className="lead">Search, filter and export what bcns has pulled into your workspace.</p>
+    </div>
   );
 
   if (!plan.card) {
@@ -111,7 +104,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
     <>
       {heading}
 
-      <p className="text-sm text-muted-foreground">{view.syncLine}</p>
+      <p className="sync">{view.syncLine}</p>
 
       <StatsStrip
         pinned={catalog.filter((s) => pinned.includes(s.id))}
@@ -121,24 +114,23 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
       />
 
       {view.notices.map((n) => (
-        <p key={n.source} role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p key={n.source} role="alert" className="note note-alert">
           {n.text}{" "}
-          <Link href="/" className="underline underline-offset-4">
+          <Link href="/">
             Go to Sources
           </Link>
         </p>
       ))}
 
-      <nav aria-label="Data sources" className="flex flex-wrap gap-2">
+      <nav aria-label="Data sources" className="tabs">
         {view.tabs.map((c) => (
           <Link
             key={c.source}
             href={`/data?source=${c.source}`}
             aria-current={c.source === card.source ? "page" : undefined}
-            className={buttonVariants({ variant: c.source === card.source ? "default" : "outline", size: "sm" })}
           >
             {c.title}
-            {c.connected && !c.pending ? null : <Badge className="px-2 py-0">{c.pending ? "Awaiting first pull" : c.label}</Badge>}
+            {c.connected && !c.pending ? null : <span className="chip">{c.pending ? "Awaiting first pull" : c.label}</span>}
           </Link>
         ))}
       </nav>
@@ -147,7 +139,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
         <EmptyState title={view.emptyCopy?.title ?? "Nothing to show"} message={view.emptyCopy?.message} />
       ) : (
         <>
-          <nav aria-label={`${card.title} views`} className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border text-sm">
+          <nav aria-label={`${card.title} views`} className="views">
             {views.map((v) => {
               const count = counts[`${card.source}/${v.id}`];
               return (
@@ -155,18 +147,10 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
                   key={v.id}
                   href={`/data?source=${card.source}&view=${v.id}`}
                   aria-current={v.id === cfg.id ? "page" : undefined}
-                  className={cn(
-                    "-mb-px rounded-sm border-b-2 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    v.id === cfg.id
-                      ? "border-primary font-medium text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
                 >
                   {v.label}
-                  <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
-                    <span aria-hidden="true">
-                      {count?.toLocaleString("en-US") ?? "—"} <span className="text-[10px]">30d</span>
-                    </span>
+                  <span className="n">
+                    <span aria-hidden="true">{count?.toLocaleString("en-US") ?? "—"} 30d</span>
                     <span className="sr-only">{count == null ? " count unavailable" : ` ${count.toLocaleString("en-US")} rows in the last 30 days`}</span>
                   </span>
                 </Link>
@@ -174,37 +158,39 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
             })}
           </nav>
 
-          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-            <form method="get" action="/data" className="flex w-full flex-wrap items-end gap-3 lg:w-auto">
+          <div className="tools">
+            <form method="get" action="/data">
               <input type="hidden" name="source" value={card.source} />
               <input type="hidden" name="view" value={cfg.id} />
               <label className={cn(LABEL, "w-full sm:w-56")}>
                 Search
-                <input type="search" name="q" defaultValue={params.q} maxLength={100} placeholder="Search…" className={FIELD} />
+                <input type="search" name="q" defaultValue={params.q} maxLength={100} placeholder="Search…" />
               </label>
               <label className={cn(LABEL, "min-w-0 flex-1 sm:w-40 sm:flex-none")}>
                 From
-                <input type="date" name="from" defaultValue={params.from ?? ""} className={FIELD} />
+                <input type="date" name="from" defaultValue={params.from ?? ""} />
               </label>
               <label className={cn(LABEL, "min-w-0 flex-1 sm:w-40 sm:flex-none")}>
                 To
-                <input type="date" name="to" defaultValue={params.to ?? ""} className={FIELD} />
+                <input type="date" name="to" defaultValue={params.to ?? ""} />
               </label>
-              <div className="flex gap-2">
-                <Button type="submit">Apply</Button>
-                <Link href={`/data?source=${card.source}&view=${cfg.id}`} className={buttonVariants({ variant: "ghost" })}>
+              <div className="acts">
+                <button type="submit" className={BTN}>
+                  Apply
+                </button>
+                <Link href={`/data?source=${card.source}&view=${cfg.id}`} className={BTN_GHOST}>
                   Clear
                 </Link>
               </div>
             </form>
-            <div className="flex flex-col items-start gap-1 sm:items-end">
+            <div className="exp">
               {result.count > 0 ? (
-                <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
+                <a href={exportHref} className={BTN_OUT}>
                   Export CSV
                 </a>
               ) : null}
               {result.count > EXPORT_ROW_CAP ? (
-                <p role="status" className="max-w-xs text-xs text-muted-foreground sm:text-right">
+                <p role="status" className="meta">
                   {truncationNote()}
                 </p>
               ) : null}
@@ -212,23 +198,23 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
           </div>
 
           {result.error ? (
-            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p role="alert" className="note note-alert">
               This view could not be loaded. Try again in a moment.
               {params.page > 1 ? (
                 <>
                   {" "}
-                  <Link href={link(1)} className="underline underline-offset-4">
+                  <Link href={link(1)}>
                     Back to the first page
                   </Link>
                 </>
               ) : null}
             </p>
           ) : result.rows.length === 0 ? (
-            <div role="status" className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card px-6 py-10 text-sm">
-              <p className="font-medium">
+            <div role="status" className="empty">
+              <p>
                 {params.page > 1 ? "No rows on this page" : filtered ? "No rows match these filters" : view.emptyCopy?.title ?? "Nothing here yet"}
               </p>
-              <p className="text-muted-foreground">
+              <p>
                 {params.page > 1
                   ? "You are past the last page of results."
                   : filtered
@@ -238,7 +224,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
               {params.page > 1 || filtered ? (
                 <Link
                   href={params.page > 1 ? link(1) : `/data?source=${card.source}&view=${cfg.id}`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  className={BTN_OUT_SM}
                 >
                   {params.page > 1 ? "Back to the first page" : "Clear filters"}
                 </Link>
@@ -248,29 +234,29 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
             <>
               <DataTable cfg={cfg} rows={result.rows} />
 
-              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                <p className="tabular-nums">
+              <div className="pager">
+                <p>
                   Showing {result.start + 1}–{result.start + result.rows.length} of {result.count.toLocaleString("en-US")}
                 </p>
-                <nav aria-label="Pagination" className="flex items-center gap-2">
-                  <span className="tabular-nums">
+                <nav aria-label="Pagination">
+                  <span>
                     Page {params.page} of {pages}
                   </span>
                   {params.page > 1 ? (
-                    <Link href={link(params.page - 1)} rel="prev" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    <Link href={link(params.page - 1)} rel="prev" className={BTN_OUT_SM}>
                       Previous
                     </Link>
                   ) : (
-                    <span aria-disabled="true" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "pointer-events-none opacity-50")}>
+                    <span aria-disabled="true" className={BTN_OUT_SM}>
                       Previous
                     </span>
                   )}
                   {params.page < pages ? (
-                    <Link href={link(params.page + 1)} rel="next" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    <Link href={link(params.page + 1)} rel="next" className={BTN_OUT_SM}>
                       Next
                     </Link>
                   ) : (
-                    <span aria-disabled="true" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "pointer-events-none opacity-50")}>
+                    <span aria-disabled="true" className={BTN_OUT_SM}>
                       Next
                     </span>
                   )}

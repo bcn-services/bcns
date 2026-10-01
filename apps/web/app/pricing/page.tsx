@@ -24,10 +24,11 @@ export default function PricingPage() {
           emphasis="actually need"
           description={pricing.description}
           size="oversized"
+          rule={false}
         />
         <Pricing />
         <Faq />
-        <CtaBand title={contactSection.title} description={contactSection.description} />
+        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" />
       </main>
       <SiteFooter />
     </div>

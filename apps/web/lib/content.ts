@@ -107,6 +107,8 @@ export interface CaseStudyLabels {
   problemLabel: string;
   approachLabel: string;
   outcomeLabel: string;
+  /** Link label under each case on the `/work` list. */
+  readLabel: string;
 }
 
 export interface PastWorkContent {
@@ -228,6 +230,239 @@ export interface PageMetaRegistry {
   work: PageMeta;
   pricing: PageMeta;
   about: PageMeta;
+  connect: PageMeta;
+  deluxe: PageMeta;
+  aiConsulting: PageMeta;
+}
+
+/** Connected-tool ids; match the `--tool-*` CSS vars and `tool.*` Tailwind colors. */
+export type ToolId = "shopify" | "square" | "quickbooks" | "calendar" | "gmail";
+
+export interface ToolItem {
+  id: ToolId;
+  /** Full name, e.g. "Google Calendar". */
+  name: string;
+  /** Short name used inside the hero chips, e.g. "Calendar". */
+  short: string;
+  /** What the tool is for, shown on the Connect page chips. */
+  role: string;
+}
+
+export interface PillarItem {
+  n: string;
+  label: string;
+  name: string;
+  line: string;
+  price: string;
+  href: string;
+}
+
+export interface AskHeroItem {
+  question: string;
+  /** Tools that light up and send dots into the block for this question. */
+  toolIds: ToolId[];
+  /** Bold lead of the answer, e.g. "6 appointments." */
+  answerLead: string;
+  answerRest: string;
+}
+
+export interface AskHeroContent {
+  ariaLabel: string;
+  items: [AskHeroItem, AskHeroItem, AskHeroItem];
+}
+
+export interface StoryStep {
+  /** Full step label, e.g. "How it works | 01 / 05". */
+  label: string;
+  /** Whole heading text. `emphasis` is the substring to render in the accent style. */
+  title: string;
+  emphasis: string;
+  description: string;
+}
+
+export interface StoryContent {
+  /** aria-label of the pinned home section. */
+  ariaLabel: string;
+  /** aria-label of the step rail. */
+  railLabel: string;
+  /** aria-label of the stage diagram. */
+  diagramLabel: string;
+  /** aria-label of the home proof row (copy itself is `hero.proofPoints`). */
+  proofAriaLabel: string;
+  steps: [StoryStep, StoryStep, StoryStep, StoryStep, StoryStep];
+  /** Final step: question, answer and the weekly bar chart. */
+  chart: {
+    question: string;
+    answerLead: string;
+    answerRest: string;
+    days: [string, string, string, string, string, string, string];
+    /** Orders per day, Mon to Sun (bar heights). */
+    values: [number, number, number, number, number, number, number];
+  };
+}
+
+export interface ServicesOverviewContent {
+  eyebrow: string;
+  title: string;
+  emphasis: string;
+  /** aria-label of the three-cube section. */
+  cubeLabel: string;
+  /** aria-label of the interactive cube button. */
+  cubeAriaLabel: string;
+  /** Link label at the foot of each pillar card. */
+  cardMore: string;
+  processTitle: string;
+  processEmphasis: string;
+  /** Emphasis inside `contactSection.title` for the closing band. */
+  ctaEmphasis: string;
+}
+
+export interface ConnectDemoDestination {
+  title: string;
+  /** Wide-layout line. */
+  line: string;
+  /** Short line for narrow layouts. */
+  short: string;
+}
+
+export interface ConnectDemoContent {
+  eyebrow: string;
+  title: string;
+  emphasis: string;
+  noSetupFee: string;
+  replayLabel: string;
+  /** aria-label of the steps section. */
+  stageLabel: string;
+  diagramLabel: string;
+  /** Per step of `connect.steps`: the substring of the title to emphasise. */
+  stepEmphasis: [string, string, string];
+  /** Per step: "bcns Connect | 01 / 03". */
+  stepLabels: [string, string, string];
+  toolsEyebrow: string;
+  toolsTitle: string;
+  toolsEmphasis: string;
+  toolsLede: string;
+  /** Extra chips after the five `tools` (no role line). */
+  extraChips: [string, string, string];
+  /** Sorted-row labels in the stage diagram. */
+  rows: [string, string, string, string, string];
+  destinations: [ConnectDemoDestination, ConnectDemoDestination, ConnectDemoDestination];
+  faqEmphasis: string;
+  /** `faq.items[].question` values to show on the Connect page, in order. */
+  faqQuestions: [string, string, string, string, string, string];
+}
+
+export interface DeluxeTile {
+  name: string;
+  value: number;
+  /** Text before the number, e.g. "$". Omitted when none. */
+  prefix?: string;
+  /** Text after the number, e.g. "d". Omitted when none. */
+  suffix?: string;
+  sub: string;
+  toolIds: ToolId[];
+}
+
+export interface DeluxeRow {
+  title: string;
+  detail: string;
+  tag: string;
+}
+
+export interface DeluxeChip {
+  question: string;
+  tiles: [DeluxeTile, DeluxeTile, DeluxeTile];
+  listHeading: string;
+  /** Either bars (percent heights, Mon to Sun) or rows, never both. */
+  bars?: number[];
+  rows?: DeluxeRow[];
+  /** Agent answer; `**text**` marks bold. */
+  answer: string;
+  source: string;
+}
+
+export interface DeluxeStep {
+  label: string;
+  title: string;
+  emphasis: string;
+  description: string;
+}
+
+export interface DeluxeDemoContent {
+  /** Page head eyebrow/title/lede are `useCases.blockEyebrow/blockTitle/blockDescription`. */
+  titleEmphasis: string;
+  ctaSecondary: string;
+  howEyebrow: string;
+  askTitle: string;
+  askEmphasis: string;
+  askLede: string;
+  groupLabel: string;
+  dashboardTitle: string;
+  agentLabel: string;
+  agentPlaceholder: string;
+  /** Letters under the bar chart, Mon to Sun. */
+  dayLetters: string;
+  chips: [DeluxeChip, DeluxeChip, DeluxeChip];
+  steps: [DeluxeStep, DeluxeStep, DeluxeStep, DeluxeStep];
+  buildEyebrow: string;
+  buildTitle: string;
+  buildEmphasis: string;
+  workEyebrow: string;
+  workTitle: string;
+  workEmphasis: string;
+  workCta: string;
+  /** Price-slot label per `pastWork.items`, in order. */
+  workLabels: [string, string];
+  pricingEyebrow: string;
+}
+
+export interface AiDayLeaveItem {
+  n: string;
+  title: string;
+  line: string;
+}
+
+export interface AiDayContent {
+  /** Substring of `aiConsult.title` styled as the accent in the page head. */
+  titleEmphasis: string;
+  ctaSecondary: string;
+  tabsLabel: string;
+  /** Tab names in order; also the first word of each step label. */
+  tabs: [string, string, string];
+  /** Per step of `aiConsult.steps`: the substring of the title to emphasise. */
+  stepEmphasis: [string, string, string];
+  /** Per step: "Morning | 01 / 03". */
+  stepLabels: [string, string, string];
+  timeline: {
+    ariaLabel: string;
+    /** Stop labels for narrow layouts. */
+    short: [string, string, string];
+    /** Stop labels for wide layouts. */
+    long: [string, string, string];
+    start: string;
+    end: string;
+    now: string;
+  };
+  leaveEyebrow: string;
+  leaveTitle: string;
+  leaveEmphasis: string;
+  leave: [AiDayLeaveItem, AiDayLeaveItem, AiDayLeaveItem];
+  pricingEyebrow: string;
+  faqEmphasis: string;
+  /** `faq.items[].question` values to show on the AI consulting page, in order. */
+  faqQuestions: [string, string, string, string];
+}
+
+export interface PricingPageContent {
+  /** Link label under each tier, in tier order. */
+  learnMore: [string, string, string];
+  disclaimer: string;
+}
+
+export interface AboutPageContent {
+  whyHeading: string;
+  /** Substring of the closing line of `about.whyBcns` styled as the accent. */
+  whyEmphasis: string;
 }
 
 export interface SiteContent {
@@ -246,6 +481,16 @@ export interface SiteContent {
   legal: LegalContent;
   navCards: NavCardsContent;
   pageMeta: PageMetaRegistry;
+  tools: [ToolItem, ToolItem, ToolItem, ToolItem, ToolItem];
+  pillars: [PillarItem, PillarItem, PillarItem];
+  askHero: AskHeroContent;
+  story: StoryContent;
+  servicesOverview: ServicesOverviewContent;
+  connectDemo: ConnectDemoContent;
+  deluxeDemo: DeluxeDemoContent;
+  aiDay: AiDayContent;
+  pricingPage: PricingPageContent;
+  aboutPage: AboutPageContent;
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +740,7 @@ export const siteContent: SiteContent = {
       problemLabel: "The problem",
       approachLabel: "Our approach",
       outcomeLabel: "The outcome",
+      readLabel: "Read the case study",
     },
   },
 
@@ -1020,5 +1266,340 @@ export const siteContent: SiteContent = {
       description:
         "Nate builds. Brandon makes sure it's worth building. Two founders who left generic tools behind to build custom software that fits small businesses.",
     },
+    connect: {
+      title: "bcns Connect | Every Tool in One Place",
+      description:
+        "bcns Connect plugs into the tools your small business already uses and keeps everything organized in one place. $200/month, no setup fee.",
+    },
+    deluxe: {
+      title: "Deluxe Builds | bcns",
+      description:
+        "Custom AI agents, apps and dashboards built on top of your bcns Connect data. From $5,000 setup plus $300/month, with a fixed quote before work starts.",
+    },
+    aiConsulting: {
+      title: "AI Consulting | bcns",
+      description:
+        "One day on your business: we find where AI actually helps, build a workflow with you watching, and get your team using it. $1,000 a day.",
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Editorial-rebuild keys (home stage, services sub-pages)
+  // -------------------------------------------------------------------------
+
+  tools: [
+    { id: "shopify", name: "Shopify", short: "Shopify", role: "Online store" },
+    { id: "square", name: "Square", short: "Square", role: "Payments" },
+    { id: "quickbooks", name: "QuickBooks", short: "QuickBooks", role: "Money" },
+    { id: "calendar", name: "Google Calendar", short: "Calendar", role: "Calendar" },
+    { id: "gmail", name: "Gmail", short: "Gmail", role: "Email" },
+  ],
+
+  pillars: [
+    {
+      n: "01",
+      label: "Get organized",
+      name: "bcns Connect",
+      line: "Every tool you use, connected in one organized place.",
+      price: "$200 a month",
+      href: "/services/connect",
+    },
+    {
+      n: "02",
+      label: "Put it to work",
+      name: "Deluxe builds",
+      line: "An AI agent, an app or a dashboard, built on top of Connect around how you work.",
+      price: "From $5,000 setup",
+      href: "/services/deluxe",
+    },
+    {
+      n: "03",
+      label: "Learn to optimize",
+      name: "AI consulting",
+      line: "One day on your business: where AI actually helps, built with you, and your team using it.",
+      price: "$1,000 a day",
+      href: "/services/ai-consulting",
+    },
+  ],
+
+  askHero: {
+    ariaLabel:
+      "Example: ask your business a question, and the connected tools answer in plain words",
+    items: [
+      {
+        question: "Who's booked tomorrow?",
+        toolIds: ["calendar"],
+        answerLead: "6 appointments.",
+        answerRest: "First one at 9:30.",
+      },
+      {
+        question: "Which invoices are still unpaid?",
+        toolIds: ["quickbooks"],
+        answerLead: "3 invoices,",
+        answerRest: "$1,240 in total.",
+      },
+      {
+        question: "What sold best this month?",
+        toolIds: ["shopify", "square"],
+        answerLead: "The large candle set,",
+        answerRest: "41 sold.",
+      },
+    ],
+  },
+
+  story: {
+    ariaLabel: "How it works",
+    railLabel: "Jump to a step",
+    diagramLabel:
+      "Five tool cards start jumbled, settle into an arc, and send colored dots into one building block.",
+    proofAriaLabel: "Why bcns Connect",
+    steps: [
+      {
+        label: "How it works | 01 / 05",
+        title: "Your tools, all over the place",
+        emphasis: "all over the place",
+        description:
+          "Shopify, Square, QuickBooks, Google Calendar, Gmail. Each holds a piece of your business, and none of them talk to each other.",
+      },
+      {
+        label: "How it works | 02 / 05",
+        title: "We connect them",
+        emphasis: "connect them",
+        description:
+          "One connection to each, set up by us. You keep using every tool the way you do today.",
+      },
+      {
+        label: "How it works | 03 / 05",
+        title: "Everything in one place",
+        emphasis: "one place",
+        description:
+          "Customers, orders, money, appointments and messages, sorted together and kept current.",
+      },
+      {
+        label: "How it works | 04 / 05",
+        title: "Three ways to use it",
+        emphasis: "Three ways",
+        description:
+          "Get organized, put it to work, or learn to optimize. Start with Connect and add the rest when you are ready.",
+      },
+      {
+        label: "How it works | 05 / 05",
+        title: "Ask it anything",
+        emphasis: "anything",
+        description: "An AI agent or an app we build for you works on top of your organized data.",
+      },
+    ],
+    chart: {
+      question: "What did we sell last week?",
+      answerLead: "$4,280",
+      answerRest: "from 63 orders. Up 12% on the week before.",
+      days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      values: [3, 4, 3, 5, 4, 6, 7],
+    },
+  },
+
+  servicesOverview: {
+    eyebrow: "Our services",
+    title: "Three ways bcns can help your business",
+    emphasis: "help your business",
+    cubeLabel: "The three pillars of bcns",
+    cubeAriaLabel: "The three bcns cubes. Open to see our three services.",
+    cardMore: "Learn more",
+    processTitle: "How we work",
+    processEmphasis: "work",
+    ctaEmphasis: "slowing you down",
+  },
+
+  connectDemo: {
+    eyebrow: "bcns Connect",
+    title: "How bcns Connect works",
+    emphasis: "bcns Connect",
+    noSetupFee: "no setup fee",
+    replayLabel: "Play again",
+    stageLabel: "How bcns Connect works",
+    diagramLabel:
+      "Tools start jumbled and connected, a cube appears and sorts everything into organized rows, then it feeds a team view, AI tools and Deluxe builds.",
+    stepEmphasis: ["connect", "one organized place", "put it to work"],
+    stepLabels: [
+      "bcns Connect | 01 / 03",
+      "bcns Connect | 02 / 03",
+      "bcns Connect | 03 / 03",
+    ],
+    toolsEyebrow: "What it connects",
+    toolsTitle: "The tools you already use",
+    toolsEmphasis: "already use",
+    toolsLede: "We plug into each one. Nothing about how you use them changes.",
+    extraChips: ["Ad accounts", "Project boards", "Files"],
+    rows: ["Customers", "Orders", "Money", "Messages", "Files"],
+    destinations: [
+      { title: "Team view", line: "The whole business at once", short: "The business" },
+      { title: "AI tools", line: "Work from your real data", short: "Real data" },
+      { title: "Deluxe builds", line: "Anything we build starts here", short: "Start here" },
+    ],
+    faqEmphasis: "ask too",
+    faqQuestions: [
+      "What is bcns Connect?",
+      "Do I have to stop using my current software?",
+      "What does the monthly fee cover?",
+      "Can I use my data with other tools?",
+      "Is my data private?",
+      "What happens if I want to cancel?",
+    ],
+  },
+
+  deluxeDemo: {
+    titleEmphasis: "custom built",
+    ctaSecondary: "See how a build comes together",
+    howEyebrow: "How a build works",
+    askTitle: "Ask your business a question.",
+    askEmphasis: "a question.",
+    askLede:
+      "Pick one below. This is how a dashboard and an AI agent answer it, using data that is already organized in Connect.",
+    groupLabel: "Pick a question",
+    dashboardTitle: "Your dashboard",
+    agentLabel: "AI agent",
+    agentPlaceholder: "Ask about your business",
+    dayLetters: "MTWTFSS",
+    chips: [
+      {
+        question: "What did we sell last week?",
+        tiles: [
+          { name: "Orders", value: 63, sub: "last week", toolIds: ["shopify", "square"] },
+          { name: "Money", value: 4280, prefix: "$", sub: "last week", toolIds: ["quickbooks", "square"] },
+          { name: "Customers", value: 214, sub: "in total", toolIds: ["shopify", "square", "gmail"] },
+        ],
+        listHeading: "Sales by day",
+        bars: [46, 54, 62, 58, 88, 80, 52],
+        answer: "**$4,280** from **63** orders. Up 12% on the week before.",
+        source: "From your Orders and Money data",
+      },
+      {
+        question: "What's booked this week?",
+        tiles: [
+          { name: "Booked", value: 9, sub: "this week", toolIds: ["calendar"] },
+          { name: "Today", value: 2, sub: "on the schedule", toolIds: ["calendar"] },
+          { name: "Open", value: 5, sub: "slots left", toolIds: ["calendar", "square"] },
+        ],
+        listHeading: "Coming up",
+        rows: [
+          { title: "Tue 9:00", detail: "Maria R. · Full detail", tag: "Confirmed" },
+          { title: "Wed 1:30", detail: "Sam T. · Interior clean", tag: "Confirmed" },
+          { title: "Fri 10:00", detail: "Jo L. · Paint correction", tag: "Deposit paid" },
+        ],
+        answer: "**9** bookings this week, **2** today. Thursday afternoon is still open.",
+        source: "From your Calendar and Square data",
+      },
+      {
+        question: "Who needs a reply?",
+        tiles: [
+          { name: "To answer", value: 5, sub: "messages", toolIds: ["gmail"] },
+          { name: "Quotes", value: 3, sub: "no reply yet", toolIds: ["gmail", "quickbooks"] },
+          { name: "Oldest", value: 2, suffix: "d", sub: "days waiting", toolIds: ["gmail"] },
+        ],
+        listHeading: "Waiting on you",
+        rows: [
+          { title: "Dana K.", detail: "Asked for a quote", tag: "Draft ready" },
+          { title: "Pat M.", detail: "Wants to reschedule", tag: "Draft ready" },
+          { title: "Lee S.", detail: "Where is my order?", tag: "Draft ready" },
+        ],
+        answer: "**5** messages are waiting. I drafted replies for the top **3**.",
+        source: "From your Gmail and Orders data",
+      },
+    ],
+    steps: [
+      {
+        label: "01 / 04",
+        title: "Your data, already organized.",
+        emphasis: "already organized.",
+        description:
+          "Customers, orders, money, appointments and messages, sorted in bcns Connect. Every Deluxe build starts here.",
+      },
+      {
+        label: "02 / 04",
+        title: "We build an app on top.",
+        emphasis: "app",
+        description:
+          "A dashboard, a booking tool, a back-office app, reading from the same data as everything else.",
+      },
+      {
+        label: "03 / 04",
+        title: "An agent that knows your business.",
+        emphasis: "knows your business.",
+        description: "Ask in plain words. It answers from your real data, not guesses.",
+      },
+      {
+        label: "04 / 04",
+        title: "Built around how you work.",
+        emphasis: "how you work.",
+        description:
+          "Scoped with you, quoted fixed, and arranged the way your team actually uses it.",
+      },
+    ],
+    buildEyebrow: "What we build",
+    buildTitle: "If you have a pain point, we can build a tool to alleviate it.",
+    buildEmphasis: "we can build a tool",
+    workEyebrow: "Past work",
+    workTitle: "What we've built, and what it changed.",
+    workEmphasis: "what it changed.",
+    workCta: "Read the case study",
+    workLabels: ["Dashboard", "Custom app"],
+    pricingEyebrow: "Deluxe build pricing",
+  },
+
+  aiDay: {
+    titleEmphasis: "AI consult",
+    ctaSecondary: "See the day",
+    tabsLabel: "Part of the day",
+    tabs: ["Morning", "Midday", "Afternoon"],
+    stepEmphasis: ["already do", "with you watching", "real work"],
+    stepLabels: ["Morning | 01 / 03", "Midday | 02 / 03", "Afternoon | 03 / 03"],
+    timeline: {
+      ariaLabel:
+        "A one-day timeline from morning to evening. A marker moves along it as a bottleneck is found, a tool is built, and a team uses it.",
+      short: ["Find", "Build", "Use"],
+      long: ["Find where AI helps", "Build it with you", "Your team uses it"],
+      start: "Morning",
+      end: "Evening",
+      now: "Now",
+    },
+    leaveEyebrow: "What you leave with",
+    leaveTitle: "By evening, it's already working.",
+    leaveEmphasis: "it's already working.",
+    leave: [
+      {
+        n: "01",
+        title: "A clear list of where AI helps",
+        line: "The repetitive, slow or double-typed parts of your week, and the honest answer on which of them are worth automating.",
+      },
+      {
+        n: "02",
+        title: "One workflow you watched get built",
+        line: "The task costing you the most hours, built in front of you, so you know how it was put together and can build the next one.",
+      },
+      {
+        n: "03",
+        title: "A team that has used it on real work",
+        line: "Your people ran it on their own jobs, with us there when something broke. Hands-on training, not a slide deck.",
+      },
+    ],
+    pricingEyebrow: "AI consulting pricing",
+    faqEmphasis: "we'd ask too",
+    faqQuestions: [
+      "Do you use AI?",
+      "Do I need to be technical to work with you?",
+      "Does my tool use AI?",
+      "Can I use my data with other tools?",
+    ],
+  },
+
+  pricingPage: {
+    learnMore: ["About bcns Connect", "About Deluxe builds", "About AI consulting"],
+    disclaimer:
+      "Prices listed are standard starting price and are subject to change. We will provide a fixed quote for your product after our consult.",
+  },
+
+  aboutPage: {
+    whyHeading: "Why bcns",
+    whyEmphasis: "the specific one.",
   },
 };

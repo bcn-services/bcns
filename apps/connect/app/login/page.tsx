@@ -1,4 +1,3 @@
-import { SectionHeading } from "@bcn-services/ui";
 import { requestReset, signIn } from "./actions";
 import { FINISH_PATH } from "@/lib/shopify-oauth";
 import { BCNS_EMAIL } from "@/lib/request-connection";
@@ -16,33 +15,60 @@ const ERRORS: Record<string, string> = {
 
 const RESET_SENT_MESSAGE = "If that email has an account, we've sent a reset link.";
 
+/** The shared sign-in frame: tinted page, one card with the wordmark, a link back to the marketing site. */
+function Frame({ title, description, children }: { title: React.ReactNode; description: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="lg">
+      <div className="lcard-wrap">
+        <div className="lcard">
+          <div className="wm">
+            <span className="wm-mark" aria-hidden="true" />
+            <span>
+              bcns <b>Connect</b>
+            </span>
+          </div>
+          <span className="flow" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+          <h1>{title}</h1>
+          <div className="d">{description}</div>
+          {children}
+        </div>
+        <p className="back">
+          <a href="https://bcn-services.com">Back to bcn-services.com</a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ForgotForm() {
   return (
-    <div className="mx-auto w-full max-w-sm">
-      <SectionHeading as="h1" align="left" title="Reset your password" description="Enter your email and we'll send a link to choose a new password." />
-      <form action={requestReset} className="mt-8 flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="email">
+    <Frame
+      title={
+        <>
+          Reset your <b>password</b>
+        </>
+      }
+      description="Enter your email and we'll send a link to choose a new password."
+    >
+      <form action={requestReset}>
+        <label className="field" htmlFor="email">
           Email
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+          <input id="email" name="email" type="email" autoComplete="email" required />
         </label>
-        <button
-          type="submit"
-          className="h-10 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
+        <button type="submit" className="btn">
           Send reset link
         </button>
-        <a href="/login" className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <a href="/login" className="lnk">
           Back to sign in
         </a>
       </form>
-    </div>
+    </Frame>
   );
 }
 
@@ -55,70 +81,56 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
   if (searchParams.forgot) return <ForgotForm />;
   const resetSent = searchParams.ok === "reset-sent";
   return (
-    <div className="mx-auto w-full max-w-sm">
-      <SectionHeading
-        as="h1"
-        align="left"
-        title="Sign in"
-        description={
-          finishingShopify
-            ? "Shopify approved the connection. Sign in to your bcns workspace to finish adding your store."
-            : "One login for your dashboard, your sources and your team."
-        }
-      />
-      {finishingShopify ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          No bcns account yet?{" "}
-          <a href={`mailto:${BCNS_EMAIL}?subject=${encodeURIComponent("bcns Connect workspace for my Shopify store")}`} className="font-medium text-primary underline underline-offset-4">
-            Email bcns
-          </a>{" "}
-          and we&apos;ll set up your workspace. Then open bcns Connect from your Shopify admin to finish.
-        </p>
-      ) : null}
-      <form action={signIn} className="mt-8 flex flex-col gap-4">
+    <Frame
+      title={
+        <>
+          Sign <b>in</b>
+        </>
+      }
+      description={
+        finishingShopify ? (
+          <>
+            <p>Shopify approved the connection. Sign in to your bcns workspace to finish adding your store.</p>
+            <p>
+              No bcns account yet?{" "}
+              <a href={`mailto:${BCNS_EMAIL}?subject=${encodeURIComponent("bcns Connect workspace for my Shopify store")}`} className="ul">
+                Email bcns
+              </a>{" "}
+              and we&apos;ll set up your workspace. Then open bcns Connect from your Shopify admin to finish.
+            </p>
+          </>
+        ) : (
+          "One login for your dashboard, your sources and your team."
+        )
+      }
+    >
+      <form action={signIn}>
         {finishingShopify ? <input type="hidden" name="next" value={FINISH_PATH} /> : null}
-        <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="email">
+        <label className="field" htmlFor="email">
           Email
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+          <input id="email" name="email" type="email" autoComplete="email" required />
         </label>
-        <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="password">
+        <label className="field" htmlFor="password">
           Password
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+          <input id="password" name="password" type="password" autoComplete="current-password" required />
         </label>
         {resetSent ? (
-          <p role="status" className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground">
+          <p role="status" className="note note-plain">
             {RESET_SENT_MESSAGE}
           </p>
         ) : null}
         {error ? (
-          <p role="alert" className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
+          <p role="alert" className="note note-alert">
             {error}
           </p>
         ) : null}
-        <button
-          type="submit"
-          className="h-10 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
+        <button type="submit" className="btn">
           Sign in
         </button>
-        <a href="/login?forgot=1" className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <a href="/login?forgot=1" className="lnk">
           Forgot password?
         </a>
       </form>
-    </div>
+    </Frame>
   );
 }

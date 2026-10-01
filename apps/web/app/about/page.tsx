@@ -20,10 +20,11 @@ export default function AboutPage() {
           eyebrow={about.eyebrow}
           title={about.title}
           emphasis="behind bcns"
+          rule={false}
           description={about.description}
         />
         <AboutFounder />
-        <CtaBand title={contactSection.title} description={contactSection.description} />
+        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" />
       </main>
       <SiteFooter />
     </div>

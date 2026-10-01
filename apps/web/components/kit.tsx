@@ -3,6 +3,7 @@ import * as React from "react";
 
 import { Reveal } from "@/components/reveal";
 import { Cube } from "@/components/cube";
+import { siteContent } from "@/lib/content";
 
 /**
  * The pieces every page in the design language is assembled from: the page
@@ -38,7 +39,7 @@ export function emphasize(text: string, phrase: string): React.ReactNode {
 export function Eyebrow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <p
-      className={`font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary ${className}`.trim()}
+      className={`font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary-ink ${className}`.trim()}
     >
       {children}
     </p>
@@ -70,6 +71,7 @@ export function PageHead({
   emphasis,
   description,
   size = "default",
+  rule = true,
 }: {
   eyebrow: string;
   title: string;
@@ -77,9 +79,17 @@ export function PageHead({
   description: string;
   /** `oversized` is the page's one bold moment — use at most once per page. */
   size?: "default" | "oversized";
+  /** Full-width hairline under the head. Pages whose next block draws its own inset rule pass `false`. */
+  rule?: boolean;
 }) {
   return (
-    <div className={`${GUTTER} flex flex-col items-start border-b border-border py-16 sm:py-20 lg:pb-16 lg:pt-[5.75rem]`}>
+    <div
+      className={`${GUTTER} flex flex-col items-start ${
+        rule
+          ? "border-b border-border py-16 sm:py-20 lg:pb-16 lg:pt-[5.75rem]"
+          : "pb-16 pt-16 lg:pt-[4.5rem]"
+      }`}
+    >
       <Reveal>
         <Eyebrow>{eyebrow}</Eyebrow>
       </Reveal>
@@ -102,51 +112,85 @@ export function PageHead({
 }
 
 /**
- * Closing CTA. `tone="plate"` is the full-bleed #7EB3F7 version — a page's one
- * bold moment. `tone="quiet"` is the hairline row that floods blue on hover.
- * Copy comes from `contactSection`, verbatim.
+ * Closing CTA. `tone="plate"` is the prototype's `.cta-band`: the full-bleed
+ * flood-blue plate with eyebrow, light headline, lead and a filled button. In
+ * dark mode the button flips to the light fill so it stays the loudest thing on
+ * the plate. `tone="quiet"` is the hairline row that floods blue on hover.
+ * Copy comes from `contactSection`; the eyebrow, emphasis and button label
+ * default to the shared content keys (`contactSection.eyebrow`,
+ * `servicesOverview.ctaEmphasis`, `hero.ctaPrimary`).
  */
 export function CtaBand({
   title,
   description,
   tone = "quiet",
+  eyebrow = siteContent.contactSection.eyebrow,
+  emphasis = siteContent.servicesOverview.ctaEmphasis,
+  cta = siteContent.hero.ctaPrimary,
 }: {
   title: string;
   description: string;
   tone?: "quiet" | "plate";
+  eyebrow?: string;
+  emphasis?: string;
+  cta?: string;
 }) {
-  const plate = tone === "plate";
+  if (tone === "plate") {
+    return (
+      <section className="bg-accent text-accent-foreground dark:text-white">
+        <div className={`${GUTTER} py-16 lg:py-[4.5rem]`}>
+          <Reveal>
+            <p className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] opacity-90">
+              {eyebrow}
+            </p>
+          </Reveal>
+          <Reveal
+            as="h2"
+            delay={80}
+            className="mt-4 max-w-[18ch] text-balance font-display text-[clamp(2.25rem,5vw,3.5rem)] font-light leading-[1.05] tracking-[-0.02em] [&_b]:font-semibold"
+          >
+            {title.includes(emphasis) ? (
+              <>
+                {title.slice(0, title.indexOf(emphasis))}
+                <b>{emphasis}</b>
+                {title.slice(title.indexOf(emphasis) + emphasis.length)}
+              </>
+            ) : (
+              title
+            )}
+          </Reveal>
+          <Reveal as="p" delay={160} className="mt-4 max-w-[40rem] opacity-95">
+            {description}
+          </Reveal>
+          <Reveal delay={240}>
+            <Link
+              href="/#contact"
+              className="lift-button mt-9 inline-block rounded-lg bg-accent-foreground px-7 py-3.5 text-[0.9375rem] font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-accent"
+            >
+              {cta}
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+    );
+  }
   return (
     <Link
       href="/#contact"
-      className={`group block border-t border-border ${
-        plate
-          ? "bg-accent text-accent-foreground"
-          : "flood-row border-b focus-visible:outline-none"
-      }`}
+      className="flood-row group block border-b border-t border-border focus-visible:outline-none"
     >
       <div className={`${GUTTER} grid items-center gap-8 py-14 sm:grid-cols-[1fr_3.75rem] sm:py-[3.5rem]`}>
         <div>
-          <p
-            className={`text-balance font-light tracking-[-0.02em] ${
-              plate ? "text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.05]" : "text-[clamp(1.75rem,3.4vw,2.5rem)]"
-            }`}
-          >
+          <p className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light tracking-[-0.02em]">
             {title}
           </p>
-          <p
-            className={`mt-2.5 max-w-3xl text-[0.9375rem] leading-relaxed ${
-              plate ? "text-accent-foreground/85" : "text-muted-foreground group-hover:text-accent-foreground"
-            }`}
-          >
+          <p className="mt-2.5 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground group-hover:text-accent-foreground">
             {description}
           </p>
         </div>
         <span
           aria-hidden
-          className={`hidden text-[1.75rem] transition-transform duration-[350ms] ease-out sm:block sm:justify-self-end ${
-            plate ? "group-hover:translate-x-2" : "flood-arrow"
-          }`}
+          className="flood-arrow hidden text-[1.75rem] sm:block sm:justify-self-end"
         >
           &rarr;
         </span>

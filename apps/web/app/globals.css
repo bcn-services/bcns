@@ -5,7 +5,7 @@
 @layer base {
   /*
    * Light mode is the approved artboard palette, converted to HSL:
-   *   ground #FBFCFE · ink #14161a · secondary text #55575c · hairline #DDE4EE
+   *   ground #FBFCFE · ink #2f3440 (soft charcoal, never black) · secondary text #5b6070 · hairline #DDE4EE
    *   accents #4a86d7 / #7EB3F7 · tint panel #F1F6FD · card #FFFFFF
    *
    * Dark mode is derived in the same spirit rather than inverted: a near-black
@@ -15,20 +15,23 @@
    */
   :root {
     --background: 220 60% 99%; /* #FBFCFE ground */
-    --foreground: 220 13% 9%; /* #14161a ink */
+    --foreground: 222 15% 22%; /* #2f3440 soft charcoal ink */
 
     --card: 0 0% 100%; /* #FFFFFF raised surface */
-    --card-foreground: 220 13% 9%;
+    --card-foreground: 222 15% 22%;
 
     --primary: 214 64% 57%; /* #4a86d7 */
     --primary-foreground: 0 0% 100%;
+    /* Filled-button / link blue (~#3669b4): #4a86d7 under white text is ~3.7:1,
+       this is ~5.4:1 (4.6+ on --secondary). Dark mode: same as --primary. Use bg-primary-ink. */
+    --primary-ink: 215 54% 46%;
 
     /* Tint panel #F1F6FD — the quiet blue-grey fill behind calm blocks. */
     --secondary: 215 75% 97%;
-    --secondary-foreground: 220 13% 9%;
+    --secondary-foreground: 222 15% 22%;
 
     --muted: 215 75% 97%;
-    --muted-foreground: 223 4% 35%; /* #55575c */
+    --muted-foreground: 226 10% 40%; /* #5b6070 */
 
     /* #7EB3F7 — the flood blue: index-row hover, full-bleed plates, borders. */
     --accent: 214 88% 73%;
@@ -42,6 +45,16 @@
     --ring: 214 64% 57%;
 
     --radius: 1rem;
+
+    /* Connected-tool colors and the three logo-cube faces. Same in both themes. */
+    --tool-shopify: 124 20% 47%; /* #5f8f62 */
+    --tool-square: 250 43% 60%; /* #7b6cc4 */
+    --tool-quickbooks: 173 31% 45%; /* #4f978f */
+    --tool-calendar: 35 51% 50%; /* #c08a3e */
+    --tool-gmail: 5 45% 55%; /* #c0625a */
+    --cube-top: 214 84% 88%; /* #C7DDFA */
+    --cube-left: 214 88% 73%; /* #7EB3F7 */
+    --cube-right: 214 64% 57%; /* #4A86D7 */
   }
 
   .dark {
@@ -52,7 +65,8 @@
     --card-foreground: 214 20% 94%;
 
     --primary: 214 88% 73%; /* #7EB3F7 — the lighter blue leads on black */
-    --primary-foreground: 220 14% 7%;
+    --primary-foreground: 216 64% 22%; /* #14315c on the light blue */
+    --primary-ink: 214 88% 73%; /* #7EB3F7 */
 
     --secondary: 218 16% 13%; /* dark equivalent of the tint panel */
     --secondary-foreground: 214 20% 94%;
@@ -60,7 +74,7 @@
     --muted: 218 16% 13%;
     --muted-foreground: 218 8% 65%;
 
-    --accent: 214 64% 57%; /* #4a86d7 floods on dark; the deeper blue holds text */
+    --accent: 215 52% 47%; /* #3a6fb8: deep enough that white text on the flood clears 4.5:1 */
     --accent-foreground: 214 92% 95%;
 
     --destructive: 0 63% 50%;
