@@ -4,37 +4,59 @@ Project-level guidance for Claude Code agents working in this repo.
 
 ## What this repo is
 
-bcns is a software studio that builds custom software for local small businesses. This monorepo is the bcns **platform repo** — it holds the marketing site, the shared packages, and the droplet provisioning scripts. **Direction as of 2026-09-15:** the bcns Connect platform (`bcns-data`) and the Deluxe client apps (first `apps/sb`) move into this repo, with a hub at `connect.bcn-services.com` and an MCP server — see `docs/architecture/platform-v1.md` for the layout, chunks and verification gates. Until that merge PR lands, the layout below is current. Contents:
-- `apps/web/` — the marketing/landing website (Next.js 14 App Router + TypeScript + Tailwind)
-- `packages/ui/` — shared React component library (`@bcn-services/ui`)
-- `packages/config/` — shared tsconfig, ESLint, Tailwind, Prettier config (`@bcn-services/config`)
-- `packages/app-core/` — shared application core (`@bcn-services/app-core`): pricing & seat-billing math, subscription-state (provision/suspend) logic, and a BYOK Anthropic client
-- `infra/` — provisioning-as-code for the shared DigitalOcean droplet that hosts **client** apps (bootstrap, per-client onboarding, systemd unit, nightly backups). Nothing here touches `apps/web`.
-- `docs/architecture/` — ADRs. `hosted-web-model.md` is the hosted-web business/delivery decision.
-- `templates/` — placeholder for future app starters; **empty today**. The former `templates/hosted-web/` starter was deleted once its logic moved into `app-core@0.2.0`.
+bcns is a software studio that builds custom software for local small businesses. This monorepo is the whole platform (one-repo decision 2026-09-15; plan and gates in `docs/architecture/platform-v1.md`):
+- `apps/web/` — marketing site (Next.js 14 App Router + TS + Tailwind), deployed on Vercel. Must never import from `apps/*`, `platform/` or `packages/{data-client,tenant}` (`apps/web/__tests__/isolation.test.mjs`).
+- `apps/connect/` — the hub, `connect.bcn-services.com` (sign-in, sources + health, team, access). Six connector sources: Shopify, Meta, Monday, Meet, Drive, QuickBooks (`lib/sources.ts`).
+- `apps/mcp/` — MCP server, `mcp.bcn-services.com`. Plain Node process, not Next; never holds a service-role key.
+- `apps/sb/` — SB Command Center, the first Deluxe client app.
+- `apps/_template/` + `scripts/new-app.sh <slug> <port>` — stamp for the next Deluxe app. `mcp`, `connect`, `sb`, `web`, `_template` are reserved slugs.
+- `packages/ui`, `config`, `app-core`, `data-client`, `tenant` — shared, all `@bcn-services/*`, consumed as `workspace:*`. `tenant` = session-cookie helpers + membership middleware + `EXPECTED_CLIENT_ID` pin.
+- `platform/` — the former `bcns-data`: `supabase/` (migrations, Edge Functions), `worker/` (Cloud Run connector job), `scripts/` (onboard, add-member, add-source), `test/`, `docs/`. Workspace package `@bcn-services/platform`.
+- `infra/` — droplet-as-code: bootstrap, `onboard-client.sh`, `bcns-app@.service`, backups, `ports.txt` (slug→port registry: l2detailz 3100, sb 3101, connect 3102, mcp 3103, ta 3104).
+- `docs/architecture/` — ADRs and chunk plans. `hosted-web-model.md` is superseded by `platform-v1.md`.
+- `templates/` — empty. Legacy one-off client builds (Technology Associates, l2detailz, DeLuca's) keep their own repos.
 
 ## Commands
 
-```bash
-pnpm install          # install all deps (from repo root)
-pnpm dev              # dev server at http://localhost:3000
-pnpm build            # production build (all packages via Turbo)
-pnpm lint             # ESLint across all packages
-pnpm typecheck        # tsc --noEmit across all packages
-pnpm test             # test suites across all packages
+Run from the repo root; Turborepo fans out. Root pins `pnpm@9.15.0` (`packageManager`).
 
-# Opt-in static export -> apps/web/out/ (plain files, nginx-servable, no Node).
-# Not the default: the default build is what Vercel runs.
-pnpm --filter @bcn-services/web export
-pnpm format           # Prettier write
-pnpm format:check     # Prettier check (CI-safe)
+```bash
+pnpm install
+pnpm dev              # turbo dev: every app with a dev script (web is pinned to :3000)
+pnpm build            # turbo build, all packages
+pnpm lint             # ESLint
+pnpm typecheck        # tsc --noEmit
+pnpm test             # turbo test, then test:docs, test:infra, test:new-app
+pnpm format:check     # Prettier (pnpm format writes)
+pnpm --filter @bcn-services/web export   # opt-in static export -> apps/web/out/
 ```
 
-All commands run from the repo root via Turborepo. There is no need to `cd` into `apps/web/`.
+**pnpm version.** Machine with pnpm 11 on PATH (verified 2026-09-30, pnpm 11.15.1): bare `pnpm lint` and `pnpm typecheck` from the root pass, because pnpm 11 self-switches to 9.15.0 from `packageManager`. `corepack pnpm lint` and `corepack pnpm typecheck` FAIL there: turbo's child `pnpm run` is the PATH pnpm 11, which refuses under corepack ("configured to use 9.15.0 ... Your current pnpm is v11"). Use the form that passes on your machine; CI uses `pnpm/action-setup`.
+
+**`pnpm build` clobbers a running `pnpm dev`** (routes 500 on a missing vendor chunk, Tailwind arbitrary classes stop applying). Stop dev before building.
+
+**Supabase CLI: always `--workdir platform`** (`supabase db push`, `migration list`, `functions deploy`). Without it the CLI reports "Remote migration versions not found"; never run `migration repair` for that.
+
+## Test gotchas
+
+- `platform` tests (vitest): the DB-backed files skip, with a printed message, when the local stack at `127.0.0.1:54322` (or `DATABASE_URL`) is unreachable. A green local run without `supabase start` did not run them. CI starts the stack and never skips.
+- `apps/connect` tests import `@bcn-services/tenant` from `packages/tenant/dist`; build it first (`pnpm --filter @bcn-services/tenant build`). Under turbo, `test` depends on `build`, so `pnpm test` does it for you.
+- App `test` scripts are hard-coded file lists (`tsx --test tests/a.test.mjs ...`) in `apps/{connect,sb,_template}/package.json`. A new test file does nothing until it is added to that list. `apps/mcp` runs `tsc && node --test tests/*.test.mjs`; `apps/web` runs `__tests__/*.mjs`.
+- `apps/web`: `__tests__/a2-fix-verification.test.mjs` was red on main when the `apps` CI job was written, so that job excludes `@bcn-services/web` from test (`platform-ci.yml`).
+
+## What a merge to `main` deploys
+
+Read the workflow before assuming; paths below are the `on.push.paths` filters as of 2026-09-30.
+
+- `deploy-app.yml`: a push touching `apps/sb/**`, `apps/connect/**`, `apps/mcp/**`, `packages/**`, root `package.json`, `pnpm-lock.yaml` or the workflow itself deploys **all of sb, connect and mcp** (matrix `["sb","connect","mcp"]`; each builds, rsyncs to the droplet, restarts `bcns-app@<slug>`, health-checks `/api/health`, rolls back on failure). A docs-only edit under `apps/sb/` or `apps/connect/` still matches and restarts them. `workflow_dispatch` with `slug` redeploys one.
+- `deploy-worker.yml`: `platform/worker/**`, `platform/package.json`, root `package.json`, `pnpm-lock.yaml` -> builds the worker image and updates the Cloud Run Job `bcns-data-worker`.
+- `platform-ci.yml`: tests, not a deploy. Push to main on `platform/**`, `packages/data-client/**`, root package/lock; on PRs also `apps/**` and `packages/**`. Job `test` = local Supabase stack + platform typecheck/test + worker image build; job `apps` = turbo lint/typecheck/test over `apps/*`.
+- Marketing (Vercel): Ignored Build Step skips builds unless `apps/web`, `packages/ui`, `config`, `app-core`, root package/lock changed (README -> Deploy).
+- Migrations, Edge Functions, DNS and dashboard settings never deploy from a merge; they are Nate-run steps.
 
 ## Architecture
 
-**Monorepo tooling:** pnpm workspaces + Turborepo. Task pipeline in `turbo.json`. Any new directory under `apps/` or `packages/` is auto-picked up by the workspace glob.
+**Monorepo tooling:** pnpm workspaces + Turborepo. Task pipeline in `turbo.json`. `pnpm-workspace.yaml` globs `apps/*`, `packages/*` and `platform`.
 
 **Web app (`apps/web/`):** Next.js 14 App Router, TypeScript strict mode, Tailwind CSS with HSL token theme (light + dark). Page entry is `app/page.tsx`; layout in `app/layout.tsx`. All site-wide constants (name, domain, email, nav items, tagline, description) live in `apps/web/lib/site.ts` — update that file, not individual components.
 
@@ -68,15 +90,9 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 - `lib/content.ts` is the single source of truth for all marketing copy — keep it that way. `lib/site.ts` holds only name / domain / email / nav. `CONTENT.md` is the field-by-field companion to `content.ts` and must be updated alongside it.
 - Fonts are self-hosted via `next/font/local` from `apps/web/app/fonts/`. Do **not** switch back to `next/font/google`: it fetches over the network at build time with no timeout in production, so an unreachable Google CDN fails `next build` in CI. To add or update a face, follow `apps/web/app/fonts/README.md`.
 
-## Adding a client app later
+## Adding a client app
 
-Superseded 2026-09-15: client apps become `apps/<slug>` in this repo, stamped by `scripts/new-app.sh` from `apps/_template` (plan: `docs/architecture/platform-v1.md`). `docs/architecture/hosted-web-model.md` records the earlier decision. Legacy one-off builds (Technology Associates, l2detailz) keep their own repos.
-
-1. Create the new repo and wire it against the shared packages by hand. **There is no starter template today** — `templates/hosted-web/` was deleted once its logic moved into `app-core@0.2.0`, and its replacement (a standalone GitHub Template Repository) does not exist yet.
-2. Consume the shared packages **by version** (as normal dependencies, not `workspace:*`): `@bcn-services/ui`, `@bcn-services/config`, and `@bcn-services/app-core`.
-3. Propagate shared improvements by publishing a new package version and bumping it in each client repo — no copy-paste, no hand-editing per app.
-
-`apps/` in this monorepo holds only the platform repo's own app — the marketing site (`apps/web`). DeLuca's was extracted to its own repo (`bcns-client-delucas`).
+Run `scripts/new-app.sh <slug> <port>` from the root (the `/new-client-app` skill does this): it stamps `apps/_template` to `apps/<slug>`, writes `CLIENT.md`, and registers the port in `infra/ports.txt`. Then add the slug to `deploy-app.yml` in both `on.push.paths` and `strategy.matrix.slug` (a push deploys nothing for it until you do), and onboard the droplet with `infra/onboard-client.sh`. Apps consume shared packages as `workspace:*` and read all data through `@bcn-services/data-client` as the signed-in user; no migrations and no service-role key in an app (each app's `scripts/check-env.ts`, e.g. `apps/sb/scripts/check-env.ts`, fails the build).
 
 ## Deploy
 
