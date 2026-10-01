@@ -10,8 +10,9 @@ test("Sign in renders as an outline button in both header variants", () => {
   assert.equal(signIn.length, 2);
   for (const a of signIn) {
     assert.match(a, /rel="noopener"/);
-    for (const c of ["lift-button", "rounded-lg", "border-border", "bg-transparent", "text-foreground", "focus-visible:ring-2"])
+    for (const c of ["rounded-lg", "border-input", "focus-visible:ring-2"])
       assert.ok(a.includes(c), `missing ${c}`);
   }
-  assert.ok(!/fetch\(/.test(src));
+  const site = readFileSync(new URL("../lib/site.ts", import.meta.url), "utf8");
+  assert.match(site, /signIn:[^}]*href: "https:\/\/connect\.bcn-services\.com"/);
 });

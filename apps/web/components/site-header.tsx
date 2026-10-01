@@ -20,7 +20,7 @@ export function SiteHeader() {
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-4 lg:gap-9">
-          <nav aria-label="Primary" className="hidden items-center gap-9 md:flex">
+          <nav aria-label="Primary" className="hidden items-center gap-6 md:flex lg:gap-9">
             {siteConfig.nav.map((item) => (
               <Link
                 key={item.href}
@@ -33,7 +33,7 @@ export function SiteHeader() {
             <a
               href={siteConfig.signIn.href}
               rel="noopener"
-              className="lift-button rounded-lg border border-border bg-transparent px-[1.375rem] py-[0.6875rem] text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="rounded-lg border border-input bg-transparent px-[1.375rem] py-[0.6875rem] text-sm font-medium text-foreground transition-colors duration-200 hover:border-accent hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {siteConfig.signIn.label}
             </a>
@@ -66,7 +66,7 @@ export function SiteHeader() {
               <a
                 href={siteConfig.signIn.href}
                 rel="noopener"
-                className="lift-button mt-1 block rounded-lg border border-border bg-transparent px-5 py-2.5 text-center text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="mt-1 block rounded-lg border border-input bg-transparent px-5 py-2.5 text-center text-sm font-medium text-foreground transition-colors duration-200 hover:border-accent hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {siteConfig.signIn.label}
               </a>
