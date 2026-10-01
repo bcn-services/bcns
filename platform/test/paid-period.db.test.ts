@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { CLIENTS, pool, signIn, sql, USERS } from './helpers.js'
 import type { Tick } from '../worker/src/db.js'
 import { paidPeriods } from '../worker/src/paid-period.js'
+import { BRIDGE_SHOP } from '../worker/src/privacy.js'
 
 const made: string[] = []
 const HOUR = 3_600_000
@@ -15,7 +16,7 @@ type Answer = { status: number; body: unknown }
 const subs = (s: unknown[]): Answer => ({ status: 200, body: { data: { currentAppInstallation: { activeSubscriptions: s } } } })
 
 /** Transport answering per shop host; records which shops were asked. Any other host fails the test. */
-function mkTick(answers: Record<string, Answer>, asked: string[]): Tick {
+function mkTick(answers: Record<string, Answer>, asked: string[], events: string[] = []): Tick {
   const fetchStub = (async (url: string | URL) => {
     const host = new URL(String(url)).host
     asked.push(host)
@@ -25,7 +26,7 @@ function mkTick(answers: Record<string, Answer>, asked: string[]): Tick {
   }) as unknown as typeof fetch
   return {
     taskIndex: 0, taskCount: 1, owner: `test-${randomUUID().slice(0, 8)}`, fetch: fetchStub,
-    stubbed: true, now: () => new Date(), log: () => {}, budgetMs: 60_000, claimLimit: 24,
+    stubbed: true, now: () => new Date(), log: (event) => { events.push(event) }, budgetMs: 60_000, claimLimit: 24,
   }
 }
 
@@ -99,7 +100,8 @@ describe('paidPeriods: the worker step', () => {
   })
 
   it('the bridge app row is never asked about or touched', async () => {
-    // Mutation 3 (DB half): remove the isPublicApp filter -> asked + checked_at set -> red.
+    // Mutation 3 (DB half): remove the SQL `config->>'app' is null` clause AND the isPublicApp
+    // call -> asked + checked_at set -> red. Each alone is covered by the other (two guards).
     const c = await mkClient({ paidThrough: new Date(Date.now() - 2 * HOUR), config: { app: 'bcns-data' } })
     const asked: string[] = []
     await paidPeriods(mkTick({ [c.shop]: subs([]) }, asked))
@@ -120,33 +122,79 @@ describe('paidPeriods: the worker step', () => {
     expect((await state(none.id)).token).toBe('active')
     expect((await state(future.id)).token).toBe('active')
   })
+
+  it('a disabled schedule or a non-active token is never selected', async () => {
+    const disabled = await mkClient({ paidThrough: new Date(Date.now() - 2 * HOUR) })
+    await sql(`update data.connector_schedule set enabled = false where client_id = $1`, [disabled.id])
+    const failed = await mkClient({ paidThrough: new Date(Date.now() - 2 * HOUR) })
+    await sql(`update data.source_tokens set status = 'auth_failed' where client_id = $1`, [failed.id])
+    const asked: string[] = []
+    await paidPeriods(mkTick({ [disabled.shop]: subs([]), [failed.shop]: subs([]) }, asked))
+    expect(asked).not.toContain(disabled.shop)
+    expect(asked).not.toContain(failed.shop)
+    expect((await state(disabled.id)).checked_at).toBeNull()
+    expect((await state(failed.id)).checked_at).toBeNull()
+    expect((await state(failed.id)).token).toBe('auth_failed')
+  })
+
+  it('contextFor throwing never revokes, and the row waits for the next daily check', async () => {
+    // An invalid sessions_mode makes the shopify configSchema.parse inside contextFor throw.
+    const c = await mkClient({ paidThrough: new Date(Date.now() - 2 * HOUR), config: { sessions_mode: 'bogus' } })
+    const asked: string[] = []
+    const events: string[] = []
+    await paidPeriods(mkTick({ [c.shop]: subs([]) }, asked, events))
+    expect(events).toContain('paid_period_failed')
+    expect(asked).not.toContain(c.shop)
+    const s = await state(c.id)
+    expect(s.token).toBe('active')
+    expect(s.enabled).toBe(true)
+    expect(s.checked_at).not.toBeNull()
+  })
+
+  it('a BRIDGE_SHOP row with no config.app marker is never asked about or touched', async () => {
+    const c = await mkClient({ paidThrough: new Date(Date.now() - 2 * HOUR), shop: BRIDGE_SHOP })
+    const asked: string[] = []
+    await paidPeriods(mkTick({ [c.shop]: subs([]) }, asked))
+    expect(asked).not.toContain(c.shop)
+    const s = await state(c.id)
+    expect(s.token).toBe('active')
+    expect(s.enabled).toBe(true)
+    expect(s.checked_at).toBeNull()
+  })
 })
 
 describe('data.shopify_paid_through tenancy', () => {
-  it('no tenant can read the table, not even its own row (forbidden read)', async () => {
-    // Mutation 5: grant select to authenticated + a permissive policy -> beta sees acme's row -> red.
-    await sql(
-      `insert into data.shopify_paid_through (client_id, shop, paid_through) values ($1, 'acme-pp.myshopify.com', now() + interval '1 day')
-       on conflict (client_id) do update set paid_through = excluded.paid_through`, [CLIENTS.acme])
+  /** Reads acme's row as the given authenticated user: a row count, or 'denied' (42501). */
+  async function readAcmeRowAs(userId: string, clientId: string): Promise<number | 'denied'> {
     const c = await pool.connect()
-    let seen: number | 'denied'
     try {
       await c.query('begin')
       await c.query(`select set_config('request.jwt.claims', $1, true)`,
-        [JSON.stringify({ sub: USERS.betaMember.id, role: 'authenticated', client_id: CLIENTS.beta })])
+        [JSON.stringify({ sub: userId, role: 'authenticated', client_id: clientId })])
       await c.query('set local role authenticated')
       try {
         const r = await c.query(`select count(*)::int n from data.shopify_paid_through where client_id = $1`, [CLIENTS.acme])
-        seen = r.rows[0].n
+        return r.rows[0].n
       } catch (e) {
         expect((e as { code?: string }).code).toBe('42501')
-        seen = 'denied'
+        return 'denied'
       }
     } finally {
       await c.query('rollback').catch(() => {})
       c.release()
     }
-    expect(seen === 'denied' || seen === 0).toBe(true)
+  }
+
+  it('no tenant can read the table, not even its own row (forbidden read)', async () => {
+    // Mutation 5: grant select to authenticated + a permissive policy -> beta sees acme's row -> red.
+    await sql(
+      `insert into data.shopify_paid_through (client_id, shop, paid_through) values ($1, 'acme-pp.myshopify.com', now() + interval '1 day')
+       on conflict (client_id) do update set paid_through = excluded.paid_through`, [CLIENTS.acme])
+    const other = await readAcmeRowAs(USERS.betaMember.id, CLIENTS.beta)
+    expect(other === 'denied' || other === 0).toBe(true)
+    // Its own row: acme's owner cannot read it either.
+    const own = await readAcmeRowAs(USERS.acmeOwner.id, CLIENTS.acme)
+    expect(own === 'denied' || own === 0).toBe(true)
   })
 })
 
