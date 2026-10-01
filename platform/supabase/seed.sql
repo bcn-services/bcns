@@ -76,7 +76,7 @@ begin
               case when i % 2 = 0 then 'High' else 'Low' end, 'Group '||(i % 4), 'Owner '||(i % 3), day0 + i + 7,
               'https://monday.example.com/items/'||i, day0 + i);
       insert into data.messages (client_id, source, external_id, kind, title, body, occurred_at, participants, url, source_updated_at)
-      values (c.id, 'meet', 'meet-'||i, 'meeting_notes', 'Meeting '||i, 'Notes for meeting '||i, (day0 + i)::timestamptz + interval '15 hours',
+      values (c.id, 'meet', 'meet-'||i, 'meeting_note', 'Meeting '||i, 'Notes for meeting '||i, (day0 + i)::timestamptz + interval '15 hours',
               array['a@example.com','b@example.com'], 'https://docs.example.com/'||i, day0 + i);
       insert into data.records (client_id, source, external_id, kind, title, body, attributes, occurred_at)
       values (c.id, (case when i < 40 then 'dashboard' else 'meta' end)::data.source, case when i < 40 then 'rec-'||i else 'camp-'||(i-40) end,

@@ -5,6 +5,7 @@
 // a data.clients row -- an orphan can only exist if the Storage cleanup didn't run or didn't finish.
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
+import { join } from 'node:path'
 import { localKeys, sql, SUPABASE_URL } from './helpers.js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -28,7 +29,9 @@ describe('drive-tombstone.test.ts Storage cleanup', () => {
     const before = await orphanedMediaObjects()
     expect(before.rows).toEqual([]) // sanity: no pre-existing leak from another suite/run
 
-    execFileSync('corepack', ['pnpm', 'exec', 'vitest', 'run', 'test/drive-tombstone.test.ts'], {
+    // Run vitest's entry directly under this node: `corepack pnpm exec` re-resolves/may fetch pnpm and adds a
+    // process layer, which is what made this test flaky under the 60s budget.
+    execFileSync(process.execPath, [join(process.cwd(), 'node_modules/vitest/vitest.mjs'), 'run', 'test/drive-tombstone.test.ts'], {
       cwd: process.cwd(),
       stdio: 'pipe',
       env: { ...process.env, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: localKeys().service },
