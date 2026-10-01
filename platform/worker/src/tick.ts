@@ -76,12 +76,13 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
     await step('ensurePartitions', () => ensurePartitions(t))
     await step('refreshTokens', () => refreshTokens(t))
     await step('probeAuthFailed', () => probeAuthFailed(t))
-    await step('paidPeriods', () => paidPeriods(t))
   }
 
   await step('claimAndRun', () => claimAndRun(t))
 
   if (housekeeping) {
+    // After claimAndRun: up to 50 Shopify calls (10 s timeout each) must not eat the run budget.
+    await step('paidPeriods', () => paidPeriods(t))
     await step('computeHealth', () => computeHealth(t))
     // Before alerts: alerts() ends its own call with sendPending(), which flushes every unsent
     // data.notifications row (not just the ones alerts() itself just raised) — so an escalation

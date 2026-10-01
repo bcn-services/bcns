@@ -98,8 +98,10 @@ export async function paidPeriods(t: Tick): Promise<number> {
                                       and lower(s.config->>'shop') = lower(p.shop)
        join data.source_tokens tk on (tk.client_id, tk.source) = (s.client_id, s.source)
       where s.enabled and tk.status = 'active' and p.paid_through < now()
+        -- Bridge rows out in SQL so they never hold a LIMIT slot; isPublicApp below is the second guard.
+        and s.config->>'app' is null and lower(p.shop) <> $1
         and (p.checked_at is null or p.checked_at < now() - interval '20 hours')
-      order by p.paid_through limit 50`)
+      order by p.paid_through limit 50`, [BRIDGE_SHOP])
   let revoked = 0
   for (const row of due.rows) {
     if (!isPublicApp(row.shop, row.config)) continue
@@ -119,8 +121,10 @@ export async function paidPeriods(t: Tick): Promise<number> {
       }
       t.log('paid_period', { client: row.client_id, shop: row.shop, ...d })
     } catch (e) {
-      // Fail open: nothing revoked; checked_at untouched, so the row is retried next tick.
+      // Fail open: nothing revoked. checked_at is (re)set here too, so a row whose check keeps
+      // throwing (e.g. contextFor's config parse) is retried in ~20 h, not every tick.
       t.log('paid_period_failed', { client: row.client_id, shop: row.shop, error: e instanceof Error ? e.message : String(e) })
+      await sql(`update data.shopify_paid_through set checked_at = now() where client_id = $1`, [row.client_id]).catch(() => {})
     }
   }
   return revoked
