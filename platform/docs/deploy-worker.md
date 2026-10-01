@@ -32,7 +32,7 @@ everything runs nothing at all, which is a safe way to read what it would do.
    straight into Secret Manager;
    none is echoed or written to disk. Step 7 creates the Scheduler job as the `bcns-data-tick`
    service account, so the principal running the script needs `iam.serviceAccounts.actAs` on it —
-   project Owner already has it.
+   project Owner already has it. Step 6b (QuickBooks) is opt-in — see below; skip it for now.
 3. **Set the four GitHub settings it prints** (step 8) — `GCP_WORKLOAD_IDENTITY_PROVIDER` and
    `GCP_SERVICE_ACCOUNT` as secrets, `GCP_REGION` and `GCP_PROJECT` as variables, all with
    `GITHUB_TOKEN= gh ...`.
@@ -54,6 +54,37 @@ everything runs nothing at all, which is a safe way to read what it would do.
 
 The workflow only ever touches the image and the task/CPU/memory shape; env and secrets live on the
 job, so re-running the setup script is never needed after a code change.
+
+## QuickBooks (opt-in, step 6b)
+
+Not part of steps 5/6 on purpose: a `--set-secrets` ref to a secret that does not exist yet fails the
+job create/update, and step 6 never re-applies env to a job that already exists. The worker reads
+the three vars only while pulling a QuickBooks source (`QUICKBOOKS_ENV` in `baseUrl()`, the client
+id/secret inside `refreshToken`), so **running the script or `deploy-worker` before the Intuit secret
+exists is safe** — a tick with no QuickBooks source never touches them.
+
+| Var | Kind | Where |
+|---|---|---|
+| `QUICKBOOKS_CLIENT_ID` | plain env | exported before step 6b (public half, like `SHOPIFY_CLIENT_ID`) |
+| `QUICKBOOKS_ENV` | plain env | exported, `sandbox` or `production`; must match the realm the owner connects (no default, `baseUrl()` throws) |
+| `QUICKBOOKS_CLIENT_SECRET` | Secret Manager | typed at step 6b's hidden prompt; created once, existing secret kept, accessor bound to the runtime SA |
+
+```
+export QUICKBOOKS_CLIENT_ID=<Intuit client id> QUICKBOOKS_ENV=sandbox
+bash scripts/gcp-setup.sh      # n to every step except 6b
+```
+
+6b creates the secret first, then `gcloud run jobs update --update-env-vars ... --update-secrets ...`
+(merges; other vars stay). It skips with a stderr message if the job is missing or the exports are
+unset/invalid, and is safe to re-run. In the Intuit developer app set redirect URI
+`https://connect.bcn-services.com/api/oauth/quickbooks/callback` and scope
+`com.intuit.quickbooks.accounting`. The hub needs `QUICKBOOKS_CLIENT_ID` / `QUICKBOOKS_CLIENT_SECRET`
+in the droplet's `/srv/connect/env`, and the source stays hidden until `quickbooks` is added to
+`OAUTH_APPROVED_SOURCES` there (operator step, then restart the connect service). Run 6b first: a
+connection made before the job has the client id refreshes with an empty id and is marked
+`auth_failed`. If 6b fails with permission denied right after the secret grant, wait a minute and re-run it.
+If a half-failed create left the secret with no version, 6b keeps it and the update fails on `:latest`:
+`gcloud secrets versions add QUICKBOOKS_CLIENT_SECRET --data-file=-` fixes it.
 
 ## Afterwards
 
