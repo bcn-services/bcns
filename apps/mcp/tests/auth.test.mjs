@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import { ALLOWED_ORIGIN, authorize, bearer, originAllowed, supabaseEnv } from '../dist/auth.js'
 
 const ok = async () => 'user-1'
+/** A token shaped like the hook's: header.payload.signature (the signature is verify()'s job). */
+const jwt = (claims) => `h.${Buffer.from(JSON.stringify({ sub: 'user-1', ...claims })).toString('base64url')}.s`
+const MEMBER = jwt({ client_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc', client_role: 'member' })
 const allowAll = () => true
 
 test('bearer: present', () => {
@@ -74,11 +77,11 @@ test('authorize: over the rate limit is 429, and the token is never verified', a
 
 test('authorize: a verified token passes its own value through', async () => {
   const result = await authorize(
-    { authorization: 'Bearer good.jwt' },
+    { authorization: `Bearer ${MEMBER}` },
     { verify: ok, allow: allowAll },
   )
   assert.equal(result.ok, true)
-  assert.equal(result.token, 'good.jwt')
+  assert.equal(result.token, MEMBER)
   assert.equal(result.userId, 'user-1')
 })
 
@@ -88,4 +91,13 @@ test('supabaseEnv: anon key only, and it refuses to start without one', () => {
     anonKey: 'anon',
   })
   assert.throws(() => supabaseEnv({ SUPABASE_URL: 'https://x.supabase.co' }), /SUPABASE_ANON_KEY/)
+})
+
+test('authorize: a verified PENDING sign-up (no client_id claim) is 403 no_membership', async () => {
+  for (const token of [jwt({ client_status: 'pending' }), jwt({}), 'not-a-jwt']) {
+    const result = await authorize({ authorization: `Bearer ${token}` }, { verify: ok, allow: allowAll })
+    assert.equal(result.ok, false, token)
+    assert.equal(result.status, 403, token)
+    assert.deepEqual(result.body, { error: 'no_membership' }, token)
+  }
 })

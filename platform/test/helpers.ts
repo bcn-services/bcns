@@ -101,12 +101,13 @@ export const PNG_1x1 = Buffer.from(
 
 /**
  * RPCs in schema api that intentionally have zero `authenticated`/`anon` execute privilege —
- * service_role only, called from an Edge Function that authenticates the caller itself (HMAC),
+ * service_role only, called from an Edge Function that authenticates the caller itself (HMAC, or
+ * for signup_create_client none: the caller is a visitor creating their own account),
  * never via a Supabase Auth JWT. `no_claim_zero_rows` and `rpc_every_write_scoped` both assume
  * every api RPC is JWT-tenant-scoped, which doesn't apply here; N1's own
  * rpc-record-shop-redact.test.ts covers this RPC's real access-control surface instead.
  */
-export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled'])
+export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled', 'signup_create_client'])
 
 /**
  * One argument builder per api RPC, every id pointing at seeded `beta` rows. Used by the

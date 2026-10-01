@@ -137,3 +137,10 @@ test("requireMembership: user claims never override the verified token's client"
   assert.equal(result.membership.clientId, CLIENT_ID);
   assert.equal(result.membership.role, "member");
 });
+
+test("requireMembership: a pending sign-up is no-membership, flagged pending, never a membership", async () => {
+  const result = await requireMembership(
+    stubClient({ user: { id: USER_ID }, token: accessToken({ sub: USER_ID, client_status: "pending" }) })
+  );
+  assert.deepEqual(result, { ok: false, reason: "no-membership", pending: true });
+});

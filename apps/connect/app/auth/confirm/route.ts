@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@bcn-services/tenant";
-import { confirmTarget } from "@/lib/auth-link";
+import { confirmTarget, LINK_EXPIRED_PATH } from "@/lib/auth-link";
 import { getConfig } from "@/lib/env";
+import { notifySignupConfirmed } from "@/lib/signup";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Landing for the invite and password-reset emails (token_hash + verifyOtp, the
+ * Landing for the invite, password-reset and sign-up confirmation emails (token_hash + verifyOtp, the
  * SSR flow in the Supabase docs). Public in the matcher: the visitor has no
  * session yet; verifyOtp is what creates it.
  *
@@ -22,10 +23,17 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const q = request.nextUrl.searchParams;
-  const path = await confirmTarget(createServerSupabase(), {
+  const supabase = createServerSupabase();
+  const path = await confirmTarget(supabase, {
     token_hash: q.get("token_hash"),
     type: q.get("type"),
     next: q.get("next"),
   });
-  return NextResponse.redirect(`${getConfig().hubBaseUrl}${path}`, 303);
+  const config = getConfig();
+  // A self-service sign-up's confirmation link (type=email): tell bcns once, on the click
+  // that verified it. The middleware then confines the new session to /pending.
+  if (config.signupEnabled && q.get("type") === "email" && path !== LINK_EXPIRED_PATH) {
+    await notifySignupConfirmed(supabase, { apiKey: config.resendApiKey });
+  }
+  return NextResponse.redirect(`${config.hubBaseUrl}${path}`, 303);
 }

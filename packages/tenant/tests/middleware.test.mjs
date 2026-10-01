@@ -210,3 +210,26 @@ test("behind nginx: X-Forwarded-Host is ignored (nginx passes it through, so it 
   const response = await tenantMiddleware()(req);
   assert.equal(new URL(response.headers.get("location")).host, "sb.bcn-services.com");
 });
+
+test("pending sign-up, hub (pendingPath set): kept signed in and confined to the pending page", async () => {
+  const mw = tenantMiddleware({ pendingPath: "/pending" });
+  const cookie = sessionCookie({ client_status: "pending" });
+  for (const path of ["/", "/data", "/access", "/api/oauth/start/meta"]) {
+    const response = await mw(request(path, { cookie }));
+    assert.equal(response.status, 307, path);
+    assert.equal(new URL(response.headers.get("location")).pathname, "/pending", path);
+  }
+  assert.equal((await mw(request("/pending", { cookie }))).status, 200);
+  assert.ok(!calls.some((url) => url.includes("/auth/v1/logout")), "a pending session is not signed out on the hub");
+});
+
+test("pending sign-up, client app (no pendingPath): refused exactly like no-membership", async () => {
+  const response = await tenantMiddleware({ expectedClientId: CLIENT_ID })(
+    request("/pending", { cookie: sessionCookie({ client_status: "pending" }) })
+  );
+  assert.equal(response.status, 307);
+  const location = new URL(response.headers.get("location"));
+  assert.equal(location.pathname, "/login");
+  assert.equal(location.searchParams.get("error"), "no-membership");
+  assert.ok(calls.some((url) => url.includes("/auth/v1/logout") && url.includes("scope=local")));
+});

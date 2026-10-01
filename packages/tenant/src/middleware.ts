@@ -16,6 +16,12 @@ export interface TenantMiddlewareOptions {
   expectedClientId?: string;
   /** Where signed-out and rejected visitors land. Default "/login". */
   loginPath?: string;
+  /**
+   * The hub only: a pending sign-up (no membership yet, see requireMembership) is kept signed
+   * in and confined to this path. Unset (every client app), pending is plain no-membership:
+   * signed out and sent to ?error=no-membership.
+   */
+  pendingPath?: string;
 }
 
 /** Everything except the self-authenticating health route and static assets. */
@@ -38,6 +44,9 @@ export const CONNECT_PUBLIC_ROUTES = [
   // Invite / password-reset email landing: the visitor has no session yet. The route
   // only calls verifyOtp on a single-use token_hash and redirects; it reads nothing else.
   "auth/confirm$",
+  // Self-service sign-up form (P1): pre-sign-in by definition. The page 404s unless
+  // SIGNUP_ENABLED, and its action only forwards to the public signup Edge Function.
+  "signup$",
 ];
 
 export function tenantMiddleware(
@@ -98,6 +107,11 @@ export function tenantMiddleware(
       return redirect;
     };
 
+    if (result.reason === "no-membership" && result.pending && opts.pendingPath) {
+      // Kept signed in (activation flips the next token to a full membership), but nothing
+      // except the pending page itself is served; it signs out through its own action.
+      return request.nextUrl.pathname === opts.pendingPath ? response : redirectTo(opts.pendingPath);
+    }
     if (result.reason === "wrong-client") {
       // Signed in, but to someone else's tenant: drop the session so the next
       // sign-in starts clean instead of bouncing off this app forever.
