@@ -165,8 +165,9 @@ Turning it on, in order:
    `20261001000200_signup_pending.sql` (hook pending branch + `api.signup_create_client`).
 2. `supabase functions deploy signup --workdir platform --project-ref cnsxbglhredokjbvudfd --no-verify-jwt`.
    It also reads the platform-injected `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-   Deployed without the secret it stays dark. Hand-check: `curl -s -o /dev/null -w '%{http_code}' -X POST
-   https://cnsxbglhredokjbvudfd.supabase.co/functions/v1/signup` prints `404`.
+   Deployed without the secret it stays dark. Hand-check: `curl -s -X POST
+   https://cnsxbglhredokjbvudfd.supabase.co/functions/v1/signup` prints `{"error":"not_found"}` (the
+   gateway's own 404 for a missing function has a different body, `{"code":"NOT_FOUND",...}`).
 3. Hosted Auth (dashboard):
    - "Confirm email" ON. Public sign-ups ("Allow new users to sign up") OFF: the function uses the
      admin API, and the `resend` (type=signup) it calls has no sign-ups-disabled check.
@@ -180,7 +181,9 @@ Turning it on, in order:
 5. `supabase secrets set SIGNUP_ENABLED=1 --workdir platform --project-ref cnsxbglhredokjbvudfd`.
 6. `SIGNUP_ENABLED=1` in `/srv/connect/env`, restart `bcns-app@connect`, confirm a new pid.
 7. Hand-check: sign up with a non-team address. The confirmation mail reaches it, its link lands
-   on `/pending`, and exactly one notice arrives at `BCNS_EMAIL`.
+   on `/pending`, and exactly one notice arrives at `BCNS_EMAIL`. Then sign up again with another
+   non-team address, do not confirm, wait more than 60s and sign up with it once more: a second
+   confirmation mail arrives (proves GoTrue reports the duplicate as `email_exists`).
 
 Switching off: `supabase secrets unset SIGNUP_ENABLED --workdir platform --project-ref cnsxbglhredokjbvudfd`,
 then remove `SIGNUP_ENABLED` from `/srv/connect/env` and restart (confirm a new pid). The secret
@@ -207,5 +210,6 @@ Known v1 limits:
   silent to the visitor. Hand-check / alert: `signup_client_failed` with `code: "BCNS8"` in the
   `signup` function logs means real sign-ups are being dropped.
 - Over the cap, each request still creates and then deletes a GoTrue user (no mail).
-- Timing: a new address takes measurably longer to answer than an existing one, so existence can
-  be inferred by timing. Accepted for v1.
+- Timing: an existing unconfirmed address now costs about as much as a new one (both send mail),
+  but a confirmed address (re-send does nothing) answers faster, so "a confirmed account exists"
+  can be inferred by timing. Accepted for v1.
