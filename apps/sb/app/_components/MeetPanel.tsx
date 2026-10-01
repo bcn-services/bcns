@@ -10,7 +10,7 @@ import { EXTERNAL_LINK_PROPS, SERVICE_LINKS } from "@/lib/links";
 import { MeetIcon, NoteIcon } from "./icons";
 import { Panel, PanelHead, StateNote, ViewAll } from "./Panel";
 
-function NoteCard({ note }: { note: NoteLike }) {
+function NoteCard({ note, timezone }: { note: NoteLike; timezone: string }) {
   const body = (
     <>
       <span className="note-card__icon">
@@ -18,7 +18,7 @@ function NoteCard({ note }: { note: NoteLike }) {
       </span>
       <span className="note-card__body">
         <span className="note-card__title">{note.title ?? "Meeting note"}</span>
-        <span className="note-card__date">{note.occurred_at ? formatDayLabel(note.occurred_at) : "—"}</span>
+        <span className="note-card__date">{note.occurred_at ? formatDayLabel(note.occurred_at, timezone) : "—"}</span>
         <span className="note-card__excerpt">{noteExcerpt(note.body)}</span>
       </span>
     </>
@@ -33,7 +33,7 @@ function NoteCard({ note }: { note: NoteLike }) {
   return <div className="note-card">{body}</div>;
 }
 
-export function MeetPanel({ state, notes, connectHref }: { state: PanelState; notes: NoteLike[]; connectHref: string }) {
+export function MeetPanel({ state, notes, connectHref, timezone }: { state: PanelState; notes: NoteLike[]; connectHref: string; timezone: string }) {
   return (
     <Panel className="panel--column">
       <PanelHead
@@ -53,7 +53,7 @@ export function MeetPanel({ state, notes, connectHref }: { state: PanelState; no
       {state === "data" ? (
         <div className="note-list">
           {sortRecentNotes(notes).map((note, i) => (
-            <NoteCard key={note.id ?? `${note.occurred_at ?? ""}-${i}`} note={note} />
+            <NoteCard key={note.id ?? `${note.occurred_at ?? ""}-${i}`} note={note} timezone={timezone} />
           ))}
         </div>
       ) : (

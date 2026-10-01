@@ -412,9 +412,14 @@ export function formatRangeLabel(from: string, to: string): string {
   return `${aMon} ${a.d} – ${bMon} ${b.d}, ${b.y}`;
 }
 
-/** "May 30, 2025" for a single day (note cards, activity). */
-export function formatDayLabel(ymdOrIso: string): string {
-  const ymd = ymdOrIso.slice(0, 10);
+/** "May 30, 2025" for a single day (note cards, activity). A full timestamp is
+ *  read as a calendar day in `timezone` (the client's), not the UTC date. */
+export function formatDayLabel(ymdOrIso: string, timezone?: string): string {
+  let ymd = ymdOrIso.slice(0, 10);
+  if (timezone && ymdOrIso.length > 10 && isValidTimezone(timezone)) {
+    const at = new Date(ymdOrIso);
+    if (!Number.isNaN(at.getTime())) ymd = todayInTimezone(timezone, at);
+  }
   if (!YMD_RE.test(ymd)) return "—";
   const { y, m, d } = ymdParts(ymd);
   return `${MONTHS[m - 1] ?? ""} ${d}, ${y}`;

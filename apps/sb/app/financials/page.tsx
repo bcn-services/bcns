@@ -36,7 +36,7 @@ import {
   type FinancialEntry,
   type FinancialTile,
 } from "@/lib/financials";
-import { healthFor, panelState, type PanelState } from "@/lib/panels";
+import { panelState, qboConnection, type PanelState } from "@/lib/panels";
 import {
   formatCount,
   formatDayLabel,
@@ -123,9 +123,9 @@ export default async function FinancialsPage({
   const sectorIds = collectSectorIds(sectorBudgets, sectorAssignments);
   const assignmentMap = toAssignmentMap(sectorAssignments);
 
-  const qboHealth = healthFor(shell.health, "quickbooks");
-  const qboConnected = qboHealth !== null;
-  const qboLastSynced = qboHealth?.last_success_at ? formatRelativeTime(qboHealth.last_success_at) : null;
+  const qbo = qboConnection(shell.health);
+  const qboConnected = qbo.connected;
+  const qboLastSynced = qbo.lastSuccessAt ? formatRelativeTime(qbo.lastSuccessAt) : null;
 
   const summarySplit = splitPeriods(summary.rows, range.from, range.to, range.prevFrom, range.prevTo);
   const spendSplit = splitPeriods(spend.rows, range.from, range.to, range.prevFrom, range.prevTo);
