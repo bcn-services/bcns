@@ -8,6 +8,7 @@ import { alerts, computeHealth, egressPooled } from './health.js'
 import { purge, thumbnails } from './media.js'
 import { renormalize } from './renormalize.js'
 import { shopRedact } from './privacy.js'
+import { paidPeriods } from './paid-period.js'
 
 export interface TickOpts {
   taskIndex?: number
@@ -75,6 +76,7 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
     await step('ensurePartitions', () => ensurePartitions(t))
     await step('refreshTokens', () => refreshTokens(t))
     await step('probeAuthFailed', () => probeAuthFailed(t))
+    await step('paidPeriods', () => paidPeriods(t))
   }
 
   await step('claimAndRun', () => claimAndRun(t))
