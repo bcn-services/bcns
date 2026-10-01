@@ -27,7 +27,7 @@ const LANE_DOTS = [
 ];
 
 export function PastWork() {
-  const { eyebrow, title, description, items, holdingState, caseStudy } = siteContent.pastWork;
+  const { eyebrow, title, description, items, holdingState, caseStudy, readLabel } = siteContent.pastWork;
 
   return (
     <>
@@ -92,7 +92,7 @@ export function PastWork() {
                     {item.tag}
                   </p>
                   <h2 className="mt-3.5 text-balance text-[clamp(1.75rem,3.2vw,2.5rem)] font-light leading-[1.12] tracking-[-0.02em]">
-                    {item.title}
+                    {item.titleEmphasis ? emphasize(item.title, item.titleEmphasis) : item.title}
                   </h2>
                   <dl className="mt-9 grid gap-[1.625rem]">
                     {blocks.map(({ label, text, out }) => (
@@ -116,7 +116,7 @@ export function PastWork() {
                     href={`/work/${item.slug}`}
                     className="group mt-8 inline-flex items-center gap-2 rounded-sm font-display text-[0.9375rem] font-medium text-primary-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
-                    {caseStudy.readLabel}
+                    {readLabel}
                     <span aria-hidden className="transition-transform duration-300 ease-out group-hover:translate-x-1.5">
                       &rarr;
                     </span>

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { CtaBand, GUTTER } from "@/components/kit";
+import { GUTTER } from "@/components/kit";
+import { CtaBand } from "@/components/cta-band";
 import { AiDay } from "@/components/services/ai-day";
 import { AiFaq } from "@/components/services/ai-faq";
 import { AiLeave } from "@/components/services/ai-sections";
@@ -48,7 +49,7 @@ export default function AiConsultingPage() {
           aria-label={aiConsult.description}
           className={`${GUTTER} scroll-mt-20 pb-[4.5rem] pt-10 lg:pb-[6.5rem] lg:pt-14`}
         >
-          <AiDay />
+          <AiDay aiDay={aiDay} steps={aiConsult.steps} />
         </section>
 
         <Section>

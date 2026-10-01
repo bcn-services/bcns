@@ -5,7 +5,7 @@ import { siteContent } from "@/lib/content";
 
 /** Homepage hero: copy on the left, the "ask it anything" loop on the right (stacked on phones). */
 export function Hero() {
-  const { hero } = siteContent;
+  const { hero, askHero, tools } = siteContent;
 
   return (
     <section id="top" className={`${GUTTER} grid items-center gap-9 py-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-14 lg:py-[4.5rem]`}>
@@ -14,7 +14,7 @@ export function Hero() {
           <i className="size-2 flex-none rounded-full bg-primary" />
           {hero.badge}
         </p>
-        <h1 className="mt-[22px] max-w-[16ch] text-balance text-[clamp(2.4rem,6vw,4rem)] font-light leading-[1.06] tracking-[-0.025em]">
+        <h1 className="mt-[22px] max-w-[12ch] text-balance text-[clamp(2.4rem,6vw,4rem)] font-light leading-[1.06] tracking-[-0.025em]">
           {emphasize(hero.headline, "ready for the future")}
         </h1>
         <p className="mt-[22px] max-w-[34rem] text-pretty text-[1.1875rem] leading-[1.6] text-muted-foreground">{hero.subheadline}</p>
@@ -33,7 +33,7 @@ export function Hero() {
           </Link>
         </div>
       </div>
-      <AskHero />
+      <AskHero askHero={askHero} tools={tools} />
     </section>
   );
 }

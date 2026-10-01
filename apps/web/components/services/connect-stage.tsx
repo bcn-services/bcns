@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { FACE_FILLS, LOGO_CUBES } from "@/components/cube";
 import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
 import { FlowDots, useElementSize, useInView, useReducedMotion } from "@/components/motion";
-import { siteContent, type ToolId } from "@/lib/content";
+import type { AiConsultContent, ConnectDemoContent, ToolId, ToolItem } from "@/lib/content";
 import { connectGeo, type Pt } from "./connect-geo";
 
 /**
@@ -29,8 +29,9 @@ const SUB = "fill-muted-foreground text-[12px] font-normal";
 const at = (a: readonly (readonly number[])[], i: number): Pt => [a[i]?.[0] ?? 0, a[i]?.[1] ?? 0];
 const move = (x: number, y: number, extra = "") => `translate(${x}px,${y}px)${extra}`;
 
-function Diagram({ w, h, phase, instant }: { w: number; h: number; phase: Phase; instant: boolean }) {
-  const { tools, connectDemo } = siteContent;
+interface StageData { tools: readonly ToolItem[]; connectDemo: ConnectDemoContent }
+
+function Diagram({ w, h, phase, instant, tools, connectDemo }: { w: number; h: number; phase: Phase; instant: boolean } & StageData) {
   const { rows, destinations } = connectDemo;
   const g = connectGeo(w, h);
   const s = phase === 0 ? 0 : phase < 3 ? 1 : 2; // scrambled / sorting / put to work
@@ -64,9 +65,8 @@ function Diagram({ w, h, phase, instant }: { w: number; h: number; phase: Phase;
     const rr = Math.floor(k / 6), jj = k % 6, ci = (jj + rr * 2) % 5;
     let x: number, y: number, sc = 1, o = 1;
     if (phase === 0) {
-      const sc0 = at(g.scr, ci);
-      x = sc0[0] + g.cw * 0.5 + ((k * 53) % (g.cw * 0.75));
-      y = sc0[1] + g.ch / 2 + ((k * 37) % 50) - 25;
+      const lp = g.loose[k]; // clear of every scrambled card; unplaced dots stay hidden
+      x = lp?.[0] ?? g.cx; y = lp?.[1] ?? g.cy; o = lp ? 1 : 0;
     } else if (phase === 1) {
       x = g.cx + ((k * 7) % 11) - 5; y = g.cy + ((k * 5) % 11) - 5; sc = 0.5; o = 0;
     } else if (phase === 2) {
@@ -97,13 +97,13 @@ function Diagram({ w, h, phase, instant }: { w: number; h: number; phase: Phase;
         className={`stroke-primary ${MOVE}`} style={flowGroup(s === 0)}
       />
       {flowA.map((d, i) => (
-        <g key={`a${i}`} className={flowCls} style={flowGroup(s === 0)}><FlowDots d={d} color={toolColor(i)} n={3} r={3} period={3.2} /></g>
+        <g key={`a${i}`} className={flowCls} style={flowGroup(s === 0)}><FlowDots d={d} color={toolColor(i)} n={3} r={3} period={3.2} active={s === 0} /></g>
       ))}
       {flowB.map((d, i) => (
-        <g key={`b${i}`} className={flowCls} style={flowGroup(s !== 0)}><FlowDots d={d} color={toolColor(i)} n={3} r={3} period={3.2} /></g>
+        <g key={`b${i}`} className={flowCls} style={flowGroup(s !== 0)}><FlowDots d={d} color={toolColor(i)} n={3} r={3} period={3.2} active={s !== 0} /></g>
       ))}
       {flowC.map((d, i) => (
-        <g key={`c${i}`} className={flowCls} style={flowGroup(s === 2)}><FlowDots d={d} color={primary} n={g.land ? 3 : 2} r={3} period={3.2} /></g>
+        <g key={`c${i}`} className={flowCls} style={flowGroup(s === 2)}><FlowDots d={d} color={primary} n={g.land ? 3 : 2} r={3} period={3.2} active={s === 2} /></g>
       ))}
 
       {/* output cards */}
@@ -164,8 +164,7 @@ function Diagram({ w, h, phase, instant }: { w: number; h: number; phase: Phase;
   );
 }
 
-export function ConnectStage() {
-  const { connect, connectDemo } = siteContent;
+export function ConnectStage({ connect, connectDemo, tools }: { connect: AiConsultContent; connectDemo: ConnectDemoContent; tools: readonly ToolItem[] }) {
   const reduced = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(panelRef);
@@ -207,7 +206,7 @@ export function ConnectStage() {
           className="relative h-[460px] w-full overflow-hidden rounded-[20px] border border-border bg-secondary min-[600px]:h-[400px] min-[1024px]:h-[540px]"
         >
           {size.width >= 100 && size.height >= 100 && (
-            <Diagram key={`${size.width}x${size.height}`} w={size.width} h={size.height} phase={shownPhase} instant={instant} />
+            <Diagram key={`${size.width}x${size.height}`} w={size.width} h={size.height} phase={shownPhase} instant={instant} tools={tools} connectDemo={connectDemo} />
           )}
         </div>
         {/* The row is always reserved so the page never jumps when the button arrives. */}

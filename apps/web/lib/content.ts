@@ -93,6 +93,8 @@ export interface ScreenshotItem {
 export interface PastWorkItem {
   slug: string;
   title: string;
+  /** Optional trailing phrase of `title` set in the blue emphasis style on the `/work` card. */
+  titleEmphasis?: string;
   /** Industry + build type, shown as a Badge on the /work card (e.g. "Restaurant · Bookkeeping"). */
   tag: string;
   problem: string;
@@ -107,8 +109,6 @@ export interface CaseStudyLabels {
   problemLabel: string;
   approachLabel: string;
   outcomeLabel: string;
-  /** Link label under each case on the `/work` list. */
-  readLabel: string;
 }
 
 export interface PastWorkContent {
@@ -118,6 +118,8 @@ export interface PastWorkContent {
   items: PastWorkItem[];
   holdingState: HoldingState;
   caseStudy: CaseStudyLabels;
+  /** Link label under each case on the `/work` list. */
+  readLabel: string;
 }
 
 export interface ReviewItem {
@@ -687,6 +689,7 @@ export const siteContent: SiteContent = {
       {
         slug: "delucas",
         title: "DeLuca's revenue dashboard",
+        titleEmphasis: "dashboard",
         tag: "Restaurant · Bookkeeping",
         problem:
           "He was not tracking revenue or costs. The only signal he had about the business was the amount that landed in his bank account.",
@@ -706,6 +709,7 @@ export const siteContent: SiteContent = {
       {
         slug: "l2detailz",
         title: "L2 Detailz booking site and admin",
+        titleEmphasis: "and admin",
         tag: "Auto detailing · Booking",
         problem:
           "Bookings arrived as unsorted email and the schedule was kept by hand, costing time and leaving room for error. He also could not post his own deals.",
@@ -740,8 +744,8 @@ export const siteContent: SiteContent = {
       problemLabel: "The problem",
       approachLabel: "Our approach",
       outcomeLabel: "The outcome",
-      readLabel: "Read the case study",
     },
+    readLabel: "Read the case study",
   },
 
   reviews: {

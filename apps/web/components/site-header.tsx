@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NavLink } from "@/components/nav-link";
 import { ServicesMenu } from "@/components/services-menu";
 import { NavDetails } from "@/components/nav-details";
 import { LogoMark } from "@/components/cube";
@@ -35,9 +36,9 @@ export function SiteHeader() {
             item.href === "/services" ? (
               <ServicesMenu key={item.href} />
             ) : (
-              <Link key={item.href} href={item.href} className={NAV_LINK}>
+              <NavLink key={item.href} href={item.href} className={NAV_LINK}>
                 {item.label}
-              </Link>
+              </NavLink>
             )
           )}
         </nav>
@@ -75,9 +76,9 @@ export function SiteHeader() {
                   ))}
                 </div>
               ) : (
-                <Link key={item.href} href={item.href} className={MOBILE_LINK}>
+                <NavLink key={item.href} href={item.href} className={MOBILE_LINK}>
                   {item.label}
-                </Link>
+                </NavLink>
               )
             )}
             <div className="mt-2 flex flex-col gap-2 border-t border-border px-1 pt-3">

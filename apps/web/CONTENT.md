@@ -579,6 +579,12 @@ Each entry has:
 - **Renders twice:** card heading on `/work` and the `<h1>` on `/work/[slug]`, so it has to work standalone in both.
 - **Length:** ≤60 chars
 
+#### items[n].titleEmphasis
+- **Field:** `pastWork.items[n].titleEmphasis` (optional)
+- **Purpose:** The trailing phrase of `title` set in the blue semibold emphasis on the `/work` card heading ("dashboard", "and admin"). Not applied on the `/work/[slug]` `<h1>`.
+- **Note:** Must be a substring of `title`; if it is missing the title renders plain.
+- **Length:** a word or short phrase
+
 #### items[n].tag
 - **Field:** `pastWork.items[n].tag`
 - **Purpose:** Industry plus build type, rendered as a `Badge` on the `/work` card
@@ -701,8 +707,8 @@ every case study — not per-item.
 - **Tone:** Short, factual noun phrase
 - **Length:** 1-3 words
 
-#### caseStudy.readLabel
-- **Field:** `pastWork.caseStudy.readLabel`
+#### readLabel
+- **Field:** `pastWork.readLabel`
 - **Purpose:** Link label under each case on the `/work` list, pointing at the detail page. Currently `Read the case study`.
 - **Tone:** Short verb phrase
 - **Length:** 2-5 words

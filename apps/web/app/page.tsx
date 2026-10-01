@@ -18,7 +18,7 @@ export default function HomePage() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <ConnectStory />
+        <ConnectStory story={siteContent.story} tools={siteContent.tools} pillars={siteContent.pillars} />
         <ProofRow />
         <ContactSection />
       </main>

@@ -117,6 +117,15 @@ export function LogoCube({
   const [pinned, setPinned] = useState(false);
   const isOpen = (reduced && (interactive || hasCards)) || open || (interactive && (hover || focus || pinned));
 
+  // Esc closes a hover/focus/pinned cube wherever focus is (the box's own onKeyDown only hears it when focus is inside)
+  const engaged = interactive && (hover || focus || pinned);
+  useEffect(() => {
+    if (!engaged) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setPinned(false); setFocus(false); setHover(false); } };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [engaged]);
+
   // touch: auto-open once when half in view
   const seen = useInView(boxRef, { threshold: 0.5, once: true, enabled: interactive && touch && !reduced });
   useEffect(() => { if (seen) setPinned(true); }, [seen]);

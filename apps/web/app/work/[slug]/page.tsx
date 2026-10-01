@@ -68,7 +68,7 @@ export default function CaseStudyPage({ params }: CaseStudyPageProps) {
           <div className={GUTTER}>
             <Link
               href="/work"
-              className="group inline-flex items-center gap-1.5 rounded-sm font-display text-sm text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group inline-flex items-center gap-1.5 rounded-sm font-display text-sm text-muted-foreground transition-colors hover:text-primary-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ArrowLeft
                 className="size-4 transition-transform duration-200 ease-out group-hover:-translate-x-1"
@@ -103,7 +103,7 @@ export default function CaseStudyPage({ params }: CaseStudyPageProps) {
                       as="div"
                       className={index === 0 ? "pb-8" : index === sections.length - 1 ? "pt-8" : "py-8"}
                     >
-                      <h2 className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary">
+                      <h2 className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary-ink">
                         {label}
                       </h2>
                       <p className="mt-3 text-lg leading-relaxed text-muted-foreground">{text}</p>

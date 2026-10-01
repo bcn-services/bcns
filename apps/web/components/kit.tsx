@@ -1,14 +1,13 @@
-import Link from "next/link";
 import * as React from "react";
 
 import { Reveal } from "@/components/reveal";
 import { Cube } from "@/components/cube";
-import { siteContent } from "@/lib/content";
 
 /**
  * The pieces every page in the design language is assembled from: the page
  * gutter, the blue eyebrow, the light display headline, the hairline rule that
- * draws itself in on scroll, the CTA band, and the quiet cube texture.
+ * draws itself in on scroll, and the quiet cube texture. (The CTA band lives in cta-band.tsx so
+ * client components that import these primitives don't pull in the site content.)
  *
  * Authored once here so a spacing or type-scale decision is made in one place
  * rather than re-derived per page.
@@ -98,7 +97,7 @@ export function PageHead({
         delay={80}
         className={`mt-5 text-balance font-light leading-[1.06] tracking-[-0.025em] ${
           size === "oversized"
-            ? "max-w-[20ch] text-[clamp(2.75rem,7.5vw,5.25rem)]"
+            ? "max-w-[16ch] text-[clamp(2.75rem,7.5vw,5.25rem)]"
             : "max-w-[22ch] text-[clamp(2.25rem,5vw,3.625rem)] lg:max-w-[18ch]"
         }`}
       >
@@ -108,94 +107,6 @@ export function PageHead({
         {description}
       </Reveal>
     </div>
-  );
-}
-
-/**
- * Closing CTA. `tone="plate"` is the prototype's `.cta-band`: the full-bleed
- * flood-blue plate with eyebrow, light headline, lead and a filled button. In
- * dark mode the button flips to the light fill so it stays the loudest thing on
- * the plate. `tone="quiet"` is the hairline row that floods blue on hover.
- * Copy comes from `contactSection`; the eyebrow, emphasis and button label
- * default to the shared content keys (`contactSection.eyebrow`,
- * `servicesOverview.ctaEmphasis`, `hero.ctaPrimary`).
- */
-export function CtaBand({
-  title,
-  description,
-  tone = "quiet",
-  eyebrow = siteContent.contactSection.eyebrow,
-  emphasis = siteContent.servicesOverview.ctaEmphasis,
-  cta = siteContent.hero.ctaPrimary,
-}: {
-  title: string;
-  description: string;
-  tone?: "quiet" | "plate";
-  eyebrow?: string;
-  emphasis?: string;
-  cta?: string;
-}) {
-  if (tone === "plate") {
-    return (
-      <section className="bg-accent text-accent-foreground dark:text-white">
-        <div className={`${GUTTER} py-16 lg:py-[4.5rem]`}>
-          <Reveal>
-            <p className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] opacity-90">
-              {eyebrow}
-            </p>
-          </Reveal>
-          <Reveal
-            as="h2"
-            delay={80}
-            className="mt-4 max-w-[18ch] text-balance font-display text-[clamp(2.25rem,5vw,3.5rem)] font-light leading-[1.05] tracking-[-0.02em] [&_b]:font-semibold"
-          >
-            {title.includes(emphasis) ? (
-              <>
-                {title.slice(0, title.indexOf(emphasis))}
-                <b>{emphasis}</b>
-                {title.slice(title.indexOf(emphasis) + emphasis.length)}
-              </>
-            ) : (
-              title
-            )}
-          </Reveal>
-          <Reveal as="p" delay={160} className="mt-4 max-w-[40rem] opacity-95">
-            {description}
-          </Reveal>
-          <Reveal delay={240}>
-            <Link
-              href="/#contact"
-              className="lift-button mt-9 inline-block rounded-lg bg-accent-foreground px-7 py-3.5 text-[0.9375rem] font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-accent"
-            >
-              {cta}
-            </Link>
-          </Reveal>
-        </div>
-      </section>
-    );
-  }
-  return (
-    <Link
-      href="/#contact"
-      className="flood-row group block border-b border-t border-border focus-visible:outline-none"
-    >
-      <div className={`${GUTTER} grid items-center gap-8 py-14 sm:grid-cols-[1fr_3.75rem] sm:py-[3.5rem]`}>
-        <div>
-          <p className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light tracking-[-0.02em]">
-            {title}
-          </p>
-          <p className="mt-2.5 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground group-hover:text-accent-foreground">
-            {description}
-          </p>
-        </div>
-        <span
-          aria-hidden
-          className="flood-arrow hidden text-[1.75rem] sm:block sm:justify-self-end"
-        >
-          &rarr;
-        </span>
-      </div>
-    </Link>
   );
 }
 

@@ -59,7 +59,7 @@ export function AiConsult({
               >
                 <CubeBullet />
               </span>
-              <p className="font-display text-[0.8125rem] font-medium tracking-[0.16em] text-primary">
+              <p className="font-display text-[0.8125rem] font-medium tracking-[0.16em] text-primary-ink">
                 {step}
               </p>
               <h3 className="mt-2.5 text-[1.25rem] font-semibold leading-snug sm:text-[1.4375rem]">

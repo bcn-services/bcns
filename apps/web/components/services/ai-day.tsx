@@ -4,7 +4,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent
 
 import { emphasize } from "@/components/kit";
 import { useElementSize, useInView, useReducedMotion } from "@/components/motion";
-import { siteContent } from "@/lib/content";
+import type { AiConsultStep, AiDayContent } from "@/lib/content";
 import { AiIllustration } from "./ai-illustrations";
 
 /**
@@ -21,9 +21,7 @@ const NARROW_PX = 700;
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 const SLIDE = "[transition:left_.9s_cubic-bezier(.4,0,.2,1),width_.9s_cubic-bezier(.4,0,.2,1)] motion-reduce:transition-none";
 
-function Timeline({ stage, width, height }: { stage: number; width: number; height: number }) {
-  const { timeline } = siteContent.aiDay;
-  const { steps } = siteContent.aiConsult;
+function Timeline({ stage, width, height, timeline, steps }: { stage: number; width: number; height: number; timeline: AiDayContent["timeline"]; steps: readonly AiConsultStep[] }) {
   const narrow = width < NARROW_PX;
   const ih = (narrow ? Math.min(width - 48, 300) : Math.min(340, width * 0.28)) * (150 / 240);
   const iw = (ih * 240) / 150;
@@ -107,9 +105,8 @@ function Timeline({ stage, width, height }: { stage: number; width: number; heig
   );
 }
 
-export function AiDay() {
-  const { tabs, tabsLabel, stepEmphasis, stepLabels } = siteContent.aiDay;
-  const { steps } = siteContent.aiConsult;
+export function AiDay({ aiDay, steps }: { aiDay: AiDayContent; steps: readonly AiConsultStep[] }) {
+  const { tabs, tabsLabel, stepEmphasis, stepLabels } = aiDay;
   const uid = useId();
   const tabId = (i: number) => `${uid}-tab-${i}`;
   const panelId = `${uid}-panel`;
@@ -197,7 +194,7 @@ export function AiDay() {
           className="relative mt-5 h-[380px] overflow-hidden rounded-[1.25rem] border border-border bg-secondary min-[700px]:h-[430px]"
         >
           {size.width >= 100 && size.height >= 100 && (
-            <Timeline stage={reduced ? sel : step} width={size.width} height={size.height} />
+            <Timeline stage={reduced ? sel : step} width={size.width} height={size.height} timeline={aiDay.timeline} steps={steps} />
           )}
         </div>
         {current && (

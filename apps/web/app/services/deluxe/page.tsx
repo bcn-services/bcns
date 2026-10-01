@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { CtaBand, Eyebrow, GUTTER, emphasize } from "@/components/kit";
+import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
+import { CtaBand } from "@/components/cta-band";
 import { Reveal } from "@/components/reveal";
 import { DeluxeAsk } from "@/components/services/deluxe-ask";
 import { DeluxeBuild, DeluxeSteps, DeluxeWork } from "@/components/services/deluxe-sections";
@@ -56,7 +57,7 @@ export default function DeluxePage() {
           <Reveal as="p" delay={160} className="mt-4 max-w-[38rem] text-[1.1875rem] leading-[1.6] text-muted-foreground">
             {deluxeDemo.askLede}
           </Reveal>
-          <DeluxeAsk />
+          <DeluxeAsk deluxeDemo={deluxeDemo} tools={siteContent.tools} />
           <DeluxeSteps />
         </section>
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { PageHead, CtaBand } from "@/components/kit";
+import { PageHead } from "@/components/kit";
+import { CtaBand } from "@/components/cta-band";
 import { AboutFounder } from "@/components/about-founder";
 import { SiteFooter } from "@/components/site-footer";
 import { siteContent } from "@/lib/content";
@@ -24,7 +25,7 @@ export default function AboutPage() {
           description={about.description}
         />
         <AboutFounder />
-        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" />
+        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" highlights={[]} />
       </main>
       <SiteFooter />
     </div>

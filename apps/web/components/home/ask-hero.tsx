@@ -3,14 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FlowDots, useElementSize, useInView, useReducedMotion } from "@/components/motion";
-import { siteContent } from "@/lib/content";
+import type { AskHeroContent, ToolItem } from "@/lib/content";
 import { TOOL_BG, TOOL_COLOR } from "./tool-colors";
 
-const { askHero, tools } = siteContent;
-const ITEMS = askHero.items;
-
 /** One question's beat: type (40ms/char) -> chips light up -> answer in -> answer out -> next question at 5s. */
-function AskScene({ w, h, active, reduced }: { w: number; h: number; active: boolean; reduced: boolean }) {
+function AskScene({ w, h, active, reduced, askHero, tools }: { w: number; h: number; active: boolean; reduced: boolean; askHero: AskHeroContent; tools: readonly ToolItem[] }) {
+  const ITEMS = askHero.items;
   const [qi, setQi] = useState(0);
   const first = ITEMS[0];
   const [typed, setTyped] = useState(reduced ? first.question.length : 0);
@@ -43,7 +41,7 @@ function AskScene({ w, h, active, reduced }: { w: number; h: number; active: boo
       setTimeout(() => setQi((q) => (q + 1) % ITEMS.length), 5000),
     ];
     return () => { clearInterval(iv); ts.forEach(clearTimeout); };
-  }, [qi, active, reduced, first]);
+  }, [qi, active, reduced, first, ITEMS]);
 
   const cmp = w < 520 || h < 400;
   const pad = cmp ? 14 : 24;
@@ -87,7 +85,7 @@ function AskScene({ w, h, active, reduced }: { w: number; h: number; active: boo
           const on = lit && d.toolIds.includes(t.id);
           return (
             <g key={t.id} className={`[transition:opacity_.4s] ${on ? "opacity-100" : "opacity-0"}`}>
-              <FlowDots d={path} color={TOOL_COLOR[t.id]} n={4} r={3.6} period={1.9 + i * 0.12} showPath={false} />
+              <FlowDots d={path} color={TOOL_COLOR[t.id]} n={4} r={3.6} period={1.9 + i * 0.12} showPath={false} active={on} />
             </g>
           );
         })}
@@ -156,7 +154,7 @@ function AskScene({ w, h, active, reduced }: { w: number; h: number; active: boo
 }
 
 /** Hero art: the time-based "ask it anything" loop. Pauses off-screen and in hidden tabs; static frame under reduced motion. */
-export function AskHero() {
+export function AskHero({ askHero, tools }: { askHero: AskHeroContent; tools: readonly ToolItem[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const size = useElementSize(ref);
   const inView = useInView(ref, { rootMargin: "40px" });
@@ -171,11 +169,11 @@ export function AskHero() {
 
   return (
     <div
-      ref={ref} role="group" aria-label={askHero.ariaLabel}
+      ref={ref} role="img" aria-label={askHero.ariaLabel}
       className="relative min-h-[300px] min-w-0 overflow-hidden rounded-[20px] border border-border bg-secondary lg:min-h-[460px]"
     >
       {size.width >= 100 && size.height >= 100 && (
-        <AskScene key={`${size.width}x${size.height}`} w={size.width} h={size.height} active={inView && !tabHidden && !reduced} reduced={reduced} />
+        <AskScene key={`${size.width}x${size.height}`} w={size.width} h={size.height} active={inView && !tabHidden && !reduced} reduced={reduced} askHero={askHero} tools={tools} />
       )}
     </div>
   );

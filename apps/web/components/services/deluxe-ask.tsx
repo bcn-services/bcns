@@ -4,7 +4,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Cube } from "@/components/cube";
 import { useInView, useReducedMotion } from "@/components/motion";
-import { siteContent, type DeluxeChip, type ToolId } from "@/lib/content";
+import type { DeluxeChip, DeluxeDemoContent, ToolId, ToolItem } from "@/lib/content";
 
 /**
  * "Ask your business a question": three question chips over a dashboard + AI
@@ -41,9 +41,8 @@ function renderBold(text: string) {
   );
 }
 
-function Mock({ chip, progress }: { chip: DeluxeChip; progress: number }) {
-  const { dashboardTitle, agentLabel, agentPlaceholder, dayLetters } = siteContent.deluxeDemo;
-  const { tools } = siteContent;
+function Mock({ chip, progress, deluxeDemo, tools }: { chip: DeluxeChip; progress: number; deluxeDemo: DeluxeDemoContent; tools: readonly ToolItem[] }) {
+  const { dashboardTitle, agentLabel, agentPlaceholder, dayLetters } = deluxeDemo;
   const toolName = (id: ToolId) => tools.find((t) => t.id === id)?.name ?? id;
   const ease = 1 - Math.pow(1 - progress, 3);
 
@@ -164,8 +163,8 @@ function Mock({ chip, progress }: { chip: DeluxeChip; progress: number }) {
   );
 }
 
-export function DeluxeAsk() {
-  const { chips, groupLabel } = siteContent.deluxeDemo;
+export function DeluxeAsk({ deluxeDemo, tools }: { deluxeDemo: DeluxeDemoContent; tools: readonly ToolItem[] }) {
+  const { chips, groupLabel } = deluxeDemo;
   const rootRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const seen = useInView(rootRef, { threshold: 0.3, once: true, enabled: !reduced });
@@ -235,7 +234,7 @@ export function DeluxeAsk() {
           </button>
         ))}
       </div>
-      <Mock chip={chips[cur] ?? chips[0]} progress={progress} />
+      <Mock chip={chips[cur] ?? chips[0]} progress={progress} deluxeDemo={deluxeDemo} tools={tools} />
     </div>
   );
 }

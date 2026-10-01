@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { siteContent } from "@/lib/content";
+import type { FaqContent } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
 
@@ -10,8 +10,8 @@ import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
  * <details>; this stays a client component so the answers can animate their
  * height, and so more than one can be open at once.
  */
-export function Faq() {
-  const { eyebrow, title, description, items } = siteContent.faq;
+export function Faq({ faq, emphasis }: { faq: FaqContent; emphasis: string }) {
+  const { eyebrow, title, description, items } = faq;
   const [open, setOpen] = React.useState<number[]>([]);
 
   const toggle = (index: number) =>
@@ -34,7 +34,7 @@ export function Faq() {
             delay={80}
             className="mt-4 text-balance text-[clamp(1.9rem,3.8vw,2.75rem)] font-light leading-[1.12] tracking-[-0.02em]"
           >
-            {emphasize(title, siteContent.connectDemo.faqEmphasis)}
+            {emphasize(title, emphasis)}
           </Reveal>
           <Reveal as="p" delay={160} className="mt-[1.125rem] max-w-[26rem] text-[1.0625rem] leading-[1.6] text-muted-foreground">
             {description}

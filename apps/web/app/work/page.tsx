@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { CtaBand } from "@/components/kit";
+import { CtaBand } from "@/components/cta-band";
 import { PastWork } from "@/components/past-work";
 import { Reviews } from "@/components/reviews";
 import { SiteFooter } from "@/components/site-footer";
@@ -19,7 +19,7 @@ export default function WorkPage() {
       <main className="flex-1">
         <PastWork />
         <Reviews />
-        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" />
+        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" highlights={[]} />
       </main>
       <SiteFooter />
     </div>

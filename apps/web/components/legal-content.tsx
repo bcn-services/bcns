@@ -15,7 +15,7 @@ export function LegalContent({ content }: { content: LegalPageContent }) {
       <div className="mt-8 max-w-[68ch] divide-y divide-border">
         {content.sections.map((section, index) => (
           <div key={section.heading} className={index === 0 ? "pb-8" : "py-8"}>
-            <h2 className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary">
+            <h2 className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary-ink">
               {section.heading}
             </h2>
             {section.body.map((paragraph, i) => (

@@ -23,7 +23,13 @@ const buildExists = existsSync(buildDir);
 // <span> (e.g. an accent word in the headline) — a raw includes() on HTML
 // breaks the moment that happens even though the copy is correct and present.
 // Strip tags first so literal checks assert on rendered text, not raw markup.
-const stripTags = (html) => html.replace(/<[^>]+>/g, "");
+// Visible text: drop tags, then decode the entities React escapes (e.g. the apostrophe in "DeLuca's").
+const stripTags = (html) =>
+  html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
 
 let passed = 0;
 let failed = 0;
@@ -245,10 +251,8 @@ if (!buildExists) {
       'index.html contains hero headline verbatim',
       indexText.includes("Get your business ready for the future")
     );
-    assert(
-      'index.html contains nav card title "Our Service"',
-      indexText.includes("Our Service")
-    );
+    // The redesigned home no longer renders the nav cards (approved 2026-10-01);
+    // "Pricing" below still has to appear via the header nav.
     assert(
       'index.html contains nav card title "Pricing"',
       indexText.includes("Pricing")

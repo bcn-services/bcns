@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { PageHead, CtaBand, Eyebrow, GUTTER, emphasize } from "@/components/kit";
+import { PageHead, Eyebrow, GUTTER, emphasize } from "@/components/kit";
+import { CtaBand } from "@/components/cta-band";
 import { PillarCubes } from "@/components/pillar-cubes";
 import { Reveal } from "@/components/reveal";
 import { SiteFooter } from "@/components/site-footer";
@@ -61,7 +62,7 @@ export default function ServicesPage() {
           </div>
         </section>
 
-        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" />
+        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" highlights={[]} />
       </main>
       <SiteFooter />
     </div>

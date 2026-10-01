@@ -1,14 +1,10 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FlowDots, LogoCube, PinnedStage, restGeometry, useMediaQuery, useReducedMotion, type Size } from "@/components/motion";
-import { siteContent } from "@/lib/content";
+import type { PillarItem, StoryContent, ToolItem } from "@/lib/content";
 import { TOOL_COLOR, TOOL_FILL } from "./tool-colors";
 
-const { story, tools, pillars } = siteContent;
-const STEPS = story.steps.map((s) => ({ label: s.label, title: s.title, emphasis: s.emphasis, description: s.description }));
-const VALUES = story.chart.values;
-const DOT_COUNT = VALUES.reduce((t, v) => t + v * 2, 0);
 const ANG = [-60, -30, 0, 30, 60].map((a) => (a * Math.PI) / 180);
 const TILT = [-7, 5, -4, 7, -6];
 const EASE = "cubic-bezier(.4,0,.2,1)";
@@ -62,17 +58,22 @@ function scatter(w: number, h: number, cw: number, ch: number): Spot[] {
   return out.map((o, i) => ({ ...o, x: o.cx - cw / 2, y: o.cy - ch / 2, hw: (bb[i]?.w ?? 0) / 2 + 12, hh: (bb[i]?.h ?? 0) / 2 + 12 }));
 }
 
-interface SceneProps { step: number; w: number; h: number }
+interface SceneProps {
+  step: number; w: number; h: number;
+  story: StoryContent; tools: readonly ToolItem[]; pillars: readonly PillarItem[];
+}
 
 /**
  * The one scene all five steps share: tools -> connection -> one block with sorted dots -> the three-block logo
  * -> a chart answer. Geometry is computed once per size (the caller keys on w x h); `step` only flips styles,
  * so every move is a CSS transition between stable elements.
  */
-const StageScene = memo(function StageScene({ step, w, h }: SceneProps) {
+const StageScene = memo(function StageScene({ step, w, h, story, tools, pillars }: SceneProps) {
   const wide = useMediaQuery("(min-width: 900px)");
   const reduced = useReducedMotion();
   const narrow = w < 560;
+  const VALUES = story.chart.values;
+  const DOT_COUNT = VALUES.reduce((t, v) => t + v * 2, 0);
 
   const g = (() => {
     const cw = narrow ? 140 : 156;
@@ -162,7 +163,7 @@ const StageScene = memo(function StageScene({ step, w, h }: SceneProps) {
             const sx = a.x + g.cw;
             const sy = a.y + g.ch / 2;
             const d = `M${sx} ${sy} C ${sx + 60} ${sy} ${g.C1.x - g.bwB / 2 - 50} ${g.C1.y} ${g.C1.x} ${g.C1.y}`;
-            return <FlowDots key={t.id} d={d} color={TOOL_COLOR[t.id]} n={4} r={3.4} period={3.2 + i * 0.25} />;
+            return <FlowDots key={t.id} d={d} color={TOOL_COLOR[t.id]} n={4} r={3.4} period={3.2 + i * 0.25} active={step === 1 || step === 2} />;
           })}
         </g>
         <g>
@@ -280,11 +281,12 @@ const StageScene = memo(function StageScene({ step, w, h }: SceneProps) {
 });
 
 /** Home "How it works": five scroll-pinned steps (stacked static frames on small screens / reduced motion). */
-export function ConnectStory() {
+export function ConnectStory({ story, tools, pillars }: { story: StoryContent; tools: readonly ToolItem[]; pillars: readonly PillarItem[] }) {
+  const steps = useMemo(() => story.steps.map((s) => ({ label: s.label, title: s.title, emphasis: s.emphasis, description: s.description })), [story]);
   return (
     <PinnedStage
-      id="how" aria-label={story.ariaLabel} railLabel={story.railLabel} steps={STEPS} figHeight={440}
-      renderFrame={(step, _p, size: Size) => <StageScene key={`${size.width}x${size.height}`} step={step} w={size.width} h={size.height} />}
+      id="how" aria-label={story.ariaLabel} railLabel={story.railLabel} steps={steps} figHeight={440}
+      renderFrame={(step, size: Size) => <StageScene key={`${size.width}x${size.height}`} step={step} w={size.width} h={size.height} story={story} tools={tools} pillars={pillars} />}
     />
   );
 }

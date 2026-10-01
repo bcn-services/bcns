@@ -16,6 +16,8 @@ export interface FlowDotsProps {
   showPath?: boolean;
   strokeOpacity?: number;
   strokeWidth?: number;
+  /** false parks the loop (e.g. the path is faded out); default true */
+  active?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ export interface FlowDotsProps {
  * a single static frame under prefers-reduced-motion.
  */
 export function FlowDots({
-  d, color, n = 6, r = 3, period = 3.6, showPath = true, strokeOpacity = 0.45, strokeWidth = 1.5,
+  d, color, n = 6, r = 3, period = 3.6, showPath = true, strokeOpacity = 0.45, strokeWidth = 1.5, active = true,
 }: FlowDotsProps) {
   const gRef = useRef<SVGGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -35,10 +37,10 @@ export function FlowDots({
   useEffect(() => {
     const path = pathRef.current;
     if (!path) return;
+    let len = 0;
+    try { len = path.getTotalLength(); } catch { len = 0; }
+    if (!len) return;
     const place = (t: number) => {
-      let len = 0;
-      try { len = path.getTotalLength(); } catch { len = 0; }
-      if (!len) return;
       dotRefs.current.forEach((c, k) => {
         if (!c) return;
         const u = (t / period + k / n) % 1;
@@ -49,12 +51,12 @@ export function FlowDots({
       });
     };
     if (reduced) { place(period * 0.3); return; }
-    if (!visible) return;
+    if (!visible || !active) return;
     let raf = 0;
     const loop = (now: number) => { place(now / 1000); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [d, n, period, reduced, visible]);
+  }, [d, n, period, reduced, visible, active]);
 
   return (
     <g ref={gRef}>
