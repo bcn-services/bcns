@@ -1093,3 +1093,73 @@ test("finish route wiring: subscription gate runs before the connect_source writ
   assert.match(read("../app/api/webhooks/shopify/app-uninstalled/route.ts"), /appUninstalledRoute\(request\)/);
   assert.ok(read("../middleware.ts").includes("api/webhooks/"), "middleware matcher must leave /api/webhooks/ (Shopify sends no cookie) unauthenticated");
 });
+
+/* ------------------------------- paid period stored for the worker (P9, 20261002000100) */
+
+/** fakeApi with a per-function answer: the mismatch read, and the paid-through store. */
+function storeApi(store) {
+  const calls = [];
+  return {
+    calls,
+    rpc: async (fn, args) => {
+      calls.push([fn, args]);
+      if (fn !== "record_shopify_paid_through") return { data: false, error: null };
+      if (store instanceof Error) throw store;
+      return store;
+    },
+  };
+}
+
+test("managedPricingRedirect: a reinstall inside a paid period stores the Partner end date for the worker -- once, after the mismatch read", async () => {
+  const api = storeApi({ data: null, error: null });
+  const [result, lines] = await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_BODY }], PAID), { api }));
+  assert.equal(result, null);
+  assert.deepEqual(api.calls, [
+    ["shopify_shop_mismatch", { p_shop: SHOP }],
+    ["record_shopify_paid_through", { p_shop: SHOP, p_until: "2026-10-25T16:29:00.000Z" }],
+  ]);
+  assert.deepEqual(lines, [`[connect] shopify finish paid through 2026-10-25T16:29:00.000Z shop=${SHOP}`]);
+});
+
+test("managedPricingRedirect: a failed paid-through store never changes the outcome -- still null (write), only a warning naming the code", async () => {
+  const stores = {
+    "rpc error": [{ data: null, error: { code: "BCNS3" } }, "BCNS3"],
+    "error without code": [{ data: null, error: {} }, "rpc"],
+    threw: [new Error("fetch failed"), "threw"],
+  };
+  for (const [name, [store, code]] of Object.entries(stores)) {
+    const fail = fakeFail();
+    const [result, lines] = await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_BODY }], PAID), { api: storeApi(store), fail }));
+    assert.equal(result, null, name);
+    assert.deepEqual(fail.codes, [], name);
+    assert.deepEqual(lines, [
+      `[connect] shopify finish paid through 2026-10-25T16:29:00.000Z shop=${SHOP}`,
+      `[connect] shopify paid-through not stored (${code}) shop=${SHOP}`,
+    ], name);
+  }
+});
+
+// Byte-for-byte: every outcome other than "paid through" makes no store call, and
+// a store that fails returns the same response as one that succeeds.
+test("managedPricingRedirect: no store call on ACTIVE, the plan page, an ungated pending -- and the store's result never changes the response", async () => {
+  const snapshot = (r) => (r === null ? null : { status: r.status, headers: [...r.headers.entries()] });
+  const ENDED = { status: 200, body: cycle("2026-09-01T00:00:00Z") };
+  const cases = {
+    active: [() => gateFetch([{ status: 200, body: ACTIVE_BODY }], PAID), {}, null],
+    "plan page (period ended)": [() => gateFetch([{ status: 200, body: NONE_BODY }], ENDED), {}, PLAN_URL_FALLBACK],
+    "plan page (partner unset)": [() => gateFetch([{ status: 200, body: NONE_BODY }], PAID), { partner: undefined }, PLAN_URL_FALLBACK],
+    bridge: [() => gateFetch([{ status: 200, body: NONE_BODY }], PAID), { pending: { ...INSTALL_PENDING, app: ALT_APP } }, null],
+    "tenant-bound": [() => gateFetch([{ status: 200, body: NONE_BODY }], PAID), { pending: { ...TOKEN, clientId: CLIENT } }, null],
+  };
+  for (const [name, [fetchFor, over, location]] of Object.entries(cases)) {
+    const api = storeApi({ data: null, error: null });
+    const [result] = await withLogs(() => gate(fetchFor(), { ...over, api }));
+    assert.equal(result === null ? null : result.headers.get("location"), location, name);
+    assert.ok(!api.calls.some(([fn]) => fn === "record_shopify_paid_through"), name);
+  }
+  const paidWith = async (store) => snapshot((await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_BODY }], PAID), { api: storeApi(store) })))[0]);
+  const ok = await paidWith({ data: null, error: null });
+  assert.equal(ok, null);
+  assert.deepEqual(await paidWith({ data: null, error: { code: "42501" } }), ok);
+  assert.deepEqual(await paidWith(new Error("boom")), ok);
+});
