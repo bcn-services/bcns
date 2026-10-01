@@ -20,6 +20,7 @@ import type { InviteDeps } from "../invite-member/handler.ts";
 import type { MintDeps } from "../mint-agent-login/handler.ts";
 import { randomPassword } from "../mint-agent-login/handler.ts";
 import type { ShopRedactDeps } from "../shopify-shop-redact/handler.ts";
+import type { SignupDeps } from "../signup/handler.ts";
 
 const URL_ = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -148,7 +149,8 @@ export function mintDeps(request: Request): MintDeps {
  * 20260924000300: `usage on schema api` + `execute on api.record_shop_redact` to service_role
  * only; still zero access to any `data` table, which is the wall this file's own comment
  * describes). The RPC itself is the narrow SECURITY DEFINER surface, not this client.
- * api.record_app_uninstalled (20260929000200) is the second and only other such grant.
+ * api.record_app_uninstalled (20260929000200) is the second such grant; api.signup_create_client
+ * (20261001000200, signupDeps below) is the third.
  */
 export function shopRedactDeps(): ShopRedactDeps {
   return {
@@ -169,6 +171,45 @@ export function shopRedactDeps(): ShopRedactDeps {
       return { revoked: typeof data === "number" ? data : 0 };
     },
     // Shop + webhook id + outcome only — never the payload, the HMAC header, or the secret.
+    log(event, data) {
+      console.log(JSON.stringify({ event, ...data }));
+    },
+  };
+}
+
+/**
+ * signup (P1) has no caller JWT either. The admin API creates and (on a failed second step)
+ * deletes the user; api.signup_create_client is called as the service role, the third grant
+ * described above. The confirmation email goes through GoTrue's own mailer via the PUBLIC
+ * resend endpoint with the anon key — the same call any visitor can already make — so this
+ * file holds no mail credential and GoTrue's email rate limit applies on top of the DB cap.
+ */
+export function signupDeps(): SignupDeps {
+  return {
+    async createUser(email, password) {
+      const { data, error } = await admin().auth.admin.createUser({ email, password, email_confirm: false });
+      return { userId: data?.user?.id ?? null, error: error?.code ?? error?.message };
+    },
+    async createClient(userId, name) {
+      const { data, error } = await admin().schema("api").rpc("signup_create_client", {
+        p_user_id: userId,
+        p_name: name,
+      });
+      if (error) throw Object.assign(new Error(`signup_create_client: ${error.message}`), { code: error.code });
+      return data as string;
+    },
+    async deleteUser(userId) {
+      const { error } = await admin().auth.admin.deleteUser(userId);
+      if (error) throw new Error(`deleteUser: ${error.message}`);
+    },
+    async sendConfirmation(email, redirectTo) {
+      const { error } = await createClient(URL_, ANON, NO_SESSION).auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: redirectTo },
+      });
+      return { error: error?.message };
+    },
     log(event, data) {
       console.log(JSON.stringify({ event, ...data }));
     },
