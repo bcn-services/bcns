@@ -148,3 +148,26 @@ curl -fsS https://connect.bcn-services.com/api/health
 journalctl -u bcns-app@connect -f
 ln -sfn /srv/connect/releases/<old-sha> /srv/connect/current && sudo systemctl restart bcns-app@connect  # rollback
 ```
+
+## Self-service sign-up (P1, shipped dark)
+
+Off until `SIGNUP_ENABLED=1` is in `/srv/connect/env` (then restart `bcns-app@connect`).
+Off = `/signup` 404s and `/login` is byte-identical to before. Turning it on, in order:
+
+1. Migrations, in order: `20261001000100_client_status_pending.sql` (enum value, own file),
+   `20261001000200_signup_pending.sql` (hook pending branch + `api.signup_create_client`).
+2. `supabase functions deploy signup --workdir platform --project-ref cnsxbglhredokjbvudfd --no-verify-jwt`.
+   No new secrets: it reads the platform-injected `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+3. Hosted Auth: keep public sign-ups OFF (the function uses the admin API); keep "Confirm email" ON;
+   `https://connect.bcn-services.com/auth/confirm` must be in the redirect allow-list.
+4. `SIGNUP_ENABLED=1` in `/srv/connect/env`, restart, confirm a new pid.
+
+A new owner lands on `/pending` until activated. Each confirmed sign-up mails `BCNS_EMAIL` once.
+Activate (pending -> active only; anything else is refused):
+
+```bash
+DATABASE_URL=... pnpm --filter @bcn-services/platform exec tsx scripts/activate-client.ts --slug <slug>
+```
+
+Abuse bound: at most 10 pending clients per rolling hour (BCNS8); over the cap the function
+deletes the new user, sends nothing, and answers like success.

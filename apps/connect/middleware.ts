@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { tenantMiddleware } from "@bcn-services/tenant/middleware";
 import { getConfig } from "@/lib/env";
 
-const tenant = tenantMiddleware({ loginPath: "/login" });
+const tenant = tenantMiddleware({ loginPath: "/login", pendingPath: "/pending" });
 
 /**
  * Shopify opens the app URL (application_url in shopify.app.toml, the hub root)
@@ -64,5 +64,5 @@ export const config = {
   //
   // The Meta and Monday routes are deliberately NOT excluded: they need a signed-in
   // owner, and the middleware bounce is the first half of that check.
-  matcher: ["/((?!api/health$|api/webhooks/|api/oauth/meta/data-deletion$|api/oauth/shopify/|auth/confirm$|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/health$|api/webhooks/|api/oauth/meta/data-deletion$|api/oauth/shopify/|auth/confirm$|signup$|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -2,6 +2,7 @@ import { SectionHeading } from "@bcn-services/ui";
 import { requestReset, signIn } from "./actions";
 import { FINISH_PATH } from "@/lib/shopify-oauth";
 import { BCNS_EMAIL } from "@/lib/request-connection";
+import { getConfig } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,11 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
         <a href="/login?forgot=1" className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
           Forgot password?
         </a>
+        {getConfig().signupEnabled ? (
+          <a href="/signup" className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+            Create account
+          </a>
+        ) : null}
       </form>
     </div>
   );

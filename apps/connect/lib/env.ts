@@ -62,6 +62,12 @@ export interface HubConfig {
    * email fallback: unset or failing there is a non-2xx, so Shopify retries.
    */
   shopRedactFunctionUrl?: string;
+  /**
+   * SIGNUP_ENABLED=1|true turns on self-service sign-up (P1): the /signup page, the "Create
+   * account" link on /login, and the bcns notice on a confirmed sign-up. Anything else = all
+   * three are absent and /signup is a 404.
+   */
+  signupEnabled: boolean;
 
   // sb-bridge: remove after SB migrates to bcns Connect
   /** The one store (full *.myshopify.com) that installs the bcns-data app instead. */
@@ -96,6 +102,7 @@ export function getConfig(): HubConfig {
     shopifyPartnerOrgId: readEnv("SHOPIFY_PARTNER_ORG_ID"),
     shopifyAppGid: readEnv("SHOPIFY_APP_GID"),
     shopRedactFunctionUrl: readEnv("SHOP_REDACT_FUNCTION_URL"),
+    signupEnabled: ["1", "true"].includes(readEnv("SIGNUP_ENABLED")?.toLowerCase() ?? ""),
 
     // sb-bridge: remove after SB migrates to bcns Connect
     shopifyAltShop: readEnv("SHOPIFY_ALT_SHOP"), // sb-bridge: remove after SB migrates to bcns Connect
