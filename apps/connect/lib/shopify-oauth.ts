@@ -795,7 +795,8 @@ export function openPending(
  *     set: shopGid (a second Admin call), then paidThrough. A store uninstalled
  *     and reinstalled inside a period it already paid for has no ACTIVE
  *     subscription, yet Shopify's plan page has nothing for it to approve — so
- *     it writes instead of looping there. Neither is asked after an ACTIVE
+ *     it writes instead of looping there, and the period's end is stored
+ *     (recordPaidThrough) for the worker to end access when it passes. Neither is asked after an ACTIVE
  *     answer or a failed check, and every failure of either is the plan page,
  *     as before.
  *  4. The plan-page redirect. SHOPIFY_APP_HANDLE is only needed to build that
@@ -809,12 +810,32 @@ export function openPending(
 /** Failures of the subscription check that say nothing about the subscription itself. */
 const TRANSIENT_CHECK_FAILURES: ReadonlySet<string> = new Set(["timeout", "network_error", "http_error"]);
 
-/** The one RPC the gate makes; structural so a test can fake it without a Supabase client. */
+/** The two RPCs the gate makes; structural so a test can fake them without a Supabase client. */
 export interface ShopMismatchApi {
   rpc(
     fn: "shopify_shop_mismatch",
     args: { p_shop: string }
   ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+  rpc(
+    fn: "record_shopify_paid_through",
+    args: { p_shop: string; p_until: string }
+  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+}
+
+/**
+ * Stores the paid-through date (api.record_shopify_paid_through,
+ * 20261002000100) so the worker's paidPeriods step ends access once the period
+ * is over. Never changes the response: a failed store is logged and the
+ * merchant still writes, as before — the worst case is the pre-existing gap
+ * (access outlives the period), never a paying merchant locked out.
+ */
+async function recordPaidThrough(api: ShopMismatchApi, shop: string, until: string): Promise<void> {
+  try {
+    const { error } = await api.rpc("record_shopify_paid_through", { p_shop: shop, p_until: until });
+    if (error) console.warn(`[connect] shopify paid-through not stored (${error.code ?? "rpc"}) shop=${shop}`);
+  } catch {
+    console.warn(`[connect] shopify paid-through not stored (threw) shop=${shop}`);
+  }
 }
 
 export async function managedPricingRedirect(params: {
@@ -853,6 +874,7 @@ export async function managedPricingRedirect(params: {
       const paid = gid ? await paidThrough(gid, { token, orgId, appGid }, fetchImpl, now) : null;
       if (paid?.paid) {
         console.info(`[connect] shopify finish paid through ${paid.until} shop=${pending.shop}`);
+        await recordPaidThrough(api, pending.shop, paid.until);
         return null;
       }
       why += `; partner: ${paid ? paid.reason : "no_shop_id"}`;
