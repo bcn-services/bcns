@@ -18,71 +18,64 @@
 </script>
 <link rel="stylesheet" href="assets/site.css">
 <style>
-  .stage-fig { --fig-h: 460px; }
   .page-head h1 { max-width: 22ch; }
   .page-head .ctas { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 14px; }
 
-  /* ---- stage pieces: HTML elements positioned by JS so text stays real size ---- */
-  .dx { position: absolute; inset: 0; overflow: hidden; font-family: "Manrope", sans-serif; }
-  .dx * { box-sizing: border-box; }
-  .dx.nt, .dx.nt * { transition: none !important; }
-  .dx .win, .dx .pc, .dx .chart, .dx .agent {
-    position: absolute; border-radius: 14px;
-    transition: left .75s cubic-bezier(.4, 0, .2, 1), top .75s cubic-bezier(.4, 0, .2, 1), width .75s cubic-bezier(.4, 0, .2, 1), height .75s cubic-bezier(.4, 0, .2, 1), opacity .5s, transform .6s, box-shadow .5s, border-color .4s;
-  }
-  .dx .win { background: var(--card); border: 1px solid var(--input); box-shadow: 0 16px 40px var(--shadow); opacity: 0; transform: scale(.96); z-index: 1; }
-  .dx.s1 .win, .dx.s2 .win, .dx.s3 .win { opacity: 1; transform: none; }
-  .dx.s3 .win { border-color: var(--primary); }
-  .dx .wbar { height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: 1px solid var(--border); }
-  .dx .wbar i { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
-  .dx .wt { margin-left: 8px; font: 500 13px "Space Grotesk", sans-serif; color: var(--muted); letter-spacing: .02em; }
-  .dx .wcube { margin-left: auto; width: 26px; height: 26px; opacity: 0; transform: scale(.2); transition: opacity .5s .2s, transform .7s cubic-bezier(.34, 1.56, .5, 1) .2s; }
-  .dx .wcube svg { width: 100%; height: 100%; display: block; }
-  .dx.s3 .wcube { opacity: 1; transform: none; }
-
-  .dx .pc { z-index: 2; background: var(--card); border: 1px solid var(--input); display: flex; padding: 0 16px; overflow: hidden; }
-  .dx .pc .nm { font: 500 15px "Space Grotesk", sans-serif; letter-spacing: -.005em; }
-  .dx .pc .dots { display: flex; gap: 6px; }
-  .dx .pc .dots i { width: 9px; height: 9px; border-radius: 50%; display: block; }
-  .dx .pc .val { font: 500 26px/1.1 "Space Grotesk", sans-serif; letter-spacing: -.02em; }
-  .dx .pc .sub { font-size: 12px; color: var(--muted); line-height: 1.3; }
-  .dx .pc[data-m="row"] { flex-direction: row; align-items: center; justify-content: space-between; }
-  .dx .pc[data-m="row"] .val, .dx .pc[data-m="row"] .sub { display: none; }
-  .dx .pc[data-m="tile"] { flex-direction: column; justify-content: center; padding: 8px 14px; gap: 2px; box-shadow: 0 6px 18px var(--shadow); }
-  .dx .pc[data-m="tile"] .nm { font-size: 13px; color: var(--muted); }
-  .dx .pc[data-m="tile"] .dots { position: absolute; right: 12px; top: 12px; gap: 4px; }
-  .dx .pc[data-m="tile"] .dots i { width: 7px; height: 7px; }
-  .dx.narrow .pc[data-m="tile"] { padding: 6px 12px; gap: 0; }
-  .dx.narrow .pc .val { font-size: 19px; }
-  .dx.narrow .pc .sub { display: none; }
-  .dx.narrow .pc[data-m="tile"] .dots { top: 8px; right: 10px; }
-  .dx .pc.hl { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent), 0 6px 18px var(--shadow); }
-
-  .dx .chart { z-index: 2; background: var(--tint); border: 1px solid var(--border); display: flex; align-items: flex-end; gap: 7%; padding: 14px 16px 12px; opacity: 0; }
-  .dx.s1 .chart, .dx.s2 .chart, .dx.s3 .chart { opacity: 1; }
-  .dx .chart b { flex: 1; background: var(--primary); border-radius: 3px 3px 0 0; opacity: .85; transform-origin: bottom; transform: scaleY(0); transition: transform .8s cubic-bezier(.34, 1.2, .5, 1); }
-  .dx.s1 .chart b, .dx.s2 .chart b, .dx.s3 .chart b { transform: scaleY(1); }
-  .dx .chart b:nth-child(2) { transition-delay: .06s } .dx .chart b:nth-child(3) { transition-delay: .12s } .dx .chart b:nth-child(4) { transition-delay: .18s }
-  .dx .chart b:nth-child(5) { transition-delay: .24s } .dx .chart b:nth-child(6) { transition-delay: .3s } .dx .chart b:nth-child(7) { transition-delay: .36s }
-
-  .dx .agent { z-index: 2; background: var(--card); border: 1px solid var(--primary); box-shadow: 0 16px 40px var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; opacity: 0; transform: translateY(14px); overflow: hidden; }
-  .dx.s2 .agent, .dx.s3 .agent { opacity: 1; transform: none; }
-  .dx .agent .ah { display: flex; align-items: center; gap: 8px; font: 500 13px "Space Grotesk", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--primary-ink); }
-  .dx .agent .ah i { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); display: block; }
-  .dx .agent .q { align-self: flex-end; max-width: 92%; background: var(--tint); border: 1px solid var(--border); border-radius: 12px 12px 3px 12px; padding: 8px 12px; font-size: 14px; line-height: 1.4; }
-  .dx .agent .a { align-self: flex-start; max-width: 96%; background: var(--primary-ink); color: var(--on-primary); border-radius: 12px 12px 12px 3px; padding: 9px 12px; font-size: 14px; line-height: 1.45; opacity: 0; transform: translateY(8px); transition: opacity .5s, transform .5s; }
-  :root[data-theme="dark"] .dx .agent .a { background: var(--accent); }
-  .dx .agent .a b { font-family: "Space Grotesk", sans-serif; font-weight: 600; }
-  .dx .agent.on .a { opacity: 1; transform: none; }
-  .dx .agent .src { font-size: 12px; color: var(--muted); opacity: 0; transition: opacity .5s .2s; }
-  .dx .agent.on .src { opacity: 1; }
-  .dx .agent .mc { flex: 1; min-height: 0; display: flex; align-items: flex-end; gap: 9px; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border); opacity: 0; transition: opacity .5s .3s; }
-  .dx .agent.on .mc { opacity: 1; }
-  .dx .agent .mc span { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
-  .dx .agent .mc b { width: 100%; background: var(--primary); opacity: .8; border-radius: 3px 3px 0 0; display: block; max-height: calc(100% - 18px); }
-  .dx .agent .mc em { font: normal 500 12px "Space Grotesk", sans-serif; color: var(--muted); }
-  .dx.narrow .agent .mc { display: none; }
-  @media (prefers-reduced-motion: reduce) { .dx, .dx * { transition: none !important; } }
+  /* ---- click-driven answer view: question chips over a dashboard + agent mock ---- */
+  .ask { padding-top: 40px; padding-bottom: 72px; }
+  @media (min-width: 1024px) { .ask { padding-top: 56px; padding-bottom: 104px; } }
+  .ask .lede { margin-top: 16px; max-width: 38rem; }
+  .qs { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0 18px; }
+  .qchip { min-height: 48px; padding: 10px 20px; border: 1px solid var(--input); border-radius: 999px; background: var(--card); color: var(--ink); font: 500 15px/1.3 "Space Grotesk", sans-serif; cursor: pointer; text-align: left; transition: border-color .2s, background-color .2s, color .2s, box-shadow .2s; }
+  .qchip:hover { border-color: var(--primary); }
+  .qchip[aria-pressed="true"] { background: var(--primary-ink); border-color: var(--primary-ink); color: var(--on-primary); box-shadow: 0 8px 20px var(--shadow); }
+  :root[data-theme="dark"] .qchip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); }
+  .mock { border: 1px solid var(--input); border-radius: 20px; background: var(--card); box-shadow: 0 16px 40px var(--shadow); overflow: hidden; }
+  .mbar { height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .mbar i { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+  .mbar .wt { margin-left: 8px; font: 500 13px "Space Grotesk", sans-serif; color: var(--muted); letter-spacing: .02em; }
+  .mbar .wcube { margin-left: auto; width: 26px; height: 26px; }
+  .mbar .wcube svg { width: 100%; height: 100%; display: block; }
+  .mbody { display: grid; gap: 14px; padding: 14px; }
+  @media (min-width: 900px) { .mbody { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; padding: 20px; } }
+  .dash { display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  @media (min-width: 600px) { .tiles { gap: 12px; } }
+  .tile { border: 1px solid var(--border); border-radius: 12px; background: var(--tint); padding: 10px; box-shadow: 0 6px 18px var(--shadow); }
+  .tile .nm { font: 500 12px "Space Grotesk", sans-serif; color: var(--muted); }
+  .tile .val { margin-top: 2px; font: 500 22px/1.15 "Space Grotesk", sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  @media (min-width: 600px) { .tile { padding: 12px 14px; } .tile .val { font-size: 28px; } }
+  .tile .sub { font-size: 12px; line-height: 1.3; color: var(--muted); }
+  .tile .dots { display: flex; gap: 4px; margin-top: 8px; }
+  .tile .dots i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+  .list { border: 1px solid var(--border); border-radius: 12px; background: var(--tint); overflow: hidden; }
+  .list .lh { padding: 10px 14px 8px; font: 500 12px "Space Grotesk", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .list .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 14px; }
+  .list .row b { display: block; font: 500 15px "Space Grotesk", sans-serif; }
+  .list .row small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+  .list .tg { flex: none; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font: 500 12px "Space Grotesk", sans-serif; color: var(--primary-ink); white-space: nowrap; }
+  .bars { display: flex; align-items: flex-end; gap: 8px; height: 144px; padding: 6px 14px 12px; border-top: 1px solid var(--border); }
+  .bars span { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+  .bars b { display: block; width: 100%; max-height: calc(100% - 18px); background: var(--primary); opacity: .85; border-radius: 3px 3px 0 0; transform-origin: bottom; animation: grow .7s cubic-bezier(.34, 1.2, .5, 1) both; animation-delay: calc(var(--i) * 60ms + 250ms); }
+  .bars em { font: normal 500 12px "Space Grotesk", sans-serif; color: var(--muted); }
+  .agent { min-width: 0; min-height: 168px; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--primary); border-radius: 14px; background: var(--card); box-shadow: 0 16px 40px var(--shadow); }
+  .agent .ah { display: flex; align-items: center; gap: 8px; font: 500 13px "Space Grotesk", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--primary-ink); }
+  .agent .ah i { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); display: block; }
+  .agent .q { align-self: flex-end; max-width: 92%; background: var(--tint); border: 1px solid var(--border); border-radius: 12px 12px 3px 12px; padding: 8px 12px; font-size: 14px; line-height: 1.4; }
+  .agent .a { align-self: flex-start; max-width: 96%; background: var(--primary-ink); color: var(--on-primary); border-radius: 12px 12px 12px 3px; padding: 9px 12px; font-size: 14px; line-height: 1.45; }
+  :root[data-theme="dark"] .agent .a { background: var(--accent); }
+  .agent .a b { font-family: "Space Grotesk", sans-serif; font-weight: 600; }
+  .agent .src { font-size: 12px; color: var(--muted); }
+  .agent .box { margin-top: auto; padding: 10px 14px; border: 1px solid var(--input); border-radius: 999px; font-size: 13px; color: var(--muted); }
+  @keyframes up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes grow { from { transform: scaleY(0); } to { transform: none; } }
+  .in { animation: up .55s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 80ms); }
+  @media (prefers-reduced-motion: reduce) { .in, .bars b { animation: none !important; } .qchip { transition: none; } }
+  .steps4 { margin-top: 48px; display: grid; gap: 22px; padding-top: 28px; border-top: 1px solid var(--border); }
+  @media (min-width: 700px) { .steps4 { grid-template-columns: repeat(2, 1fr); gap: 28px 32px; } }
+  @media (min-width: 1100px) { .steps4 { grid-template-columns: repeat(4, 1fr); } }
+  .steps4 h3 { margin-top: 8px; font-weight: 400; font-size: 1.3rem; letter-spacing: -.01em; line-height: 1.2; }
+  .steps4 p { margin-top: 8px; font-size: 15px; line-height: 1.6; color: var(--muted); }
 
   /* ---- grids & cards ---- */
   .sec-h { max-width: 26ch; margin: 16px 0 40px; }
@@ -121,15 +114,20 @@
     <div class="ctas"><a class="btn-primary" href="index.html#contact">Book a free consult</a><a class="btn-outline" href="#how">See how a build comes together</a></div>
   </section>
 
-  <section class="stage-section" id="how" aria-label="How a Deluxe build comes together">
-    <div class="stage-track"><div class="stage-pin"><div class="stage-panel">
-      <div class="stage-dia"></div><div class="stage-caps"></div><nav class="stage-rail" aria-label="Jump to a step"></nav>
-    </div></div></div>
-    <ol class="stage-stack">
-      <li class="stage-step"><p class="steplabel">How a build works | 01 / 04</p><h2>Your data, <b class="em">already organized.</b></h2><p class="l">Customers, orders, money, appointments and messages, sorted in bcns Connect. Every Deluxe build starts here.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">How a build works | 02 / 04</p><h2>We build an <b class="em">app</b> on top.</h2><p class="l">A dashboard, a booking tool, a back-office app, reading from the same data as everything else.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">How a build works | 03 / 04</p><h2>An agent that <b class="em">knows your business.</b></h2><p class="l">Ask in plain words. It answers from your real data, not guesses.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">How a build works | 04 / 04</p><h2>Built around <b class="em">how you work.</b></h2><p class="l">Scoped with you, quoted fixed, and arranged the way your team actually uses it.</p><div class="stage-fig"></div></li>
+  <section class="gut ask" id="how" aria-labelledby="ask-h">
+    <p class="eyebrow">How a build works</p>
+    <h2 class="h-lg" id="ask-h" style="margin-top:16px">Ask your business <b class="em">a question.</b></h2>
+    <p class="lede">Pick one below. This is how a dashboard and an AI agent answer it, using data that is already organized in Connect.</p>
+    <div class="qs" id="qs" role="group" aria-label="Pick a question"></div>
+    <div class="mock">
+      <div class="mbar"><i></i><i></i><i></i><span class="wt">Your dashboard</span><span class="wcube" id="wcube"></span></div>
+      <div class="mbody"><div class="dash" id="dash"></div><div class="agent" id="agent" aria-live="polite"></div></div>
+    </div>
+    <ol class="steps4">
+      <li><p class="steplabel">01 / 04</p><h3>Your data, <b class="em">already organized.</b></h3><p>Customers, orders, money, appointments and messages, sorted in bcns Connect. Every Deluxe build starts here.</p></li>
+      <li><p class="steplabel">02 / 04</p><h3>We build an <b class="em">app</b> on top.</h3><p>A dashboard, a booking tool, a back-office app, reading from the same data as everything else.</p></li>
+      <li><p class="steplabel">03 / 04</p><h3>An agent that <b class="em">knows your business.</b></h3><p>Ask in plain words. It answers from your real data, not guesses.</p></li>
+      <li><p class="steplabel">04 / 04</p><h3>Built around <b class="em">how you work.</b></h3><p>Scoped with you, quoted fixed, and arranged the way your team actually uses it.</p></li>
     </ol>
   </section>
 
@@ -210,73 +208,57 @@
 <script src="assets/site.js"></script>
 <script>
 (function () {
-  var T = bcns.tools;
-  var ROWS = [
-    { n: "Customers", v: "214", s: "in total", d: ["shopify", "square", "gmail"] },
-    { n: "Orders", v: "63", s: "last week", d: ["shopify", "square"] },
-    { n: "Money", v: "$4,280", s: "last week", d: ["quickbooks", "square"] },
-    { n: "Appointments", v: "9", s: "this week", d: ["calendar"] },
-    { n: "Messages", v: "5", s: "to answer", d: ["gmail"] }
-  ];
+  var T = bcns.tools, rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   var BARS = [46, 54, 62, 58, 88, 80, 52];
-  var ORDER_A = [0, 1, 2, 3, 4], ORDER_B = [3, 4, 1, 2, 0]; /* step 4 re-arranges the tiles around how this team works */
+  /* each view: the question, three tiles (count-ups), a list or bar chart, and the agent's answer */
+  var VIEWS = [
+    { q: "What did we sell last week?",
+      tiles: [["Orders", 63, "", "", "last week", ["shopify", "square"]], ["Money", 4280, "$", "", "last week", ["quickbooks", "square"]], ["Customers", 214, "", "", "in total", ["shopify", "square", "gmail"]]],
+      head: "Sales by day", bars: BARS,
+      a: "<b>$4,280</b> from <b>63</b> orders. Up 12% on the week before.", src: "From your Orders and Money data" },
+    { q: "What's booked this week?",
+      tiles: [["Booked", 9, "", "", "this week", ["calendar"]], ["Today", 2, "", "", "on the schedule", ["calendar"]], ["Open", 5, "", "", "slots left", ["calendar", "square"]]],
+      head: "Coming up", rows: [["Tue 9:00", "Maria R. &middot; Full detail", "Confirmed"], ["Wed 1:30", "Sam T. &middot; Interior clean", "Confirmed"], ["Fri 10:00", "Jo L. &middot; Paint correction", "Deposit paid"]],
+      a: "<b>9</b> bookings this week, <b>2</b> today. Thursday afternoon is still open.", src: "From your Calendar and Square data" },
+    { q: "Who needs a reply?",
+      tiles: [["To answer", 5, "", "", "messages", ["gmail"]], ["Quotes", 3, "", "", "no reply yet", ["gmail", "quickbooks"]], ["Oldest", 2, "", "d", "days waiting", ["gmail"]]],
+      head: "Waiting on you", rows: [["Dana K.", "Asked for a quote", "Draft ready"], ["Pat M.", "Wants to reschedule", "Draft ready"], ["Lee S.", "Where is my order?", "Draft ready"]],
+      a: "<b>5</b> messages are waiting. I drafted replies for the top <b>3</b>.", src: "From your Gmail and Orders data" }
+  ];
+  var qs = document.getElementById("qs"), dash = document.getElementById("dash"), agent = document.getElementById("agent"), cur = -1, raf = 0;
+  document.getElementById("wcube").innerHTML = bcns.logoSvg("");
+  qs.innerHTML = VIEWS.map(function (v, i) { return '<button class="qchip" type="button" aria-pressed="false" data-i="' + i + '">' + v.q + "</button>"; }).join("");
 
-  function build(frame) {
-    var h = '<div class="win"><div class="wbar"><i></i><i></i><i></i><span class="wt">Your dashboard</span><span class="wcube">' + bcns.logoSvg("") + '</span></div></div>';
-    ROWS.forEach(function (r) {
-      h += '<div class="pc" data-m="row"><span class="nm">' + r.n + '</span><span class="val">' + r.v + '</span><span class="sub">' + r.s + '</span><span class="dots">' +
-        r.d.map(function (k) { return '<i style="background:' + T[k] + '" title="' + k + '"></i>'; }).join("") + '</span></div>';
-    });
-    h += '<div class="chart" aria-hidden="true">' + BARS.map(function (b) { return '<b style="height:' + b + '%"></b>'; }).join("") + '</div>';
-    h += '<div class="agent"><div class="ah"><i></i>AI agent</div><div class="q">What did we sell last week?</div>' +
-      '<div class="a"><b>$4,280</b> from <b>63</b> orders. Up 12% on the week before.</div><div class="src">From your Orders and Money data</div>' +
-      '<div class="mc" aria-hidden="true">' + BARS.map(function (b, k) { return '<span><b style="height:' + b + '%"></b><em>' + "MTWTFSS".charAt(k) + '</em></span>'; }).join("") + '</div></div>';
-    frame.innerHTML = '<div class="dx nt" role="img" aria-label="Organized rows lift into a dashboard of tiles, an AI agent answers a question from that data, and the bcns cube appears in the window corner.">' + h + '</div>';
-    return frame.firstChild;
+  function fmt(n, pre, suf) { return pre + Math.round(n).toLocaleString("en-US") + suf; }
+  function show(i) {
+    var v = VIEWS[i], k = 0;
+    cancelAnimationFrame(raf);
+    var h = '<div class="tiles">' + v.tiles.map(function (t) {
+      return '<div class="tile in" style="--i:' + (k++) + '"><div class="nm">' + t[0] + '</div><div class="val" data-to="' + t[1] + '" data-pre="' + t[2] + '" data-suf="' + t[3] + '">' + fmt(t[1], t[2], t[3]) + '</div><div class="sub">' + t[4] +
+        '</div><div class="dots">' + t[5].map(function (d) { return '<i style="background:' + T[d] + '" title="' + d + '"></i>'; }).join("") + "</div></div>";
+    }).join("") + "</div>";
+    h += '<div class="list in" style="--i:3"><div class="lh">' + v.head + "</div>";
+    if (v.bars) h += '<div class="bars" aria-hidden="true">' + v.bars.map(function (b, n) { return '<span><b style="height:' + b + "%;--i:" + n + '"></b><em>' + "MTWTFSS".charAt(n) + "</em></span>"; }).join("") + "</div>";
+    else h += v.rows.map(function (r, n) { return '<div class="row in" style="--i:' + (4 + n) + '"><div><b>' + r[0] + "</b><small>" + r[1] + '</small></div><span class="tg">' + r[2] + "</span></div>"; }).join("");
+    dash.innerHTML = h + "</div>";
+    agent.innerHTML = '<div class="ah"><i></i>AI agent</div><div class="q in" style="--i:2">' + v.q + '</div><div class="a in" style="--i:6">' + v.a + '</div><div class="src in" style="--i:7">' + v.src + '</div><div class="box" aria-hidden="true">Ask about your business</div>';
+    if (rm) return;
+    var vals = [].slice.call(dash.querySelectorAll(".val")), t0 = performance.now(), D = 800, delay = 150;
+    vals.forEach(function (el) { el.textContent = fmt(0, el.dataset.pre, el.dataset.suf); });
+    (function tick(now) {
+      var u = Math.min(1, Math.max(0, (now - t0 - delay) / D)), e = 1 - Math.pow(1 - u, 3);
+      vals.forEach(function (el) { el.textContent = fmt(el.dataset.to * e, el.dataset.pre, el.dataset.suf); });
+      if (u < 1) raf = requestAnimationFrame(tick);
+    })(t0);
   }
-  function px(el, x, y, w, h) { el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = w + "px"; el.style.height = h + "px"; }
-
-  function layout(dx, w, h, s, p) {
-    var narrow = w < 700, win = dx.querySelector(".win"), pcs = dx.querySelectorAll(".pc"), chart = dx.querySelector(".chart"), agent = dx.querySelector(".agent");
-    dx.className = "dx s" + s + (narrow ? " narrow" : "") + (dx.classList.contains("nt") ? " nt" : "");
-    var ww, wh, wx, wy, ax, ay, aw, ah, cols, rows;
-    if (narrow) {
-      ww = Math.min(w - 24, 520); wh = 228; wx = (w - ww) / 2; cols = 2; rows = 3;
-      wy = s >= 2 ? 12 : (h - wh) / 2;
-      ax = wx; ay = wy + wh + 12; aw = ww; ah = Math.max(h - ay - 12, 170);
-    } else {
-      cols = 3; rows = 2; wh = Math.min(h - 72, 440);
-      ww = s >= 2 ? Math.min(Math.max(w * .54, 440), 720, w - 72 - 280) : Math.min(w - 48, 720);
-      wx = s >= 2 ? 24 : (w - ww) / 2; wy = (h - wh) / 2;
-      ax = wx + ww + 24; ay = wy; aw = w - 24 - ax; ah = wh;
-    }
-    px(win, wx, wy, ww, wh);
-    px(agent, ax, ay, aw, ah);
-    var gx = wx + 12, gy = wy + 36 + 12, gw = ww - 24, gh = wh - 36 - 24, gap = narrow ? 8 : 12;
-    var tw = (gw - gap * (cols - 1)) / cols, th = (gh - gap * (rows - 1)) / rows;
-    function slot(k) { return [gx + (k % cols) * (tw + gap), gy + Math.floor(k / cols) * (th + gap)]; }
-    var order = s >= 3 ? ORDER_B : ORDER_A, rw = Math.min(380, w - 48), rh = 46, rg = 12, ry0 = (h - (5 * rh + 4 * rg)) / 2;
-    Array.prototype.forEach.call(pcs, function (el, i) {
-      el.style.transitionDelay = (i * 55) + "ms";
-      if (s === 0) { el.dataset.m = "row"; px(el, (w - rw) / 2, ry0 + i * (rh + rg), rw, rh); }
-      else { el.dataset.m = "tile"; var xy = slot(order.indexOf(i)); px(el, xy[0], xy[1], tw, th); }
-    });
-    var cxy = slot(5); px(chart, cxy[0], cxy[1], tw, th);
-    var on = s === 3 || (s === 2 && p > 0.3);
-    agent.classList.toggle("on", on);
-    pcs[1].classList.toggle("hl", s >= 2 && on); pcs[2].classList.toggle("hl", s >= 2 && on);
+  function pick(i) {
+    if (i === cur) return;
+    cur = i;
+    [].slice.call(qs.children).forEach(function (b, n) { b.setAttribute("aria-pressed", String(n === i)); });
+    show(i);
   }
-
-  function render(i, p, frame) {
-    var w = Math.round(frame.clientWidth), h = Math.round(frame.clientHeight);
-    if (w < 100 || h < 100) return;
-    var dx = frame._dx; if (!dx) { dx = frame._dx = build(frame); }
-    var first = !frame._laid; frame._laid = true;
-    if (frame._w !== w || frame._h !== h) { dx.classList.add("nt"); frame._w = w; frame._h = h; first = true; }
-    layout(dx, w, h, i, p);
-    if (first) { void dx.offsetWidth; dx.classList.remove("nt"); }
-  }
-  bcns.pinStage(document.getElementById("how"), 4, render);
+  qs.addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) pick(+b.dataset.i); });
+  pick(0);
 })();
 </script>
 </body>

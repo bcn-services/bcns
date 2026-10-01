@@ -7,7 +7,7 @@ Light/dark come from `[data-theme]` on `<html>` (key `bcns-site-theme`). Use `cl
 Tool colors are tokens: `--shopify --square --quickbooks --calendar --gmail` (also `bcns.tools`). Nothing under 12px; no text on skewed cube faces.
 
 ## Page map (relative links only)
-index.html (= Home A) · home-a.html · home-b.html · home-c.html · services.html · services-connect.html · services-deluxe.html · services-ai.html ·
+index.html (home) · services.html · services-connect.html · services-deluxe.html · services-ai.html ·
 work.html · pricing.html · about.html · connect-login.html · connect-sources.html · connect-data.html · connect-team.html · connect-access.html.
 Contact = `index.html#contact`. Hub pages (`connect-*`) use a hub header, not the site header.
 
@@ -33,11 +33,6 @@ The logo cube. Rests as the logo, turns face-on to numerals + icons; hover/focus
 Touch auto-opens once at ~50% in view and the hint reads "Tap to open". `cards:false` shows the cubes alone. Pillar copy lives in `bcns.pillars`.
 ```js
 bcns.buildCube(document.getElementById("cube"), { cards: true });
-```
-
-**`mountHomePill(current) -> el`** Floating "Home A / B / C" switcher linking `home-a/b/c.html`; `current` is `"a" | "b" | "c"`.
-```js
-bcns.mountHomePill("b");
 ```
 
 Also exposed: `logoSvg(cls)`, `setTheme("light"|"dark")`, `tools`, `pillars`.

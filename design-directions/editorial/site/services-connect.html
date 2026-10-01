@@ -21,8 +21,24 @@
   .rate { margin-top: 28px; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--tint); }
   .rate b { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 1.5rem; letter-spacing: -.01em; }
   .rate span { color: var(--muted); font-size: 15px; }
-  .stage-section { --fig-h: 460px; }
-  @media (min-width: 600px) { .stage-section { --fig-h: 400px; } }
+  /* ---- plays-on-view stage: panel + step copy, no scroll pinning ---- */
+  .how { --fig-h: 460px; display: grid; gap: 32px; padding-top: 40px; padding-bottom: 72px; }
+  @media (min-width: 600px) { .how { --fig-h: 400px; } }
+  @media (min-width: 1024px) { .how { --fig-h: 540px; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; align-items: center; padding-top: 56px; padding-bottom: 104px; } }
+  .how-stage { min-width: 0; }
+  .panel { position: relative; width: 100%; height: var(--fig-h); border: 1px solid var(--border); border-radius: 20px; background: var(--tint); overflow: hidden; }
+  .panel > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .replay-row { margin-top: 14px; min-height: 44px; display: flex; justify-content: flex-end; }
+  .replay-row .btn-outline { min-height: 44px; visibility: hidden; opacity: 0; transition: opacity .4s, visibility 0s .4s, border-color .2s, background-color .2s; }
+  .how.done .replay-row .btn-outline { visibility: visible; opacity: 1; transition: opacity .4s, visibility 0s 0s, border-color .2s, background-color .2s; }
+  .steps li { border-left: 3px solid var(--border); padding: 4px 0 4px 22px; margin-bottom: 26px; transition: border-color .4s, opacity .4s; }
+  .steps li:last-child { margin-bottom: 0; }
+  .steps li.on { border-left-color: var(--primary); }
+  .how.playing .steps li:not(.on) { opacity: .45; }
+  .steps h2 { margin-top: 8px; font-weight: 300; letter-spacing: -.02em; line-height: 1.15; text-wrap: balance; font-size: clamp(1.45rem, 2.4vw, 1.85rem); }
+  .steps p.l { margin-top: 10px; color: var(--muted); font-size: 16px; max-width: 30rem; }
+  .demo.nt, .demo.nt * { transition: none !important; }
+  @media (prefers-reduced-motion: reduce) { .demo, .demo * { transition: none !important; } .replay-row { display: none; } .steps li { transition: none; } }
   .demo text { fill: var(--ink); font-family: "Space Grotesk", sans-serif; font-weight: 500; font-size: 13px; }
   .demo text.sub { fill: var(--muted); font-family: "Manrope", sans-serif; font-weight: 400; font-size: 12px; }
   .demo text.ttl { font-size: 15px; font-weight: 600; }
@@ -53,15 +69,16 @@
     <p class="rate"><b>$200 / month</b><span>no setup fee</span></p>
   </section>
 
-  <!-- pinned stage: 3 steps from content.connect.steps -->
-  <section class="stage-section" id="how" aria-label="How bcns Connect works">
-    <div class="stage-track"><div class="stage-pin"><div class="stage-panel">
-      <div class="stage-dia"></div><div class="stage-caps"></div><nav class="stage-rail" aria-label="Jump to a step"></nav>
-    </div></div></div>
-    <ol class="stage-stack">
-      <li class="stage-step"><p class="steplabel">bcns Connect | 01 / 03</p><h2>We <b class="em">connect</b> the tools you already use</h2><p class="l">Your online store, ad accounts, project boards, calendar, email and files. We plug into each one, and nothing about how you use them changes.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">bcns Connect | 02 / 03</p><h2>Everything lands in <b class="em">one organized place</b></h2><p class="l">Customers, orders, money, messages and files, sorted the same way no matter where they came from and kept current on their own. For the first time, all of it can be searched and compared together.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">bcns Connect | 03 / 03</p><h2>You <b class="em">put it to work</b></h2><p class="l">Your team sees the whole business at once. The AI tools you already use can work from your real data instead of guesses. And anything we build for you with Deluxe starts from here.</p><div class="stage-fig"></div></li>
+  <!-- plays on view: 3 steps from content.connect.steps -->
+  <section class="gut how" id="how" aria-label="How bcns Connect works">
+    <div class="how-stage">
+      <div class="panel" id="panel"></div>
+      <div class="replay-row"><button class="btn-outline btn-sm" id="replay" type="button">Play again</button></div>
+    </div>
+    <ol class="steps" id="steps">
+      <li><p class="steplabel">bcns Connect | 01 / 03</p><h2>We <b class="em">connect</b> the tools you already use</h2><p class="l">Your online store, ad accounts, project boards, calendar, email and files. We plug into each one, and nothing about how you use them changes.</p></li>
+      <li><p class="steplabel">bcns Connect | 02 / 03</p><h2>Everything lands in <b class="em">one organized place</b></h2><p class="l">Customers, orders, money, messages and files, sorted the same way no matter where they came from and kept current on their own. For the first time, all of it can be searched and compared together.</p></li>
+      <li><p class="steplabel">bcns Connect | 03 / 03</p><h2>You <b class="em">put it to work</b></h2><p class="l">Your team sees the whole business at once. The AI tools you already use can work from your real data instead of guesses. And anything we build for you with Deluxe starts from here.</p></li>
     </ol>
   </section>
 
@@ -153,8 +170,9 @@
   }
 
   function build(frame, w, h) {
+    (frame._dots || []).forEach(function (d) { d.destroy(); }); frame._dots = [];
     frame.innerHTML = ""; frame._w = w; frame._h = h;
-    var g = geo(w, h), svg = mk("svg", { class: "demo", viewBox: "0 0 " + w + " " + h, role: "img", "aria-label": "Tools start jumbled and connected, a cube appears and sorts everything into organized rows, then it feeds a team view, AI tools and Deluxe builds." }, frame);
+    var g = geo(w, h), svg = mk("svg", { class: "demo nt", viewBox: "0 0 " + w + " " + h, role: "img", "aria-label": "Tools start jumbled and connected, a cube appears and sorts everything into organized rows, then it feeds a team view, AI tools and Deluxe builds." }, frame);
     var root = mk("g", {}, svg), gF = mk("g", {}, root), gD = mk("g", {}, root), gC = mk("g", {}, root), gR = mk("g", {}, root), gQ = mk("g", {}, root), gS = mk("g", {}, root);
     var cc = [g.cx, g.cy], flows = { a: [], b: [], c: [] };
     /* tool cards */
@@ -163,7 +181,7 @@
       mk("circle", { cx: 16, cy: g.ch / 2, r: 5, fill: COLS[i] }, c); mk("text", { x: 30, y: g.ch / 2 + 4.5 }, c).textContent = n; return c;
     });
     /* connector sets: a = scrambled cards to the empty target, b = tidy cards to the cube, c = cube to the three destinations */
-    function path(set, d, col, n) { var f = mk("g", { class: "flow" }, gF), p = mk("path", { class: "conn", d: d, stroke: col }, f); bcns.flowDots(svg, p, col, { n: n || 3, r: 3, period: 3.2 }); flows[set].push(f); }
+    function path(set, d, col, n) { var f = mk("g", { class: "flow" }, gF), p = mk("path", { class: "conn", d: d, stroke: col }, f); frame._dots.push(bcns.flowDots(svg, p, col, { n: n || 3, r: 3, period: 3.2 })); flows[set].push(f); }
     var ring = mk("circle", { class: "ring", cx: cc[0], cy: cc[1], r: g.cs * .42 }, gF);
     NAMES.forEach(function (n, i) {
       var s = g.scr[i], t = g.tool[i], sx = s[0] + g.cw / 2, sy = s[1] + g.ch / 2, tx = t[0] + (g.land ? g.cw : g.cw / 2), ty = t[1] + (g.land ? g.ch / 2 : g.ch);
@@ -219,13 +237,40 @@
     return svg;
   }
 
-  function render(i, p, frame) {
-    var w = Math.round(frame.clientWidth), h = Math.round(frame.clientHeight);
+  /* ---- play once when ~40% in view, rest on the final frame, "Play again" replays ---- */
+  var sec = document.getElementById("how"), panel = document.getElementById("panel"), btn = document.getElementById("replay");
+  var steps = [].slice.call(document.querySelectorAll("#steps li")), rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var cur = rm ? 2 : 0, curP = 1, timers = [];
+
+  function paint(s, p, instant) {
+    cur = s; curP = p;
+    var w = Math.round(panel.clientWidth), h = Math.round(panel.clientHeight);
     if (w < 100 || h < 100) return;
-    if (frame._w !== w || frame._h !== h) { build(frame, w, h); frame._set(i, p); void frame.offsetWidth; frame._st = null; }
-    frame._set(i, p);
+    var rebuilt = panel._w !== w || panel._h !== h;
+    if (rebuilt) build(panel, w, h);
+    var svg = panel.firstChild;
+    if (instant || rebuilt) { svg.classList.add("nt"); panel._set(s, p); void svg.getBoundingClientRect(); svg.classList.remove("nt"); }
+    else panel._set(s, p);
   }
-  bcns.pinStage(document.getElementById("how"), 3, render);
+  function mark(i) { steps.forEach(function (li, k) { li.classList.toggle("on", k === i); }); }
+  function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    sec.classList.remove("done"); sec.classList.add("playing");
+    paint(0, 0, true); mark(0);
+    at(1900, function () { mark(1); paint(1, 0); });
+    at(2900, function () { paint(1, 1); });
+    at(4500, function () { mark(2); paint(2, 1); });
+    at(6000, function () { sec.classList.remove("playing"); sec.classList.add("done"); });
+  }
+  if ("ResizeObserver" in window) new ResizeObserver(function () { paint(cur, curP, true); }).observe(panel); else paint(cur, curP, true);
+  btn.addEventListener("click", play);
+  if (!rm) {
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); play(); } }, { threshold: 0.4 });
+      io.observe(panel);
+    } else play();
+  }
 })();
 </script>
 </body>

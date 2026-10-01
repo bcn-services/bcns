@@ -18,7 +18,6 @@
 </script>
 <link rel="stylesheet" href="assets/site.css">
 <style>
-  .stage-fig { --fig-h: 430px; }
   .page-head h1 { max-width: 20ch; }
   .page-head .ctas { margin-top: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
   .rate { font: 500 1.25rem "Space Grotesk", sans-serif; color: var(--primary-ink); }
@@ -27,7 +26,7 @@
   .tl { position: absolute; inset: 0; overflow: hidden; }
   .tl * { box-sizing: border-box; }
   .tl .line { position: absolute; height: 2px; border-radius: 1px; background: var(--border); }
-  .tl .fill { position: absolute; height: 2px; border-radius: 1px; background: var(--primary); }
+  .tl .fill { position: absolute; height: 2px; border-radius: 1px; background: var(--primary); transition: width .9s cubic-bezier(.4, 0, .2, 1); }
   .tl .tk { position: absolute; width: 1px; height: 8px; background: var(--input); }
   .tl .stp { position: absolute; width: 0; }
   .tl .stp i { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--tint); border: 2px solid var(--input); transition: background-color .4s, border-color .4s; }
@@ -35,7 +34,8 @@
   .tl .stp span { position: absolute; top: 16px; left: 0; transform: translateX(-50%); white-space: nowrap; font: 500 13px "Space Grotesk", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); transition: color .4s; }
   .tl .stp.pass span { color: var(--primary-ink); }
   .tl .end { position: absolute; font: 400 13px "Space Grotesk", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .tl .now { position: absolute; width: 0; height: 0; z-index: 3; }
+  .tl .now { position: absolute; width: 0; height: 0; z-index: 3; transition: left .9s cubic-bezier(.4, 0, .2, 1); }
+  .tl.nt, .tl.nt * { transition: none !important; }
   .tl .now i { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent); animation: nowp 2.4s ease-in-out infinite; }
   .tl .now span { position: absolute; left: 0; top: -34px; transform: translateX(-50%); font: 600 12px "Space Grotesk", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--primary-ink); }
   @keyframes nowp { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--primary) 8%, transparent); } }
@@ -61,6 +61,22 @@
   .ill .ring.on { animation: ringp 2.2s ease-out infinite; }
   @keyframes ringp { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.25); } }
   @media (prefers-reduced-motion: reduce) { .tl *, .tl { transition: none !important; animation: none !important; } }
+
+  /* ---- stepper: tabs over the timeline, copy below ---- */
+  .how { padding-top: 40px; padding-bottom: 72px; }
+  @media (min-width: 1024px) { .how { padding-top: 56px; padding-bottom: 104px; } }
+  .tabs { display: flex; gap: 6px; width: 100%; max-width: 30rem; padding: 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--tint); }
+  .tabs button { flex: 1; min-height: 48px; padding: 10px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: 500 15px "Space Grotesk", sans-serif; cursor: pointer; transition: background-color .3s, color .3s; }
+  .tabs button:hover { color: var(--ink); }
+  .tabs button[aria-selected="true"] { background: var(--primary-ink); color: var(--on-primary); }
+  :root[data-theme="dark"] .tabs button[aria-selected="true"] { background: var(--primary); }
+  .panel { position: relative; margin-top: 20px; height: 380px; border: 1px solid var(--border); border-radius: 20px; background: var(--tint); overflow: hidden; }
+  @media (min-width: 700px) { .panel { height: 430px; } }
+  .cp { margin-top: 28px; max-width: 44rem; animation: up .5s cubic-bezier(.2, .7, .2, 1) both; }
+  .cp h2 { margin-top: 12px; font-weight: 300; letter-spacing: -.02em; line-height: 1.12; text-wrap: balance; font-size: clamp(1.9rem, 4vw, 2.6rem); }
+  .cp p.l { margin-top: 14px; max-width: 36rem; color: var(--muted); }
+  @keyframes up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .cp { animation: none; } .tabs button { transition: none; } }
 
   /* ---- sections ---- */
   .sec-h { max-width: 24ch; margin: 16px 0 40px; }
@@ -99,15 +115,20 @@
     <div class="ctas"><span class="rate">$1,000 / day</span><a class="btn-primary" href="index.html#contact">Book a free consult</a><a class="btn-outline" href="#how">See the day</a></div>
   </section>
 
-  <section class="stage-section" id="how" aria-label="One day of AI consulting">
-    <div class="stage-track"><div class="stage-pin"><div class="stage-panel">
-      <div class="stage-dia"></div><div class="stage-caps"></div><nav class="stage-rail" aria-label="Jump to a step"></nav>
-    </div></div></div>
-    <ol class="stage-stack">
-      <li class="stage-step"><p class="steplabel">Morning | 01 / 03</p><h2>We look at the work you <b class="em">already do</b></h2><p class="l">We go through your week with you and find the parts that are repetitive, slow, or typed in twice. Most of a business does not need AI. We tell you which parts of yours do.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">Midday | 02 / 03</p><h2>We build one of them <b class="em">with you watching</b></h2><p class="l">We take the task costing you the most hours and build the workflow for it while you watch, so you see how it was put together and not just the finished thing.</p><div class="stage-fig"></div></li>
-      <li class="stage-step"><p class="steplabel">Afternoon | 03 / 03</p><h2>Your team uses it on <b class="em">real work</b></h2><p class="l">The rest of the day is your people running it on their own jobs, with us there when something breaks.</p><div class="stage-fig"></div></li>
-    </ol>
+  <section class="gut how" id="how" aria-label="One day of AI consulting">
+    <div class="tabs" id="tabs" role="tablist" aria-label="Part of the day">
+      <button type="button" role="tab" id="tab-0" aria-selected="true" aria-controls="tp" tabindex="0">Morning</button>
+      <button type="button" role="tab" id="tab-1" aria-selected="false" aria-controls="tp" tabindex="-1">Midday</button>
+      <button type="button" role="tab" id="tab-2" aria-selected="false" aria-controls="tp" tabindex="-1">Afternoon</button>
+    </div>
+    <div id="tp" role="tabpanel" aria-labelledby="tab-0">
+      <div class="panel" id="panel"></div>
+      <div id="copy">
+        <div class="cp"><p class="steplabel">Morning | 01 / 03</p><h2>We look at the work you <b class="em">already do</b></h2><p class="l">We go through your week with you and find the parts that are repetitive, slow, or typed in twice. Most of a business does not need AI. We tell you which parts of yours do.</p></div>
+        <div class="cp" hidden><p class="steplabel">Midday | 02 / 03</p><h2>We build one of them <b class="em">with you watching</b></h2><p class="l">We take the task costing you the most hours and build the workflow for it while you watch, so you see how it was put together and not just the finished thing.</p></div>
+        <div class="cp" hidden><p class="steplabel">Afternoon | 03 / 03</p><h2>Your team uses it on <b class="em">real work</b></h2><p class="l">The rest of the day is your people running it on their own jobs, with us there when something breaks.</p></div>
+      </div>
+    </div>
   </section>
 
   <section class="section">
@@ -212,10 +233,11 @@
     return frame.firstChild;
   }
 
-  function render(step, p, frame) {
+  /* step: -1 = day not started, 0..2 = the stop we are on. Everything animates through CSS transitions. */
+  function render(step, frame) {
     var w = Math.round(frame.clientWidth), h = Math.round(frame.clientHeight);
     if (w < 100 || h < 100) return;
-    var tl = frame._tl || (frame._tl = build(frame)), narrow = w < 700, pinned = frame.classList.contains("stage-dia");
+    var tl = frame._tl || (frame._tl = build(frame)), narrow = w < 700;
     var q = function (s) { return tl.querySelectorAll(s); }, stps = q(".stp"), ills = q(".ill");
     var iw = narrow ? Math.min(w - 48, 300) : Math.min(340, w * .28), ih = iw * 150 / 240;
     var block = ih + 60 + 72, top = Math.max((h - block) / 2, 8), ty = top + ih + 60;
@@ -224,33 +246,64 @@
     line.style.cssText = "left:" + x0 + "px;top:" + ty + "px;width:" + (x1 - x0) + "px";
     Array.prototype.forEach.call(q(".tk"), function (t, k) { t.style.left = (x0 + k * (x1 - x0) / 10) + "px"; t.style.top = (ty - 4) + "px"; });
     var ends = q(".end"); ends[0].style.cssText = "left:" + x0 + "px;top:" + (ty + 52) + "px"; ends[1].style.cssText = "right:" + (w - x1) + "px;top:" + (ty + 52) + "px";
-
-    /* the now-marker: sits on its stop while the picture builds, then glides to the next one */
-    var nx;
-    if (!pinned) nx = xs[step];
-    else if (step === 0) nx = x0 + (xs[0] - x0) * ease(c01(p / .25));
-    else nx = xs[step];
-    if (pinned) {
-      if (step < 2) nx = xs[step] + (xs[step + 1] - xs[step]) * ease(c01((p - .55) / .45));
-      else nx = xs[2] + (x1 - xs[2]) * ease(c01((p - .75) / .25));
-      if (step === 0 && p < .25) nx = x0 + (xs[0] - x0) * ease(p / .25);
-    }
+    var nx = step < 0 ? x0 : xs[step];
     fill.style.cssText = "left:" + x0 + "px;top:" + ty + "px;width:" + Math.max(nx - x0, 0) + "px";
-    var now = tl.querySelector(".now"); now.style.cssText = "left:" + nx + "px;top:" + ty + "px";
-
+    tl.querySelector(".now").style.cssText = "left:" + nx + "px;top:" + ty + "px";
     xs.forEach(function (sx, i) {
       var s = stps[i]; s.style.cssText = "left:" + sx + "px;top:" + ty + "px";
       s.querySelector("span").textContent = (narrow ? "0" + (i + 1) + " " + SHORT[i] : "0" + (i + 1) + " " + LONG[i]);
-      s.classList.toggle("pass", pinned ? nx >= sx - 1 : i <= step);
-      var ill = ills[i];
+      s.classList.toggle("pass", i <= step);
+      var ill = ills[i], visible = narrow ? i === step : i <= step;
       ill.style.cssText = "width:" + iw + "px;height:" + ih + "px;left:" + ((narrow ? w / 2 : sx) - iw / 2) + "px;top:" + top + "px";
-      var visible = pinned && !narrow ? i <= step : i === step;
-      var sp = !pinned ? 1 : i < step ? 1 : i === step ? c01(p / .7) : 0;
       ill.classList.toggle("show", visible);
-      Array.prototype.forEach.call(ill.querySelectorAll("[data-t]"), function (el) { el.classList.toggle("on", visible && sp >= parseFloat(el.getAttribute("data-t"))); });
+      Array.prototype.forEach.call(ill.querySelectorAll("[data-t]"), function (el) {
+        el.style.transitionDelay = visible ? (parseFloat(el.getAttribute("data-t")) * .8 + .15).toFixed(2) + "s" : "0s";
+        el.classList.toggle("on", visible);
+      });
     });
   }
-  bcns.pinStage(document.getElementById("how"), 3, render);
+
+  var tabs = [].slice.call(document.querySelectorAll("#tabs [role=tab]")), copies = [].slice.call(document.querySelectorAll("#copy .cp")), panel = document.getElementById("panel"), tp = document.getElementById("tp");
+  var rm = matchMedia("(prefers-reduced-motion: reduce)").matches, cur = rm ? 0 : -1, sel = 0, interacted = false, timers = [];
+
+  function draw(step, instant) {
+    cur = step;
+    var tl = panel._tl; if (tl && instant) tl.classList.add("nt");
+    render(step, panel);
+    if (tl && instant) { void tl.offsetWidth; tl.classList.remove("nt"); }
+  }
+  function select(i, focus) {
+    sel = i;
+    tabs.forEach(function (t, k) { t.setAttribute("aria-selected", String(k === i)); t.tabIndex = k === i ? 0 : -1; });
+    copies.forEach(function (c, k) { c.hidden = k !== i; });
+    tp.setAttribute("aria-labelledby", "tab-" + i);
+    if (focus) tabs[i].focus();
+    draw(i, rm);
+  }
+  function stop() { interacted = true; timers.forEach(clearTimeout); timers = []; }
+  document.getElementById("tabs").addEventListener("pointerdown", stop);
+  document.getElementById("tabs").addEventListener("keydown", function (e) {
+    var k = e.key, n = tabs.length, i = sel;
+    if (k === "ArrowRight" || k === "ArrowDown") i = (sel + 1) % n; else if (k === "ArrowLeft" || k === "ArrowUp") i = (sel + n - 1) % n;
+    else if (k === "Home") i = 0; else if (k === "End") i = n - 1; else return;
+    e.preventDefault(); stop(); select(i, true);
+  });
+  tabs.forEach(function (t, i) { t.addEventListener("click", function () { stop(); select(i); }); });
+
+  if ("ResizeObserver" in window) new ResizeObserver(function () { draw(cur, true); }).observe(panel); else draw(cur, true);
+  /* first view: build the morning, then walk through midday and afternoon once, unless the visitor takes over */
+  function auto() {
+    if (interacted) return;
+    select(0);
+    timers.push(setTimeout(function () { select(1); }, 2500));
+    timers.push(setTimeout(function () { select(2); }, 5000));
+  }
+  if (!rm) {
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); if (interacted) select(sel); else auto(); } }, { threshold: 0.4 });
+      io.observe(panel);
+    } else select(0);
+  }
 })();
 </script>
 </body>
