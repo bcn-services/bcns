@@ -130,13 +130,13 @@ test("EXPECTED_SOURCES: QuickBooks is listed in the Integrations popup", () => {
   assert.ok(integrationRows([]).some((r) => r.source === "quickbooks" && r.label === "QuickBooks"));
 });
 
-test("qboConnection: missing/auth_failed/error rows are not connected; ok/stale/never_ran are", async () => {
+test("qboConnection: missing/auth_failed rows are not connected; ok/stale/error/never_ran are", async () => {
   const { qboConnection } = await import("../lib/panels.ts");
   assert.equal(qboConnection([]).connected, false);
-  for (const status of ["auth_failed", "error"]) {
+  for (const status of ["auth_failed"]) {
     assert.deepEqual(qboConnection([{ source: "quickbooks", status, last_success_at: "2026-09-01T00:00:00Z" }]), { connected: false, lastSuccessAt: null });
   }
-  for (const status of ["ok", "stale", "never_ran"]) assert.equal(qboConnection([{ source: "quickbooks", status }]).connected, true);
+  for (const status of ["ok", "stale", "error", "never_ran"]) assert.equal(qboConnection([{ source: "quickbooks", status }]).connected, true);
   assert.equal(qboConnection([{ source: "quickbooks", status: "ok", last_success_at: "x" }]).lastSuccessAt, "x");
 });
 

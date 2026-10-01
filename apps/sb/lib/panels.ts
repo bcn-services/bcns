@@ -42,11 +42,11 @@ export function panelState(rows: HealthLike[], sources: readonly string[], hasRo
   return hasRows ? "data" : "empty";
 }
 
-/** QuickBooks counts as connected only while its health row is neither
- *  auth_failed nor error; a missing row is "not connected", like any panel. */
+/** QuickBooks counts as connected only while its health row is not
+ *  auth_failed (a lone "error" is one failed sync; rows stay visible); a missing row is "not connected", like any panel. */
 export function qboConnection(rows: HealthLike[]): { connected: boolean; lastSuccessAt: string | null } {
   const h = healthFor(rows, "quickbooks");
-  const connected = h !== null && h.status !== "auth_failed" && h.status !== "error";
+  const connected = h !== null && h.status !== "auth_failed";
   return { connected, lastSuccessAt: connected ? (h?.last_success_at ?? null) : null };
 }
 
