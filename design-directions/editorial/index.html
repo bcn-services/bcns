@@ -14,7 +14,7 @@ iframe{border:0;width:100%;height:100%;display:block}
 <iframe id="f" title="direction"></iframe>
 <div id="bar"><button id="p" aria-label="Previous">&larr;</button><span id="lbl"></span><button id="n" aria-label="Next">&rarr;</button></div>
 <script>
-const V=[["A","Velobyte method"],["B","Linear-style"],["C","Stripe-style"],["D","bcns anchor"]];
+const V=[["A","Velobyte method"],["B","Linear-style"],["C","Stripe-style"],["D","bcns anchor"],["E","Cubes are the hero"],["F","Blocks stack up"],["G","Velobyte lanes"],["H","Center stage"]];
 const f=document.getElementById('f'),lbl=document.getElementById('lbl');
 let i=Math.max(0,V.findIndex(v=>v[0]===new URLSearchParams(location.search).get('v')));
 function show(){f.src=V[i][0]+'.html';lbl.textContent=V[i][0]+' — '+V[i][1];history.replaceState(null,'','?v='+V[i][0]);}
