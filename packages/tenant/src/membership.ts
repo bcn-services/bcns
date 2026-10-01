@@ -29,7 +29,7 @@ export interface RequireMembershipOptions {
 
 export type MembershipResult =
   | { ok: true; membership: Membership }
-  | { ok: false; reason: "signed-out" | "no-membership" | "wrong-client" };
+  | { ok: false; reason: "signed-out" | "no-membership" | "wrong-client"; pending?: true };
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -101,7 +101,14 @@ export async function requireMembership(
   } = await supabase.auth.getSession();
   const claims = claimsFromToken(session?.access_token);
   const membership = membershipFromUser({ ...user, ...claims } as User);
-  if (!membership) return { ok: false, reason: "no-membership" };
+  if (!membership) {
+    // A self-service sign-up awaiting activation: the hook issues the session with
+    // client_status "pending" and NO client_id/client_role (20261001000200), so it is still
+    // no-membership everywhere. The flag only lets the hub show /pending instead of signing out.
+    return claims.client_status === "pending"
+      ? { ok: false, reason: "no-membership", pending: true }
+      : { ok: false, reason: "no-membership" };
+  }
 
   if (opts.expectedClientId && membership.clientId !== opts.expectedClientId) {
     return { ok: false, reason: "wrong-client" };

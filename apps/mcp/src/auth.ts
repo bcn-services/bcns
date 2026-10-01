@@ -97,7 +97,22 @@ const UNAUTHORIZED = {
   headers: { 'WWW-Authenticate': 'Bearer realm="bcns"' },
 }
 
-/** Origin, then Bearer, then rate limit, then token verification. */
+/**
+ * The tenant claim the access-token hook writes. Decode-only: called after `verify` has had the
+ * auth server check this exact token. A pending self-service sign-up (P1) is issued a session
+ * with no client_id, so it is refused here instead of reaching tools that RLS would empty anyway.
+ */
+export function hasClientClaim(token: string): boolean {
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'))
+    const clientId = (claims as Record<string, unknown> | null)?.client_id
+    return typeof clientId === 'string' && clientId.length > 0
+  } catch {
+    return false
+  }
+}
+
+/** Origin, then Bearer, then rate limit, then token verification, then the tenant claim. */
 export async function authorize(headers: HeaderBag, deps: AuthDeps): Promise<AuthResult> {
   if (!originAllowed(headers)) return { ok: false, status: 403, body: { error: 'forbidden_origin' } }
 
@@ -108,6 +123,7 @@ export async function authorize(headers: HeaderBag, deps: AuthDeps): Promise<Aut
 
   const userId = await deps.verify(token)
   if (!userId) return UNAUTHORIZED
+  if (!hasClientClaim(token)) return { ok: false, status: 403, body: { error: 'no_membership' } }
 
   return { ok: true, token, userId }
 }
