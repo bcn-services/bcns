@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bcns | AI consulting</title>
+<meta name="description" content="One day, spent on your business: where AI actually helps, built with you, and your team using it. $1,000 a day.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem("bcns-site-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+<link rel="stylesheet" href="assets/site.css">
+<style>
+  .stage-fig { --fig-h: 430px; }
+  .page-head h1 { max-width: 20ch; }
+  .page-head .ctas { margin-top: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+  .rate { font: 500 1.25rem "Space Grotesk", sans-serif; color: var(--primary-ink); }
+
+  /* ---- one-day timeline stage ---- */
+  .tl { position: absolute; inset: 0; overflow: hidden; }
+  .tl * { box-sizing: border-box; }
+  .tl .line { position: absolute; height: 2px; border-radius: 1px; background: var(--border); }
+  .tl .fill { position: absolute; height: 2px; border-radius: 1px; background: var(--primary); }
+  .tl .tk { position: absolute; width: 1px; height: 8px; background: var(--input); }
+  .tl .stp { position: absolute; width: 0; }
+  .tl .stp i { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--tint); border: 2px solid var(--input); transition: background-color .4s, border-color .4s; }
+  .tl .stp.pass i { background: var(--primary); border-color: var(--primary); }
+  .tl .stp span { position: absolute; top: 16px; left: 0; transform: translateX(-50%); white-space: nowrap; font: 500 13px "Space Grotesk", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); transition: color .4s; }
+  .tl .stp.pass span { color: var(--primary-ink); }
+  .tl .end { position: absolute; font: 400 13px "Space Grotesk", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .tl .now { position: absolute; width: 0; height: 0; z-index: 3; }
+  .tl .now i { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent); animation: nowp 2.4s ease-in-out infinite; }
+  .tl .now span { position: absolute; left: 0; top: -34px; transform: translateX(-50%); font: 600 12px "Space Grotesk", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--primary-ink); }
+  @keyframes nowp { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--primary) 8%, transparent); } }
+  .tl .ill { position: absolute; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: 0 10px 28px var(--shadow); opacity: 0; transform: translateY(10px); transition: opacity .5s, transform .6s; }
+  .tl .ill.show { opacity: 1; transform: none; }
+  .tl .ill svg { display: block; width: 100%; height: 100%; }
+  /* illustration parts: hidden until their data-t threshold; JS toggles .on */
+  .ill [data-t] { opacity: 0; transition: opacity .5s, transform .7s cubic-bezier(.34, 1.4, .5, 1); transform-box: fill-box; transform-origin: center; }
+  .ill [data-t].on { opacity: 1; transform: none; }
+  .ill .sc { transform: scale(.3); }
+  .ill .fromL { transform: translate(-34px, 8px); } .ill .fromR { transform: translate(34px, -10px); } .ill .fromB { transform: translateY(26px); }
+  .ill .row-bg { fill: var(--tint); stroke: var(--border); }
+  .ill .bar { fill: var(--dim); }
+  .ill .hot { fill: color-mix(in srgb, var(--primary) 14%, var(--card)); stroke: var(--primary); stroke-width: 1.5; }
+  .ill .warn { fill: var(--warn); opacity: .85; }
+  .ill .stk { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ill .head { fill: var(--accent); } .ill .body { fill: var(--accent); opacity: .55; }
+  .ill .ok { fill: var(--ok); } .ill .okc { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ill .prog { fill: var(--primary); transform-origin: left center; }
+  .ill .prog[data-t] { transform: scaleX(0); opacity: 1; }
+  .ill .prog.on { transform: scaleX(1); transition: transform 1.1s ease-out; }
+  .ill .ring { fill: none; stroke: var(--primary); stroke-width: 1.5; }
+  .ill .ring.on { animation: ringp 2.2s ease-out infinite; }
+  @keyframes ringp { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.25); } }
+  @media (prefers-reduced-motion: reduce) { .tl *, .tl { transition: none !important; animation: none !important; } }
+
+  /* ---- sections ---- */
+  .sec-h { max-width: 24ch; margin: 16px 0 40px; }
+  .leave { display: grid; gap: 16px; }
+  @media (min-width: 900px) { .leave { grid-template-columns: repeat(3, 1fr); gap: 24px; } }
+  .leave .n { font: 300 2.6rem/1 "Space Grotesk", sans-serif; color: var(--primary); letter-spacing: -.02em; }
+  .leave h3 { margin-top: 14px; }
+  .price { display: grid; gap: 28px; align-items: center; }
+  @media (min-width: 900px) { .price { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 72px; } }
+  .price .big { font: 300 clamp(2.6rem, 6vw, 4.25rem)/1.05 "Space Grotesk", sans-serif; letter-spacing: -.03em; }
+  .price .big b { font-weight: 600; color: var(--primary); }
+  .price .desc { margin-top: 18px; max-width: 30rem; color: var(--muted); }
+  .ticks li { display: flex; gap: 14px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--border); font-size: 16px; }
+  .ticks li:last-child { border-bottom: 1px solid var(--border); }
+  .ticks li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); transform: translateY(-1px); }
+  .faq { max-width: 52rem; border-bottom: 1px solid var(--border); }
+  .faq details { border-top: 1px solid var(--border); }
+  .faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px 0; font: 500 1.2rem/1.35 "Space Grotesk", sans-serif; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--input); border-radius: 50%; font-size: 18px; color: var(--primary-ink); transition: transform .25s; }
+  .faq details[open] summary::after { transform: rotate(45deg); }
+  .faq summary:hover { color: var(--primary-ink); }
+  .faq p { padding: 0 48px 24px 0; color: var(--muted); max-width: 44rem; }
+  :root[data-theme="dark"] .cta-band .btn-primary { background: var(--plate-fg); color: var(--plate); }
+</style>
+</head>
+<body>
+
+<div data-site-header></div>
+
+<main>
+  <section class="gut page-head">
+    <p class="eyebrow">AI consulting</p>
+    <h1 class="h-xl">How an <b class="em">AI consult</b> works</h1>
+    <p class="lede">One day, spent on your business.</p>
+    <div class="ctas"><span class="rate">$1,000 / day</span><a class="btn-primary" href="index.html#contact">Book a free consult</a><a class="btn-outline" href="#how">See the day</a></div>
+  </section>
+
+  <section class="stage-section" id="how" aria-label="One day of AI consulting">
+    <div class="stage-track"><div class="stage-pin"><div class="stage-panel">
+      <div class="stage-dia"></div><div class="stage-caps"></div><nav class="stage-rail" aria-label="Jump to a step"></nav>
+    </div></div></div>
+    <ol class="stage-stack">
+      <li class="stage-step"><p class="steplabel">Morning | 01 / 03</p><h2>We look at the work you <b class="em">already do</b></h2><p class="l">We go through your week with you and find the parts that are repetitive, slow, or typed in twice. Most of a business does not need AI. We tell you which parts of yours do.</p><div class="stage-fig"></div></li>
+      <li class="stage-step"><p class="steplabel">Midday | 02 / 03</p><h2>We build one of them <b class="em">with you watching</b></h2><p class="l">We take the task costing you the most hours and build the workflow for it while you watch, so you see how it was put together and not just the finished thing.</p><div class="stage-fig"></div></li>
+      <li class="stage-step"><p class="steplabel">Afternoon | 03 / 03</p><h2>Your team uses it on <b class="em">real work</b></h2><p class="l">The rest of the day is your people running it on their own jobs, with us there when something breaks.</p><div class="stage-fig"></div></li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <div class="gut">
+      <p class="eyebrow">What you leave with</p>
+      <h2 class="h-lg sec-h">By evening, <b class="em">it's already working.</b></h2>
+      <div class="leave">
+        <div class="card"><p class="n">01</p><h3>A clear list of where AI helps</h3><p class="line">The repetitive, slow or double-typed parts of your week, and the honest answer on which of them are worth automating.</p></div>
+        <div class="card"><p class="n">02</p><h3>One workflow you watched get built</h3><p class="line">The task costing you the most hours, built in front of you, so you know how it was put together and can build the next one.</p></div>
+        <div class="card"><p class="n">03</p><h3>A team that has used it on real work</h3><p class="line">Your people ran it on their own jobs, with us there when something broke. Hands-on training, not a slide deck.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="price">
+    <div class="gut price">
+      <div>
+        <p class="eyebrow">AI consulting pricing</p>
+        <p class="big" style="margin-top:16px"><b>$1,000</b> / day</p>
+        <p class="desc">Want to learn how to integrate AI into your business? We can teach you modern best practices and practical applications.</p>
+      </div>
+      <ul class="ticks">
+        <li>Audit your business for AI opportunities</li>
+        <li>Learn how to build impactful AI workflows</li>
+        <li>Hands-on training for your team</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
+    <div class="gut">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="h-lg sec-h">The questions <b class="em">we'd ask too</b></h2>
+      <div class="faq">
+        <details><summary>Do you use AI?</summary><p>AI is the most powerful tool on Earth, but it isn't magic. We have created custom AI tools to streamline our workflows and ensure quality products for our clients. It allows us to build faster and more efficiently to tend to your needs when you need it.</p></details>
+        <details><summary>Do I need to be technical to work with you?</summary><p>No. We ask about your business and help you figure out how to streamline your processes. We emphasize clear communication and will ensure you can understand everything you need to about your solution.</p></details>
+        <details><summary>Does my tool use AI?</summary><p>bcns Connect gets your business ready for AI. Whether to use it is up to you. Some of our Deluxe builds use AI, but only when it is actually the right tool for the job.</p></details>
+        <details><summary>Can I use my data with other tools?</summary><p>Yes. Your data is yours. Once it's organized in Connect, you can plug in the AI assistants and apps you already like.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band" id="contact">
+    <div class="gut">
+      <p class="eyebrow">Get in touch</p>
+      <h2 class="disp" style="margin-top:16px">Tell us what's <b>slowing you down</b></h2>
+      <p class="lead">Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to get you connected.</p>
+      <a class="btn-primary" href="mailto:nseluga@bcn-services.com">Book a free consult</a>
+      <div class="cta-facts">
+        <div><b>Free consult</b><p>A 30-minute call about how your business runs. No obligations or cost to you.</p></div>
+        <div><b>Fixed quote</b><p>You approve the exact product and its price before any work starts.</p></div>
+        <div><b>Your data</b><p>We host and maintain everything for you. Your data is always yours and we'll hand it over at any time.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div data-site-footer></div>
+
+<script src="assets/site.js"></script>
+<script>
+(function () {
+  /* three small illustrations, all 240x150, no text inside. Parts carry data-t (0..1): they build in once the stop's progress passes it. */
+  var ILL = [
+    /* 1 find where AI helps: four tasks, one gets a magnifier and a highlighted, hours-long bar */
+    '<svg viewBox="0 0 240 150" aria-hidden="true">' +
+    [0, 1, 2, 3].map(function (r) {
+      var y = 14 + r * 32, hot = r === 2;
+      return '<g data-t="' + (0.02 + r * 0.06) + '" class="fromB"><rect class="row-bg" x="14" y="' + y + '" width="212" height="24" rx="7"/><circle cx="29" cy="' + (y + 12) + '" r="5" class="bar"/>' +
+        '<rect class="bar" x="43" y="' + (y + 9) + '" width="' + (hot ? 40 : 56 + r * 12) + '" height="6" rx="3"/>' + (hot ? '' : '<rect class="bar" x="' + (110 + r * 8) + '" y="' + (y + 9) + '" width="40" height="6" rx="3"/>') + '</g>';
+    }).join("") +
+    '<g data-t="0.45" class="sc"><rect class="hot" x="14" y="78" width="212" height="24" rx="7"/><rect class="warn" x="90" y="87" width="104" height="6" rx="3"/><circle cx="29" cy="90" r="5" fill="var(--primary)"/></g>' +
+    '<rect data-t="0.5" class="ring" x="12" y="76" width="216" height="28" rx="9" style="transform-box:fill-box;transform-origin:center"/>' +
+    '<g data-t="0.3" class="sc"><circle class="stk" cx="204" cy="60" r="11" fill="var(--card)"/><path class="stk" d="M212 68 L221 77"/></g></svg>',
+    /* 2 build it with you: a mini tool assembling piece by piece */
+    '<svg viewBox="0 0 240 150" aria-hidden="true"><rect x="14" y="12" width="212" height="126" rx="9" fill="none" stroke="var(--input)" stroke-dasharray="4 4"/>' +
+    '<g data-t="0.1" class="fromL"><rect class="row-bg" x="22" y="20" width="196" height="20" rx="6"/><circle cx="34" cy="30" r="4" fill="var(--primary)"/><rect class="bar" x="46" y="27" width="60" height="6" rx="3"/></g>' +
+    '<g data-t="0.3" class="fromL"><rect class="row-bg" x="22" y="48" width="60" height="42" rx="7"/><rect class="bar" x="32" y="58" width="24" height="5" rx="2.5"/><rect fill="var(--primary)" x="32" y="70" width="38" height="9" rx="4.5"/></g>' +
+    '<g data-t="0.5" class="fromR"><rect class="row-bg" x="90" y="48" width="60" height="42" rx="7"/><rect class="bar" x="100" y="58" width="24" height="5" rx="2.5"/><rect fill="var(--primary)" x="100" y="70" width="28" height="9" rx="4.5"/></g>' +
+    '<g data-t="0.65" class="fromR"><rect class="row-bg" x="158" y="48" width="60" height="42" rx="7"/><rect class="bar" x="168" y="58" width="24" height="5" rx="2.5"/><rect fill="var(--primary)" x="168" y="70" width="40" height="9" rx="4.5"/></g>' +
+    '<g data-t="0.8" class="fromB"><rect class="hot" x="22" y="98" width="196" height="30" rx="7"/><rect class="bar" x="34" y="109" width="90" height="6" rx="3"/><rect class="bar" x="34" y="119" width="54" height="5" rx="2.5"/><circle cx="198" cy="113" r="8" class="ok"/><path class="okc" d="M193.5 113 L197 116.5 L202.5 110"/></g></svg>',
+    /* 3 your team using it: three people, each with a check and a work bar filling */
+    '<svg viewBox="0 0 240 150" aria-hidden="true">' +
+    [0, 1, 2].map(function (k) {
+      var x = 44 + k * 76, t = 0.1 + k * 0.25;
+      return '<g data-t="' + t + '" class="sc"><circle class="head" cx="' + x + '" cy="44" r="14"/><path class="body" d="M' + (x - 24) + ' 90 C ' + (x - 24) + ' 64 ' + (x + 24) + ' 64 ' + (x + 24) + ' 90 Z"/></g>' +
+        '<g data-t="' + (t + 0.12) + '" class="sc"><circle class="ok" cx="' + (x + 16) + '" cy="62" r="9"/><path class="okc" d="M' + (x + 11.5) + ' 62 L' + (x + 15) + ' 65.5 L' + (x + 20.5) + ' 59"/></g>' +
+        '<rect class="bar" x="' + (x - 26) + '" y="106" width="52" height="7" rx="3.5"/><rect data-t="' + (t + 0.05) + '" class="prog" x="' + (x - 26) + '" y="106" width="52" height="7" rx="3.5"/>' +
+        '<rect class="bar" x="' + (x - 26) + '" y="120" width="34" height="6" rx="3"/>';
+    }).join("") + '</svg>'
+  ];
+  var SHORT = ["Find", "Build", "Use"], LONG = ["Find where AI helps", "Build it with you", "Your team uses it"];
+  function ease(t) { return t * t * (3 - 2 * t); }
+  function c01(t) { return Math.max(0, Math.min(1, t)); }
+
+  function build(frame) {
+    var h = '<div class="line"></div><div class="fill"></div>';
+    for (var k = 0; k < 11; k++) h += '<i class="tk"></i>';
+    for (var i = 0; i < 3; i++) h += '<div class="stp"><i></i><span></span></div><div class="ill">' + ILL[i] + '</div>';
+    h += '<span class="end">Morning</span><span class="end">Evening</span><div class="now"><i></i><span>Now</span></div>';
+    frame.innerHTML = '<div class="tl" role="img" aria-label="A one-day timeline from morning to evening. A marker moves along it as a bottleneck is found, a tool is built, and a team uses it.">' + h + '</div>';
+    return frame.firstChild;
+  }
+
+  function render(step, p, frame) {
+    var w = Math.round(frame.clientWidth), h = Math.round(frame.clientHeight);
+    if (w < 100 || h < 100) return;
+    var tl = frame._tl || (frame._tl = build(frame)), narrow = w < 700, pinned = frame.classList.contains("stage-dia");
+    var q = function (s) { return tl.querySelectorAll(s); }, stps = q(".stp"), ills = q(".ill");
+    var iw = narrow ? Math.min(w - 48, 300) : Math.min(340, w * .28), ih = iw * 150 / 240;
+    var block = ih + 60 + 72, top = Math.max((h - block) / 2, 8), ty = top + ih + 60;
+    var x0 = 28, x1 = w - 28, xs = [.2, .5, .8].map(function (f) { return w * f; });
+    var line = tl.querySelector(".line"), fill = tl.querySelector(".fill");
+    line.style.cssText = "left:" + x0 + "px;top:" + ty + "px;width:" + (x1 - x0) + "px";
+    Array.prototype.forEach.call(q(".tk"), function (t, k) { t.style.left = (x0 + k * (x1 - x0) / 10) + "px"; t.style.top = (ty - 4) + "px"; });
+    var ends = q(".end"); ends[0].style.cssText = "left:" + x0 + "px;top:" + (ty + 52) + "px"; ends[1].style.cssText = "right:" + (w - x1) + "px;top:" + (ty + 52) + "px";
+
+    /* the now-marker: sits on its stop while the picture builds, then glides to the next one */
+    var nx;
+    if (!pinned) nx = xs[step];
+    else if (step === 0) nx = x0 + (xs[0] - x0) * ease(c01(p / .25));
+    else nx = xs[step];
+    if (pinned) {
+      if (step < 2) nx = xs[step] + (xs[step + 1] - xs[step]) * ease(c01((p - .55) / .45));
+      else nx = xs[2] + (x1 - xs[2]) * ease(c01((p - .75) / .25));
+      if (step === 0 && p < .25) nx = x0 + (xs[0] - x0) * ease(p / .25);
+    }
+    fill.style.cssText = "left:" + x0 + "px;top:" + ty + "px;width:" + Math.max(nx - x0, 0) + "px";
+    var now = tl.querySelector(".now"); now.style.cssText = "left:" + nx + "px;top:" + ty + "px";
+
+    xs.forEach(function (sx, i) {
+      var s = stps[i]; s.style.cssText = "left:" + sx + "px;top:" + ty + "px";
+      s.querySelector("span").textContent = (narrow ? "0" + (i + 1) + " " + SHORT[i] : "0" + (i + 1) + " " + LONG[i]);
+      s.classList.toggle("pass", pinned ? nx >= sx - 1 : i <= step);
+      var ill = ills[i];
+      ill.style.cssText = "width:" + iw + "px;height:" + ih + "px;left:" + ((narrow ? w / 2 : sx) - iw / 2) + "px;top:" + top + "px";
+      var visible = pinned && !narrow ? i <= step : i === step;
+      var sp = !pinned ? 1 : i < step ? 1 : i === step ? c01(p / .7) : 0;
+      ill.classList.toggle("show", visible);
+      Array.prototype.forEach.call(ill.querySelectorAll("[data-t]"), function (el) { el.classList.toggle("on", visible && sp >= parseFloat(el.getAttribute("data-t"))); });
+    });
+  }
+  bcns.pinStage(document.getElementById("how"), 3, render);
+})();
+</script>
+</body>
+</html>
