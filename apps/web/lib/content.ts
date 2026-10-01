@@ -328,6 +328,8 @@ export interface ConnectDemoDestination {
 }
 
 export interface ConnectDemoContent {
+  /** "Who it's for" line under the page head description. */
+  audience: string;
   eyebrow: string;
   title: string;
   emphasis: string;
@@ -391,6 +393,8 @@ export interface DeluxeStep {
 }
 
 export interface DeluxeDemoContent {
+  /** "Who it's for" line under the page head description. */
+  audience: string;
   /** Page head eyebrow/title/lede are `useCases.blockEyebrow/blockTitle/blockDescription`. */
   titleEmphasis: string;
   ctaSecondary: string;
@@ -425,6 +429,8 @@ export interface AiDayLeaveItem {
 }
 
 export interface AiDayContent {
+  /** "Who it's for" line under the page head description. */
+  audience: string;
   /** Substring of `aiConsult.title` styled as the accent in the page head. */
   titleEmphasis: string;
   ctaSecondary: string;
@@ -1415,6 +1421,7 @@ export const siteContent: SiteContent = {
   },
 
   connectDemo: {
+    audience: "For small businesses whose customers, orders, money and files are spread across many tools.",
     eyebrow: "bcns Connect",
     title: "How bcns Connect works",
     emphasis: "bcns Connect",
@@ -1452,6 +1459,7 @@ export const siteContent: SiteContent = {
   },
 
   deluxeDemo: {
+    audience: "For small businesses with a specific pain point that off-the-shelf software doesn't fix.",
     titleEmphasis: "custom built",
     ctaSecondary: "See how a build comes together",
     howEyebrow: "How a build works",
@@ -1551,6 +1559,7 @@ export const siteContent: SiteContent = {
   },
 
   aiDay: {
+    audience: "For owners and teams who want to use AI but aren't sure where to start.",
     titleEmphasis: "AI consult",
     ctaSecondary: "See the day",
     tabsLabel: "Part of the day",

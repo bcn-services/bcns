@@ -1216,7 +1216,8 @@ Page head and process headings for `/services`: `eyebrow`, `title`, `emphasis`,
 
 Extras for the Connect page; the three steps and the rate are `connect`.
 `eyebrow`, `title`, `emphasis` head the page; `noSetupFee` sits beside
-`connect.rate`; `replayLabel` is the "Play again" button. `stepEmphasis` and
+`connect.rate`; `audience` is the "who it's for" line under the head
+description; `replayLabel` is the "Play again" button. `stepEmphasis` and
 `stepLabels` decorate each `connect.steps` entry. `toolsEyebrow`, `toolsTitle`,
 `toolsEmphasis`, `toolsLede` head the tools section; `extraChips` follow the five
 `tools`. `rows` label the sorted rows and `destinations` are the three output cards
@@ -1227,7 +1228,8 @@ accessibility strings.
 ## Deluxe Demo (`siteContent.deluxeDemo`) — /services/deluxe
 
 Extras for the Deluxe page. Head copy is `useCases.blockEyebrow/blockTitle/
-blockDescription` (`titleEmphasis` styles part of the title); the four cards are
+blockDescription` (`titleEmphasis` styles part of the title; `audience` is the
+"who it's for" line under the description); the four cards are
 `useCases.items`; past work is `pastWork.items` (`workLabels` is the price-slot
 label per item); pricing is `pricing.tiers[1]`. `ctaSecondary`, `howEyebrow`,
 `askTitle`, `askEmphasis`, `askLede`, `groupLabel`, `dashboardTitle`, `agentLabel`,
@@ -1243,7 +1245,8 @@ heights, `rows` are `{ title, detail, tag }`; `answer` marks bold with `**`.
 
 Extras for the AI consulting page; the three steps and the rate are `aiConsult`.
 `titleEmphasis` is the substring of `aiConsult.title` styled as the accent in the
-page head. `ctaSecondary` is "See the day"; `tabsLabel` and `tabs` (Morning, Midday,
+page head; `audience` is the "who it's for" line under the head description.
+`ctaSecondary` is "See the day"; `tabsLabel` and `tabs` (Morning, Midday,
 Afternoon) drive the tablist; `stepEmphasis` and `stepLabels` decorate each
 `aiConsult.steps` entry. `timeline` has the diagram strings (`ariaLabel`, `short`
 and `long` stop labels, `start`, `end`, `now`). `leaveEyebrow`, `leaveTitle`,

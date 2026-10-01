@@ -20,6 +20,9 @@ export function ConnectHead() {
       <Reveal as="p" delay={160} className="mt-5 max-w-[34rem] text-[1.1875rem] leading-relaxed text-muted-foreground">
         {connect.description}
       </Reveal>
+      <Reveal as="p" delay={200} className="mt-3 max-w-[34rem] text-[0.9375rem] font-medium leading-relaxed">
+        {connectDemo.audience}
+      </Reveal>
       <Reveal
         delay={240}
         className="mt-7 inline-flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl border border-border bg-secondary px-5 py-3"

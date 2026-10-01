@@ -33,6 +33,7 @@ export default function DeluxePage() {
           title={useCases.blockTitle}
           emphasis={deluxeDemo.titleEmphasis}
           description={useCases.blockDescription}
+          audience={deluxeDemo.audience}
         >
           <Link href="/#contact" className={BTN_PRIMARY}>
             {hero.ctaPrimary}

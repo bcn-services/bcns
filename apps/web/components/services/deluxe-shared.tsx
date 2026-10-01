@@ -22,6 +22,7 @@ export function HeadWithActions({
   title,
   emphasis,
   description,
+  audience,
   maxWidth = "max-w-[22ch]",
   children,
 }: {
@@ -29,6 +30,7 @@ export function HeadWithActions({
   title: string;
   emphasis: string;
   description: string;
+  audience: string;
   maxWidth?: string;
   children?: ReactNode;
 }) {
@@ -46,6 +48,9 @@ export function HeadWithActions({
       </Reveal>
       <Reveal as="p" delay={160} className="mt-5 max-w-[34rem] text-[1.1875rem] leading-[1.6] text-muted-foreground">
         {description}
+      </Reveal>
+      <Reveal as="p" delay={200} className="mt-3 max-w-[34rem] text-[0.9375rem] font-medium leading-relaxed">
+        {audience}
       </Reveal>
       {children && (
         <Reveal delay={240} className="mt-[1.875rem] flex flex-wrap items-center gap-x-[1.375rem] gap-y-3.5">

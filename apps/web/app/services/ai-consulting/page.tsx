@@ -33,6 +33,7 @@ export default function AiConsultingPage() {
           title={aiConsult.title}
           emphasis={aiDay.titleEmphasis}
           description={aiConsult.description}
+          audience={aiDay.audience}
           maxWidth="max-w-[20ch]"
         >
           <span className="font-display text-xl font-medium text-primary-ink">{aiConsult.rate}</span>
