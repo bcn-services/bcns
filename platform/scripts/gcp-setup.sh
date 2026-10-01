@@ -15,6 +15,9 @@
 #     from the environment rather than a prompt. BCNS_ALERT_FROM is prompted for with a
 #     default. Every other worker env var has a default in worker/src (RUN_BUDGET_MS,
 #     CLAIM_LIMIT, EGRESS_ALLOWANCE_BYTES, ...).
+#   - Step 6b (QuickBooks) is opt-in and never required for the worker to run: it needs
+#     QUICKBOOKS_CLIENT_ID and QUICKBOOKS_ENV (sandbox|production) exported, and skips with a
+#     message otherwise. Running this script or deploy-worker before 6b is safe.
 #
 # Never does:
 #   - Runs no gcloud command before you answer y. The `describe` existence checks also run
@@ -257,6 +260,47 @@ if ask; then
     fi
     "${grant_dev[@]}"   # the job exists by here, either way
     "${grant_ops[@]}"
+  fi
+fi
+
+# ---------------------------------------------------------------- 6b. QuickBooks (opt-in)
+# Not in SECRET_ENV / step 6: a --set-secrets ref to a missing secret fails the job create/update,
+# and step 6 never re-applies env to a job that already exists. So QuickBooks is its own step,
+# run once after the Intuit app exists. The worker reads these only while pulling a QuickBooks
+# source, so skipping this step (or running deploy-worker first) is always safe.
+step '6b. QuickBooks (opt-in) — Intuit client secret + job env'
+QBO_SECRET=QUICKBOOKS_CLIENT_SECRET
+qbo_env="QUICKBOOKS_CLIENT_ID=${QUICKBOOKS_CLIENT_ID:-<export QUICKBOOKS_CLIENT_ID>},QUICKBOOKS_ENV=${QUICKBOOKS_ENV:-<export QUICKBOOKS_ENV sandbox|production>}"
+update_qbo=(gcloud run jobs update "$JOB" --project "$PROJECT" --region "$REGION"
+  --update-env-vars "$qbo_env" --update-secrets "${QBO_SECRET}=${QBO_SECRET}:latest")
+show gcloud secrets create "$QBO_SECRET" --project "$PROJECT" --replication-policy automatic --data-file=-
+show gcloud secrets add-iam-policy-binding "$QBO_SECRET" --project "$PROJECT" \
+  --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor
+show "${update_qbo[@]}"
+note 'needs QUICKBOOKS_CLIENT_ID and QUICKBOOKS_ENV (sandbox|production) exported, and step 6 already done.'
+note 'the secret is created first, so the update never references a missing secret. The value is typed'
+note 'at a hidden prompt, never echoed; an existing secret is kept. --update-* merges, other vars stay.'
+if ask; then
+  if [[ ! "${QUICKBOOKS_CLIENT_ID:-}" =~ ^[A-Za-z0-9]+$ || ! "${QUICKBOOKS_ENV:-}" =~ ^(sandbox|production)$ ]]; then
+    echo '  skipped: export QUICKBOOKS_CLIENT_ID (letters/digits only) and QUICKBOOKS_ENV=sandbox|production, then re-run this step.' >&2
+  elif ! exists gcloud run jobs describe "$JOB" --project "$PROJECT" --region "$REGION"; then
+    echo "  skipped: ${JOB} does not exist yet — run step 6 first, then re-run this step." >&2
+  else
+    if exists gcloud secrets describe "$QBO_SECRET" --project "$PROJECT"; then
+      note "$QBO_SECRET already exists — keeping it."
+    else
+      printf '  value for %s (hidden): ' "$QBO_SECRET"
+      read -rs value || { printf '\n'; echo "  no input for $QBO_SECRET — aborting before a half-set secret." >&2; exit 1; }
+      printf '\n'
+      [[ -n "$value" ]] || { echo "  empty value for $QBO_SECRET — aborting." >&2; exit 1; }
+      printf '%s' "$value" |
+        gcloud secrets create "$QBO_SECRET" --project "$PROJECT" --replication-policy automatic --data-file=-
+      unset value
+    fi
+    gcloud secrets add-iam-policy-binding "$QBO_SECRET" --project "$PROJECT" \
+      --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor >/dev/null
+    note 'if the update below fails with permission denied, the new grant is still propagating: wait a minute and re-run 6b.'
+    "${update_qbo[@]}"
   fi
 fi
 
