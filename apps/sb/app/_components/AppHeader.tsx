@@ -97,7 +97,7 @@ export function AppHeader({
                     <span className="integration-row__label">{row.label}</span>
                     <span className={`badge badge--${row.tone}`}>{row.statusLabel}</span>
                     <span className="integration-row__meta">
-                      {row.lastSuccessAt ? `Last success ${formatDayLabel(row.lastSuccessAt)}` : "No successful run yet"}
+                      {row.lastSuccessAt ? `Last success ${formatDayLabel(row.lastSuccessAt, timezone)}` : "No successful run yet"}
                     </span>
                     {row.lastError ? <span className="integration-row__error">{row.lastError}</span> : null}
                   </li>

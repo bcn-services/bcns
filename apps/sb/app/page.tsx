@@ -13,8 +13,8 @@ import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
 import { dailyReportLines, loadDailyReport, yesterdayInTimezone, type DailyReport } from "@/lib/daily-report";
-import { panelState } from "@/lib/panels";
-import { mediaThumbPath } from "@/lib/library";
+import { activityEmptyState, panelState } from "@/lib/panels";
+import { fileCountLabel, mediaThumbPath } from "@/lib/library";
 import {
   aggregateCampaigns,
   bestCreative,
@@ -166,7 +166,7 @@ export default async function HomePage({
   const setRows = mediaSets.error ? [] : (mediaSets.data ?? []);
   const mediaRows = media.error ? [] : (media.data ?? []);
   const libraryTiles = [
-    ...setRows.map((s) => ({ key: `set-${s.id}`, name: s.name ?? "Untitled set", sub: `${s.file_count ?? 0} Files`, thumbPath: s.cover_thumb_path })),
+    ...setRows.map((s) => ({ key: `set-${s.id}`, name: s.name ?? "Untitled set", sub: fileCountLabel(s.file_count), thumbPath: s.cover_thumb_path })),
     ...mediaRows.map((m) => ({ key: `media-${m.id}`, name: m.title ?? m.filename ?? "Untitled", sub: m.kind ?? "File", thumbPath: mediaThumbPath(m) })),
   ].slice(0, 6);
 
@@ -243,7 +243,7 @@ export default async function HomePage({
       </div>
 
       <div className="grid-secondary">
-        <MeetPanel state={meetState} notes={noteRows} connectHref={connectHref} />
+        <MeetPanel state={meetState} notes={noteRows} connectHref={connectHref} timezone={shell.timezone} />
         <MondayPanel state={mondayState} tasks={taskRows} connectHref={connectHref} />
 
         <Panel className="panel--column">
@@ -285,7 +285,7 @@ export default async function HomePage({
                 ))}
               </div>
             ) : (
-              <StateNote state={activity.error ? "empty" : "not_connected"} label="a source" connectHref={connectHref} />
+              <StateNote state={activityEmptyState(shell.health)} label="a source" connectHref={connectHref} />
             )}
           </div>
         </Panel>

@@ -271,3 +271,10 @@ test("computeMetaMetrics: no rows reads as no data, not as zeros", () => {
   assert.equal(m.roas.value, null);
   assert.equal(m.cpc.value, null);
 });
+
+test("formatDayLabel: a timestamp is the calendar day in the client's timezone, not UTC", () => {
+  assert.equal(formatDayLabel("2025-05-31T02:30:00Z", "America/Los_Angeles"), "May 30, 2025");
+  assert.equal(formatDayLabel("2025-05-30T23:30:00Z", "Asia/Tokyo"), "May 31, 2025");
+  assert.equal(formatDayLabel("2025-05-31T02:30:00Z", "Not/AZone"), "May 31, 2025", "invalid tz falls back to the UTC day");
+  assert.equal(formatDayLabel("2025-05-30", "Asia/Tokyo"), "May 30, 2025", "a plain day is never shifted");
+});

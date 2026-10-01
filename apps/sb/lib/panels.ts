@@ -11,6 +11,7 @@ export const EXPECTED_SOURCES = [
   { source: "monday", label: "Monday.com" },
   { source: "meet", label: "Google Meet" },
   { source: "drive", label: "Google Drive" },
+  { source: "quickbooks", label: "QuickBooks" },
 ] as const;
 
 export type ExpectedSource = (typeof EXPECTED_SOURCES)[number]["source"];
@@ -39,6 +40,20 @@ export function isConnected(rows: HealthLike[], sources: readonly string[]): boo
 export function panelState(rows: HealthLike[], sources: readonly string[], hasRows: boolean): PanelState {
   if (!isConnected(rows, sources)) return "not_connected";
   return hasRows ? "data" : "empty";
+}
+
+/** QuickBooks counts as connected only while its health row is not
+ *  auth_failed (a lone "error" is one failed sync; rows stay visible); a missing row is "not connected", like any panel. */
+export function qboConnection(rows: HealthLike[]): { connected: boolean; lastSuccessAt: string | null } {
+  const h = healthFor(rows, "quickbooks");
+  const connected = h !== null && h.status !== "auth_failed";
+  return { connected, lastSuccessAt: connected ? (h?.last_success_at ?? null) : null };
+}
+
+/** Recent Activity has no range or source of its own: with no rows it is
+ *  "empty" once any connector reports health, "not_connected" before that. */
+export function activityEmptyState(rows: HealthLike[]): Exclude<PanelState, "data"> {
+  return rows.length > 0 ? "empty" : "not_connected";
 }
 
 const STATUS_LABELS: Record<string, string> = {
