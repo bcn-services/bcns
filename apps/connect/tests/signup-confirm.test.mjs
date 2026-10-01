@@ -20,6 +20,7 @@ const HUB = "https://connect.bcn-services.com";
 const SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const USER = { id: USER_ID, email: "owner@acme.example", aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" };
+const HOUR_AGO = new Date(Date.now() - 3600_000).toISOString();
 const PENDING = { client_status: "pending" };
 const MEMBER = { client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc", client_role: "owner" };
 
@@ -38,7 +39,8 @@ const b64url = (v) => Buffer.from(JSON.stringify(v), "utf8").toString("base64url
 const jwt = (claims) => `header.${b64url({ sub: USER_ID, email: USER.email, exp: Math.floor(Date.now() / 1000) + 3600, ...claims })}.signature`;
 
 /** GET /auth/confirm with GoTrue answering verify with a session carrying `claims` (null = verify fails). */
-async function confirm({ type, claims, enabled = true }) {
+async function confirm({ type, claims, enabled = true, confirmedAt = new Date().toISOString() }) {
+  const user = { ...USER, email_confirmed_at: confirmedAt };
   Object.assign(process.env, { NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon", RESEND_API_KEY: "re_test", HUB_BASE_URL: HUB });
   if (enabled) process.env.SIGNUP_ENABLED = "1";
   else delete process.env.SIGNUP_ENABLED;
@@ -49,9 +51,9 @@ async function confirm({ type, claims, enabled = true }) {
     if (url.includes("api.resend.com")) return mails.push(JSON.parse(init.body)), json({ id: "m" });
     if (url.includes("/auth/v1/verify")) {
       if (!claims) return json({ code: 403, error_code: "otp_expired", msg: "expired" }, 403);
-      return json({ access_token: jwt(claims), refresh_token: "r", token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: USER });
+      return json({ access_token: jwt(claims), refresh_token: "r", token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user });
     }
-    if (url.includes("/auth/v1/user")) return json(USER);
+    if (url.includes("/auth/v1/user")) return json(user);
     return json({});
   };
   const request = new NextRequest(`${HUB}/auth/confirm?token_hash=th_123&type=${type}`, { headers: { host: "connect.bcn-services.com" } });
@@ -68,6 +70,11 @@ test("confirm route: a pending sign-up's email link sends exactly one notice to 
   assert.equal(mails.length, 1);
   assert.deepEqual(mails[0].to, [BCNS_EMAIL]);
   assert.equal(mails[0].reply_to, USER.email);
+});
+
+test("confirm route: a pending user whose address was confirmed an hour ago (a later type=email verify) gets no notice", async () => {
+  const { mails } = await confirm({ type: "email", claims: PENDING, confirmedAt: HOUR_AGO });
+  assert.equal(mails.length, 0);
 });
 
 test("confirm route: no notice for recovery, an active member, a failed verify, or the switch off", async () => {

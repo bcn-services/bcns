@@ -26,7 +26,8 @@ not a filter this server could forget — there is no credential here that could
 
 `/mcp` answers `401` with `WWW-Authenticate: Bearer realm="bcns"` for a missing or malformed
 header and for a token that does not verify, `403` for an `Origin` other than
-`https://mcp.bcn-services.com` (absent is fine — a CLI sends none), and `429` over the rate
+`https://mcp.bcn-services.com` (absent is fine — a CLI sends none), `403 {"error":"no_membership"}`
+for a token with no client claim (a pending self-service sign-up), and `429` over the rate
 limit.
 
 ## What `/srv/mcp/env` needs

@@ -16,6 +16,8 @@ import { BCNS_EMAIL, REQUEST_FROM, sendMail, type RequestDeps, type ResendEmail 
 export const SIGNUP_PATH = "/signup";
 export const PENDING_PATH = "/pending";
 export const SIGNUP_SENT_PATH = `${SIGNUP_PATH}?ok=check-email`;
+/** notifySignupConfirmed only fires when the address was confirmed this recently. */
+const NOTICE_WINDOW_MS = 10 * 60 * 1000;
 
 export interface SignupForm {
   name: string;
@@ -87,7 +89,10 @@ export async function notifySignupConfirmed(
     if (result.ok || !result.pending) return false;
     const { data } = await supabase.auth.getUser();
     const email = data.user?.email;
-    if (!email) return false;
+    // Only the click that just confirmed the address: a later type=email verify (e.g. a magic link)
+    // by a still-pending user must not notify bcns again.
+    const confirmedAt = Date.parse(data.user?.email_confirmed_at ?? "");
+    if (!email || !(Date.now() - confirmedAt < NOTICE_WINDOW_MS)) return false;
     return await sendMail(signupNotice(email), "signup confirmed", deps);
   } catch {
     return false;

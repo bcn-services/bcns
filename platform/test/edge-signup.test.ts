@@ -14,9 +14,12 @@ interface Recorded {
   logs: Array<{ event: string; data: Record<string, unknown> }>
 }
 
-function deps(over: { exists?: boolean; rpcCode?: string; deleteFails?: boolean } = {}): { deps: SignupDeps; rec: Recorded } {
+function deps(
+  over: { exists?: boolean; rpcCode?: string; deleteFails?: boolean; enabled?: boolean; mailThrows?: boolean } = {},
+): { deps: SignupDeps; rec: Recorded } {
   const rec: Recorded = { users: [], clients: [], deleted: [], mails: [], logs: [] }
   const d: SignupDeps = {
+    enabled: over.enabled ?? true,
     createUser: async (email) => {
       rec.users.push({ email })
       return over.exists ? { userId: null, error: 'email_exists' } : { userId: NEW_USER }
@@ -32,6 +35,7 @@ function deps(over: { exists?: boolean; rpcCode?: string; deleteFails?: boolean 
     },
     sendConfirmation: async (email, redirectTo) => {
       rec.mails.push({ email, redirectTo })
+      if (over.mailThrows) throw new Error('smtp down')
       return {}
     },
     log: (event, data) => rec.logs.push({ event, data }),
@@ -64,16 +68,34 @@ describe('signup', () => {
     expect(rec.deleted).toEqual([])
   })
 
-  it('an address that already has an account creates nothing, sends nothing, and answers identically', async () => {
+  it('switch off (SIGNUP_ENABLED unset): 404 for any request, no dependency called', async () => {
+    for (const req of [post(GOOD), post(null, 'GET')]) {
+      const { deps: d, rec } = deps({ enabled: false })
+      const res = await handle(req, d)
+      expect(res.status).toBe(404)
+      expect(await res.json()).toEqual({ error: 'not_found' })
+      expect(rec).toEqual({ users: [], clients: [], deleted: [], mails: [], logs: [] })
+    }
+  })
+
+  it('an address that already has an account creates nothing, re-sends the confirmation, and answers identically', async () => {
     const fresh = await read(await handle(post(GOOD), deps().deps))
     const { deps: d, rec } = deps({ exists: true })
     const again = await read(await handle(post(GOOD), d))
     expect(again).toEqual(fresh)
     expect(rec.clients).toEqual([])
-    expect(rec.mails).toEqual([])
     expect(rec.deleted).toEqual([])
+    expect(rec.mails).toEqual([{ email: 'owner@acme.example', redirectTo: SIGNUP_REDIRECT }])
     // The log never carries the address.
     expect(JSON.stringify(rec.logs)).not.toContain('acme.example')
+  })
+
+  it('an existing address whose re-send throws still answers identically', async () => {
+    const fresh = await read(await handle(post(GOOD), deps().deps))
+    const { deps: d, rec } = deps({ exists: true, mailThrows: true })
+    expect(await read(await handle(post(GOOD), d))).toEqual(fresh)
+    expect(rec.clients).toEqual([])
+    expect(rec.logs.map((l) => l.event)).toContain('signup_resend_failed')
   })
 
   it('a failed client step deletes the new auth user (no orphan) and sends no mail', async () => {

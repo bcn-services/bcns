@@ -10,6 +10,9 @@
  * Step 2 failing deletes the user from step 1, so no orphan auth user is left behind. Mail is
  * only sent after step 2 succeeds, so the database cap bounds mail too.
  *
+ * Dark by default: unless the function secret SIGNUP_ENABLED is `1`, every request answers 404
+ * before anything else runs (the hub's SIGNUP_ENABLED only shows the page; this is the real switch).
+ *
  * No email enumeration: an address that already has an account, a capped window and a fresh
  * sign-up all answer the same 200 ACCEPTED body. Only malformed input (independent of whether
  * the address exists) and a server fault on a NEW address answer differently.
@@ -33,6 +36,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ACCEPTED = { ok: true } as const;
 
 export interface SignupDeps {
+  /** Function secret SIGNUP_ENABLED === "1". False = 404, nothing called. */
+  enabled: boolean;
   /** userId null = not created (most often: the address already has an account). */
   createUser(email: string, password: string): Promise<{ userId: string | null; error?: string }>;
   /** api.signup_create_client. Throws with `code` set to the SQLSTATE on failure. */
@@ -44,6 +49,7 @@ export interface SignupDeps {
 }
 
 export async function handle(request: Request, deps: SignupDeps): Promise<Response> {
+  if (!deps.enabled) return json({ error: "not_found" }, 404);
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -58,8 +64,19 @@ export async function handle(request: Request, deps: SignupDeps): Promise<Respon
 
   const created = await deps.createUser(email, password);
   if (!created.userId) {
-    // Existing account (or GoTrue refused): nothing created, nothing sent, same answer.
+    // Every createUser refusal answers the same 200. Never map weak_password/validation_failed to
+    // 400: GoTrue checks for a duplicate email before password strength, so that would leak existence.
     deps.log("signup_not_created", { reason: created.error ?? "unknown" });
+    if (created.error === "email_exists") {
+      // Re-send the confirmation: GoTrue /resend is a no-op for confirmed or unknown users and has its
+      // own per-user rate limit, so a lost mail is recoverable without creating anything.
+      try {
+        const sent = await deps.sendConfirmation(email, SIGNUP_REDIRECT);
+        if (sent.error) deps.log("signup_resend_failed", {});
+      } catch {
+        deps.log("signup_resend_failed", {});
+      }
+    }
     return json(ACCEPTED, 200);
   }
 

@@ -151,23 +151,61 @@ ln -sfn /srv/connect/releases/<old-sha> /srv/connect/current && sudo systemctl r
 
 ## Self-service sign-up (P1, shipped dark)
 
-Off until `SIGNUP_ENABLED=1` is in `/srv/connect/env` (then restart `bcns-app@connect`).
-Off = `/signup` 404s and `/login` is byte-identical to before. Turning it on, in order:
+Two switches, both named `SIGNUP_ENABLED`:
+
+- **The real switch:** the `signup` Edge Function secret. Unset (or anything but `1`) = the function
+  answers `404 {"error":"not_found"}` to every request and creates nothing. The function is public
+  (`--no-verify-jwt`), so this is what keeps sign-up off even if someone calls it directly.
+- **The page switch:** `SIGNUP_ENABLED=1` in `/srv/connect/env` only shows `/signup` and the
+  "Create account" link on `/login`. Unset = `/signup` 404s and `/login` is byte-identical to before.
+
+Turning it on, in order:
 
 1. Migrations, in order: `20261001000100_client_status_pending.sql` (enum value, own file),
    `20261001000200_signup_pending.sql` (hook pending branch + `api.signup_create_client`).
 2. `supabase functions deploy signup --workdir platform --project-ref cnsxbglhredokjbvudfd --no-verify-jwt`.
-   No new secrets: it reads the platform-injected `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-3. Hosted Auth: keep public sign-ups OFF (the function uses the admin API); keep "Confirm email" ON;
-   `https://connect.bcn-services.com/auth/confirm` must be in the redirect allow-list.
-4. `SIGNUP_ENABLED=1` in `/srv/connect/env`, restart, confirm a new pid.
+   It also reads the platform-injected `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+   Deployed without the secret it stays dark. Hand-check: `curl -s -o /dev/null -w '%{http_code}' -X POST
+   https://cnsxbglhredokjbvudfd.supabase.co/functions/v1/signup` prints `404`.
+3. Hosted Auth (dashboard):
+   - "Confirm email" ON. Public sign-ups ("Allow new users to sign up") OFF: the function uses the
+     admin API, and the `resend` (type=signup) it calls has no sign-ups-disabled check.
+   - Redirect allow-list includes `https://connect.bcn-services.com/auth/confirm`.
+   - Email template "Confirm signup": the link must be
+     `https://connect.bcn-services.com/auth/confirm?token_hash={{ .TokenHash }}&type=email`
+     (must be `type=email`; the default `{{ .ConfirmationURL }}` lands with no token_hash and shows
+     link-expired, and no bcns notice is sent). Hand-check: the template preview shows that URL.
+4. **Gate: custom SMTP (Resend) wizard done.** The default Supabase SMTP only delivers to team
+   addresses, so a merchant would get no mail. Do not go past this step until it is done.
+5. `supabase secrets set SIGNUP_ENABLED=1 --workdir platform --project-ref cnsxbglhredokjbvudfd`.
+6. `SIGNUP_ENABLED=1` in `/srv/connect/env`, restart `bcns-app@connect`, confirm a new pid.
+7. Hand-check: sign up with a non-team address. The confirmation mail reaches it, its link lands
+   on `/pending`, and exactly one notice arrives at `BCNS_EMAIL`.
 
-A new owner lands on `/pending` until activated. Each confirmed sign-up mails `BCNS_EMAIL` once.
-Activate (pending -> active only; anything else is refused):
+Switching off: `supabase secrets unset SIGNUP_ENABLED --workdir platform --project-ref cnsxbglhredokjbvudfd`,
+then remove `SIGNUP_ENABLED` from `/srv/connect/env` and restart (confirm a new pid). The secret
+alone stops new accounts; the hub var only hides the page.
+
+A new owner lands on `/pending` until activated. Each confirmed sign-up mails `BCNS_EMAIL` once
+(only when the address was confirmed within the last 10 minutes).
+
+Activate (pending -> active only; anything else is refused). **First contact the owner at the
+sign-up address** and confirm they made the account: anyone can sign up with someone else's
+address and their own password, and activation is the only gate on that.
 
 ```bash
 DATABASE_URL=... pnpm --filter @bcn-services/platform exec tsx scripts/activate-client.ts --slug <slug>
 ```
 
-Abuse bound: at most 10 pending clients per rolling hour (BCNS8); over the cap the function
-deletes the new user, sends nothing, and answers like success.
+An address that already has an account gets the same answer and a re-sent confirmation mail (GoTrue
+sends nothing to an already-confirmed address, and rate-limits re-sends per user); nothing is created.
+
+Known v1 limits:
+
+- Abuse bound: at most 10 pending clients per rolling hour across everyone (BCNS8). Over the cap
+  the function deletes the new user, sends nothing, and answers like success, so the cap is
+  silent to the visitor. Hand-check / alert: `signup_client_failed` with `code: "BCNS8"` in the
+  `signup` function logs means real sign-ups are being dropped.
+- Over the cap, each request still creates and then deletes a GoTrue user (no mail).
+- Timing: a new address takes measurably longer to answer than an existing one, so existence can
+  be inferred by timing. Accepted for v1.

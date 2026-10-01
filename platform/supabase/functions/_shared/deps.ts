@@ -186,6 +186,7 @@ export function shopRedactDeps(): ShopRedactDeps {
  */
 export function signupDeps(): SignupDeps {
   return {
+    enabled: Deno.env.get("SIGNUP_ENABLED") === "1",
     async createUser(email, password) {
       const { data, error } = await admin().auth.admin.createUser({ email, password, email_confirm: false });
       return { userId: data?.user?.id ?? null, error: error?.code ?? error?.message };

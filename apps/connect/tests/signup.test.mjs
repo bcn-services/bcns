@@ -31,7 +31,7 @@ const HUB = "https://connect.bcn-services.com";
 const PROJECT_REF = "abcdefghijklmnopqrst";
 const SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`;
 const USER_ID = "11111111-1111-1111-1111-111111111111";
-const USER = { id: USER_ID, email: "owner@acme.example", aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" };
+const USER = { id: USER_ID, email: "owner@acme.example", aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", email_confirmed_at: new Date().toISOString() };
 const FORM = { name: "Acme Bakery", email: "owner@acme.example", password: "correct-horse" };
 
 const ENV_KEYS = ["SIGNUP_ENABLED", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "OAUTH_APPROVED_SOURCES", "HUB_BASE_URL"];

@@ -65,7 +65,8 @@ export interface HubConfig {
   /**
    * SIGNUP_ENABLED=1|true turns on self-service sign-up (P1): the /signup page, the "Create
    * account" link on /login, and the bcns notice on a confirmed sign-up. Anything else = all
-   * three are absent and /signup is a 404.
+   * three are absent and /signup is a 404. The signup Edge Function's own SIGNUP_ENABLED secret
+   * is the real switch: without it the function 404s whatever this says.
    */
   signupEnabled: boolean;
 
