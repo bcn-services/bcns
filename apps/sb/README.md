@@ -60,9 +60,9 @@ signs in as). `SUPABASE_SERVICE_ROLE_KEY` must be **unset** in shared mode:
 
 The template is a **pure skeleton**: wiring, env, tests, and docs. The shared
 logic behind these seams lives in `@bcn-services/app-core` — the `lib/` files are
-thin re-exports/bindings, so a platform fix reaches every client via a version
-bump, not a per-repo edit. `TEMPLATE.md` is the manifest of everything that
-changes when this becomes a client repo.
+thin re-exports/bindings, so a fix in app-core reaches every app on the next
+build/deploy. `TEMPLATE.md` is the manifest of everything that
+changes when a client app is stamped from the template.
 
 - **`lib/env.ts`** — lazy config accessor; the keyless-run guarantee. (The one
   lib file with real code here — env access is app wiring, not shared logic.)

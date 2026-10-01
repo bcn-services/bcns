@@ -120,7 +120,7 @@ cp apps/web/.env.example apps/web/.env.local
 
 ## Deploy (Vercel free tier)
 
-The only recurring cost is a domain — no databases or paid services.
+For the marketing site, the only recurring cost is a domain — no databases or paid services (the platform has its own hosting costs).
 
 This is a pnpm monorepo, so the deploy hinges on one project setting:
 

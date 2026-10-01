@@ -14,7 +14,7 @@ bcns is a software studio that builds custom software for local small businesses
 - `platform/` — the former `bcns-data`: `supabase/` (migrations, Edge Functions), `worker/` (Cloud Run connector job), `scripts/` (onboard, add-member, add-source), `test/`, `docs/`. Workspace package `@bcn-services/platform`.
 - `infra/` — droplet-as-code: bootstrap, `onboard-client.sh`, `bcns-app@.service`, backups, `ports.txt` (slug→port registry: l2detailz 3100, sb 3101, connect 3102, mcp 3103, ta 3104).
 - `docs/architecture/` — ADRs and chunk plans. `hosted-web-model.md` is superseded by `platform-v1.md`.
-- `templates/` — empty. Legacy one-off client builds (Technology Associates, l2detailz, DeLuca's) keep their own repos.
+- `templates/` — unused (README only); app starters live in `apps/_template`. Legacy one-off client builds (Technology Associates, l2detailz, DeLuca's) keep their own repos.
 
 ## Commands
 
@@ -49,7 +49,7 @@ pnpm --filter @bcn-services/web export   # opt-in static export -> apps/web/out/
 Read the workflow before assuming; paths below are the `on.push.paths` filters as of 2026-09-30.
 
 - `deploy-app.yml`: a push touching `apps/sb/**`, `apps/connect/**`, `apps/mcp/**`, `packages/**`, root `package.json`, `pnpm-lock.yaml` or the workflow itself deploys **all of sb, connect and mcp** (matrix `["sb","connect","mcp"]`; each builds, rsyncs to the droplet, restarts `bcns-app@<slug>`, health-checks `/api/health`, rolls back on failure). A docs-only edit under `apps/sb/` or `apps/connect/` still matches and restarts them. `workflow_dispatch` with `slug` redeploys one.
-- `deploy-worker.yml`: `platform/worker/**`, `platform/package.json`, root `package.json`, `pnpm-lock.yaml` -> builds the worker image and updates the Cloud Run Job `bcns-data-worker`.
+- `deploy-worker.yml`: `platform/worker/**`, `platform/package.json`, root `package.json`, `pnpm-lock.yaml` or the workflow itself -> builds the worker image and updates the Cloud Run Job `bcns-data-worker`.
 - `platform-ci.yml`: tests, not a deploy. Push to main on `platform/**`, `packages/data-client/**`, root package/lock; on PRs also `apps/**` and `packages/**`. Job `test` = local Supabase stack + platform typecheck/test + worker image build; job `apps` = turbo lint/typecheck/test over `apps/*`.
 - Marketing (Vercel): Ignored Build Step skips builds unless `apps/web`, `packages/ui`, `config`, `app-core`, root package/lock changed (README -> Deploy).
 - Migrations, Edge Functions, DNS and dashboard settings never deploy from a merge; they are Nate-run steps.
@@ -60,18 +60,11 @@ Read the workflow before assuming; paths below are the `on.push.paths` filters a
 
 **Web app (`apps/web/`):** Next.js 14 App Router, TypeScript strict mode, Tailwind CSS with HSL token theme (light + dark). Page entry is `app/page.tsx`; layout in `app/layout.tsx`. All site-wide constants (name, domain, email, nav items, tagline, description) live in `apps/web/lib/site.ts` — update that file, not individual components.
 
-**Component structure (`apps/web/components/`):**
-- `hero.tsx`, `how-it-works.tsx`, `use-cases.tsx`, `pricing.tsx`, `faq.tsx`, `past-work.tsx`, `reviews.tsx`, `about-founder.tsx`, `contact-section.tsx` — one file per page section, each reading its copy from `lib/content.ts`
-- `site-header.tsx`, `site-footer.tsx` — layout chrome
-- `contact-form.tsx` — form with Web3Forms / Formspree backend (env var `NEXT_PUBLIC_CONTACT_ENDPOINT`)
-- `ui/` — primitive shadcn-style components (input, label, textarea)
-- `theme-provider.tsx`, `theme-toggle.tsx` — dark mode via next-themes
-
 **Shared UI (`packages/ui/`):** Shared React primitives used by `apps/web` and any future client apps. Import as `@bcn-services/ui`. Add to this package when a component will be reused across apps.
 
 **Shared config (`packages/config/`):** All ESLint, tsconfig base, Tailwind preset, Prettier config. `apps/web` extends these — do not duplicate config in app-level files.
 
-## Environment variables
+## Environment variables (apps/web)
 
 Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 
@@ -83,8 +76,10 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 
 ## Coding conventions
 
+Tailwind, `content.ts`, `site.ts` and font rules below are `apps/web` (connect also uses Tailwind). `apps/sb` and `apps/_template` use plain CSS (`globals.css`), no Tailwind; `apps/mcp` has no UI.
+
 - TypeScript strict mode everywhere — no `any`, no type assertions without comment.
-- Tailwind only — no CSS modules, no inline styles. Use HSL token classes (`bg-background`, `text-foreground`, etc.) from the theme, not raw color classes.
+- `apps/web`: Tailwind only — no CSS modules, no inline styles. Use HSL token classes (`bg-background`, `text-foreground`, etc.) from the theme, not raw color classes.
 - Server Components by default in `app/`; add `"use client"` only when state or browser APIs are needed.
 - Shared primitives go in `packages/ui/`, not inline in `apps/web/components/ui/`.
 - `lib/content.ts` is the single source of truth for all marketing copy — keep it that way. `lib/site.ts` holds only name / domain / email / nav. `CONTENT.md` is the field-by-field companion to `content.ts` and must be updated alongside it.
@@ -94,6 +89,6 @@ Copy `.env.example` → `.env.local` in `apps/web/`. Never commit `.env.local`.
 
 Run `scripts/new-app.sh <slug> <port>` from the root (the `/new-client-app` skill does this): it stamps `apps/_template` to `apps/<slug>`, writes `CLIENT.md`, and registers the port in `infra/ports.txt`. Then add the slug to `deploy-app.yml` in both `on.push.paths` and `strategy.matrix.slug` (a push deploys nothing for it until you do), and onboard the droplet with `infra/onboard-client.sh`. Apps consume shared packages as `workspace:*` and read all data through `@bcn-services/data-client` as the signed-in user; no migrations and no service-role key in an app (each app's `scripts/check-env.ts`, e.g. `apps/sb/scripts/check-env.ts`, fails the build).
 
-## Deploy
+## Deploy (marketing site, Vercel)
 
-Vercel free tier. Required project settings: **Root Directory = `apps/web`**, Build Command `turbo run build --filter=@bcn-services/web...`, and the Ignored Build Step from README → Deploy (platform-v1). Everything else stays on auto-detect, and there is intentionally no `vercel.json` (see README → Deploy). Set the three env vars in the Vercel dashboard. No database, no paid services beyond a domain.
+Vercel free tier. Required project settings: **Root Directory = `apps/web`**, Build Command `turbo run build --filter=@bcn-services/web...`, and the Ignored Build Step from README → Deploy (platform-v1). Everything else stays on auto-detect, and there is intentionally no `vercel.json` (see README → Deploy). Set the three env vars in the Vercel dashboard. No database, no paid services beyond a domain, for the marketing site only (the platform runs Supabase, Cloud Run and a droplet).

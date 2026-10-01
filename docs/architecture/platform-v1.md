@@ -167,7 +167,7 @@ If Declan sends credentials before chunk 1 lands: deploy the frozen `bcns-client
 - Sign in at the hub → open SB → no second login; sign out propagates.
 - Independence drill: stop the hub unit; every `bcn-services.com` route still serves.
 - Worker tick green after the first post-merge deploy; RLS forbidden-read green on `main`.
-- Status 2026-10-01: the hosted gates above (sign-in to SB with no second login, independence drill, post-merge worker tick) are **not yet proven on the hosted stack**. The docs item below is in open PR `docs/v1-layout-chunk8`, unmerged.
+- Status 2026-10-01: the hosted gates above (sign-in to SB with no second login, independence drill, post-merge worker tick) are **not yet proven on the hosted stack**. Open PR `docs/v1-layout-chunk8` (unmerged) covers only this repo's CLAUDE.md/README and the `hosted-web-model.md` status; the os updates (`hosting-reference.md`, client READMEs, memory) and repo archiving are not started.
 - Docs: this repo's CLAUDE.md rewritten for the layout; `hosted-web-model.md` marked superseded; `hosting-reference.md`, os client READMEs, and the "bcns-data is bcns Connect" memory updated; repos archived.
 
 ### 9. Final UX + visual polish pass on `apps/connect` (deferred, not scoped)
