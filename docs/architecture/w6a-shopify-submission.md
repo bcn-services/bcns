@@ -365,7 +365,8 @@ Don't include the Access page unless §2's AI-tools check passes.
 1d. **Set `SHOPIFY_APP_HANDLE` on the droplet and restart.** Add it to
    `/srv/connect/env` (value: the confirmed handle, e.g. `bcns-connect`), then restart
    the connect service. Unset = a Shopify-initiated install with no active subscription
-   fails closed to the hub's generic error page instead of Shopify's plan page.
+   fails closed to the hub's generic error page instead of Shopify's plan page
+   (`plan_handle_unconfigured`), and the hub page's reopen / install links are absent.
 1e. **Set the three Partner values if reinstalls in a paid period should reconnect.**
    `SHOPIFY_PARTNER_API_TOKEN`, `SHOPIFY_PARTNER_ORG_ID` and `SHOPIFY_APP_GID` go in
    `/srv/connect/env` as a set (see `apps/connect/DEPLOY.md`). With any unset, such a
