@@ -934,13 +934,14 @@ export const siteContent: SiteContent = {
   // 2026-09-22). All US.
   //
   // MAINTAINER NOTE (not rendered): the "Agreement and acceptance" sentence
-  // about the Stripe Checkout consent box and the hub sign-in acceptance
-  // describes a DECIDED but NOT YET BUILT flow. Stripe Checkout is not set
-  // up yet, and the hub has no acceptance step today. The sentence is only
-  // true once both ship: Stripe Checkout setup, and a hub "By signing in
-  // you agree" line (a later PR). The "Who we share it with" list's Stripe
-  // entry, the terms' "Fees and billing" line, and the FAQ deliberately
-  // omit or soften Stripe until Checkout is live.
+  // describes how acceptance works TODAY: a signed quote or Order Form, or
+  // use of the services. The decided stronger flow (Stripe Checkout consent
+  // box plus a hub "By signing in you agree" line) is NOT YET BUILT. When
+  // both ship, swap the sentence to name them, and restore "the same way
+  // you accepted them the first time" in "Changes to the service and these
+  // terms". The "Who we share it with" list's Stripe entry, the terms'
+  // "Fees and billing" line, and the FAQ deliberately omit or soften Stripe
+  // until Checkout is live.
   legal: {
     privacy: {
       eyebrow: "Privacy",
@@ -1085,7 +1086,7 @@ export const siteContent: SiteContent = {
           heading: "Agreement and acceptance",
           body: [
             `These terms are between BCNS LLC ("${siteConfig.name}") and the business signing up ("you"). The person accepting them must have the authority to bind that business.`,
-            "You accept these terms by checking the consent box at checkout in Stripe Checkout, and again every time you sign in to the hub.",
+            "You accept these terms when you sign a quote or Order Form that references them, or when you start using the services, whichever comes first.",
             "A custom build or a day of AI consulting is governed by these terms plus a signed quote, which sets the scope and price for that engagement.",
           ],
         },
@@ -1179,7 +1180,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Limitation of liability",
           body: [
-            "Neither of us is liable to the other for indirect or consequential damages. Our total liability to you is capped at the fees you paid us in the 12 months before the claim. There are no other carve-outs to that cap.",
+            "Neither of us is liable to the other for indirect or consequential damages. Our total liability to you is capped at the greater of $200 or the fees you paid us in the 12 months before the claim. There are no carve-outs to that cap.",
           ],
         },
         {
@@ -1197,7 +1198,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Changes to the service and these terms",
           body: [
-            "We'll give you reasonable advance notice of a material change to these terms, and for a material change, we'll ask you to accept the updated terms again, the same way you accepted them the first time.",
+            "We'll give you reasonable advance notice of a material change to these terms, and for a material change, we'll ask you to accept the updated terms before they apply to you.",
           ],
         },
         {
