@@ -193,6 +193,7 @@ test("the query hmac is checked against our secret, not any secret", () => {
 /* ---------------------------------------------------------- webhook HMAC */
 
 const BODY = JSON.stringify({ shop_domain: SHOP, customer: { id: 191167, email: "a@b.example" } });
+const META = { shopDomain: SHOP, webhookId: null };
 const sign = (body, secret = SECRET) => createHmac("sha256", secret).update(body, "utf8").digest("base64");
 
 test("a genuine webhook signature verifies (base64, over the raw body)", () => {
@@ -218,11 +219,11 @@ test("a hex-encoded webhook signature is not accepted for a base64 header", () =
 });
 
 test("handleGdprWebhook 401s a bad signature and 200s a good one", () => {
-  const bad = handleGdprWebhook("customers/redact", BODY, sign(BODY, "wrong"), SECRET);
+  const bad = handleGdprWebhook("customers/redact", BODY, sign(BODY, "wrong"), SECRET, META);
   assert.equal(bad.status, 401);
   assert.equal(bad.notify, undefined);
 
-  const good = handleGdprWebhook("customers/redact", BODY, sign(BODY), SECRET);
+  const good = handleGdprWebhook("customers/redact", BODY, sign(BODY), SECRET, META);
   assert.equal(good.status, 200);
   assert.deepEqual(good.body, { ok: true });
   assert.match(good.notify.subject, /customers\/redact/);
@@ -232,7 +233,7 @@ test("handleGdprWebhook 401s a bad signature and 200s a good one", () => {
 
 test("all three mandatory topics are handled", () => {
   for (const topic of ["customers/data_request", "customers/redact", "shop/redact"]) {
-    assert.equal(handleGdprWebhook(topic, BODY, sign(BODY), SECRET).status, 200);
+    assert.equal(handleGdprWebhook(topic, BODY, sign(BODY), SECRET, META).status, 200);
   }
 });
 
@@ -243,7 +244,7 @@ const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
 async function post(triggeredAt, signature = sign(BODY)) {
   process.env.SHOPIFY_CLIENT_SECRET = SECRET;
   delete process.env.RESEND_API_KEY; // sendMail logs and returns: no network
-  const headers = { "X-Shopify-Hmac-Sha256": signature };
+  const headers = { "X-Shopify-Hmac-Sha256": signature, "X-Shopify-Shop-Domain": SHOP };
   if (triggeredAt !== undefined) headers["X-Shopify-Triggered-At"] = triggeredAt;
   const res = await gdprRoute(new Request("http://x/api", { method: "POST", headers, body: BODY }), "customers/redact");
   return res.status;
@@ -295,12 +296,67 @@ test("the notification carries topic, deadline, shop and webhook id, and no PII"
 
 test("unsigned headers cannot inject lines or bloat the notification", () => {
   const r = handleGdprWebhook("customers/redact", BODY, sign(BODY), SECRET, {
-    shopDomain: "x.myshopify.com\nDeadline: none",
+    shopDomain: SHOP,
     webhookId: "a".repeat(5000),
   });
   const lines = r.notify.text.split("\n");
   assert.equal(lines.filter((l) => l.startsWith("Deadline:")).length, 1);
   assert.ok(r.notify.text.length < 1000);
+  // A header that smuggles a newline cannot match the signed shop: rejected outright.
+  const inj = handleGdprWebhook("customers/redact", BODY, sign(BODY), SECRET, {
+    shopDomain: `${SHOP}\nDeadline: none`,
+    webhookId: null,
+  });
+  assert.equal(inj.status, 401);
+});
+
+/* ------------------------------------------- shop bound from the signed body */
+
+test("a replayed OAuth callback query string is not a webhook (shop binding)", () => {
+  const replay = "code=abc&shop=victim.myshopify.com&state=x&timestamp=123";
+  const r = handleGdprWebhook("shop/redact", replay, sign(replay), SECRET, {
+    shopDomain: "victim.myshopify.com",
+    webhookId: null,
+  });
+  assert.equal(r.status, 401);
+  assert.deepEqual(r.body, { error: "unauthorized" });
+  assert.equal(r.notify, undefined);
+});
+
+test("a signed non-object JSON body is rejected", () => {
+  for (const raw of ["[]", "null", '"x"', "42"]) {
+    assert.equal(handleGdprWebhook("shop/redact", raw, sign(raw), SECRET, META).status, 401, raw);
+  }
+});
+
+test("a signed body whose shop_domain differs from the header is rejected", () => {
+  const r = handleGdprWebhook("shop/redact", BODY, sign(BODY), SECRET, {
+    shopDomain: "victim.myshopify.com",
+    webhookId: null,
+  });
+  assert.equal(r.status, 401);
+});
+
+test("a missing X-Shopify-Shop-Domain header is rejected", () => {
+  assert.equal(handleGdprWebhook("shop/redact", BODY, sign(BODY), SECRET, { shopDomain: null, webhookId: null }).status, 401);
+  assert.equal(handleGdprWebhook("shop/redact", BODY, sign(BODY), SECRET).status, 401);
+});
+
+test("a signed body without a valid shop_domain is rejected", () => {
+  for (const obj of [{ customer: { id: 1 } }, { shop_domain: "not a shop" }, { shop_domain: 5 }]) {
+    const raw = JSON.stringify(obj);
+    assert.equal(handleGdprWebhook("shop/redact", raw, sign(raw), SECRET, META).status, 401, raw);
+  }
+});
+
+test("the notification's Shop line is the signed body value", () => {
+  const r = handleGdprWebhook("shop/redact", BODY, sign(BODY), SECRET, { shopDomain: SHOP.toUpperCase(), webhookId: "wh-1" });
+  assert.equal(r.status, 200);
+  assert.ok(r.notify.text.split("\n").includes(`Shop: ${SHOP}`));
+});
+
+test("an empty secret still 401s, even for a body signed with the empty key", () => {
+  assert.equal(handleGdprWebhook("shop/redact", BODY, sign(BODY, ""), "", META).status, 401);
 });
 
 /* -------------------------------------------------------- token exchange */

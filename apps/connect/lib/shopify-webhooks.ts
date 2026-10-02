@@ -29,10 +29,16 @@
  * not a replacement — and any forwarding failure (unset URL, network error,
  * timeout, non-2xx) falls back to this file's own operator email exactly as
  * before, so shop/redact never depends on the Edge Function being reachable.
+ *
+ * The shop is bound from the SIGNED body, never from a header. The HMAC alone
+ * proves only "signed with our secret", and Shopify's OAuth callback query HMAC
+ * is the same HMAC over the same secret, so a replayed install query would pass
+ * it. Every GDPR payload carries `shop_domain`; it must be a valid shop and match
+ * the (unsigned) X-Shopify-Shop-Domain header, and the email names the body value.
  */
 
 import { BCNS_EMAIL, REQUEST_FROM, type ResendEmail } from "./request-connection";
-import { verifyWebhookHmac } from "./shopify-oauth";
+import { normalizeShop, verifyWebhookHmac } from "./shopify-oauth";
 
 /** The three topics, and the route segment each is served at. */
 export const GDPR_TOPICS = {
@@ -94,7 +100,21 @@ export function handleGdprWebhook(
   // Fails closed on a missing header, a wrong signature, and a missing secret:
   // verifyWebhookHmac compares against an HMAC of the empty key rather than
   // skipping the check, so a misconfigured deploy rejects instead of accepting.
-  if (!verifyWebhookHmac(rawBody, hmacHeader, secret)) return { status: 401, body: { error: "unauthorized" } };
+  const unauthorized: WebhookResult = { status: 401, body: { error: "unauthorized" } };
+  // `!secret`: an empty key is still a key to HMAC, so anyone could sign with it.
+  if (!secret || !verifyWebhookHmac(rawBody, hmacHeader, secret)) return unauthorized;
+
+  // Bind the shop from the signed payload (see header comment). Non-JSON (e.g. a
+  // replayed callback query string) or a missing/mismatched shop_domain is a reject.
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return unauthorized;
+  }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return unauthorized;
+  const shop = normalizeShop((payload as Record<string, unknown>).shop_domain);
+  if (!shop || shop !== normalizeShop(meta.shopDomain)) return unauthorized;
 
   return {
     status: 200,
@@ -106,7 +126,7 @@ export function handleGdprWebhook(
       text: [
         `Topic: ${topic}`,
         `Deadline: ${DEADLINE[topic]}`,
-        `Shop: ${oneLine(meta.shopDomain)}`,
+        `Shop: ${shop}`,
         `Webhook id: ${oneLine(meta.webhookId)}`,
         "",
         "Find the request in the Shopify admin by shop + webhook id. The payload is",
