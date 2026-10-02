@@ -66,7 +66,7 @@ async function confirm({ type, claims, enabled = true, confirmedAt = new Date().
 
 test("confirm route: a pending sign-up's email link sends exactly one notice to BCNS_EMAIL", async () => {
   const { location, mails } = await confirm({ type: "email", claims: PENDING });
-  assert.equal(location, `${HUB}/`);
+  assert.equal(location, `${HUB}/set-password`, "the sign-up link lands on /set-password");
   assert.equal(mails.length, 1);
   assert.deepEqual(mails[0].to, [BCNS_EMAIL]);
   assert.equal(mails[0].reply_to, USER.email);

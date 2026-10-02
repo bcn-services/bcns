@@ -31,7 +31,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   });
   const config = getConfig();
   // A self-service sign-up's confirmation link (type=email): tell bcns once, on the click
-  // that verified it. The middleware then confines the new session to /pending.
+  // that verified it. confirmTarget sends it to /set-password (the account has no password yet); the
+  // middleware confines the pending session to that page and /pending.
   if (config.signupEnabled && q.get("type") === "email" && path !== LINK_EXPIRED_PATH) {
     await notifySignupConfirmed(supabase, { apiKey: config.resendApiKey });
   }

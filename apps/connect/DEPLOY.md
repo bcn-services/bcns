@@ -193,8 +193,10 @@ A new owner lands on `/pending` until activated. Each confirmed sign-up mails `B
 (only when the address was confirmed within the last 10 minutes).
 
 Activate (pending -> active only; anything else is refused). **First contact the owner at the
-sign-up address** and confirm they made the account: anyone can sign up with someone else's
-address and their own password, and activation is the only gate on that.
+sign-up address** and confirm they made the account and the business name: anyone can sign up
+with someone else's address, and activation is the only gate on that. Sign-up takes no password
+(the confirmation link lands on `/set-password`, so the inbox owner sets it), but a name
+pre-registered by someone else survives a re-sign-up, so check it.
 
 ```bash
 DATABASE_URL=... pnpm --filter @bcn-services/platform exec tsx scripts/activate-client.ts --slug <slug>

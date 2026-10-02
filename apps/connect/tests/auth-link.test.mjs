@@ -44,10 +44,11 @@ test("safeNext refuses every off-origin shape", () => {
   assert.equal(safeNext("/data?x=1"), "/data?x=1");
 });
 
-test("type=email honors a safe next and drops an unsafe one", async () => {
-  assert.equal(await confirmTarget(otp(), { token_hash: "h", type: "email", next: "/team" }), "/team");
-  for (const next of ["//evil.com", "https://evil.com", "/\\evil.com", "javascript:x", "/%2Fevil.com"]) {
-    assert.equal(await confirmTarget(otp(), { token_hash: "h", type: "email", next }), "/", next);
+test("type=email (sign-up confirmation) ends on /set-password whatever next says", async () => {
+  for (const next of [undefined, "/team", "//evil.com", "https://evil.com", "/%2Fevil.com"]) {
+    const s = otp();
+    assert.equal(await confirmTarget(s, { token_hash: "h", type: "email", next }), "/set-password", String(next));
+    assert.deepEqual(s.calls, [{ token_hash: "h", type: "email" }]);
   }
 });
 

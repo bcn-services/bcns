@@ -223,6 +223,26 @@ test("pending sign-up, hub (pendingPath set): kept signed in and confined to the
   assert.ok(!calls.some((url) => url.includes("/auth/v1/logout")), "a pending session is not signed out on the hub");
 });
 
+test("pending sign-up, hub with pendingAllow: /set-password passes, every other path still goes to /pending", async () => {
+  const mw = tenantMiddleware({ pendingPath: "/pending", pendingAllow: ["/set-password"] });
+  const cookie = sessionCookie({ client_status: "pending" });
+  assert.equal((await mw(request("/set-password", { cookie }))).status, 200);
+  assert.equal((await mw(request("/pending", { cookie }))).status, 200);
+  for (const path of ["/", "/team", "/set-password/x", "/set-passwords", "/access"]) {
+    const response = await mw(request(path, { cookie }));
+    assert.equal(response.status, 307, path);
+    assert.equal(new URL(response.headers.get("location")).pathname, "/pending", path);
+  }
+});
+
+test("pending sign-up, hub without pendingAllow: /set-password redirects to /pending", async () => {
+  const response = await tenantMiddleware({ pendingPath: "/pending" })(
+    request("/set-password", { cookie: sessionCookie({ client_status: "pending" }) })
+  );
+  assert.equal(response.status, 307);
+  assert.equal(new URL(response.headers.get("location")).pathname, "/pending");
+});
+
 test("pending sign-up, client app (no pendingPath): refused exactly like no-membership", async () => {
   const response = await tenantMiddleware({ expectedClientId: CLIENT_ID })(
     request("/pending", { cookie: sessionCookie({ client_status: "pending" }) })

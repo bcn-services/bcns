@@ -13,7 +13,6 @@ export async function signUp(form: FormData): Promise<void> {
       {
         name: String(form.get("name") ?? ""),
         email: String(form.get("email") ?? ""),
-        password: String(form.get("password") ?? ""),
       },
       { supabaseUrl: config.supabaseUrl, supabaseAnonKey: config.supabaseAnonKey }
     )

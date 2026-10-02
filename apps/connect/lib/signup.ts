@@ -10,7 +10,6 @@
 
 import { requireMembership } from "@bcn-services/tenant";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { MIN_PASSWORD_LENGTH } from "./auth-link";
 import { BCNS_EMAIL, REQUEST_FROM, sendMail, type RequestDeps, type ResendEmail } from "./request-connection";
 
 export const SIGNUP_PATH = "/signup";
@@ -22,7 +21,6 @@ const NOTICE_WINDOW_MS = 10 * 60 * 1000;
 export interface SignupForm {
   name: string;
   email: string;
-  password: string;
 }
 
 export interface SignupDeps {
@@ -42,12 +40,11 @@ export async function signupTarget(form: SignupForm, deps: SignupDeps): Promise<
   const name = form.name.trim();
   const email = form.email.trim();
   if (!name || !email) return `${SIGNUP_PATH}?error=invalid`;
-  if (form.password.length < MIN_PASSWORD_LENGTH) return `${SIGNUP_PATH}?error=short`;
   try {
     const response = await fetchImpl(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/signup`, {
       method: "POST",
       headers: { apikey: supabaseAnonKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password: form.password }),
+      body: JSON.stringify({ name, email }),
       signal: AbortSignal.timeout(15_000),
     });
     if (response.ok) return SIGNUP_SENT_PATH;

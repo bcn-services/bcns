@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { tenantMiddleware } from "@bcn-services/tenant/middleware";
 import { getConfig } from "@/lib/env";
 
-const tenant = tenantMiddleware({ loginPath: "/login", pendingPath: "/pending" });
+const tenant = tenantMiddleware({ loginPath: "/login", pendingPath: "/pending", pendingAllow: ["/set-password"] });
 
 /**
  * Shopify opens the app URL (application_url in shopify.app.toml, the hub root)
