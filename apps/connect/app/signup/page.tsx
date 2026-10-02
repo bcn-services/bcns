@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { MIN_PASSWORD_LENGTH } from "@/lib/auth-link";
 import { getConfig } from "@/lib/env";
 import { signUp } from "./actions";
 import { Frame } from "../login/frame";
@@ -7,8 +6,7 @@ import { Frame } from "../login/frame";
 export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
-  invalid: "Check the business name, email and password, then try again.",
-  short: `Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
+  invalid: "Check the business name and email, then try again.",
   unconfigured: "Sign-up is not configured for this app yet.",
   failed: "Something went wrong creating your account. Please try again in a few minutes.",
 };
@@ -19,7 +17,7 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
     return (
       <Frame
         title="Check your email"
-        description="If that address can be signed up, we've sent a link to confirm it. Once confirmed, bcns reviews new workspaces before they open."
+        description="If that address can be signed up, we've sent a link to confirm it and choose your password. Once confirmed, bcns reviews new workspaces before they open."
       >
         <a href="/login" className="lnk">
           Back to sign in
@@ -45,10 +43,6 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
         <label className="field" htmlFor="email">
           Email
           <input id="email" name="email" type="email" autoComplete="email" required />
-        </label>
-        <label className="field" htmlFor="password">
-          Password
-          <input id="password" name="password" type="password" autoComplete="new-password" required minLength={MIN_PASSWORD_LENGTH} />
         </label>
         {error ? (
           <p role="alert" className="note note-alert">

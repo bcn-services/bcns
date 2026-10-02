@@ -22,6 +22,11 @@ export interface TenantMiddlewareOptions {
    * signed out and sent to ?error=no-membership.
    */
   pendingPath?: string;
+  /**
+   * Extra pathnames a pending session may reach besides pendingPath (exact match). The hub lists
+   * "/set-password" so a sign-up confirmation can set its first password. Unset: only pendingPath.
+   */
+  pendingAllow?: string[];
 }
 
 /** Everything except the self-authenticating health route and static assets. */
@@ -110,7 +115,8 @@ export function tenantMiddleware(
     if (result.reason === "no-membership" && result.pending && opts.pendingPath) {
       // Kept signed in (activation flips the next token to a full membership), but nothing
       // except the pending page itself is served; it signs out through its own action.
-      return request.nextUrl.pathname === opts.pendingPath ? response : redirectTo(opts.pendingPath);
+      const { pathname } = request.nextUrl;
+      return pathname === opts.pendingPath || opts.pendingAllow?.includes(pathname) ? response : redirectTo(opts.pendingPath);
     }
     if (result.reason === "wrong-client") {
       // Signed in, but to someone else's tenant: drop the session so the next

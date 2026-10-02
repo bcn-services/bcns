@@ -49,10 +49,13 @@ interface OtpClient {
 }
 
 /**
- * Where the browser goes after an emailed link. Invite and recovery always land
- * on /set-password (a `next` is ignored: nothing else makes sense before a
- * password exists); `email` honors a validated `next`. Any failure is one
- * answer, so a used, expired or forged link is indistinguishable.
+ * Where the browser goes after an emailed link. Invite, recovery and email (a
+ * sign-up confirmation, which creates the account with no password) always land
+ * on /set-password: a `next` is ignored, because nothing else makes sense before
+ * the inbox owner has set a password. The `safeNext` fallback is unreachable
+ * today (every CONFIRM_TYPES entry returns above); it is the safe default for a
+ * future type. Any failure is one answer, so a used, expired or forged link is
+ * indistinguishable.
  */
 export async function confirmTarget(
   supabase: OtpClient | null,
@@ -67,7 +70,7 @@ export async function confirmTarget(
     return LINK_EXPIRED_PATH;
   }
   if (error) return LINK_EXPIRED_PATH;
-  if (type === "invite" || type === "recovery") return SET_PASSWORD_PATH;
+  if (type === "invite" || type === "recovery" || type === "email") return SET_PASSWORD_PATH;
   return safeNext(params.next) ?? "/";
 }
 

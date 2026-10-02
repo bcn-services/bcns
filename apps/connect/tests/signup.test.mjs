@@ -32,7 +32,7 @@ const PROJECT_REF = "abcdefghijklmnopqrst";
 const SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`;
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const USER = { id: USER_ID, email: "owner@acme.example", aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", email_confirmed_at: new Date().toISOString() };
-const FORM = { name: "Acme Bakery", email: "owner@acme.example", password: "correct-horse" };
+const FORM = { name: "Acme Bakery", email: "owner@acme.example" };
 
 const ENV_KEYS = ["SIGNUP_ENABLED", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "OAUTH_APPROVED_SOURCES", "HUB_BASE_URL"];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
@@ -94,12 +94,12 @@ test("switch on vs off: the login page (plain and Shopify finish) differs ONLY b
   }
 });
 
-test("switch on: /signup renders the form (business name, email, password >= 8)", async () => {
+test("switch on: /signup renders the form (business name and email only, no password)", async () => {
   process.env.SIGNUP_ENABLED = "true";
   const { default: SignupPage } = await import("../app/signup/page.tsx");
   const html = renderToStaticMarkup(SignupPage({ searchParams: {} }));
-  for (const name of ["name", "email", "password"]) assert.match(html, new RegExp(`name="${name}"`));
-  assert.match(html, /minLength="8"/);
+  for (const name of ["name", "email"]) assert.match(html, new RegExp(`name="${name}"`));
+  assert.doesNotMatch(html, /password/i);
   assert.match(renderToStaticMarkup(SignupPage({ searchParams: { ok: "check-email" } })), /Check your email/);
 });
 
@@ -113,11 +113,15 @@ test("signupTarget: posts to the signup function and maps every answer onto one 
   assert.equal(calls[0].url, `${SUPABASE_URL}/functions/v1/signup`);
   assert.equal(calls[0].init.headers.apikey, "anon");
   assert.deepEqual(JSON.parse(calls[0].init.body), FORM);
+  assert.ok(!("password" in JSON.parse(calls[0].init.body)), "the body carries no password");
   assert.equal(await signupTarget(FORM, { ...deps, fetchImpl: fetchWith(400) }), "/signup?error=invalid");
   assert.equal(await signupTarget(FORM, { ...deps, fetchImpl: fetchWith(502) }), "/signup?error=failed");
   assert.equal(await signupTarget(FORM, { ...deps, fetchImpl: async () => { throw new Error("down"); } }), "/signup?error=failed");
   calls.length = 0;
-  assert.equal(await signupTarget({ ...FORM, password: "1234567" }, { ...deps, fetchImpl: fetchWith(200) }), "/signup?error=short");
+  // a stray password on the form object is never forwarded and never an error
+  assert.equal(await signupTarget({ ...FORM, password: "1" }, { ...deps, fetchImpl: fetchWith(200) }), SIGNUP_SENT_PATH);
+  assert.ok(!("password" in JSON.parse(calls[0].init.body)));
+  calls.length = 0;
   assert.equal(await signupTarget({ ...FORM, name: "  " }, { ...deps, fetchImpl: fetchWith(200) }), "/signup?error=invalid");
   assert.equal(calls.length, 0, "a locally invalid form never reaches the function");
   assert.equal(await signupTarget(FORM, {}), "/signup?error=unconfigured");
