@@ -294,8 +294,15 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 >    from the Shopify App Store" link. About 48 hours later Shopify sends `shop/redact`, which
 >    deletes the store's data from bcns.
 >
-> The review account holds one Shopify store at a time. If you install on a second store while
-> the first is still connected, the app refuses and asks you to uninstall from the first store.
+> Shopify is the only source under review. The other cards on Sources (Meta Ads, Monday.com,
+> Google Meet, Google Drive, QuickBooks) read "Request connection" and lead to no outside login.
+>
+> One bcns account connects one Shopify store, by design: a workspace's data never mixes two
+> stores. The review account is bound to the first store you install it on, and uninstalling and
+> reinstalling on that same store works any number of times. Installing on a different store with
+> the same account is refused with "This bcns account is already connected to a different Shopify
+> store". That refusal is the intended protection, not an error. To test with a different store,
+> write to nseluga@bcn-services.com and we reset the review account the same day.
 >
 > The app only reads data. It never changes products, orders or customers. For help, write to
 > nseluga@bcn-services.com or see https://bcn-services.com.
@@ -305,6 +312,16 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 `add-member.ts`). Leave the reviewer client's `app_url` empty: the hub then shows no dashboard
 button, and **Your data** in the top bar is how the reviewer reaches `/data`. If `app_url` is
 set, the hub shows "Open your dashboard" and a "Dashboard" top-bar link to it, and it must load.
+
+**Before every (re)submission** (first rejection, 2026-10-01: our own uninstall test left the
+review tenant bound to `bcns-review-dev`, so the reviewer's store hit BCNS7, and the reviewer
+then clicked Meta's Connect and landed on a Facebook login):
+- The review tenant has no `shopify` row in `data.connector_schedule`. BCNS7 counts a revoked
+  token's row too. Clear it by queueing a `shop/redact` for the old shop (insert into
+  `data.privacy_requests` as an operator; the worker deletes the tenant's Shopify rows on its
+  next tick once the token has been dead 24 hours).
+- `OAUTH_APPROVED_SOURCES=shopify` in `/srv/connect/env`, so no other card has a Connect button
+  leading to an outside login. Restart `bcns-app@connect` and confirm a new pid.
 
 ---
 
