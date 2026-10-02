@@ -2,7 +2,10 @@
  * signup — owner self-service sign-up (P1). Public: no caller JWT exists yet, so the
  * function is deployed with --no-verify-jwt and every limit lives here and in the database.
  *
- *   1. create the auth user (admin API, unconfirmed — hosted public sign-ups stay OFF);
+ *   1. create the auth user (admin API, unconfirmed, NO password — hosted public sign-ups stay OFF).
+ *      Taking no password is the pre-hijack fix: whoever proves inbox ownership by clicking the
+ *      confirmation link sets the password on the hub's /set-password. A `password` in the body is
+ *      ignored, not rejected, so a stale client still gets the same 200;
  *   2. api.signup_create_client: the pending client + owner membership, one transaction,
  *      capped per rolling hour (BCNS8);
  *   3. ask GoTrue to send its own confirmation email, which lands on the hub's /auth/confirm.
@@ -23,10 +26,6 @@ import { json } from "../_shared/guard.ts";
 /** Where the confirmation email's link lands: the hub's token-verifying route (type=email). */
 export const SIGNUP_REDIRECT = "https://connect.bcn-services.com/auth/confirm";
 
-/** Mirrors apps/connect/lib/auth-link.ts MIN_PASSWORD_LENGTH. */
-export const MIN_PASSWORD_LENGTH = 8;
-/** bcrypt ignores bytes past 72; refuse rather than silently truncate. */
-const MAX_PASSWORD_LENGTH = 72;
 const MAX_NAME_LENGTH = 100;
 const MAX_EMAIL_LENGTH = 254;
 
@@ -39,12 +38,12 @@ export interface SignupDeps {
   /** Function secret SIGNUP_ENABLED === "1". False = 404, nothing called. */
   enabled: boolean;
   /** userId null = not created (most often: the address already has an account). */
-  createUser(email: string, password: string): Promise<{ userId: string | null; error?: string }>;
+  createUser(email: string): Promise<{ userId: string | null; error?: string }>;
   /** api.signup_create_client. Throws with `code` set to the SQLSTATE on failure. */
   createClient(userId: string, name: string): Promise<string>;
   deleteUser(userId: string): Promise<void>;
   sendConfirmation(email: string, redirectTo: string): Promise<{ error?: string }>;
-  /** Event + ids only — never the email, the password or the request body. */
+  /** Event + ids only — never the email or the request body. */
   log(event: string, data: Record<string, unknown>): void;
 }
 
@@ -55,17 +54,13 @@ export async function handle(request: Request, deps: SignupDeps): Promise<Respon
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  const password = typeof body?.password === "string" ? body.password : "";
   if (!name || name.length > MAX_NAME_LENGTH) return json({ error: "invalid_name" }, 400);
   if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) return json({ error: "invalid_email" }, 400);
-  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    return json({ error: "invalid_password" }, 400);
-  }
 
-  const created = await deps.createUser(email, password);
+  const created = await deps.createUser(email);
   if (!created.userId) {
-    // Every createUser refusal answers the same 200. Never map weak_password/validation_failed to
-    // 400: GoTrue checks for a duplicate email before password strength, so that would leak existence.
+    // Every createUser refusal answers the same 200. Never map a GoTrue validation
+    // error to 400: it checks for a duplicate email first, so that would leak existence.
     deps.log("signup_not_created", { reason: created.error ?? "unknown" });
     if (created.error === "email_exists") {
       // Re-send the confirmation: GoTrue /resend is a no-op for confirmed or unknown users and has its

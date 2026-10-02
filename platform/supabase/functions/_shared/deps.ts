@@ -187,8 +187,9 @@ export function shopRedactDeps(): ShopRedactDeps {
 export function signupDeps(): SignupDeps {
   return {
     enabled: Deno.env.get("SIGNUP_ENABLED") === "1",
-    async createUser(email, password) {
-      const { data, error } = await admin().auth.admin.createUser({ email, password, email_confirm: false });
+    async createUser(email) {
+      // No password: the inbox owner sets it on /set-password after confirming (pre-hijack fix).
+      const { data, error } = await admin().auth.admin.createUser({ email, email_confirm: false });
       return { userId: data?.user?.id ?? null, error: error?.code ?? error?.message };
     },
     async createClient(userId, name) {

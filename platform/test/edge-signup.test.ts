@@ -8,6 +8,7 @@ const NEW_USER = '33333333-3333-4333-8333-333333333333'
 
 interface Recorded {
   users: Array<{ email: string }>
+  argCounts: number[]
   clients: Array<{ userId: string; name: string }>
   deleted: string[]
   mails: Array<{ email: string; redirectTo: string }>
@@ -17,10 +18,12 @@ interface Recorded {
 function deps(
   over: { exists?: boolean; rpcCode?: string; deleteFails?: boolean; enabled?: boolean; mailThrows?: boolean } = {},
 ): { deps: SignupDeps; rec: Recorded } {
-  const rec: Recorded = { users: [], clients: [], deleted: [], mails: [], logs: [] }
+  const rec: Recorded = { users: [], argCounts: [], clients: [], deleted: [], mails: [], logs: [] }
   const d: SignupDeps = {
     enabled: over.enabled ?? true,
-    createUser: async (email) => {
+    createUser: async (...args) => {
+      const [email] = args
+      rec.argCounts.push(args.length)
       rec.users.push({ email })
       return over.exists ? { userId: null, error: 'email_exists' } : { userId: NEW_USER }
     },
@@ -43,7 +46,7 @@ function deps(
   return { deps: d, rec }
 }
 
-const GOOD = { name: 'Acme Bakery', email: 'Owner@Acme.example ', password: 'correct-horse' }
+const GOOD = { name: 'Acme Bakery', email: 'Owner@Acme.example ' }
 
 function post(body: unknown, method = 'POST'): Request {
   return new Request('https://p.supabase.co/functions/v1/signup', {
@@ -68,13 +71,24 @@ describe('signup', () => {
     expect(rec.deleted).toEqual([])
   })
 
+  it('takes no password: createUser gets the email only, and a body that still carries one is accepted and ignored', async () => {
+    for (const password of [undefined, 'short', 'x'.repeat(100), 'correct-horse', 42]) {
+      const { deps: d, rec } = deps()
+      const res = await read(await handle(post(password === undefined ? GOOD : { ...GOOD, password }), d))
+      expect(res).toEqual({ status: 200, body: JSON.stringify(ACCEPTED) })
+      expect(rec.users).toEqual([{ email: 'owner@acme.example' }])
+      expect(rec.argCounts).toEqual([1])
+      expect(JSON.stringify(rec)).not.toContain('correct-horse')
+    }
+  })
+
   it('switch off (SIGNUP_ENABLED unset): 404 for any request, no dependency called', async () => {
     for (const req of [post(GOOD), post(null, 'GET')]) {
       const { deps: d, rec } = deps({ enabled: false })
       const res = await handle(req, d)
       expect(res.status).toBe(404)
       expect(await res.json()).toEqual({ error: 'not_found' })
-      expect(rec).toEqual({ users: [], clients: [], deleted: [], mails: [], logs: [] })
+      expect(rec).toEqual({ users: [], argCounts: [], clients: [], deleted: [], mails: [], logs: [] })
     }
   })
 
@@ -125,8 +139,6 @@ describe('signup', () => {
       [{ ...GOOD, name: '  ' }, 'invalid_name'],
       [{ ...GOOD, name: 'x'.repeat(101) }, 'invalid_name'],
       [{ ...GOOD, email: 'not-an-email' }, 'invalid_email'],
-      [{ ...GOOD, password: 'short' }, 'invalid_password'],
-      [{ ...GOOD, password: 'x'.repeat(73) }, 'invalid_password'],
       [null, 'invalid_name'],
     ] as const) {
       const { deps: d, rec } = deps()
