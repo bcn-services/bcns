@@ -1,4 +1,3 @@
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, SectionHeading } from "@bcn-services/ui";
 import { requireHub } from "@/lib/session";
 import { inviteMember, removeMember } from "./actions";
 
@@ -42,81 +41,65 @@ export default async function TeamPage({
 
   return (
     <>
-      <SectionHeading
-        as="h1"
-        align="left"
-        title="Team"
-        description={
-          isOwner
+      <div>
+        <h1 className="page-title">
+          <b>Team</b>
+        </h1>
+        <p className="lead">
+          {isOwner
             ? "Everyone who can sign in to this workspace. Owners can invite and remove."
-            : "Everyone who can sign in to this workspace. Ask an owner to make changes."
-        }
-      />
+            : "Everyone who can sign in to this workspace. Ask an owner to make changes."}
+        </p>
+      </div>
 
       {searchParams.ok && MESSAGES[searchParams.ok] ? (
-        <p role="status" className="rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
+        <p role="status" className="note">
           {MESSAGES[searchParams.ok]}
         </p>
       ) : null}
       {searchParams.error ? (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p role="alert" className="note note-alert">
           {ERRORS[searchParams.error] ?? ERRORS.failed}
         </p>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Members</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-border">
-          {members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No members yet.</p>
-          ) : null}
+      <section className="panel" aria-labelledby="members-h">
+        <h2 id="members-h">Members</h2>
+        <div className="mlist">
+          {members.length === 0 ? <p className="sub">No members yet.</p> : null}
           {members.map((member) => (
-            <div key={member.user_id} className="flex flex-wrap items-center gap-3 py-3 first:pt-0">
+            <div key={member.user_id} className="mem">
               {/* memberships_v1 carries no email — auth.users is not exposed to members. */}
-              <code className="font-mono text-sm">{member.user_id.slice(0, 8)}</code>
-              <Badge className="border-border bg-muted text-muted-foreground">{member.role}</Badge>
-              {member.is_smoke ? (
-                <Badge className="border-border bg-muted text-muted-foreground">health check</Badge>
-              ) : null}
-              {member.user_id === membership.userId ? (
-                <span className="text-sm text-muted-foreground">you</span>
-              ) : null}
+              <code>{member.user_id.slice(0, 8)}</code>
+              <span className={member.user_id === membership.userId ? "chip chip-own" : "chip"}>{member.role}</span>
+              {member.is_smoke ? <span className="chip">health check</span> : null}
+              {member.user_id === membership.userId ? <span className="you">you</span> : null}
               {isOwner && !member.is_smoke && member.user_id !== membership.userId ? (
-                <form action={removeMember} className="ml-auto">
+                <form action={removeMember}>
                   <input type="hidden" name="user_id" value={member.user_id} />
-                  <Button type="submit" variant="outline" size="sm">
+                  <button type="submit" className="btn btn-out btn-sm">
                     Remove
-                  </Button>
+                  </button>
                 </form>
               ) : null}
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {isOwner ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Invite someone</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={inviteMember} className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="invite-email">
-                Email
-                <input
-                  id="invite-email"
-                  name="email"
-                  type="email"
-                  required
-                  className="h-10 w-72 max-w-full rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </label>
-              <Button type="submit">Send invite</Button>
-            </form>
-          </CardContent>
-        </Card>
+        <section className="panel" aria-labelledby="invite-h">
+          <h2 id="invite-h">Invite someone</h2>
+          <form action={inviteMember} className="inv">
+            <label className="field" htmlFor="invite-email">
+              Email
+              <input id="invite-email" name="email" type="email" required />
+            </label>
+            <button type="submit" className="btn">
+              Send invite
+            </button>
+          </form>
+        </section>
       ) : null}
     </>
   );

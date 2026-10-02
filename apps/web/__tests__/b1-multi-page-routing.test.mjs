@@ -41,16 +41,18 @@ assert("app/privacy/page.tsx exists", existsSync(resolve(root, "app/privacy/page
 assert("app/terms/page.tsx exists", existsSync(resolve(root, "app/terms/page.tsx")));
 
 // ---------------------------------------------------------------------------
-// [2] Home page: only Hero + NavCards + ContactSection (no forbidden sections)
+// [2] Home page: only Hero + ConnectStory + ProofRow + ContactSection (no forbidden sections)
 // ---------------------------------------------------------------------------
-console.log("\n[2] Home page is thin — hero + nav-cards + contact only");
+console.log("\n[2] Home page is thin — hero + connect story + proof row + contact only");
 const homeSrc = readFileSync(resolve(root, "app/page.tsx"), "utf8");
 assert("home imports Hero", homeSrc.includes("Hero"));
-assert("home imports NavCards", homeSrc.includes("NavCards"));
+assert("home imports ConnectStory", homeSrc.includes("ConnectStory"));
+assert("home imports ProofRow", homeSrc.includes("ProofRow"));
 assert("home imports ContactSection", homeSrc.includes("ContactSection"));
 assert("home does NOT import ProblemSolution", !homeSrc.includes("ProblemSolution"));
 assert("home does NOT import DeliveryModels", !homeSrc.includes("DeliveryModels"));
-assert("home DOES import HowItWorks", homeSrc.includes("HowItWorks"));
+assert("home does NOT import NavCards", !homeSrc.includes("NavCards"));
+assert("home does NOT import HowItWorks", !homeSrc.includes("HowItWorks"));
 assert("home does NOT import Pricing", !homeSrc.includes("Pricing"));
 assert("home does NOT import Faq", !homeSrc.includes("Faq"));
 assert("home does NOT import AboutFounder", !homeSrc.includes("AboutFounder"));

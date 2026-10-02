@@ -42,7 +42,7 @@ export function UseCases() {
             }`}
           >
             <div className="flex items-start justify-between gap-6">
-              <span className="rounded-full border border-accent px-3.5 py-1.5 font-display text-xs font-medium uppercase tracking-[0.1em] text-primary">
+              <span className="rounded-full border border-accent px-3.5 py-1.5 font-display text-xs font-medium uppercase tracking-[0.1em] text-primary-ink">
                 {item.tag}
               </span>
               <Cube

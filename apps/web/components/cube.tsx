@@ -56,6 +56,26 @@ export function Cube({
   );
 }
 
+/** The mark's three cubes (top first so the front two paint over the shared seams), each as [top, left, right] faces. */
+export const LOGO_CUBES: ReadonlyArray<readonly [string, string, string]> = [
+  // Top cube first so the two front cubes paint over the shared seams.
+  [
+    "M110 -8.5 L142 10 L110 28.5 L78 10 Z",
+    "M78 10 L110 28.5 L110 65.5 L78 47 Z",
+    "M110 28.5 L142 10 L142 47 L110 65.5 Z",
+  ],
+  [
+    "M78 47 L110 65.5 L78 84 L46 65.5 Z",
+    "M46 65.5 L78 84 L78 121 L46 102.5 Z",
+    "M78 84 L110 65.5 L110 102.5 L78 121 Z",
+  ],
+  [
+    "M142 47 L174 65.5 L142 84 L110 65.5 Z",
+    "M110 65.5 L142 84 L142 121 L110 102.5 Z",
+    "M142 84 L174 65.5 L174 102.5 L142 121 Z",
+  ],
+];
+
 /**
  * The three-cube mark: two seated side by side, one resting in line on top.
  * Server-safe — no motion, no client boundary.
@@ -67,29 +87,10 @@ export function LogoMark({ className }: { className?: string }) {
   // bottom vertex lands exactly where the two front cubes meet, so its two lower
   // edges lie flush along their top faces with no overhang. Written out rather
   // than transformed so the paths stay literal.
-  const cubes: Array<readonly [string, string, string]> = [
-    // Top cube first so the two front cubes paint over the shared seams.
-    [
-      "M110 -8.5 L142 10 L110 28.5 L78 10 Z",
-      "M78 10 L110 28.5 L110 65.5 L78 47 Z",
-      "M110 28.5 L142 10 L142 47 L110 65.5 Z",
-    ],
-    [
-      "M78 47 L110 65.5 L78 84 L46 65.5 Z",
-      "M46 65.5 L78 84 L78 121 L46 102.5 Z",
-      "M78 84 L110 65.5 L110 102.5 L78 121 Z",
-    ],
-    [
-      "M142 47 L174 65.5 L142 84 L110 65.5 Z",
-      "M110 65.5 L142 84 L142 121 L110 102.5 Z",
-      "M142 84 L174 65.5 L174 102.5 L142 121 Z",
-    ],
-  ];
-
   return (
     <svg viewBox="44 -10.5 132 133.5" className={className} aria-hidden focusable="false">
       <g stroke="hsl(var(--foreground))" strokeWidth={2.5} strokeLinejoin="round">
-        {cubes.map((faces, i) => (
+        {LOGO_CUBES.map((faces, i) => (
           <g key={i}>
             {faces.map((d, j) => (
               <path key={j} d={d} fill={FACE_FILLS[j]} />

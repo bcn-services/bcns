@@ -20,23 +20,23 @@ import { dashboardUrl, type ClientRow } from "@/lib/sources";
 export function HubNav({ client, role }: { client: ClientRow | null; role: "member" | "owner" }) {
   const dashboard = dashboardUrl(client);
   return (
-    <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-      <Link href="/" className="hover:text-foreground">
+    <nav aria-label="Hub">
+      <Link href="/">
         Sources
       </Link>
-      <Link href="/data" className="hover:text-foreground">
+      <Link href="/data">
         Your data
       </Link>
       {dashboard ? (
-        <a href={dashboard} className="hover:text-foreground">
+        <a href={dashboard}>
           Dashboard
         </a>
       ) : null}
-      <Link href="/team" className="hover:text-foreground">
+      <Link href="/team">
         Team
       </Link>
       {role === "owner" ? (
-        <Link href="/access" className="hover:text-foreground">
+        <Link href="/access">
           Access
         </Link>
       ) : null}
@@ -49,7 +49,7 @@ export function DashboardButton({ client }: { client: ClientRow | null }) {
   if (!dashboard) return null;
   return (
     <a href={dashboard} className="shrink-0">
-      <Button type="button">Open your dashboard</Button>
+      <Button type="button" className="btn btn-sm">Open your dashboard</Button>
     </a>
   );
 }

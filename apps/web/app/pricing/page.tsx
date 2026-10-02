@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { PageHead, CtaBand } from "@/components/kit";
+import { PageHead } from "@/components/kit";
+import { CtaBand } from "@/components/cta-band";
 import { Pricing } from "@/components/pricing";
 import { Faq } from "@/components/faq";
 import { SiteFooter } from "@/components/site-footer";
@@ -24,10 +25,11 @@ export default function PricingPage() {
           emphasis="actually need"
           description={pricing.description}
           size="oversized"
+          rule={false}
         />
         <Pricing />
-        <Faq />
-        <CtaBand title={contactSection.title} description={contactSection.description} />
+        <Faq faq={siteContent.faq} emphasis={siteContent.connectDemo.faqEmphasis} />
+        <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" highlights={[]} />
       </main>
       <SiteFooter />
     </div>

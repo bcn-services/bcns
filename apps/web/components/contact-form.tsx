@@ -142,7 +142,7 @@ export function ContactForm() {
         />
       </Field>
 
-      <Field id="message" label="What do you need?" error={errors.message}>
+      <Field id="message" label="What's slowing you down?" error={errors.message}>
         <Textarea
           id="message"
           name="message"
@@ -157,7 +157,7 @@ export function ContactForm() {
         </p>
       ) : null}
 
-      <Button type="submit" size="lg" disabled={status === "submitting"} className="w-full sm:w-auto">
+      <Button type="submit" size="lg" disabled={status === "submitting"} className="w-full bg-primary-ink hover:bg-primary-ink/90 sm:w-auto">
         {status === "submitting" ? (
           <>
             <Loader2 className="size-4 animate-spin" aria-hidden />

@@ -87,7 +87,7 @@ be ruthless about length.
 
 ### ctaSecondary
 - **Field:** `hero.ctaSecondary`
-- **Purpose:** Text for the secondary CTA button (links to `/services#connect`, the How bcns Connect works section)
+- **Purpose:** Text for the secondary CTA button (links to `#how`, the pinned "How it works" stage on the home page)
 - **Tone:** Softer than primary; invites exploration rather than conversion
 - **Length:** 2-5 words, ≤30 chars
 
@@ -344,7 +344,7 @@ tuple.
 
 How bcns Connect works, as three steps with the monthly rate as the numeric
 anchor. Same shape as `aiConsult` (`AiConsultContent`) and rendered by the
-same component with `id="connect"` (the hero's secondary CTA links here).
+same component with `id="connect"`.
 Describe the finished product, the end vision, in the owner's words: tools
 they recognise, never how the connection works underneath.
 
@@ -579,6 +579,12 @@ Each entry has:
 - **Renders twice:** card heading on `/work` and the `<h1>` on `/work/[slug]`, so it has to work standalone in both.
 - **Length:** ≤60 chars
 
+#### items[n].titleEmphasis
+- **Field:** `pastWork.items[n].titleEmphasis` (optional)
+- **Purpose:** The trailing phrase of `title` set in the blue semibold emphasis on the `/work` card heading ("dashboard", "and admin"). Not applied on the `/work/[slug]` `<h1>`.
+- **Note:** Must be a substring of `title`; if it is missing the title renders plain.
+- **Length:** a word or short phrase
+
 #### items[n].tag
 - **Field:** `pastWork.items[n].tag`
 - **Purpose:** Industry plus build type, rendered as a `Badge` on the `/work` card
@@ -700,6 +706,12 @@ every case study — not per-item.
 - **Purpose:** Section label above `items[n].outcome` on the detail page. Currently `The outcome`.
 - **Tone:** Short, factual noun phrase
 - **Length:** 1-3 words
+
+#### readLabel
+- **Field:** `pastWork.readLabel`
+- **Purpose:** Link label under each case on the `/work` list, pointing at the detail page. Currently `Read the case study`.
+- **Tone:** Short verb phrase
+- **Length:** 2-5 words
 
 ---
 
@@ -1156,6 +1168,101 @@ filled as of the C1 pass. Edit in place if positioning language changes.
 #### pageMeta.about.description
 - **Field:** `pageMeta.about.description`
 - **Length:** 140-160 chars
+
+### pageMeta.connect, pageMeta.deluxe, pageMeta.aiConsulting
+
+Same `{ title, description }` shape and lengths as the entries above, for
+`/services/connect`, `/services/deluxe` and `/services/ai-consulting`.
+
+## Tools (`siteContent.tools`) — Home, /services/connect
+
+Five connected tools, in display order: Shopify, Square, QuickBooks, Google
+Calendar, Gmail. Each is `{ id, name, short, role }`. `id` is a `ToolId`
+(`shopify | square | quickbooks | calendar | gmail`) and matches the `--tool-*` CSS
+variable and the `tool.*` Tailwind color. `short` is the hero chip name ("Calendar");
+`role` is the one-word line on the Connect chips. Plain tool names an owner recognises.
+
+## Pillars (`siteContent.pillars`) — Home, /services, /pricing
+
+The three services as cube cards: `{ n, label, name, line, price, href }`.
+`n` is "01"-"03", `label` the eyebrow ("Get organized", "Put it to work",
+"Learn to optimize"), `name` the card title, `line` one sentence, `price` the
+short price, `href` the sub-page route. Prices must match `pricing.tiers`.
+
+## Ask Hero (`siteContent.askHero`) — Home
+
+The looping question in the hero art. `ariaLabel` describes the group; `items`
+is exactly three `{ question, toolIds, answerLead, answerRest }`. `toolIds` lists
+the tools that light up; `answerLead` is the bold opening, `answerRest` the rest.
+Answers are invented demo numbers; keep them small and believable.
+
+## Story (`siteContent.story`) — Home
+
+The five-step pinned "How it works" stage. `steps` is five
+`{ label, title, emphasis, description }`; `title` is the whole heading and
+`emphasis` is the substring to style as the accent. `ariaLabel`, `railLabel` and
+`diagramLabel` are accessibility strings; `proofAriaLabel` labels the proof row
+under it (its three lines are `hero.proofPoints`). `chart` holds the last step's
+`question`, `answerLead` (bold), `answerRest`, `days` and `values` (7 bars, Mon to Sun).
+
+## Services Overview (`siteContent.servicesOverview`) — /services
+
+Page head and process headings for `/services`: `eyebrow`, `title`, `emphasis`,
+`cubeLabel`, `cubeAriaLabel` (the cube button's name), `cardMore` (the "Learn more" label on each pillar card), `processTitle`, `processEmphasis`, and `ctaEmphasis` (the substring of
+`contactSection.title` styled in the closing band). The lede reuses
+`useCases.description`; the three process steps reuse `howItWorks.items`.
+
+## Connect Demo (`siteContent.connectDemo`) — /services/connect
+
+Extras for the Connect page; the three steps and the rate are `connect`.
+`eyebrow`, `title`, `emphasis` head the page; `noSetupFee` sits beside
+`connect.rate`; `audience` is the "who it's for" line under the head
+description; `replayLabel` is the "Play again" button. `stepEmphasis` and
+`stepLabels` decorate each `connect.steps` entry. `toolsEyebrow`, `toolsTitle`,
+`toolsEmphasis`, `toolsLede` head the tools section; `extraChips` follow the five
+`tools`. `rows` label the sorted rows and `destinations` are the three output cards
+(`title`, `line`, `short` for narrow layouts). `faqEmphasis` and `faqQuestions` pick
+six entries from `faq.items` by question text. `stageLabel` and `diagramLabel` are
+accessibility strings.
+
+## Deluxe Demo (`siteContent.deluxeDemo`) — /services/deluxe
+
+Extras for the Deluxe page. Head copy is `useCases.blockEyebrow/blockTitle/
+blockDescription` (`titleEmphasis` styles part of the title; `audience` is the
+"who it's for" line under the description); the four cards are
+`useCases.items`; past work is `pastWork.items` (`workLabels` is the price-slot
+label per item); pricing is `pricing.tiers[1]`. `ctaSecondary`, `howEyebrow`,
+`askTitle`, `askEmphasis`, `askLede`, `groupLabel`, `dashboardTitle`, `agentLabel`,
+`agentPlaceholder` and `dayLetters` label the interactive demo. `chips` is three
+`{ question, tiles, listHeading, bars | rows, answer, source }`: `tiles` are three
+`{ name, value, prefix?, suffix?, sub, toolIds }` (prefix/suffix omitted when none) that count up; `bars` are percent
+heights, `rows` are `{ title, detail, tag }`; `answer` marks bold with `**`.
+`steps` is four `{ label, title, emphasis, description }`. `buildEyebrow`,
+`buildTitle`, `buildEmphasis`, `workEyebrow`, `workTitle`, `workEmphasis`,
+`workCta` and `pricingEyebrow` head the remaining sections.
+
+## AI Day (`siteContent.aiDay`) — /services/ai-consulting
+
+Extras for the AI consulting page; the three steps and the rate are `aiConsult`.
+`titleEmphasis` is the substring of `aiConsult.title` styled as the accent in the
+page head; `audience` is the "who it's for" line under the head description.
+`ctaSecondary` is "See the day"; `tabsLabel` and `tabs` (Morning, Midday,
+Afternoon) drive the tablist; `stepEmphasis` and `stepLabels` decorate each
+`aiConsult.steps` entry. `timeline` has the diagram strings (`ariaLabel`, `short`
+and `long` stop labels, `start`, `end`, `now`). `leaveEyebrow`, `leaveTitle`,
+`leaveEmphasis` and `leave` (three `{ n, title, line }`) are the "what you leave
+with" cards. `pricingEyebrow` heads the price block (`pricing.tiers[2]`);
+`faqEmphasis` and `faqQuestions` pick four entries from `faq.items`.
+
+## Pricing Page (`siteContent.pricingPage`) — /pricing
+
+`learnMore` is the link label under each tier, in tier order; `disclaimer` is the
+standard-price note above the FAQ.
+
+## About Page (`siteContent.aboutPage`) — /about
+
+`whyHeading` is the "Why bcns" eyebrow above `about.whyBcns`. `whyEmphasis` is the
+substring of its closing line styled as the accent ("the specific one.").
 
 ---
 

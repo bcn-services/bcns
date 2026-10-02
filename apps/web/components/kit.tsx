@@ -1,4 +1,3 @@
-import Link from "next/link";
 import * as React from "react";
 
 import { Reveal } from "@/components/reveal";
@@ -7,7 +6,8 @@ import { Cube } from "@/components/cube";
 /**
  * The pieces every page in the design language is assembled from: the page
  * gutter, the blue eyebrow, the light display headline, the hairline rule that
- * draws itself in on scroll, the CTA band, and the quiet cube texture.
+ * draws itself in on scroll, and the quiet cube texture. (The CTA band lives in cta-band.tsx so
+ * client components that import these primitives don't pull in the site content.)
  *
  * Authored once here so a spacing or type-scale decision is made in one place
  * rather than re-derived per page.
@@ -38,7 +38,7 @@ export function emphasize(text: string, phrase: string): React.ReactNode {
 export function Eyebrow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <p
-      className={`font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary ${className}`.trim()}
+      className={`font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary-ink ${className}`.trim()}
     >
       {children}
     </p>
@@ -70,6 +70,7 @@ export function PageHead({
   emphasis,
   description,
   size = "default",
+  rule = true,
 }: {
   eyebrow: string;
   title: string;
@@ -77,9 +78,17 @@ export function PageHead({
   description: string;
   /** `oversized` is the page's one bold moment — use at most once per page. */
   size?: "default" | "oversized";
+  /** Full-width hairline under the head. Pages whose next block draws its own inset rule pass `false`. */
+  rule?: boolean;
 }) {
   return (
-    <div className={`${GUTTER} flex flex-col items-start border-b border-border py-16 sm:py-20 lg:pb-16 lg:pt-[5.75rem]`}>
+    <div
+      className={`${GUTTER} flex flex-col items-start ${
+        rule
+          ? "border-b border-border py-16 sm:py-20 lg:pb-16 lg:pt-[5.75rem]"
+          : "pb-16 pt-16 lg:pt-[4.5rem]"
+      }`}
+    >
       <Reveal>
         <Eyebrow>{eyebrow}</Eyebrow>
       </Reveal>
@@ -88,7 +97,7 @@ export function PageHead({
         delay={80}
         className={`mt-5 text-balance font-light leading-[1.06] tracking-[-0.025em] ${
           size === "oversized"
-            ? "max-w-[20ch] text-[clamp(2.75rem,7.5vw,5.25rem)]"
+            ? "max-w-[16ch] text-[clamp(2.75rem,7.5vw,5.25rem)]"
             : "max-w-[22ch] text-[clamp(2.25rem,5vw,3.625rem)] lg:max-w-[18ch]"
         }`}
       >
@@ -98,60 +107,6 @@ export function PageHead({
         {description}
       </Reveal>
     </div>
-  );
-}
-
-/**
- * Closing CTA. `tone="plate"` is the full-bleed #7EB3F7 version — a page's one
- * bold moment. `tone="quiet"` is the hairline row that floods blue on hover.
- * Copy comes from `contactSection`, verbatim.
- */
-export function CtaBand({
-  title,
-  description,
-  tone = "quiet",
-}: {
-  title: string;
-  description: string;
-  tone?: "quiet" | "plate";
-}) {
-  const plate = tone === "plate";
-  return (
-    <Link
-      href="/#contact"
-      className={`group block border-t border-border ${
-        plate
-          ? "bg-accent text-accent-foreground"
-          : "flood-row border-b focus-visible:outline-none"
-      }`}
-    >
-      <div className={`${GUTTER} grid items-center gap-8 py-14 sm:grid-cols-[1fr_3.75rem] sm:py-[3.5rem]`}>
-        <div>
-          <p
-            className={`text-balance font-light tracking-[-0.02em] ${
-              plate ? "text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.05]" : "text-[clamp(1.75rem,3.4vw,2.5rem)]"
-            }`}
-          >
-            {title}
-          </p>
-          <p
-            className={`mt-2.5 max-w-3xl text-[0.9375rem] leading-relaxed ${
-              plate ? "text-accent-foreground/85" : "text-muted-foreground group-hover:text-accent-foreground"
-            }`}
-          >
-            {description}
-          </p>
-        </div>
-        <span
-          aria-hidden
-          className={`hidden text-[1.75rem] transition-transform duration-[350ms] ease-out sm:block sm:justify-self-end ${
-            plate ? "group-hover:translate-x-2" : "flood-arrow"
-          }`}
-        >
-          &rarr;
-        </span>
-      </div>
-    </Link>
   );
 }
 

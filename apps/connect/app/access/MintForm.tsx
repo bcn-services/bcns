@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@bcn-services/ui";
 import { mintAgentLogin, type MintResult } from "./actions";
 
 /**
@@ -47,8 +46,9 @@ export function MintForm({ supabaseUrl, anonKey }: { supabaseUrl?: string; anonK
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Button
+        <button
           type="button"
+          className="btn"
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
@@ -57,43 +57,43 @@ export function MintForm({ supabaseUrl, anonKey }: { supabaseUrl?: string; anonK
           }
         >
           {pending ? "Minting…" : result?.ok ? "Mint a new agent login" : "Mint agent login"}
-        </Button>
+        </button>
       </div>
 
       {result && !result.ok ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="note note-alert">
           {result.message}
         </p>
       ) : null}
 
       {result?.ok ? (
-        <div className="rounded-md border border-primary/40 bg-primary/10 p-4 text-sm">
-          <p className="font-medium text-primary">
+        <div className="minted">
+          <p className="h">
             Copy this now — the password is shown once and is not stored anywhere.
           </p>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            <dt className="text-muted-foreground">Email</dt>
-            <dd className="font-mono break-all">{result.email}</dd>
-            <dt className="text-muted-foreground">Password</dt>
-            <dd className="font-mono break-all">{result.password}</dd>
+          <dl>
+            <dt>Email</dt>
+            <dd>{result.email}</dd>
+            <dt>Password</dt>
+            <dd>{result.password}</dd>
           </dl>
         </div>
       ) : null}
 
       {result?.ok && supabaseUrl && anonKey ? (
-        <div className="flex flex-col gap-2 text-sm">
-          <p className="font-medium">Connect Claude Code</p>
-          <p className="text-muted-foreground">
+        <div className="conn">
+          <p className="h">Connect Claude Code</p>
+          <p>
             The MCP server takes a short-lived token, not the password. Run this in your own
             terminal: it signs in as the agent and hands the token to Claude Code.
           </p>
-          <pre className="overflow-x-auto rounded-md border bg-muted p-3 font-mono text-xs">
+          <pre className="code">
             {signInSnippet(supabaseUrl, anonKey, result.email)}
           </pre>
-          <p className="text-muted-foreground">
+          <p>
             The token expires 10 minutes after sign-in (step 1 prints the exact time), and
             Claude Code keeps the one you gave it. When the tools stop answering, run{" "}
-            <code className="font-mono">claude mcp remove bcns</code> and both steps again.
+            <code className="m">claude mcp remove bcns</code> and both steps again.
           </p>
         </div>
       ) : null}

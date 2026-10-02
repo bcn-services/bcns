@@ -4,45 +4,46 @@ import { Reveal } from "@/components/reveal";
 import { Eyebrow, GUTTER } from "@/components/kit";
 
 /**
- * Reviews. Structure unchanged from production — heading, then either the
- * quote grid or the holding state. Restyled to the shared language: the empty
- * state is now a quiet tint panel rather than a shimmering skeleton grid,
- * because a placeholder that animates reads as louder than the real content
- * it stands in for.
+ * Reviews on the tint band: heading left, then either the quote grid or the
+ * holding state (a hairline-topped note with an outline button) right.
  */
 export function Reviews() {
   const { eyebrow, title, description, items, holdingState } = siteContent.reviews;
 
   return (
-    <section id="reviews" className="border-b border-border bg-secondary">
-      <div className={`${GUTTER} py-16 sm:py-[4.75rem]`}>
-        <Reveal>
-          <Eyebrow>{eyebrow}</Eyebrow>
-        </Reveal>
-        <Reveal
-          as="h2"
-          delay={80}
-          className="mt-4 text-balance text-[clamp(1.75rem,3.6vw,2.25rem)] font-light leading-[1.2] tracking-[-0.015em]"
-        >
-          {title}
-        </Reveal>
-        <Reveal as="p" delay={160} className="mt-4 max-w-xl leading-relaxed text-muted-foreground">
-          {description}
-        </Reveal>
+    <section id="reviews" className="border-t border-border bg-secondary">
+      <div
+        className={`${GUTTER} grid gap-10 pb-24 pt-[5.5rem] lg:grid-cols-[5fr_6fr] lg:items-start lg:gap-[4.5rem]`}
+      >
+        <div>
+          <Reveal>
+            <Eyebrow>{eyebrow}</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
+            delay={80}
+            className="mt-4 text-balance text-[clamp(1.9rem,3.8vw,2.75rem)] font-light leading-[1.12] tracking-[-0.02em]"
+          >
+            {title}
+          </Reveal>
+          <Reveal as="p" delay={160} className="mt-[1.125rem] max-w-[30rem] text-[1.1875rem] leading-relaxed text-muted-foreground">
+            {description}
+          </Reveal>
+        </div>
 
         {items.length === 0 ? (
-          <Reveal delay={220} className="mt-12 rounded-2xl border border-border bg-card px-8 py-14 text-center sm:px-16">
-            <p className="text-xl font-semibold">{holdingState.title}</p>
-            <p className="mx-auto mt-4 max-w-md text-muted-foreground">{holdingState.body}</p>
+          <Reveal delay={200} className="max-w-[34rem] border-t border-input pt-7">
+            <h3 className="text-[1.375rem] font-medium leading-[1.3] tracking-[-0.01em]">{holdingState.title}</h3>
+            <p className="mt-3.5 leading-[1.7] text-muted-foreground">{holdingState.body}</p>
             <Link
               href={holdingState.ctaHref}
-              className="lift-button mt-8 inline-block rounded-lg bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground"
+              className="mt-7 inline-block rounded-lg border border-input px-7 py-3.5 text-[0.9375rem] font-medium transition-colors duration-200 hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {holdingState.ctaLabel}
             </Link>
           </Reveal>
         ) : (
-          <div className="mt-12 grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-6 sm:grid-cols-2">
             {items.map(({ quote, author, role, company }) => (
               <div
                 key={`${author}-${company}`}

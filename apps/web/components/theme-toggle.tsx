@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Button } from "@bcn-services/ui";
 
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
@@ -15,11 +14,11 @@ export function ThemeToggle() {
   const isDark = mounted && resolvedTheme === "dark";
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
+    <button
+      type="button"
       aria-label="Toggle color theme"
       onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-[0.625rem] border border-input bg-transparent text-foreground transition-colors hover:border-primary hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-[18px]"
     >
       {mounted ? (
         isDark ? (
@@ -30,6 +29,6 @@ export function ThemeToggle() {
       ) : (
         <span className="size-4" />
       )}
-    </Button>
+    </button>
   );
 }

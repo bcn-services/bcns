@@ -1,14 +1,4 @@
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  SectionHeading,
-  cn,
-} from "@bcn-services/ui";
+import { cn } from "@bcn-services/ui";
 import { requestConnectionAction } from "./actions";
 import { DashboardButton } from "./nav";
 import { loadClient, requireHub } from "@/lib/session";
@@ -29,12 +19,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Token classes only — the preset has no "success" colour, so `ok` uses primary. */
+/** Status label classes (globals.css `.st-*`): colour and dot style only, no pill. */
 const TONE: Record<Tone, string> = {
-  ok: "border-primary/40 bg-primary/10 text-primary",
-  warn: "border-accent bg-accent/25 text-accent-foreground",
-  error: "border-destructive/40 bg-destructive/10 text-destructive",
-  idle: "border-border bg-muted text-muted-foreground",
+  ok: "st-ok",
+  warn: "st-warn",
+  error: "st-error",
+  idle: "st-idle",
 };
 
 function when(iso: string | null, timeZone?: string | null): string {
@@ -73,44 +63,42 @@ export default async function SourcesPage({
 
   return (
     <>
-      <SectionHeading
-        as="h1"
-        align="left"
-        title="Sources"
-        description="What bcns is pulling into your workspace, and how it is doing."
-      />
+      <div>
+        <h1 className="page-title">
+          <b>Sources</b>
+        </h1>
+        <p className="lead">What bcns is pulling into your workspace, and how it is doing.</p>
+      </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
-          <div>
-            <p className="font-medium">{client?.name ?? "Your workspace"}</p>
-            <p className="text-sm text-muted-foreground">{usage ?? "Usage is not available yet."}</p>
-          </div>
-          <DashboardButton client={client} />
-        </CardContent>
-      </Card>
+      <div className="ws">
+        <div>
+          <p className="n">{client?.name ?? "Your workspace"}</p>
+          <p className="u">{usage ?? "Usage is not available yet."}</p>
+        </div>
+        <DashboardButton client={client} />
+      </div>
 
       {searchParams.requested ? (
-        <p role="status" className="rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
+        <p role="status" className="note">
           Request sent — bcns will be in touch about {searchParams.requested}.
         </p>
       ) : null}
       {mailto ? (
-        <p role="status" className="rounded-md border border-border bg-muted px-4 py-3 text-sm">
+        <p role="status" className="note note-plain">
           We couldn&apos;t send that automatically.{" "}
-          <a href={mailto} className="font-medium text-primary underline underline-offset-4">
+          <a href={mailto}>
             Email us
           </a>{" "}
           and we&apos;ll set up {pending}.
         </p>
       ) : null}
       {searchParams.connected ? (
-        <p className="rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
+        <p role="status" className="note">
           {cards.find((c) => c.source === searchParams.connected)?.title ?? searchParams.connected} is connected. The first pull starts within the hour.
         </p>
       ) : null}
       {searchParams.error ? (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p role="alert" className="note note-alert">
           {searchParams.error === "forbidden"
             ? "That action is owner-only."
             : searchParams.error === "invalid-shop"
@@ -128,7 +116,7 @@ export default async function SourcesPage({
             restartUrl ? (
               <>
                 {" "}
-                <a href={restartUrl} className="font-medium underline underline-offset-4">
+                <a href={restartUrl}>
                   Start again
                 </a>
               </>
@@ -139,23 +127,30 @@ export default async function SourcesPage({
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid-src">
         {cards.map((card) => (
-          <Card key={card.source} className="flex flex-col">
-            <CardHeader className="flex-row items-start justify-between space-y-0 gap-3">
-              <div>
-                <CardTitle>{card.title}</CardTitle>
-                <CardDescription>{card.pending ? "First sync pending" : `Last success: ${when(card.lastSuccessAt, client?.timezone)}`}</CardDescription>
-              </div>
-              <Badge className={cn("shrink-0", TONE[card.tone])}>{card.label}</Badge>
-            </CardHeader>
-            <CardContent className="mt-auto flex flex-col gap-3">
-              {card.lastError ? (
-                <p className="text-sm text-muted-foreground" title={card.lastError}>
-                  {card.lastError}
-                </p>
-              ) : null}
-              {card.connected ? null : connectPath(config, card.source) && membership.role === "owner" ? (
+          <article key={card.source} data-source={card.source} className="sc">
+            <div className="sc-h">
+              <h2 className="sc-t">
+                <span className="dot" aria-hidden="true" />
+                {card.title}
+              </h2>
+              <span className={cn("st", TONE[card.tone])}>{card.label}</span>
+            </div>
+            <p className="meta">{card.pending ? "First sync pending" : `Last success: ${when(card.lastSuccessAt, client?.timezone)}`}</p>
+            {card.lastError ? (
+              <p className="err" title={card.lastError}>
+                {card.lastError}
+              </p>
+            ) : null}
+            <div className="sc-f">
+              {card.connected ? (
+                <span className="flow" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              ) : connectPath(config, card.source) && membership.role === "owner" ? (
                 /**
                  * Self-serve: the source's app is approved and configured. Owners only
                  * (api.connect_source is owner-gated in the database). Shopify never
@@ -169,23 +164,23 @@ export default async function SourcesPage({
                     action={connectPath(config, "shopify")!}
                   />
                 ) : (
-                  <form action={connectPath(config, card.source)!} method="POST" className="flex gap-2">
-                    <Button type="submit" variant="outline" size="sm">
+                  <form action={connectPath(config, card.source)!} method="POST">
+                    <button type="submit" className="btn btn-out btn-sm">
                       Connect
-                    </Button>
+                    </button>
                   </form>
                 )
               ) : (
                 /* Unapproved, unconfigured, or a non-owner: chunk 4 behaviour, unchanged. */
                 <form action={requestConnectionAction}>
                   <input type="hidden" name="source" value={card.source} />
-                  <Button type="submit" variant="outline" size="sm">
+                  <button type="submit" className="btn btn-out btn-sm">
                     Request connection
-                  </Button>
+                  </button>
                 </form>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </article>
         ))}
       </div>
     </>
@@ -197,21 +192,21 @@ function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: stri
   if (ctl.kind === "form") {
     // Operator path: an explicit ?shop= query, sent as a hidden field, never typed.
     return (
-      <form action={action} method="GET" className="flex gap-2">
+      <form action={action} method="GET">
         <input type="hidden" name="shop" value={ctl.shop} />
-        <Button type="submit" variant="outline" size="sm">
+        <button type="submit" className="btn btn-out btn-sm">
           {ctl.label}
-        </Button>
+        </button>
       </form>
     );
   }
   if (ctl.kind === "reconnect-in-shopify") {
-    return <p className="text-sm text-muted-foreground">Open bcns Connect from your Shopify admin to reconnect.</p>;
+    return <p className="tiny">Open bcns Connect from your Shopify admin to reconnect.</p>;
   }
   return (
-    <p className="text-sm text-muted-foreground">
+    <p className="tiny">
       {ctl.url ? (
-        <a href={ctl.url} className="font-medium text-primary underline underline-offset-4">
+        <a href={ctl.url} className="ul">
           Install bcns Connect from the Shopify App Store
         </a>
       ) : (

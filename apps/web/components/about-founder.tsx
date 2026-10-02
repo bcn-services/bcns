@@ -1,12 +1,12 @@
 import Image from "next/image";
 import { siteContent } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
-import { GUTTER } from "@/components/kit";
-import { Cube } from "@/components/cube";
+import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
+import { LogoMark } from "@/components/cube";
 
 /**
- * The two founders as hairline cards, then the "why bcns" statement on the
- * full-bleed blue plate — this page's one bold moment.
+ * The two founders as open columns divided by a hairline, then the "why bcns"
+ * statement on the tint band with the mark drifting in the corner.
  *
  * The section heading lives in the page's `PageHead`.
  */
@@ -31,6 +31,9 @@ function beats(statement: string) {
   };
 }
 
+/** Role-line dot per founder: Nate the brand blue, Brandon the flood blue. */
+const ROLE_DOT = ["bg-primary", "bg-accent"] as const;
+
 /** Initials fallback for a founder with no photo yet. */
 function initials(name: string) {
   return name
@@ -42,104 +45,102 @@ function initials(name: string) {
 
 export function AboutFounder() {
   const { founders, whyBcns } = siteContent.about;
+  const { whyHeading, whyEmphasis } = siteContent.aboutPage;
   const { lead, middle, close } = beats(whyBcns);
 
   return (
     <>
-      <section id="founders" className={`${GUTTER} grid gap-7 py-16 lg:grid-cols-2`}>
-        {founders.map((founder, i) => (
-          <Reveal
-            key={founder.name}
-            delay={i * 110}
-            className="lift-card flex h-full flex-col rounded-[1.25rem] border border-border bg-card p-8 sm:p-10 sm:px-10 sm:py-11"
-          >
-            <div className="flex items-center gap-5">
-              {founder.photo ? (
-                <Image
-                  src={founder.photo}
-                  alt=""
-                  width={72}
-                  height={72}
-                  className="size-[4.5rem] shrink-0 rounded-full border border-accent object-cover"
-                />
-              ) : (
-                <span
-                  aria-hidden
-                  className="flex size-[4.5rem] shrink-0 items-center justify-center rounded-full border border-accent bg-secondary font-display text-[1.375rem] font-bold text-primary"
-                >
-                  {initials(founder.name)}
-                </span>
-              )}
-              <div>
-                <h2 className="text-[1.375rem] font-semibold sm:text-[1.625rem]">{founder.name}</h2>
-                <p className="mt-1 font-display text-[0.8125rem] font-medium uppercase tracking-[0.1em] text-primary">
-                  {founder.roleLine}
-                </p>
+      <section id="founders" aria-label={siteContent.about.eyebrow} className={GUTTER}>
+        <div className="grid border-t border-border min-[900px]:grid-cols-2">
+          {founders.map((founder, i) => (
+            <Reveal
+              key={founder.name}
+              as="article"
+              delay={i * 110}
+              className={`border-b border-border pb-14 pt-[3.25rem] min-[900px]:border-b-0 min-[900px]:py-16 ${
+                i === 0 ? "min-[900px]:pr-14" : "min-[900px]:border-l min-[900px]:pl-14"
+              }`}
+            >
+              <div className="flex items-center gap-[1.375rem]">
+                {founder.photo ? (
+                  <Image
+                    src={founder.photo}
+                    alt={founder.name}
+                    width={76}
+                    height={76}
+                    className="size-[4.75rem] shrink-0 rounded-full border border-accent object-cover"
+                  />
+                ) : (
+                  <span
+                    aria-hidden
+                    className="grid size-[4.75rem] shrink-0 place-items-center rounded-full border border-accent bg-secondary font-display text-2xl font-medium tracking-[0.02em] text-primary-ink"
+                  >
+                    {initials(founder.name)}
+                  </span>
+                )}
+                <div>
+                  <h2 className="font-display text-[clamp(1.625rem,3vw,2.125rem)] font-light leading-[1.12] tracking-[-0.02em]">
+                    {founder.name}
+                  </h2>
+                  <Eyebrow className="mt-2 flex items-center gap-2.5">
+                    <span aria-hidden className={`size-2 rounded-full ${ROLE_DOT[i] ?? "bg-primary"}`} />
+                    {founder.roleLine}
+                  </Eyebrow>
+                </div>
               </div>
-            </div>
 
-            <p className="mt-[1.625rem] text-[0.90625rem] leading-[1.75] text-muted-foreground">
-              {founder.bio}
-            </p>
+              <p className="mt-8 max-w-[34rem] leading-[1.8] text-muted-foreground">{founder.bio}</p>
 
-            <div aria-hidden className="mb-[1.125rem] mt-6 h-px bg-border" />
-            <ul className="mt-auto font-display text-[0.8125rem] text-muted-foreground">
-              {founder.credentials.map((credential) => (
-                <li key={credential}>{credential}</li>
-              ))}
-            </ul>
-          </Reveal>
-        ))}
+              <ul className="mt-8 border-t border-border pt-5 font-display text-sm tracking-[0.02em] text-muted-foreground">
+                {founder.credentials.map((credential) => (
+                  <li key={credential}>{credential}</li>
+                ))}
+              </ul>
+            </Reveal>
+          ))}
+        </div>
       </section>
 
-      {/* The bold moment: the statement on a full-bleed plate. */}
-      <section className="relative overflow-hidden bg-accent text-accent-foreground">
-        {/* The mark at poster scale, bleeding off the corner. Outline only and
-            barely there: it anchors the plate without competing with the type. */}
+      <section aria-label={whyHeading} className="relative overflow-hidden border-t border-border bg-secondary">
+        {/* The mark at poster scale, swaying in the corner. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-20 -top-16 hidden w-[30rem] text-accent-foreground/20 lg:block"
+          className="pointer-events-none absolute -right-10 -top-[1.875rem] hidden w-[21.25rem] animate-sway opacity-[0.13] motion-reduce:animate-none lg:block"
         >
-          <Cube filled={false} strokeWidth={0.5} className="w-full" />
+          <LogoMark className="block h-auto w-full" />
         </div>
 
-        <div className={`relative ${GUTTER} py-16 sm:py-[5.5rem]`}>
+        <div
+          className={`relative ${GUTTER} grid gap-10 pb-24 pt-20 lg:grid-cols-[6fr_5fr] lg:gap-x-[5.5rem] lg:gap-y-6 lg:pb-28 lg:pt-[6.5rem]`}
+        >
+          <Reveal className="lg:col-span-full">
+            <Eyebrow>{whyHeading}</Eyebrow>
+          </Reveal>
           <Reveal
-            variant="draw-rule"
-            aria-hidden
-            className="h-px w-16 origin-left bg-current opacity-40"
-          />
+            as="p"
+            delay={80}
+            className="text-balance font-display text-[clamp(1.625rem,3.2vw,2.5rem)] font-light leading-[1.22] tracking-[-0.02em]"
+          >
+            {lead}
+          </Reveal>
 
-          <div className="mt-9 grid gap-x-16 gap-y-9 lg:grid-cols-[1.1fr_1fr]">
-            <Reveal
-              as="p"
-              className="text-balance text-[clamp(1.625rem,3vw,2.375rem)] font-light leading-[1.26] tracking-[-0.015em]"
-            >
-              {lead}
-            </Reveal>
-
-            <div className="lg:pt-2.5">
-              {middle && (
-                <Reveal
-                  as="p"
-                  delay={110}
-                  className="max-w-[46ch] text-[1.0625rem] leading-[1.75] text-accent-foreground/80"
-                >
-                  {middle}
-                </Reveal>
-              )}
-              {close && (
-                <Reveal
-                  as="p"
-                  delay={200}
-                  className={`border-l-2 border-accent-foreground/40 pl-5 text-[1.1875rem] font-semibold leading-snug ${
-                    middle ? "mt-7" : ""
-                  }`}
-                >
-                  {close}
-                </Reveal>
-              )}
-            </div>
+          <div>
+            {middle && (
+              <Reveal as="p" delay={160} className="max-w-[38rem] text-[1.0625rem] leading-[1.8] text-muted-foreground">
+                {middle}
+              </Reveal>
+            )}
+            {close && (
+              <Reveal
+                as="p"
+                delay={240}
+                className={`border-l-2 border-primary pl-5 font-display text-[1.375rem] font-medium leading-[1.35] ${
+                  middle ? "mt-7" : ""
+                }`}
+              >
+                {emphasize(close, whyEmphasis)}
+              </Reveal>
+            )}
           </div>
         </div>
       </section>

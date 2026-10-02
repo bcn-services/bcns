@@ -25,7 +25,14 @@ export const siteConfig = {
     { label: "Pricing", href: "/pricing" },
     { label: "About", href: "/about" },
   ],
-  signIn: { label: "Sign in", href: "https://connect.bcn-services.com" },
+  /** Services dropdown (desktop) and the sub-links in the mobile menu. */
+  services: [
+    { label: "Overview", href: "/services", blurb: "Three ways bcns can help your business" },
+    { label: "bcns Connect", href: "/services/connect", blurb: "Every tool in one organized place" },
+    { label: "Deluxe builds", href: "/services/deluxe", blurb: "An agent, app or dashboard on top" },
+    { label: "AI consulting", href: "/services/ai-consulting", blurb: "One day on your business" },
+  ],
+  signIn: { label: "Sign in to Connect", href: "https://connect.bcn-services.com" },
 } as const;
 
 export type SiteConfig = typeof siteConfig;

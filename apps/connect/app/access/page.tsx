@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, SectionHeading } from "@bcn-services/ui";
 import { getConfig } from "@/lib/env";
 import { requireOwner } from "@/lib/session";
 import { MintForm } from "./MintForm";
@@ -13,20 +12,18 @@ export default async function AccessPage() {
 
   return (
     <>
-      <SectionHeading
-        as="h1"
-        align="left"
-        title="Access"
-        description="Give your own software — or an AI agent — a login of its own."
-      />
+      <div>
+        <h1 className="page-title">
+          <b>Access</b>
+        </h1>
+        <p className="lead">Give your own software — or an AI agent — a login of its own.</p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Agent login</CardTitle>
-          <CardDescription>What it is, and what it can reach</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          <p className="text-sm text-muted-foreground">
+      <section className="panel" aria-labelledby="agent-h">
+        <h2 id="agent-h">Agent login</h2>
+        <p className="sub">What it is, and what it can reach</p>
+        <div className="body">
+          <p className="t">
             An agent login is an ordinary member account for this workspace that belongs to a
             program instead of a person. It signs in with an email and password like anyone else and
             sees exactly the same data you do, scoped by the same rules — no more, and never another
@@ -35,22 +32,18 @@ export default async function AccessPage() {
             password; the old password stops working.
           </p>
           <MintForm supabaseUrl={supabaseUrl} anonKey={supabaseAnonKey} />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>MCP server</CardTitle>
-          <CardDescription>Connect Claude Code to this workspace</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            The hosted MCP server at <code className="font-mono">mcp.bcn-services.com</code> lets
-            Claude and other agent products read this workspace as the agent login above. Mint a
-            login, then follow the steps that appear under it.
-          </p>
-        </CardContent>
-      </Card>
+      <section className="panel" aria-labelledby="mcp-h">
+        <h2 id="mcp-h">MCP server</h2>
+        <p className="sub">Connect Claude Code to this workspace</p>
+        <p className="t">
+          The hosted MCP server at <code className="m">mcp.bcn-services.com</code> lets
+          Claude and other agent products read this workspace as the agent login above. Mint a
+          login, then follow the steps that appear under it.
+        </p>
+      </section>
     </>
   );
 }

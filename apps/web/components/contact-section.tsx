@@ -1,7 +1,7 @@
 import { ContactForm } from "@/components/contact-form";
 import { siteContent } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
-import { Eyebrow, GUTTER } from "@/components/kit";
+import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
 
 /**
  * Closing contact band: copy and a hairline highlight table on the left, the
@@ -23,7 +23,7 @@ export function ContactSection() {
             delay={80}
             className="mt-5 max-w-[16ch] text-balance text-[clamp(2.25rem,4.6vw,3.125rem)] font-light leading-[1.1] tracking-[-0.02em]"
           >
-            {title}
+            {emphasize(title, siteContent.servicesOverview.ctaEmphasis)}
           </Reveal>
           <Reveal
             as="p"
