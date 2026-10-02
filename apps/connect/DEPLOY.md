@@ -170,7 +170,15 @@ Turning it on, in order:
    gateway's own 404 for a missing function has a different body, `{"code":"NOT_FOUND",...}`).
 3. Hosted Auth (dashboard):
    - "Confirm email" ON. Public sign-ups ("Allow new users to sign up") OFF: the function uses the
-     admin API, and the `resend` (type=signup) it calls has no sign-ups-disabled check.
+     admin API, and the `resend` (type=signup) it calls has no sign-ups-disabled check. Public
+     sign-ups OFF is also part of the pre-hijack fix: GoTrue's own `/auth/v1/signup` takes a password
+     before the address is proven. Hand-check: `curl -s -X POST
+     https://cnsxbglhredokjbvudfd.supabase.co/auth/v1/signup -H "apikey: <anon key>" -H
+     "Content-Type: application/json" -d '{"email":"x@example.com","password":"12345678abc"}'`
+     answers `signup_disabled`.
+   - No unconfirmed user holds a password (rows from before the fix, when the function took one):
+     `select email from auth.users where email_confirmed_at is null and encrypted_password is not null and encrypted_password <> '';`
+     returns nothing. Delete any it returns before going on.
    - Redirect allow-list includes `https://connect.bcn-services.com/auth/confirm`.
    - Email template "Confirm signup": the link must be
      `https://connect.bcn-services.com/auth/confirm?token_hash={{ .TokenHash }}&type=email`
@@ -181,7 +189,10 @@ Turning it on, in order:
 5. `supabase secrets set SIGNUP_ENABLED=1 --workdir platform --project-ref cnsxbglhredokjbvudfd`.
 6. `SIGNUP_ENABLED=1` in `/srv/connect/env`, restart `bcns-app@connect`, confirm a new pid.
 7. Hand-check: sign up with a non-team address. The confirmation mail reaches it, its link lands
-   on `/pending`, and exactly one notice arrives at `BCNS_EMAIL`. Then sign up again with another
+   on `/set-password`, saving a password lands on `/pending`, and exactly one notice arrives at
+   `BCNS_EMAIL`. Pre-hijack replay: POST `{"name":"x","email":"<second address>","password":"attacker1"}`
+   straight to the function, sign up with that address on `/signup`, confirm and set a password;
+   signing in with `attacker1` must fail. Then sign up again with another
    non-team address, do not confirm, wait more than 60s and sign up with it once more: a second
    confirmation mail arrives (proves GoTrue reports the duplicate as `email_exists`).
 

@@ -17,7 +17,7 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
     return (
       <Frame
         title="Check your email"
-        description="If that address can be signed up, we've sent a link to confirm it. Once confirmed, bcns reviews new workspaces before they open."
+        description="If that address can be signed up, we've sent a link to confirm it and choose your password. Once confirmed, bcns reviews new workspaces before they open."
       >
         <a href="/login" className="lnk">
           Back to sign in

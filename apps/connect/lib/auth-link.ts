@@ -52,8 +52,9 @@ interface OtpClient {
  * Where the browser goes after an emailed link. Invite, recovery and email (a
  * sign-up confirmation, which creates the account with no password) always land
  * on /set-password: a `next` is ignored, because nothing else makes sense before
- * the inbox owner has set a password. Any other type would honor a validated
- * `next`. Any failure is one answer, so a used, expired or forged link is
+ * the inbox owner has set a password. The `safeNext` fallback is unreachable
+ * today (every CONFIRM_TYPES entry returns above); it is the safe default for a
+ * future type. Any failure is one answer, so a used, expired or forged link is
  * indistinguishable.
  */
 export async function confirmTarget(
