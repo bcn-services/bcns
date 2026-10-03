@@ -81,7 +81,11 @@ rm -f /etc/nginx/sites-enabled/default
 # platform-v1: :80 is a default_server too. certbot-mode vhosts listen on 80;
 # without this nginx would promote the alphabetically-first `listen 80` vhost
 # and unknown-Host requests on :80 would 301 to that client instead of dropping.
-# Matches the live droplet file (md5 3ec5a9fe7fd377b175110431318f94d5).
+# ssl_protocols lives HERE because nginx < 1.29.2 (the droplet runs 1.24) takes the
+# protocol set for a shared :443 listener from its default server; the per-server
+# lines in onboard-client.sh's vhosts do not take effect on those versions.
+# This file therefore no longer matches the pre-hardening live droplet file
+# (md5 3ec5a9fe7fd377b175110431318f94d5); the live file needs the same line added.
 cat > /etc/nginx/sites-available/00-default <<'EOF'
 server {
     listen 80 default_server;
@@ -90,6 +94,7 @@ server {
     listen [::]:443 ssl default_server;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
     return 444;
 }
 EOF

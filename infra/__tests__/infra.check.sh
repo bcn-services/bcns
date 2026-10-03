@@ -151,10 +151,12 @@ case "$sbv" in *'proxy_pass http://127.0.0.1:3101;'*) ok "certbot vhost proxies 
 case "$sbv" in *'proxy_buffer_size        16k;'*) ok "certbot vhost keeps the Supabase cookie buffers" ;; *) bad "proxy buffers missing" ;; esac
 check "certbot vhost: HSTS (no includeSubDomains/preload) on the 443 block" \
   "$(printf '%s\n' "$sbv" | grep -c '^    add_header Strict-Transport-Security "max-age=31536000" always;$')" "1"
-check "certbot vhost: one ssl_protocols TLSv1.2 TLSv1.3" \
+check "certbot vhost: per-server ssl_protocols line present once (effective on nginx >= 1.29.2; older nginx takes it from the 00-default server, see bootstrap.sh)" \
   "$(printf '%s\n' "$sbv" | grep -c '^    ssl_protocols TLSv1.2 TLSv1.3;$')" "1"
-check "cloudflare vhost: HSTS + ssl_protocols in both 443 blocks" \
+check "cloudflare vhost: HSTS + per-server ssl_protocols line in both 443 blocks" \
   "$(render l2detailz 3100 l2details.com cloudflare | grep -cE 'Strict-Transport-Security "max-age=31536000" always;|ssl_protocols TLSv1.2 TLSv1.3;')" "4"
+check "bootstrap 00-default sets ssl_protocols (what pins TLS on nginx < 1.29.2)" \
+  "$(grep -c '^    ssl_protocols TLSv1.2 TLSv1.3;$' "$here/bootstrap.sh")" "1"
 cdv=$(render sb 3101 sb.bcn-services.com /etc/ssl/custom)
 case "$cdv" in *'ssl_certificate     /etc/ssl/custom/fullchain.pem;'*) ok "cert-dir mode uses <dir>/fullchain.pem" ;; *) bad "cert-dir path wrong" ;; esac
 case "$(cat "$here/onboard-client.sh")" in *'certbot certonly --webroot'*) ok "certbot runs webroot HTTP-01 (no nginx plugin rewriting vhosts)" ;; *) bad "certbot invocation not webroot" ;; esac
