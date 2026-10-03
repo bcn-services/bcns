@@ -948,7 +948,7 @@ export const siteContent: SiteContent = {
       title: "Privacy Policy",
       description:
         "How bcns collects, uses, and protects the information that runs through bcns Connect, the hub, and the MCP server.",
-      effectiveDate: "Last updated September 22, 2026.",
+      effectiveDate: "Last updated October 2, 2026.",
       sections: [
         {
           heading: "Who we are",
@@ -961,7 +961,7 @@ export const siteContent: SiteContent = {
           heading: "The two roles we play",
           body: [
             "For your own account data, like your email and sign-in sessions, bcns is the controller: we decide why that data is collected and how it's used.",
-            "For the data you connect from Shopify, Meta Ads, monday.com, Google Drive, or a meeting-notes folder, bcns is a processor. You are the controller of that data, and you decide what gets connected and why.",
+            "For the data you connect from Shopify, Meta Ads, monday.com, QuickBooks Online, Google Drive, or a meeting-notes folder, bcns is a processor. You are the controller of that data, and you decide what gets connected and why.",
           ],
         },
         {
@@ -972,6 +972,7 @@ export const siteContent: SiteContent = {
             "Shopify, if you connect it: order totals, statuses, line items and refunds going back 13 months; products, variants and prices; inventory counts; Shopify Payments payouts; and, on each order, the customer's ID, email and display name only, with no phone number or address.",
             "Meta Ads, if you connect it: your ad account's timezone and currency; campaign and ad details, including ad creative; daily performance numbers like spend, impressions, clicks and reach; and copies of your ad creative images, which we store.",
             "monday.com, if you connect it: the one board you point us at, its name, columns, groups, and every item's name, dates, group and column values. Whatever your team keeps in those columns, including names or emails, comes with it.",
+            "QuickBooks Online, if you connect it: read-only access, through the com.intuit.quickbooks.accounting scope, to your Purchase and Bill transactions, meaning each expense or bill's date, amount, currency, vendor, memo and account. We never write to QuickBooks. The account owner can disconnect it at any time, which revokes our access at Intuit and deletes the QuickBooks data we stored.",
             "Google Drive and meeting notes, if you connect them: for a meeting-notes folder, the full text of the notes, which can include the names of people in the meeting and what they said. For a Drive folder, file names, types, sizes, dates, links, and thumbnail images we copy and store. We don't touch the underlying file contents in Drive.",
             "Access tokens: for each source you connect, we store a token that lets our sync service read that source on your behalf. See \"Security\" below for how we protect it.",
           ],
