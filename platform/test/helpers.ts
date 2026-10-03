@@ -138,6 +138,9 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   connect_source: { args: { p_source: 'shopify', p_kind: 'shopify_admin', p_secret: '', p_config: {}, p_interval: '1 hour', p_backfill_depth: '13 months' }, expect: 'BCNS3' },
   // A read: one boolean about the caller's own tenant, no shop or client argument to aim elsewhere.
   shopify_shop_mismatch: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
+  // A non-quickbooks source fails validation before any write, so the probe never revokes
+  // a real row. Tenant comes from the JWT, never an argument.
+  disconnect_source: { args: { p_source: 'shopify' }, expect: 'BCNS3' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
