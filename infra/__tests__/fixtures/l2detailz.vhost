@@ -4,6 +4,8 @@ server {
     server_name www.l2details.com;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     return 301 https://l2details.com$request_uri;
 }
 server {
@@ -12,6 +14,8 @@ server {
     server_name l2details.com;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     location / {
         proxy_pass http://127.0.0.1:3100;
         proxy_set_header Host $host;
