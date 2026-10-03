@@ -184,3 +184,12 @@ export function shopifyControl(
   if (card.status !== "none") return { kind: "reconnect-in-shopify" };
   return { kind: "install", url: appHandle ? `https://apps.shopify.com/${appHandle}` : null };
 }
+
+/**
+ * Whether the card offers Disconnect: QuickBooks only (the one source with an
+ * owner disconnect, api.disconnect_source), owners only, and only when something
+ * is stored — including "Reconnect needed", whose token the owner may want gone.
+ */
+export function canDisconnect(card: Pick<SourceCard, "source" | "status">, role: string | null | undefined): boolean {
+  return card.source === "quickbooks" && role === "owner" && card.status !== "none";
+}

@@ -8,6 +8,7 @@ import { connectPath } from "@/lib/oauth-config";
 import { reopenAppUrl } from "@/lib/shopify-oauth";
 import { formatDateTime } from "@/lib/data-format";
 import {
+  canDisconnect,
   composeSources,
   shopifyControl,
   egressLine,
@@ -35,7 +36,7 @@ function when(iso: string | null, timeZone?: string | null): string {
 export default async function SourcesPage({
   searchParams,
 }: {
-  searchParams: { requested?: string; email?: string; error?: string; connected?: string; shop?: string };
+  searchParams: { requested?: string; email?: string; error?: string; connected?: string; disconnected?: string; shop?: string };
 }) {
   const { api, membership } = await requireHub();
   const client = await loadClient();
@@ -97,6 +98,11 @@ export default async function SourcesPage({
           {cards.find((c) => c.source === searchParams.connected)?.title ?? searchParams.connected} is connected. The first pull starts within the hour.
         </p>
       ) : null}
+      {searchParams.disconnected === "quickbooks" ? (
+        <p role="status" className="note">
+          QuickBooks is disconnected. bcns is revoking its access at Intuit and deleting the QuickBooks data it stored.
+        </p>
+      ) : null}
       {searchParams.error ? (
         <p role="alert" className="note note-alert">
           {searchParams.error === "forbidden"
@@ -111,7 +117,9 @@ export default async function SourcesPage({
                     ? "Your Shopify connection timed out before sign-in finished (it is held for 15 minutes), so nothing was saved."
                     : searchParams.error === "shop-mismatch"
                       ? "This bcns account is already connected to a different Shopify store, and one account connects one store. Email us to switch stores."
-                      : "Something went wrong. Try again."}
+                      : searchParams.error === "disconnect-failed"
+                        ? "QuickBooks could not be disconnected. Nothing was changed. Try again."
+                        : "Something went wrong. Try again."}
           {searchParams.error === "connect-expired" ? (
             restartUrl ? (
               <>
@@ -179,6 +187,18 @@ export default async function SourcesPage({
                   </button>
                 </form>
               )}
+              {canDisconnect(card, membership.role) ? (
+                /* Two steps without JS: the summary opens the confirm, the button inside submits. */
+                <details className="disc">
+                  <summary>Disconnect</summary>
+                  <form action="/api/oauth/quickbooks/disconnect" method="POST">
+                    <p>This disconnects QuickBooks and deletes the QuickBooks data bcns has stored for this workspace.</p>
+                    <button type="submit" className="btn btn-sm btn-danger">
+                      Disconnect and delete data
+                    </button>
+                  </form>
+                </details>
+              ) : null}
             </div>
           </article>
         ))}
