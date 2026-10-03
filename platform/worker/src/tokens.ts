@@ -79,14 +79,16 @@ export async function probeAuthFailed(t: Tick): Promise<number> {
       detail = redact(e instanceof Error ? e.message : String(e))
     }
     if (good) ok++
-    await sql(
+    // `status = 'auth_failed'`: an owner disconnect (status 'revoked') that landed during the
+    // probe's HTTP call must not be flipped back to active.
+    const upd = await sql(
       `update data.source_tokens set status = case when $3 then 'active' else status end,
          status_detail = case when $3 then null else coalesce($4, status_detail) end,
          updated_at = now()
-       where client_id = $1 and source = $2`,
+       where client_id = $1 and source = $2 and status = 'auth_failed'`,
       [row.client_id, row.source, good, detail])
     // A recovered credential takes its refresh-failure reason (run.ts refreshOne) off the hub card.
-    if (good) await sql(`update data.connector_schedule set last_error = null, last_error_at = null where client_id = $1 and source = $2`,
+    if (good && upd.rowCount) await sql(`update data.connector_schedule set last_error = null, last_error_at = null where client_id = $1 and source = $2`,
       [row.client_id, row.source])
   }
   return ok

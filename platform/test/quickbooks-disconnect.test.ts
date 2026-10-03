@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { clientWithToken, mintJwt, pool, serviceClient, sql } from './helpers.js'
 import { closePool, type Tick } from '../worker/src/db.js'
 import { INTUIT_REVOKE_URL, revokeDisconnected } from '../worker/src/disconnect.js'
+import { probeAuthFailed } from '../worker/src/tokens.js'
 
 const made: string[] = []
 const users: string[] = []
@@ -27,12 +28,19 @@ async function mkUser(client: string, role: 'owner' | 'member'): Promise<string>
   return mintJwt(data.user.id, { client_id: client })
 }
 
-/** A connected source for `client`: token, schedule, health row, one canonical + one raw row. */
-async function seed(client: string, source: 'quickbooks' | 'shopify', status = 'active') {
+/**
+ * A connected source for `client`: token, schedule, health row, one canonical + one raw row.
+ * A 'revoked' token defaults to status_detail 'owner_disconnect' (what api.disconnect_source writes);
+ * `age` backdates the token's updated_at (an insert, so the touch trigger does not run).
+ */
+async function seed(client: string, source: 'quickbooks' | 'shopify', status = 'active',
+  opts: { detail?: string | null; age?: string } = {}) {
+  const detail = opts.detail !== undefined ? opts.detail : status === 'revoked' ? 'owner_disconnect' : null
   const kind = source === 'quickbooks' ? 'quickbooks_oauth_refresh' : 'shopify_admin'
   const config = source === 'quickbooks' ? { realm_id: '123' } : { shop: `qd-${client.slice(0, 8)}.myshopify.com` }
-  await sql(`insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, status)
-             values ($1, $2, $3, 'access-secret', 'refresh-secret', $4)`, [client, source, kind, status])
+  await sql(`insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, status, status_detail, updated_at)
+             values ($1, $2, $3, 'access-secret', 'refresh-secret', $4, $5, now() - $6::interval)`,
+    [client, source, kind, status, detail, opts.age ?? '0'])
   await sql(`insert into data.connector_schedule (client_id, source, interval, backfill_from, config, next_run_at)
              values ($1, $2, '1 hour', current_date - 7, $3::jsonb, now() + interval '1 day')`, [client, source, JSON.stringify(config)])
   await sql(`insert into data.connector_health (client_id, source, status, status_since) values ($1, $2, 'ok', now())`, [client, source])
@@ -74,7 +82,7 @@ beforeAll(() => {
 afterAll(async () => {
   for (const u of users) await serviceClient().auth.admin.deleteUser(u)
   if (made.length) {
-    for (const t of ['raw', 'raw_latest', 'records', 'connector_health', 'connector_schedule', 'source_tokens']) {
+    for (const t of ['notifications', 'raw', 'raw_latest', 'records', 'connector_health', 'connector_schedule', 'source_tokens']) {
       await sql(`delete from data.${t} where client_id = any($1::uuid[])`, [made])
     }
     await sql(`delete from data.clients where id = any($1::uuid[])`, [made])
@@ -161,14 +169,65 @@ describe('worker revokeDisconnected', () => {
     expect(await counts(client, 'quickbooks')).toEqual(NONE)
   })
 
-  it('already invalid at Intuit (400 invalid_grant, or 401): rows still deleted', async () => {
-    const a = await mkClient(), b = await mkClient()
+  it('already invalid at Intuit (400 invalid_grant): rows still deleted', async () => {
+    const a = await mkClient()
     await seed(a, 'quickbooks', 'revoked')
     await revokeDisconnected(mkTick(() => json(400, { error: 'invalid_grant' })))
     expect(await counts(a, 'quickbooks')).toEqual(NONE)
+  })
+
+  it('401 invalid_client (our app credentials, not the token) keeps the row', async () => {
+    const b = await mkClient()
     await seed(b, 'quickbooks', 'revoked')
-    await revokeDisconnected(mkTick(() => json(401, { error: 'invalid_token' })))
-    expect(await counts(b, 'quickbooks')).toEqual(NONE)
+    await revokeDisconnected(mkTick(() => json(401, { error: 'invalid_client' })))
+    expect(await counts(b, 'quickbooks')).toEqual(ALL)
+    expect((await tokenOf(b)).status).toBe('revoked')
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
+  })
+
+  it('a QuickBooks row revoked for any other reason (operator) is never auto-deleted', async () => {
+    const op = await mkClient()
+    await seed(op, 'quickbooks', 'revoked', { detail: 'operator' })
+    const calls: Call[] = []
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 }), calls))
+    expect(calls).toHaveLength(0)
+    expect(await counts(op, 'quickbooks')).toEqual(ALL)
+  })
+
+  it('an in-flight run (schedule lease held) keeps the row until the lease ends', async () => {
+    const client = await mkClient()
+    await seed(client, 'quickbooks', 'revoked')
+    await sql(`update data.connector_schedule set lease_until = now() + interval '10 minutes', lease_owner = 'run'
+               where client_id = $1 and source = 'quickbooks'`, [client])
+    const calls: Call[] = []
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 }), calls))
+    expect(calls).toHaveLength(0)
+    expect(await counts(client, 'quickbooks')).toEqual(ALL)
+    await sql(`update data.connector_schedule set lease_until = now() - interval '1 second' where client_id = $1 and source = 'quickbooks'`, [client])
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
+    expect(await counts(client, 'quickbooks')).toEqual(NONE)
+  })
+
+  it('stuck over 24h: one quickbooks_revoke_stuck notification per client per day, row kept', async () => {
+    const old = await mkClient(), fresh = await mkClient()
+    await seed(old, 'quickbooks', 'revoked', { age: '25 hours' })
+    await seed(fresh, 'quickbooks', 'revoked')
+    // 4xx so the loop does not stop after the first client.
+    for (let i = 0; i < 2; i++) await revokeDisconnected(mkTick(() => json(403, { error: 'forbidden' })))
+    const notes = await sql(`select client_id, dedupe_key from data.notifications where kind = 'quickbooks_revoke_stuck' and client_id = any($1::uuid[])`, [[old, fresh]])
+    expect(notes.rows).toEqual([{ client_id: old, dedupe_key: expect.stringMatching(new RegExp(`^quickbooks_revoke_stuck:${old}:\\d{4}-\\d{2}-\\d{2}$`)) }])
+    expect(await counts(old, 'quickbooks')).toEqual(ALL)
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
+  })
+
+  it('a transient failure stops the pass: one Intuit call, not one per client', async () => {
+    const a = await mkClient(), b = await mkClient()
+    await seed(a, 'quickbooks', 'revoked')
+    await seed(b, 'quickbooks', 'revoked')
+    const calls: Call[] = []
+    await revokeDisconnected(mkTick(() => json(503, { error: 'unavailable' }), calls))
+    expect(calls).toHaveLength(1)
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
   })
 
   it('a 5xx or a network error keeps the row for the next tick', async () => {
@@ -210,5 +269,24 @@ describe('worker revokeDisconnected', () => {
     expect(calls).toHaveLength(0)
     expect(await counts(shop, 'shopify')).toEqual(ALL)
     expect(await counts(live, 'quickbooks')).toEqual(ALL)
+  })
+})
+
+describe('probeAuthFailed vs an owner disconnect', () => {
+  it('a probe that succeeds after the owner disconnected does not flip the row back to active', async () => {
+    const client = await mkClient()
+    await seed(client, 'quickbooks', 'auth_failed', { age: '2 hours' })
+    process.env.QUICKBOOKS_ENV = 'sandbox'
+    let probed = false
+    // The owner disconnects while the probe's HTTP call is in flight.
+    const t = mkTick(async () => {
+      probed = true
+      await sql(`select data.disconnect_source($1, 'quickbooks')`, [client])
+      return json(200, { CompanyInfo: { Id: '123' } })
+    })
+    try { await probeAuthFailed(t) } finally { delete process.env.QUICKBOOKS_ENV }
+    expect(probed).toBe(true)
+    expect(await tokenOf(client)).toEqual({ status: 'revoked', status_detail: 'owner_disconnect' })
+    await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
   })
 })
