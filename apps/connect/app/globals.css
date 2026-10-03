@@ -64,6 +64,7 @@
       --accent-foreground: 215 83% 95%;
 
       --destructive: 5 64% 71%; /* #e58f87 */
+      --destructive-foreground: 222 15% 16%; /* #23262f: 6.1:1 on #e58f87 (white is 2.47:1) */
       --err-bg: 0 15% 12%;
       --warn: 37 64% 62%; /* #dcae62 */
 
