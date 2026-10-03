@@ -942,6 +942,14 @@ export const siteContent: SiteContent = {
   // terms". The "Who we share it with" list's Stripe entry, the terms'
   // "Fees and billing" line, and the FAQ deliberately omit or soften Stripe
   // until Checkout is live.
+  // MAINTAINER NOTE (not rendered): the QuickBooks Online entry in "What we
+  // collect" is checked against platform/worker/src/connectors/quickbooks.ts:
+  // `select *` over Purchase and Bill (full record stored as raw), 24-month
+  // backfill, read-only use of a read/write Intuit scope. It deliberately
+  // does NOT yet say the owner can disconnect to revoke at Intuit and delete
+  // the stored data: that ships with the hub disconnect PR, and the sentence
+  // goes into the same entry when it does.
+  //
   legal: {
     privacy: {
       eyebrow: "Privacy",
@@ -972,7 +980,7 @@ export const siteContent: SiteContent = {
             "Shopify, if you connect it: order totals, statuses, line items and refunds going back 13 months; products, variants and prices; inventory counts; Shopify Payments payouts; and, on each order, the customer's ID, email and display name only, with no phone number or address.",
             "Meta Ads, if you connect it: your ad account's timezone and currency; campaign and ad details, including ad creative; daily performance numbers like spend, impressions, clicks and reach; and copies of your ad creative images, which we store.",
             "monday.com, if you connect it: the one board you point us at, its name, columns, groups, and every item's name, dates, group and column values. Whatever your team keeps in those columns, including names or emails, comes with it.",
-            "QuickBooks Online, if you connect it: read-only access, through the com.intuit.quickbooks.accounting scope, to your Purchase and Bill transactions, meaning each expense or bill's date, amount, currency, vendor, memo and account. We never write to QuickBooks. The account owner can disconnect it at any time, which revokes our access at Intuit and deletes the QuickBooks data we stored.",
+            "QuickBooks Online, if you connect it: through Intuit's com.intuit.quickbooks.accounting permission, we read (and never write) your Purchase and Bill records going back 24 months: the full record as QuickBooks returns it, including date, amounts and currency, the payee (a vendor, customer or employee name), memo, line descriptions and accounts, document number, and any address QuickBooks attaches to a bill or check.",
             "Google Drive and meeting notes, if you connect them: for a meeting-notes folder, the full text of the notes, which can include the names of people in the meeting and what they said. For a Drive folder, file names, types, sizes, dates, links, and thumbnail images we copy and store. We don't touch the underlying file contents in Drive.",
             "Access tokens: for each source you connect, we store a token that lets our sync service read that source on your behalf. See \"Security\" below for how we protect it.",
           ],
