@@ -31,7 +31,7 @@ export async function refreshTokens(t: Tick): Promise<number> {
     try {
       if (await refreshOne(await contextFor(t, row.client_id, row.source), conn)) n++
     } catch (e) {
-      t.log('token_refresh_failed', { client: row.client_id, source: row.source, error: String(e) })
+      t.log('token_refresh_failed', { client: row.client_id, source: row.source, error: redact(String(e)) })
     }
   }
   return n

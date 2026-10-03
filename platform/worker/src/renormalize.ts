@@ -1,7 +1,7 @@
 // §5.8 re-normalize: replay raw_latest through normalize() without touching the schedule lease.
 import { acquireLease, envNum, releaseLease, sql, tx } from './db.js'
 import type { Tick } from './db.js'
-import { type RawRow, type Source, connectors } from './connectors/index.js'
+import { type RawRow, type Source, connectors, redact } from './connectors/index.js'
 import { applyWrites, contextFor } from './run.js'
 
 interface Due { client_id: string; source: Source; renormalize_cursor: { entity?: string; external_id?: string } | null }
@@ -76,8 +76,8 @@ async function renormalizeOne(t: Tick, d: Due, budget: number): Promise<number> 
     await sql(`update data.connector_runs set status = 'ok', finished_at = now() where id = $1`, [runId])
   } catch (e) {
     await sql(`update data.connector_runs set status = 'error', finished_at = now(), error = $2 where id = $1`,
-      [runId, e instanceof Error ? e.message : String(e)])
-    t.log('renormalize_failed', { client: d.client_id, source: d.source, error: String(e) })
+      [runId, redact(e instanceof Error ? e.message : String(e))])
+    t.log('renormalize_failed', { client: d.client_id, source: d.source, error: redact(String(e)) })
   }
   return n
 }

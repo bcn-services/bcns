@@ -149,7 +149,7 @@ lease_until              timestamptz,
 lease_owner              text,                              -- Cloud Run execution id
 last_run_at              timestamptz,
 last_success_at          timestamptz,
-last_error               text,                              -- REDACTED (§5.3 step 5); full text lives in connector_runs.error
+last_error               text,                              -- REDACTED (§5.3 step 5); connector_runs.error holds the same redacted text
 last_error_at            timestamptz,
 consecutive_failures     int not null default 0,
 renormalize_requested_at timestamptz,                       -- set by clients.timezone trigger
@@ -1075,7 +1075,7 @@ Per claimed row:
    - *everything else* → `status = 'error'`.
    Then `connector_schedule.last_error = redact(message)` (drop query strings, strip
    `access_token=[^&\s]*`, `shpat_\w+`, `Bearer \S+`, `Authorization`/`X-Shopify-Access-Token`
-   header values, cap 300 chars; the untouched text goes to `connector_runs.error`), `last_error_at`,
+   header values, cap 300 chars; the same redacted, 300-char-truncated text goes to `connector_runs.error` and the `run_failed` log), `last_error_at`,
    `consecutive_failures += 1`, `next_run_at = now() + least(interval, (2 ^ consecutive_failures) *
    interval '1 minute')`, lease cleared. Cursor stays where the last committed page left it.
 6. Throttles: sleep per the connector's rule inside the budget; if the budget runs out, treat as a
