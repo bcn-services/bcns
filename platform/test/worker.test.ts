@@ -477,8 +477,9 @@ describe('worker', () => {
       ? json({ access_token: 'at-new', expires_in: 3600, refresh_token: 'rt-new' }) : {})
     try {
       const t = mkTick(fetch)
-      // the refresh really succeeded, so only the guard on the success UPDATE decides
-      expect(await refreshOne(await contextFor(t, c, 'shopify'), connectors.shopify)).toBe('at-new')
+      // refreshOne's select skips a revoked row (status <> 'revoked'), so no refresh is attempted
+      // and a revoked grant is never rotated back to life.
+      expect(await refreshOne(await contextFor(t, c, 'shopify'), connectors.shopify)).toBeNull()
     } finally {
       delete process.env.SHOPIFY_CLIENT_ID
       delete process.env.SHOPIFY_CLIENT_SECRET
