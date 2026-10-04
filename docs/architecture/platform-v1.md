@@ -256,7 +256,7 @@ Shopify policy rulings (Nate, 2026-09-30; the doc has no Shopify policy section,
 - Rule 2.3.1: the manual shop-domain field on the hub is hidden from merchants, in a separate PR.
 
 Follow-ups from the Shopify billing work (verified in this run, 2026-09-30):
-- Nothing ends hub access when a Shopify paid period ends: the Partner API end time is only logged. Needs a stored `paid_until`, a worker or cron re-check and a migration. Accepted as a gap for now by Nate.
+- Shopify paid period end: `/finish` now stores the Partner API end time in `data.shopify_paid_through` (migration `20261002000100`), and the worker's `paidPeriods` step (`platform/worker/src/paid-period.ts`) re-checks a row about daily once that date has passed: still ACTIVE stores the new end, a clean empty list ends access through `data.revoke_shopify_install` (the uninstall state), anything uncertain keeps access. Gaps: a merchant ACTIVE at install has no row, and a hub-initiated Connect skips the billing gate.
 - After a paid period ends, the plan page behaviour is untested.
 - The worker revoked-to-`auth_failed` guard: no such branch exists; it is being written fresh on `fix/worker-revoked-guard` (open PR, unmerged).
 - Stale comment at `apps/connect/lib/env.ts:38-45` (the `shopifyAppHandle` doc block).

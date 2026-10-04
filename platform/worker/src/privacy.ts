@@ -11,7 +11,7 @@ import { deleteClientRows, deleteRawScoped } from './scope.js'
 
 // sb-bridge: the one store on the bcns-data app. Checked by shop as belt-and-suspenders
 // alongside the config.app marker below, in case a schedule row ever lost that marker.
-const BRIDGE_SHOP = 'fa8a00-11.myshopify.com' // sb-bridge: remove after SB migrates to bcns Connect
+export const BRIDGE_SHOP = 'fa8a00-11.myshopify.com' // sb-bridge: remove after SB migrates to bcns Connect
 
 /** S2: a row failing this many times, or sitting pending this long, is an operator problem. */
 const MAX_ATTEMPTS = 3

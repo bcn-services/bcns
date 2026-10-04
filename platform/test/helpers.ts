@@ -138,6 +138,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   connect_source: { args: { p_source: 'shopify', p_kind: 'shopify_admin', p_secret: '', p_config: {}, p_interval: '1 hour', p_backfill_depth: '13 months' }, expect: 'BCNS3' },
   // A read: one boolean about the caller's own tenant, no shop or client argument to aim elsewhere.
   shopify_shop_mismatch: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
+  // A past date fails validation before any write; the tenant is never an argument.
+  record_shopify_paid_through: { args: { p_shop: 'rpc-scoped.myshopify.com', p_until: '2000-01-01T00:00:00Z' }, expect: 'BCNS3' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */

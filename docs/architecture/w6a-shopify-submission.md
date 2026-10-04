@@ -128,7 +128,8 @@ paid billing period ends sees no charge screen. Shopify cancels the subscription
 uninstall but keeps the store paid until the period ends, and its plan page then
 has nothing to approve. With the three Partner values
 set, `/finish` sees the future `currentBillingCycle.endTime` and connects the store;
-the hub logs `shopify finish paid through <ISO>`. With any of them unset, or once
+the hub logs `shopify finish paid through <ISO>` and stores that end in
+`data.shopify_paid_through`. With any of them unset, or once
 the period has ended, the store lands on the plan page instead. This is Shopify's
 own behaviour, not a hub shortcut: observed in a live check on the dev store
 bcns-data-dev on 2026-09-30 (after uninstall and reinstall, the plan page showed the
@@ -140,9 +141,12 @@ subscription at once and the merchant keeps access to the end of the paid cycle)
 stated in an official Shopify doc page we have found (`managedPricingRedirect`,
 `apps/connect/lib/shopify-oauth.ts:848-860`).
 
-**Known limitation: access after period end.** Nothing ends access when a paid
-period ends. The end time is only logged (`apps/connect/lib/shopify-oauth.ts:855`),
-and no code revokes a store's access when the period runs out. Not built.
+**Access after period end.** The stored end is re-checked by the worker's
+`paidPeriods` step (`platform/worker/src/paid-period.ts`) about once a day after it
+passes, with the store's own token. Still ACTIVE: the new end is stored. A clean empty
+subscription list more than an hour after the stored end: access ends through
+`data.revoke_shopify_install`, the same state as an uninstall (data kept). Any error or
+unclear answer keeps access and is retried the next day.
 
 **Needs one live check before Submit (step 3 below).** The unit tests cover every branch
 that runs without a database. The sign-in round trip and the RPC write only run on the
