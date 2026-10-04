@@ -104,6 +104,8 @@ server {
     server_name www.$domain;
     ssl_certificate     $cert_file;
     ssl_certificate_key $key_file;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     return 301 https://$domain\$request_uri;
 }
 server {
@@ -112,6 +114,8 @@ server {
     server_name $domain;
     ssl_certificate     $cert_file;
     ssl_certificate_key $key_file;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     location / {
         proxy_pass http://127.0.0.1:$port;
         proxy_set_header Host \$host;
@@ -159,6 +163,8 @@ server {
     server_name $domain;
     ssl_certificate     $cert_file;
     ssl_certificate_key $key_file;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     location / {
         proxy_pass http://127.0.0.1:$port;
         proxy_set_header Host \$host;
