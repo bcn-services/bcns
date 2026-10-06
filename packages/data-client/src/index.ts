@@ -539,6 +539,9 @@ async function runReadView(client: DataClient, input: any, opts?: AgentToolsOpti
   // A range is a filter: on a hidden date column it would answer questions about hidden values.
   if (allow && dateCol && (dateFrom !== undefined || dateTo !== undefined) && !allow.includes(dateCol)) throw deny(dateCol)
   if (order !== undefined && order !== 'asc' && order !== 'desc') throw new ToolInputError(`bad order: ${order}`)
+  // Ordering by a hidden column leaks its ranking; the default order below is skipped instead.
+  const dateHidden = !!allow && !!dateCol && !allow.includes(dateCol)
+  if (dateHidden && order !== undefined) throw deny(dateCol as string)
   const rowLimit = limit === undefined ? 50 : limit
   if (typeof rowLimit !== 'number' || !Number.isInteger(rowLimit) || rowLimit < 1 || rowLimit > 200) {
     throw new ToolInputError(`bad limit: ${limit}`)
@@ -547,7 +550,9 @@ async function runReadView(client: DataClient, input: any, opts?: AgentToolsOpti
   // Select only what was asked for (plus the date column, if needed for order/range but not
   // itself requested) instead of `select('*')` + client-side trimming.
   let selectCols = '*'
-  if (columns !== undefined) {
+  // `columns: []` under an allowlist means "none named": an empty select= makes PostgREST fall
+  // back to `*`, which would expose every hidden column.
+  if (columns !== undefined && !(allow && columns.length === 0)) {
     const needed = new Set<string>(columns)
     if (dateCol && (!allow || allow.includes(dateCol)) && (dateFrom !== undefined || dateTo !== undefined || order !== undefined)) needed.add(dateCol)
     selectCols = [...needed].join(',')
@@ -562,7 +567,7 @@ async function runReadView(client: DataClient, input: any, opts?: AgentToolsOpti
     const d = checkDate(dateTo, 'date_to')
     q = dateCol === 'day' ? q.lte(dateCol, d) : q.lt(dateCol, addOneDay(d))
   }
-  if (dateCol) q = q.order(dateCol, { ascending: order === 'asc' })
+  if (dateCol && !dateHidden) q = q.order(dateCol, { ascending: order === 'asc' })
   q = q.limit(rowLimit)
 
   const { data, error } = await q

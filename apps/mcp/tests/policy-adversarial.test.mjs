@@ -113,9 +113,10 @@ test('date column is added only when allowlisted', async () => {
   const b = recClient()
   await assert.rejects(runTool(b.client, 'read_view', { view: 'money_v1', date_from: '2026-01-01' }, opts), /column not available on money_v1: occurred_at/)
   await assert.rejects(runTool(b.client, 'read_view', { view: 'money_v1', date_to: '2026-01-01', columns: ['id'] }, opts))
-  await runTool(b.client, 'read_view', { view: 'money_v1', columns: ['id'], order: 'desc' }, opts)
+  await assert.rejects(runTool(b.client, 'read_view', { view: 'money_v1', columns: ['id'], order: 'desc' }, opts), /column not available on money_v1: occurred_at/)
+  await runTool(b.client, 'read_view', { view: 'money_v1', columns: ['id'] }, opts)
   assert.equal(b.calls[0].cols, 'id', 'hidden date column not added to select')
-  assert.deepEqual(b.calls[0].order, ['occurred_at'], 'order still applies server-side (ordering leaks rank only)')
+  assert.deepEqual(b.calls[0].order, [], 'no default ORDER BY on the hidden date column')
 })
 
 test('no `columns` option: identical to before', async () => {
@@ -199,14 +200,32 @@ test('server: 200 rows of multi-byte data stay under the cap end to end', async 
   assert.equal(JSON.parse(text).truncated, true)
 })
 
-// OBSERVATION, not a pass/fail gate: `columns: []` on a restricted view sends `select=` (empty),
-// not the allowlist. With PostgREST an empty select returns `{}` rows (no columns), so it is
-// not a leak, but this was not confirmed against a live PostgREST (no Docker). Marked todo so a
-// future change to "empty columns -> allowlist" flips this to a normal pass.
-test('columns: [] selects the allowlist, not an empty/unrestricted select', { todo: 'columns: [] sends select= (empty); unverified against live PostgREST' }, async () => {
+// `columns: []` under an allowlist must select the allowlist: an empty `select=` makes PostgREST
+// fall back to `*`, which would expose every hidden column.
+test('columns: [] selects the allowlist, not an empty/unrestricted select', async () => {
   const { client, urls } = urlClient([])
   await runTool(client, 'read_view', { view: 'customers_v1', columns: [] }, MCP_TOOL_OPTIONS)
   assert.equal(urls[0].searchParams.get('select'), MCP_COLUMNS.customers_v1.join(','))
+})
+
+test('columns: [] on customers_v1 sends a non-empty select with no email or attributes', async () => {
+  const { client, calls } = recClient()
+  await runTool(client, 'read_view', { view: 'customers_v1', columns: [] }, MCP_TOOL_OPTIONS)
+  const cols = calls[0].cols.split(',')
+  assert.notEqual(calls[0].cols, '')
+  assert.ok(!cols.includes('email') && !cols.includes('attributes'))
+})
+
+test('a date column hidden by the allowlist: explicit order is refused, default order is skipped', async () => {
+  const opts = { views: ['money_v1'], columns: { money_v1: ['id', 'amount_minor'] } }
+  const { client, calls } = recClient()
+  for (const input of [{ view: 'money_v1', order: 'asc' }, { view: 'money_v1', order: 'desc' }, { view: 'money_v1', date_to: '2025-01-01' }]) {
+    await assert.rejects(runTool(client, 'read_view', input, opts), (e) => e.constructor.name === 'ToolInputError')
+  }
+  assert.equal(calls.length, 0)
+  await runTool(client, 'read_view', { view: 'money_v1' }, opts)
+  assert.equal(calls[0].cols, 'id,amount_minor')
+  assert.deepEqual(calls[0].order, [], 'no ORDER BY on the hidden date column')
 })
 
 test('columns: [] never produces select=* (the only unrestricted spelling)', async () => {

@@ -180,9 +180,17 @@ describe('agentTools / runTool', () => {
     const hiddenDate = { columns: { money_v1: ['id'] } }
     await expect(runTool(dc, 'read_view', { view: 'money_v1', date_from: '2000-01-01' }, hiddenDate)).rejects.toBeInstanceOf(ToolInputError)
 
-    // the date column is only auto-added when allowlisted
-    const only = (await runTool(dc, 'read_view', { view: 'money_v1', columns: ['id'], order: 'desc', limit: 1 }, hiddenDate)) as { rows: Record<string, unknown>[] }
+    // an explicit order on a hidden date column is refused; the default order is skipped, and
+    // the date column is not auto-added to the select
+    await expect(
+      runTool(dc, 'read_view', { view: 'money_v1', columns: ['id'], order: 'desc', limit: 1 }, hiddenDate),
+    ).rejects.toBeInstanceOf(ToolInputError)
+    const only = (await runTool(dc, 'read_view', { view: 'money_v1', columns: ['id'], limit: 1 }, hiddenDate)) as { rows: Record<string, unknown>[] }
     expect(Object.keys(only.rows[0])).toEqual(['id'])
+
+    // columns: [] under an allowlist selects the allowlist, never an empty select (= `*`)
+    const none = (await runTool(dc, 'read_view', { view: 'money_v1', columns: [], limit: 1 }, opts)) as { rows: Record<string, unknown>[] }
+    expect(Object.keys(none.rows[0]).sort()).toEqual(['amount_minor', 'client_id', 'id', 'occurred_at'])
 
     // a view without an allowlist is unchanged (select *)
     const all = (await runTool(dc, 'read_view', { view: 'products_v1', limit: 1 }, opts)) as { rows: Record<string, unknown>[] }
