@@ -78,6 +78,15 @@ describe('ai settings', () => {
     expect(await read(owner)).toEqual({ share_customer_contact: true })
   })
 
+  it('a token for tenant A claiming tenant B gets BCNS0 and writes nothing for B', async () => {
+    const a = await mkUser(await mkClient(), 'owner'), b = await mkUser(await mkClient(), 'owner')
+    const forged = clientWithToken(await mintJwt(a.id, { client_id: b.client }))
+    expect((await forged.rpc('log_mcp_call', { p_tool: 'forged', p_view: null, p_row_count: 0, p_ok: true, p_error_code: null })).error?.code).toBe('BCNS0')
+    expect((await forged.rpc('set_ai_settings', { p_share_customer_contact: true })).error?.code).toBe('BCNS0')
+    for (const t of ['mcp_tool_calls', 'ai_settings'])
+      expect((await sql(`select count(*)::int n from data.${t} where client_id = $1`, [b.client])).rows[0].n, t).toBe(0)
+  })
+
   it('a null value is refused (BCNS3)', async () => {
     const owner = await mkUser(await mkClient(), 'owner')
     const { error } = await clientWithToken(owner.jwt).rpc('set_ai_settings', { p_share_customer_contact: null })

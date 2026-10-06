@@ -169,6 +169,8 @@ export async function betaSnapshot() {
     (select count(*) from data.memberships where client_id = $1) memberships,
     (select count(*) from data.dashboard_versions where client_id = $1) dashboard_versions,
     (select count(*)||'/'||coalesce(sum(bytes),0) from data.egress_ledger where client_id = $1) egress,
-    (select count(*) from data.download_tickets where client_id = $1) tickets`, [CLIENTS.beta])
+    (select count(*) from data.download_tickets where client_id = $1) tickets,
+    (select count(*) from data.mcp_tool_calls where client_id = $1) mcp_tool_calls,
+    (select count(*)||'/'||coalesce(max(updated_at)::text,'') from data.ai_settings where client_id = $1) ai_settings`, [CLIENTS.beta])
   return r.rows[0]
 }

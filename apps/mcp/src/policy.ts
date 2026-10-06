@@ -27,7 +27,8 @@ export const MCP_VIEWS: AgentViewName[] = [
  *  expose every column. Additive view columns stay hidden here until someone adds them.
  *  - `attributes` (raw source JSON, where PII can hide) is out of money, messages and customers;
  *    kept on products (variants), records (dashboard ledger) and media (Drive links).
- *  - customers_v1 has no `email`: PR-C adds it behind the tenant owner's switch.
+ *  - customers_v1 has no `email` here: mcp.ts adds it per call, only while the tenant owner's
+ *    api.get_ai_settings switch is on (CUSTOMER_CONTACT_COLUMN).
  *  - media_v1 drops `uploaded_by` (internal user uuid). */
 export const MCP_COLUMNS: Partial<Record<AgentViewName, string[]>> = {
   money_v1: [
@@ -55,6 +56,12 @@ export const MCP_COLUMNS: Partial<Record<AgentViewName, string[]>> = {
     'width', 'height', 'title', 'tags', 'deleted_at', 'purge_after', 'created_at', 'updated_at', 'attributes',
   ],
 }
+
+/** The one column the owner's "share customer contact with AI" switch unlocks. Never `attributes`. */
+export const CUSTOMER_CONTACT_COLUMN = 'email'
+
+export const CONTACT_DESCRIPTION =
+  'Customer email (customers_v1) appears only if the business owner turned on contact sharing in the bcns hub.'
 
 /** Passed to both agentTools() and runTool(); no `rpcs`, so writes are off. */
 export const MCP_TOOL_OPTIONS: AgentToolsOptions = { views: MCP_VIEWS, columns: MCP_COLUMNS }
