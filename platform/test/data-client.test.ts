@@ -160,6 +160,43 @@ describe('agentTools / runTool', () => {
     await expect(runTool(dc, 'read_view', { view: 'client_v1', date_from: '2024-01-01' })).rejects.toBeInstanceOf(ToolInputError)
   })
 
+  it('columns option: allowlist is described, selected by default, and enforced on columns and filters', async () => {
+    const dc = await dataClientAs(USERS.acmeMember)
+    const opts = { columns: { money_v1: ['id', 'client_id', 'occurred_at', 'amount_minor'] } }
+
+    const readView = agentTools(opts).find((t) => t.name === 'read_view')!
+    expect(readView.description).toContain('money_v1: Orders, refunds, payouts ledger. (date column: occurred_at) (columns: id, client_id, occurred_at, amount_minor)')
+
+    // no columns requested -> exactly the allowlist
+    const res = (await runTool(dc, 'read_view', { view: 'money_v1', limit: 1 }, opts)) as { rows: Record<string, unknown>[] }
+    expect(res.rows.length).toBe(1)
+    expect(Object.keys(res.rows[0]).sort()).toEqual(['amount_minor', 'client_id', 'id', 'occurred_at'])
+
+    // denied column, denied filter column, and a range on a hidden date column
+    await expect(runTool(dc, 'read_view', { view: 'money_v1', columns: ['attributes'] }, opts)).rejects.toBeInstanceOf(ToolInputError)
+    await expect(
+      runTool(dc, 'read_view', { view: 'money_v1', filters: [{ column: 'attributes', value: 'x' }] }, opts),
+    ).rejects.toBeInstanceOf(ToolInputError)
+    const hiddenDate = { columns: { money_v1: ['id'] } }
+    await expect(runTool(dc, 'read_view', { view: 'money_v1', date_from: '2000-01-01' }, hiddenDate)).rejects.toBeInstanceOf(ToolInputError)
+
+    // an explicit order on a hidden date column is refused; the default order is skipped, and
+    // the date column is not auto-added to the select
+    await expect(
+      runTool(dc, 'read_view', { view: 'money_v1', columns: ['id'], order: 'desc', limit: 1 }, hiddenDate),
+    ).rejects.toBeInstanceOf(ToolInputError)
+    const only = (await runTool(dc, 'read_view', { view: 'money_v1', columns: ['id'], limit: 1 }, hiddenDate)) as { rows: Record<string, unknown>[] }
+    expect(Object.keys(only.rows[0])).toEqual(['id'])
+
+    // columns: [] under an allowlist selects the allowlist, never an empty select (= `*`)
+    const none = (await runTool(dc, 'read_view', { view: 'money_v1', columns: [], limit: 1 }, opts)) as { rows: Record<string, unknown>[] }
+    expect(Object.keys(none.rows[0]).sort()).toEqual(['amount_minor', 'client_id', 'id', 'occurred_at'])
+
+    // a view without an allowlist is unchanged (select *)
+    const all = (await runTool(dc, 'read_view', { view: 'products_v1', limit: 1 }, opts)) as { rows: Record<string, unknown>[] }
+    if (all.rows.length > 0) expect(Object.keys(all.rows[0])).toContain('attributes')
+  })
+
   it('rpc tools are absent by default; save_record round-trips only when opted in', async () => {
     const dc = await dataClientAs(USERS.acmeMember)
     expect(agentTools().map((t) => t.name)).not.toContain('save_record')

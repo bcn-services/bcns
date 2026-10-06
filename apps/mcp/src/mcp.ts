@@ -16,22 +16,58 @@ import {
   ToolInputError,
   type DataClient,
 } from '@bcn-services/data-client'
+import {
+  MCP_TOOL_OPTIONS,
+  RESULT_BYTE_CAP,
+  TOOL_ANNOTATIONS,
+  TOOL_TITLES,
+  UNTRUSTED_DESCRIPTION,
+  UNTRUSTED_NOTE,
+} from './policy.js'
 
 export const SERVER_INFO = { name: 'bcns', version: '0.1.0' } as const
 
 export interface McpTool {
   name: string
+  title: string
   description: string
   inputSchema: Record<string, unknown>
+  annotations: typeof TOOL_ANNOTATIONS
 }
 
 /** agentTools()'s `input_schema` is already JSON Schema; only the key name differs. */
 export function mcpTools(): McpTool[] {
-  return agentTools().map((tool) => ({
+  return agentTools(MCP_TOOL_OPTIONS).map((tool) => ({
     name: tool.name,
-    description: tool.description,
+    title: TOOL_TITLES[tool.name] ?? tool.name,
+    description: `${tool.description}\n${UNTRUSTED_DESCRIPTION}`,
     inputSchema: tool.input_schema as unknown as Record<string, unknown>,
+    annotations: TOOL_ANNOTATIONS,
   }))
+}
+
+/** What a tool call returns to the model: the rows marked as untrusted, capped at `cap` bytes of
+ *  serialized JSON by dropping trailing rows. Binary search, so a 200-row result is ~8 stringifies.
+ *  ponytail: a single row over the cap yields zero rows (truncated) — add per-field clipping if a
+ *  real tenant's one meeting transcript exceeds 256 KB. */
+export function envelope(result: unknown, cap = RESULT_BYTE_CAP): string {
+  const { rows, truncated } = result as { rows: unknown[]; truncated: boolean }
+  const build = (n: number) =>
+    JSON.stringify({
+      untrusted_data: true,
+      note: UNTRUSTED_NOTE,
+      rows: rows.slice(0, n),
+      count: n,
+      truncated: truncated || n < rows.length,
+    })
+  let lo = 0
+  let hi = rows.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (Buffer.byteLength(build(mid)) <= cap) lo = mid
+    else hi = mid - 1
+  }
+  return build(lo)
 }
 
 // A type alias, not an interface: the SDK's ServerResult union has an index signature,
@@ -59,8 +95,8 @@ export function buildServer(client: DataClient): Server {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
-      const result = await runTool(client, request.params.name, request.params.arguments ?? {})
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+      const result = await runTool(client, request.params.name, request.params.arguments ?? {}, MCP_TOOL_OPTIONS)
+      return { content: [{ type: 'text' as const, text: envelope(result) }] }
     } catch (err) {
       return toolError(err)
     }
