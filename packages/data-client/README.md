@@ -96,7 +96,10 @@ RPC and `health()` failures throw `DataClientError`, mapping the RPC's Postgres 
 SDK-agnostic tool definitions for an LLM tool loop (no Anthropic dependency; `input_schema` is
 plain JSON Schema, usable as-is for Anthropic `tools` or trivially mapped to others).
 
-- `agentTools({ views?, rpcs? })` returns the tool list: always a `read_view` tool (defaults to
+- `agentTools({ views?, rpcs? })` returns the tool list: always a `read_view` tool (sort by any column with
+  `order_by`, filter ops `eq`/`neq`/`gt`/`gte`/`lt`/`lte`/`contains`, `offset` paging) and a
+  `summarize_view` tool (count/sum/avg/min/max, grouped by up to 3 columns or a day/month/year,
+  computed app-side over at most 10,000 rows) — views default to
   every view except `customers_v1`/`memberships_v1` — user ids/PII stay out of model context
   unless a repo opts in via `views`), plus one tool per RPC named in `rpcs` (default `[]` — a
   read-only agent). Only `save_record`, `update_media`, `bulk_tag` can ever be exposed; every

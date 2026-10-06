@@ -348,6 +348,34 @@ const VIEW_DATE_COLUMN: Partial<Record<ViewName, string>> = {
   jobs_v1: 'source_updated_at',
 }
 
+/** A column set unique within one tenant (RLS leaves a single client_id), appended to every sort so
+ *  offset pages never overlap or skip on tied values. Checked against platform/supabase/migrations:
+ *  `id`/`client_id`/`user_id` are primary keys; daily_metrics, media_set_items and connector_health are
+ *  their tables' composite primary keys minus client_id; daily_summary is one row per (client_id, day);
+ *  campaign/creative daily group by (client_id, day, entity) and left-join tables unique on
+ *  (client_id, source, external_id); activity_v1 unions five tables, so `kind` (one source table each)
+ *  is added to `ref_id` to make the pair provably unique. Used only to order, never returned. */
+const VIEW_KEY: Record<ViewName, string[]> = {
+  client_v1: ['client_id'],
+  money_v1: ['id'],
+  daily_metrics_v1: ['day', 'source', 'entity_kind', 'entity_id', 'metric'],
+  daily_summary_v1: ['day'],
+  campaign_daily_v1: ['day', 'campaign_id'],
+  creative_daily_v1: ['day', 'ad_id'],
+  products_v1: ['id'],
+  customers_v1: ['id'],
+  jobs_v1: ['id'],
+  messages_v1: ['id'],
+  records_v1: ['id'],
+  media_v1: ['id'],
+  media_sets_v1: ['id'],
+  media_set_items_v1: ['set_id', 'media_id'],
+  activity_v1: ['ref_id', 'kind'],
+  connector_health_v1: ['source'],
+  egress_status_v1: ['client_id'],
+  memberships_v1: ['user_id'],
+}
+
 const VIEW_DESCRIPTIONS: Record<ViewName, string> = {
   client_v1: 'Tenant identity, timezone, status, egress quota. One row.',
   money_v1: 'Orders, refunds, payouts ledger.',
@@ -368,6 +396,15 @@ const VIEW_DESCRIPTIONS: Record<ViewName, string> = {
   egress_status_v1: 'Download-budget usage.',
   memberships_v1: 'User/role rows (user ids — excluded by default).',
 }
+
+const MAX_OFFSET = 10_000
+const MAX_GROUP_BY = 3
+/** Rows pulled per request: PostgREST's `max_rows` on Supabase. */
+const PAGE_SIZE = 1000
+/** Most rows summarize_view will read for one answer.
+ *  ponytail: app-side scan capped at 10k rows — upgrade to a security-invoker SQL function or
+ *  PostgREST aggregates if a client outgrows it. */
+const SCAN_ROW_CAP = 10_000
 
 const COLUMN_RE = /^[a-z_][a-z0-9_]{0,62}$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -402,36 +439,89 @@ function agentViews(opts?: AgentToolsOptions): AgentViewName[] {
   return opts?.views ?? DEFAULT_AGENT_VIEWS
 }
 
+function viewLines(opts?: AgentToolsOptions): string {
+  return agentViews(opts)
+    .map((v) => {
+      const dateCol = VIEW_DATE_COLUMN[v as ViewName]
+      const cols = opts?.columns?.[v as ViewName]
+      return `- ${v}: ${VIEW_DESCRIPTIONS[v as ViewName]}${dateCol ? ` (date column: ${dateCol})` : ''}${cols ? ` (columns: ${cols.join(', ')})` : ''}`
+    })
+    .join('\n')
+}
+
+const FILTER_OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains'] as const
+type FilterOp = (typeof FILTER_OPS)[number]
+
+const FILTERS_SCHEMA = {
+  type: 'array',
+  maxItems: 10,
+  items: {
+    type: 'object',
+    properties: {
+      column: { type: 'string' },
+      value: {},
+      op: { type: 'string', enum: FILTER_OPS, description: 'default eq; contains = case-insensitive substring, strings only' },
+    },
+    required: ['column', 'value'],
+  },
+}
+
 function readViewTool(opts?: AgentToolsOptions): AgentTool {
   const views = agentViews(opts)
-  const lines = views.map((v) => {
-    const dateCol = VIEW_DATE_COLUMN[v as ViewName]
-    const cols = opts?.columns?.[v as ViewName]
-    return `- ${v}: ${VIEW_DESCRIPTIONS[v as ViewName]}${dateCol ? ` (date column: ${dateCol})` : ''}${cols ? ` (columns: ${cols.join(', ')})` : ''}`
-  })
   return {
     name: 'read_view',
-    description: `Read rows from a bcns platform view, scoped to the caller's tenant by row-level security.\n${lines.join('\n')}`,
+    description:
+      `Read rows from a bcns platform view, scoped to the caller's tenant by row-level security. ` +
+      `For "top N" use order_by + order + limit; use offset (with order_by or the date column) for the next page; pages are consistent only if the data does not change between requests. ` +
+      `For totals or counts across many rows use summarize_view, not this tool.\n${viewLines(opts)}`,
     input_schema: {
       type: 'object',
       properties: {
         view: { type: 'string', enum: views },
         columns: { type: 'array', items: { type: 'string' } },
-        filters: {
-          type: 'array',
-          maxItems: 10,
-          items: {
-            type: 'object',
-            properties: { column: { type: 'string' }, value: {} },
-            required: ['column', 'value'],
-          },
-        },
+        filters: FILTERS_SCHEMA,
         date_from: { type: 'string', description: 'YYYY-MM-DD' },
         date_to: { type: 'string', description: 'YYYY-MM-DD' },
-        order: { type: 'string', enum: ['asc', 'desc'] },
+        order_by: { type: 'string', description: "column to sort by; default is the view's date column" },
+        order: { type: 'string', enum: ['asc', 'desc'], description: 'default desc' },
         limit: { type: 'integer', minimum: 1, maximum: 200 },
+        offset: { type: 'integer', minimum: 0, maximum: MAX_OFFSET },
       },
       required: ['view'],
+      additionalProperties: false,
+    },
+  }
+}
+
+const METRICS = ['count', 'sum', 'avg', 'min', 'max'] as const
+type Metric = (typeof METRICS)[number]
+const PERIODS = ['day', 'month', 'year'] as const
+type Period = (typeof PERIODS)[number]
+const SUMMARY_ORDERS = ['value_desc', 'value_asc', 'key'] as const
+
+function summarizeViewTool(opts?: AgentToolsOptions): AgentTool {
+  return {
+    name: 'summarize_view',
+    description:
+      `Count, sum, average, min or max a numeric column of a bcns platform view, optionally grouped by up to 3 columns ` +
+      `and/or by day, month or year (UTC) of the view's date column. Use it for totals such as "refunds by month". ` +
+      `Money columns ending in _minor are in minor units and are grouped by currency automatically; so is the value column of daily_metrics_v1, by metric and currency. Free-text and json columns cannot be grouped or aggregated. ` +
+      `Scans at most ${SCAN_ROW_CAP} matching rows, in several requests, so totals are exact only if the data does not change during the scan; if partial is true, narrow the date range or filters.\n${viewLines(opts)}`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        view: { type: 'string', enum: agentViews(opts) },
+        metric: { type: 'string', enum: METRICS },
+        column: { type: 'string', description: 'numeric column to aggregate; required unless metric is count' },
+        group_by: { type: 'array', maxItems: MAX_GROUP_BY, items: { type: 'string' } },
+        period: { type: 'string', enum: PERIODS, description: "bucket the view's date column (UTC)" },
+        filters: FILTERS_SCHEMA,
+        date_from: { type: 'string', description: 'YYYY-MM-DD' },
+        date_to: { type: 'string', description: 'YYYY-MM-DD' },
+        order: { type: 'string', enum: SUMMARY_ORDERS, description: 'default value_desc' },
+        limit: { type: 'integer', minimum: 1, maximum: 200, description: 'max groups returned, default 50' },
+      },
+      required: ['view', 'metric'],
       additionalProperties: false,
     },
   }
@@ -479,10 +569,10 @@ const RPC_TOOL_DESCRIPTIONS: Record<AgentRpcName, string> = {
   bulk_tag: 'Add or remove tags on up to 500 of this tenant\'s media items.',
 }
 
-/** Tool defs for the given options — always `read_view`, plus one tool per opted-in RPC (default
+/** Tool defs for the given options — always `read_view` and `summarize_view`, plus one tool per opted-in RPC (default
  *  none: a read-only agent). Destructive/egress/admin RPCs are never exposed. */
 export function agentTools(opts?: AgentToolsOptions): AgentTool[] {
-  const tools: AgentTool[] = [readViewTool(opts)]
+  const tools: AgentTool[] = [readViewTool(opts), summarizeViewTool(opts)]
   for (const name of opts?.rpcs ?? []) {
     tools.push({ name, description: RPC_TOOL_DESCRIPTIONS[name], input_schema: RPC_TOOL_SCHEMAS[name] })
   }
@@ -501,6 +591,12 @@ function checkFilterValue(value: unknown): void {
 
 function checkDate(value: unknown, field: string): string {
   if (typeof value !== 'string' || !DATE_RE.test(value)) throw new ToolInputError(`bad ${field}: ${JSON.stringify(value)}`)
+  // A real calendar day (2026-02-31 would roll over to March) in 0001-9998, so addOneDay stays a 4-digit year.
+  const year = Number(value.slice(0, 4))
+  const day = new Date(`${value}T00:00:00Z`)
+  if (year < 1 || year > 9998 || Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== value) {
+    throw new ToolInputError(`bad ${field}: ${JSON.stringify(value)}`)
+  }
   return value
 }
 
@@ -510,47 +606,142 @@ function addOneDay(date: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-async function runReadView(client: DataClient, input: any, opts?: AgentToolsOptions): Promise<unknown> {
-  const allowed = new Set(agentViews(opts))
-  const {
-    view, columns, filters, date_from: dateFrom, date_to: dateTo, order, limit,
-    ...rest
-  } = input ?? {}
-  const unknownKeys = Object.keys(rest)
-  if (unknownKeys.length > 0) throw new ToolInputError(`unknown input keys: ${unknownKeys.join(', ')}`)
-  if (typeof view !== 'string' || !allowed.has(view as AgentViewName)) throw new ToolInputError(`unknown or unexposed view: ${view}`)
+type Row = Record<string, unknown>
 
-  const dateCol = VIEW_DATE_COLUMN[view as ViewName]
-  if ((dateFrom !== undefined || dateTo !== undefined || order !== undefined) && !dateCol) {
-    throw new ToolInputError(`${view} has no date column for range/order`)
+/** The slice of a supabase-js filter builder these tools use; awaiting it runs the request. */
+interface ViewQuery extends PromiseLike<{ data: Row[] | null; error: PostgrestError | null }> {
+  eq(column: string, value: unknown): ViewQuery
+  neq(column: string, value: unknown): ViewQuery
+  is(column: string, value: null): ViewQuery
+  not(column: string, operator: 'is', value: null): ViewQuery
+  gt(column: string, value: unknown): ViewQuery
+  gte(column: string, value: unknown): ViewQuery
+  lt(column: string, value: unknown): ViewQuery
+  lte(column: string, value: unknown): ViewQuery
+  ilike(column: string, pattern: string): ViewQuery
+  order(column: string, opts: { ascending: boolean }): ViewQuery
+  range(from: number, to: number): ViewQuery
+  limit(count: number): ViewQuery
+}
+
+function viewQuery(client: DataClient, view: string, selectCols: string): ViewQuery {
+  // Cast: DataClient.views is typed per view; the view name was already checked against the exposed set.
+  return (client.views as unknown as Record<string, (columns?: string) => ViewQuery>)[view](selectCols)
+}
+
+/** The one gate every column a tool names goes through — select, filter, sort, group, metric, date
+ *  range. Each is a way to learn hidden values, so each gets the same shape and allowlist check. */
+function columnGuard(view: string, allow: string[] | undefined): (column: unknown) => string {
+  return (column) => {
+    if (typeof column !== 'string') throw new ToolInputError(`bad column name: ${JSON.stringify(column)}`)
+    checkColumn(column)
+    if (allow && !allow.includes(column)) throw new ToolInputError(`column not available on ${view}: ${column}`)
+    return column
+  }
+}
+
+interface ViewContext {
+  view: ViewName
+  dateCol: string | undefined
+  allow: string[] | undefined
+  guard: (column: unknown) => string
+}
+
+function resolveView(view: unknown, opts?: AgentToolsOptions): ViewContext {
+  if (typeof view !== 'string' || !agentViews(opts).includes(view as AgentViewName)) {
+    throw new ToolInputError(`unknown or unexposed view: ${String(view)}`)
   }
   const allow = opts?.columns?.[view as ViewName]
-  const deny = (c: string) => new ToolInputError(`column not available on ${view}: ${c}`)
-  if (columns !== undefined) {
-    if (!Array.isArray(columns)) throw new ToolInputError('columns must be an array')
-    for (const c of columns) {
-      checkColumn(c)
-      if (allow && !allow.includes(c)) throw deny(c)
-    }
+  return { view: view as ViewName, dateCol: VIEW_DATE_COLUMN[view as ViewName], allow, guard: columnGuard(view, allow) }
+}
+
+interface ParsedFilter {
+  column: string
+  op: FilterOp
+  value: unknown
+}
+
+function parseFilters(filters: unknown, guard: ViewContext['guard']): ParsedFilter[] {
+  if (filters === undefined) return []
+  if (!Array.isArray(filters) || filters.length > 10) throw new ToolInputError('filters must be an array of at most 10 entries')
+  return filters.map((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null || typeof (entry as Row).column !== 'string') throw new ToolInputError('bad filter')
+    const { column, value, op = 'eq' } = entry as Row
+    const checked = guard(column)
+    checkFilterValue(value)
+    if (typeof op !== 'string' || !(FILTER_OPS as readonly string[]).includes(op)) throw new ToolInputError(`bad filter op: ${JSON.stringify(op)}`)
+    const filterOp = op as FilterOp
+    if (filterOp === 'contains' && typeof value !== 'string') throw new ToolInputError('contains needs a string value')
+    if (filterOp !== 'eq' && filterOp !== 'neq' && value === null) throw new ToolInputError(`${filterOp} needs a non-null value`)
+    return { column: checked, op: filterOp, value }
+  })
+}
+
+function applyFilter(q: ViewQuery, f: ParsedFilter): ViewQuery {
+  switch (f.op) {
+    // PostgREST reads `eq.null` as the text 'null', so a null value is IS NULL / IS NOT NULL instead.
+    case 'eq': return f.value === null ? q.is(f.column, null) : q.eq(f.column, f.value)
+    case 'neq': return f.value === null ? q.not(f.column, 'is', null) : q.neq(f.column, f.value)
+    case 'gt': return q.gt(f.column, f.value)
+    case 'gte': return q.gte(f.column, f.value)
+    case 'lt': return q.lt(f.column, f.value)
+    case 'lte': return q.lte(f.column, f.value)
+    // % _ \ in the value are literal text, not LIKE wildcards. (PostgREST also reads `*` as `%` in
+    // like/ilike and has no escape for it; a stray `*` only widens the match inside an allowed column.)
+    case 'contains': return q.ilike(f.column, `%${String(f.value).replace(/[\\%_]/g, '\\$&')}%`)
   }
-  if (filters !== undefined) {
-    if (!Array.isArray(filters) || filters.length > 10) throw new ToolInputError('filters must be an array of at most 10 entries')
-    for (const f of filters) {
-      if (typeof f !== 'object' || f === null || typeof f.column !== 'string') throw new ToolInputError('bad filter')
-      checkColumn(f.column)
-      if (allow && !allow.includes(f.column)) throw deny(f.column)
-      checkFilterValue(f.value)
-    }
+}
+
+/** date_from/date_to as filters on the view's date column. `day` is a date; the rest are timestamps,
+ *  so date_to is exclusive of the next day. */
+function applyRange(q: ViewQuery, dateCol: string | undefined, dateFrom: unknown, dateTo: unknown): ViewQuery {
+  if (dateFrom !== undefined) q = q.gte(dateCol as string, checkDate(dateFrom, 'date_from'))
+  if (dateTo !== undefined) {
+    const d = checkDate(dateTo, 'date_to')
+    q = dateCol === 'day' ? q.lte(dateCol, d) : q.lt(dateCol as string, addOneDay(d))
   }
+  return q
+}
+
+/** Sort by `sortCol` (if any), then by the view's unique key so equal values keep one fixed order. */
+function applyOrder(q: ViewQuery, view: ViewName, sortCol: string | undefined, ascending: boolean): ViewQuery {
+  if (sortCol) q = q.order(sortCol, { ascending })
+  for (const k of VIEW_KEY[view]) if (k !== sortCol) q = q.order(k, { ascending: true })
+  return q
+}
+
+async function runReadView(client: DataClient, input: unknown, opts?: AgentToolsOptions): Promise<unknown> {
+  const {
+    view: viewName, columns, filters, date_from: dateFrom, date_to: dateTo, order, order_by: orderBy, offset, limit,
+    ...rest
+  } = (input ?? {}) as Row
+  const unknownKeys = Object.keys(rest)
+  if (unknownKeys.length > 0) throw new ToolInputError(`unknown input keys: ${unknownKeys.join(', ')}`)
+  const { view, dateCol, allow, guard } = resolveView(viewName, opts)
+
+  if ((dateFrom !== undefined || dateTo !== undefined) && !dateCol) throw new ToolInputError(`${view} has no date column for range/order`)
+  if (order !== undefined && orderBy === undefined && !dateCol) throw new ToolInputError(`${view} has no date column for range/order`)
+  if (columns !== undefined && !Array.isArray(columns)) throw new ToolInputError('columns must be an array')
+  const cols = ((columns ?? []) as unknown[]).map(guard)
+  const parsed = parseFilters(filters, guard)
   // A range is a filter: on a hidden date column it would answer questions about hidden values.
-  if (allow && dateCol && (dateFrom !== undefined || dateTo !== undefined) && !allow.includes(dateCol)) throw deny(dateCol)
-  if (order !== undefined && order !== 'asc' && order !== 'desc') throw new ToolInputError(`bad order: ${order}`)
-  // Ordering by a hidden column leaks its ranking; the default order below is skipped instead.
-  const dateHidden = !!allow && !!dateCol && !allow.includes(dateCol)
-  if (dateHidden && order !== undefined) throw deny(dateCol as string)
+  if (dateFrom !== undefined || dateTo !== undefined) guard(dateCol)
+  if (order !== undefined && order !== 'asc' && order !== 'desc') throw new ToolInputError(`bad order: ${String(order)}`)
+  // Sorting by a hidden column leaks its ranking. The default date-column sort is skipped instead
+  // when the date column is hidden; asking for it explicitly is denied.
+  let sortCol: string | undefined
+  if (orderBy !== undefined) sortCol = guard(orderBy)
+  else if (dateCol) {
+    if (order !== undefined) guard(dateCol)
+    if (!allow || allow.includes(dateCol)) sortCol = dateCol
+  }
   const rowLimit = limit === undefined ? 50 : limit
   if (typeof rowLimit !== 'number' || !Number.isInteger(rowLimit) || rowLimit < 1 || rowLimit > 200) {
-    throw new ToolInputError(`bad limit: ${limit}`)
+    throw new ToolInputError(`bad limit: ${String(limit)}`)
+  }
+  if (offset !== undefined) {
+    if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_OFFSET) throw new ToolInputError(`bad offset: ${String(offset)}`)
+    if (!sortCol) throw new ToolInputError('offset needs order_by or a visible date column')
   }
 
   // Select only what was asked for (plus the date column, if needed for order/range but not
@@ -558,28 +749,172 @@ async function runReadView(client: DataClient, input: any, opts?: AgentToolsOpti
   let selectCols = '*'
   // `columns: []` under an allowlist means "none named": an empty select= makes PostgREST fall
   // back to `*`, which would expose every hidden column.
-  if (columns !== undefined && !(allow && columns.length === 0)) {
-    const needed = new Set<string>(columns)
-    if (dateCol && (!allow || allow.includes(dateCol)) && (dateFrom !== undefined || dateTo !== undefined || order !== undefined)) needed.add(dateCol)
+  if (columns !== undefined && !(allow && cols.length === 0)) {
+    const needed = new Set<string>(cols)
+    const dateUsed = dateFrom !== undefined || dateTo !== undefined || (order !== undefined && orderBy === undefined)
+    if (dateCol && (!allow || allow.includes(dateCol)) && dateUsed) needed.add(dateCol)
     selectCols = [...needed].join(',')
   } else if (allow) {
     selectCols = allow.join(',')
   }
 
-  let q: any = (client.views as Record<string, (columns?: string) => unknown>)[view](selectCols)
-  for (const f of filters ?? []) q = q.eq(f.column, f.value)
-  if (dateFrom !== undefined) q = q.gte(dateCol, checkDate(dateFrom, 'date_from'))
-  if (dateTo !== undefined) {
-    const d = checkDate(dateTo, 'date_to')
-    q = dateCol === 'day' ? q.lte(dateCol, d) : q.lt(dateCol, addOneDay(d))
-  }
-  if (dateCol && !dateHidden) q = q.order(dateCol, { ascending: order === 'asc' })
-  q = q.limit(rowLimit)
+  let q = viewQuery(client, view, selectCols)
+  for (const f of parsed) q = applyFilter(q, f)
+  q = applyRange(q, dateCol, dateFrom, dateTo)
+  q = applyOrder(q, view, sortCol, order === 'asc')
+  q = offset !== undefined ? q.range(offset, offset + rowLimit - 1) : q.limit(rowLimit)
 
   const { data, error } = await q
   if (error) throw new DataClientError(error)
-  const rows = data
+  const rows = data ?? []
   return { rows, count: rows.length, truncated: rows.length === rowLimit }
+}
+
+/** Every row matching `apply`, in key order, one PostgREST page at a time, up to SCAN_ROW_CAP.
+ *  `partial` is true only when a matching row exists past the cap (one extra row is probed). */
+async function scanRows(
+  client: DataClient, view: ViewName, selectCols: string, apply: (q: ViewQuery) => ViewQuery,
+): Promise<{ rows: Row[]; partial: boolean }> {
+  const page = async (from: number, n: number): Promise<Row[]> => {
+    const { data, error } = await applyOrder(apply(viewQuery(client, view, selectCols)), view, undefined, true).range(from, from + n - 1)
+    if (error) throw new DataClientError(error)
+    return data ?? []
+  }
+  const rows: Row[] = []
+  // ponytail: ends on an empty page, not a short one (the server's max_rows may be below PAGE_SIZE), so
+  // every scan costs one extra empty request — upgrade to a Content-Range count if that matters.
+  while (rows.length < SCAN_ROW_CAP) {
+    const got = await page(rows.length, Math.min(PAGE_SIZE, SCAN_ROW_CAP - rows.length))
+    if (got.length === 0) return { rows, partial: false }
+    rows.push(...got)
+  }
+  return { rows, partial: (await page(rows.length, 1)).length > 0 }
+}
+
+/** UTC bucket label for a date/timestamp value: YYYY-MM-DD, YYYY-MM or YYYY. */
+function periodBucket(value: unknown, period: Period): string | null {
+  if (value === null || value === undefined) return null
+  const t = typeof value === 'string' ? new Date(value).getTime() : NaN
+  if (Number.isNaN(t)) throw new ToolInputError('date column held a non-date value')
+  return new Date(t).toISOString().slice(0, { day: 10, month: 7, year: 4 }[period])
+}
+
+function compareKeys(a: unknown[], b: unknown[]): number {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue
+    if (a[i] === null) return -1
+    if (b[i] === null) return 1
+    return (a[i] as string | number) < (b[i] as string | number) ? -1 : 1
+  }
+  return 0
+}
+
+/** Columns whose values are too large (text or json/array) to group by or aggregate for up to SCAN_ROW_CAP rows in memory. */
+const LARGE_COLUMNS = new Set(['body', 'attributes', 'participants', 'tags', 'last_error'])
+
+/** Columns a non-count metric on `column` must also be split by, so unlike values are never added:
+ *  money in minor units is one currency per row; daily_metrics_v1.value holds sessions, spend, clicks...
+ *  one `metric` per row, with spend in minor units of `currency`. */
+function splitColumnsFor(view: ViewName, column: string): string[] {
+  if (view === 'daily_metrics_v1' && column === 'value') return ['metric', 'currency']
+  if (!column.endsWith('_minor')) return []
+  return [view === 'daily_summary_v1' && column.startsWith('ad_') ? 'ad_currency' : 'currency']
+}
+
+async function runSummarizeView(client: DataClient, input: unknown, opts?: AgentToolsOptions): Promise<unknown> {
+  const {
+    view: viewName, metric, column, group_by: groupBy, period, filters, date_from: dateFrom, date_to: dateTo, order, limit,
+    ...rest
+  } = (input ?? {}) as Row
+  const unknownKeys = Object.keys(rest)
+  if (unknownKeys.length > 0) throw new ToolInputError(`unknown input keys: ${unknownKeys.join(', ')}`)
+  const { view, dateCol, allow, guard } = resolveView(viewName, opts)
+
+  if (typeof metric !== 'string' || !(METRICS as readonly string[]).includes(metric)) throw new ToolInputError(`bad metric: ${String(metric)}`)
+  const agg = metric as Metric
+  if (column === undefined && agg !== 'count') throw new ToolInputError(`${agg} needs a column`)
+  const metricCol = column === undefined ? undefined : guard(column)
+  if (groupBy !== undefined && (!Array.isArray(groupBy) || groupBy.length > MAX_GROUP_BY)) {
+    throw new ToolInputError(`group_by must be an array of at most ${MAX_GROUP_BY} columns`)
+  }
+  const groupCols = ((groupBy ?? []) as unknown[]).map(guard)
+  for (const c of [...(metricCol ? [metricCol] : []), ...groupCols]) {
+    if (LARGE_COLUMNS.has(c)) throw new ToolInputError(`${c} is too large to group by or aggregate`)
+  }
+  // The result row has fixed `period` and `value` keys; a grouped column of that name would be overwritten.
+  for (const c of groupCols) if (c === 'value' || c === 'period') throw new ToolInputError(`cannot group by a column named ${c}`)
+  if (period !== undefined && (typeof period !== 'string' || !(PERIODS as readonly string[]).includes(period))) {
+    throw new ToolInputError(`bad period: ${String(period)}`)
+  }
+  const bucket = period as Period | undefined
+  const parsed = parseFilters(filters, guard)
+  const ranged = dateFrom !== undefined || dateTo !== undefined
+  if ((bucket || ranged) && !dateCol) throw new ToolInputError(`${view} has no date column for period/range`)
+  // A bucket or a range reads the date column, so a hidden one is denied like any other column.
+  if (bucket || ranged) guard(dateCol)
+  if (order !== undefined && !(SUMMARY_ORDERS as readonly string[]).includes(order as string)) throw new ToolInputError(`bad order: ${String(order)}`)
+  const rowLimit = limit === undefined ? 50 : limit
+  if (typeof rowLimit !== 'number' || !Number.isInteger(rowLimit) || rowLimit < 1 || rowLimit > 200) {
+    throw new ToolInputError(`bad limit: ${String(limit)}`)
+  }
+
+  // Dimensions of the answer, in output order: period, group_by, then the auto currency split.
+  const dims: string[] = [...(bucket ? ['period'] : []), ...groupCols]
+  const sourceCols = [...groupCols]
+  if (agg !== 'count' && metricCol) {
+    const pinned = parsed.filter((f) => f.op === 'eq').map((f) => f.column)
+    for (const c of splitColumnsFor(view, metricCol)) {
+      if (groupCols.includes(c) || pinned.includes(c) || (allow && !allow.includes(c))) continue
+      dims.push(c)
+      sourceCols.push(c)
+    }
+  }
+  // An empty select= means `*` to PostgREST, so a bare count still names one (key) column.
+  const need = new Set<string>([...(metricCol ? [metricCol] : []), ...sourceCols, ...(bucket && dateCol ? [dateCol] : [])])
+  const selectCols = need.size > 0 ? [...need].join(',') : VIEW_KEY[view][0]
+
+  const { rows, partial } = await scanRows(client, view, selectCols, (q) => {
+    for (const f of parsed) q = applyFilter(q, f)
+    return applyRange(q, dateCol, dateFrom, dateTo)
+  })
+
+  const groups = new Map<string, { key: unknown[]; n: number; sum: number; min: number; max: number }>()
+  for (const row of rows) {
+    let v: number | undefined
+    if (metricCol !== undefined) {
+      const raw = row[metricCol]
+      if (raw === null || raw === undefined) continue // nulls are skipped, as in SQL
+      if (agg !== 'count') {
+        if (typeof raw !== 'number' || !Number.isFinite(raw)) throw new ToolInputError(`${metricCol} is not numeric`)
+        v = raw
+      }
+    }
+    const key = [...(bucket ? [periodBucket(row[dateCol as string], bucket)] : []), ...sourceCols.map((c) => row[c] ?? null)]
+    const id = JSON.stringify(key)
+    let g = groups.get(id)
+    if (!g) groups.set(id, (g = { key, n: 0, sum: 0, min: Infinity, max: -Infinity }))
+    g.n++
+    if (v !== undefined) {
+      g.sum += v
+      g.min = Math.min(g.min, v)
+      g.max = Math.max(g.max, v)
+    }
+  }
+
+  const valueOf = (g: { n: number; sum: number; min: number; max: number }): number =>
+    ({ count: g.n, sum: g.sum, avg: g.n ? g.sum / g.n : 0, min: g.min, max: g.max })[agg]
+  const all = [...groups.values()].map((g) => ({ key: g.key, value: valueOf(g) }))
+  const sortMode = order ?? 'value_desc'
+  all.sort((a, b) => (sortMode === 'key' ? 0 : sortMode === 'value_asc' ? a.value - b.value : b.value - a.value) || compareKeys(a.key, b.key))
+  const out = all.slice(0, rowLimit).map(({ key, value }) => ({ ...Object.fromEntries(dims.map((d, i) => [d, key[i]])), value }))
+  return {
+    rows: out,
+    count: out.length,
+    truncated: all.length > rowLimit,
+    scanned_rows: rows.length,
+    partial,
+    ...(partial ? { note: `totals cover only the first ${SCAN_ROW_CAP} rows; narrow the date range` } : {}),
+  }
 }
 
 /** Runs one agent tool call. `opts` must match what produced `name` via `agentTools` — an
@@ -590,6 +925,7 @@ export async function runTool(client: DataClient, name: string, input: unknown, 
   if (!exposed.has(name)) throw new ToolInputError(`unknown or unexposed tool: ${name}`)
 
   if (name === 'read_view') return runReadView(client, input, opts)
+  if (name === 'summarize_view') return runSummarizeView(client, input, opts)
 
   const rpcName = name as AgentRpcName
   const schema = RPC_TOOL_SCHEMAS[rpcName]
