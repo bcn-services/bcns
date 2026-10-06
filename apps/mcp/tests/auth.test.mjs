@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ALLOWED_ORIGIN, authorize, bearer, originAllowed, supabaseEnv } from '../dist/auth.js'
+import { ALLOWED_ORIGIN, RESOURCE_METADATA_URL, authorize, bearer, originAllowed, supabaseEnv } from '../dist/auth.js'
 
 const ok = async () => 'user-1'
 /** A token shaped like the hook's: header.payload.signature (the signature is verify()'s job). */
@@ -37,11 +37,24 @@ test('origin: absent is fine, wrong is not', () => {
   assert.equal(originAllowed({ origin: 'http://localhost:3103' }), false)
 })
 
-test('authorize: no header is 401 with a Bearer challenge', async () => {
+test('origin: the hosted connector UIs are allowed, lookalikes are not', () => {
+  for (const origin of ['https://mcp.bcn-services.com', 'https://claude.ai', 'https://chatgpt.com']) {
+    assert.equal(originAllowed({ origin }), true, origin)
+  }
+  for (const origin of ['http://claude.ai', 'https://claude.ai.evil.example', 'https://www.chatgpt.com', 'null', '']) {
+    assert.equal(originAllowed({ origin }), false, origin)
+  }
+})
+
+const CHALLENGE =
+  'Bearer resource_metadata="https://mcp.bcn-services.com/.well-known/oauth-protected-resource/mcp"'
+
+test('authorize: no header is 401 pointing at the protected-resource metadata', async () => {
   const result = await authorize({}, { verify: ok, allow: allowAll })
   assert.equal(result.ok, false)
   assert.equal(result.status, 401)
-  assert.equal(result.headers['WWW-Authenticate'], 'Bearer realm="bcns"')
+  assert.equal(result.headers['WWW-Authenticate'], CHALLENGE)
+  assert.equal(RESOURCE_METADATA_URL, 'https://mcp.bcn-services.com/.well-known/oauth-protected-resource/mcp')
 })
 
 test('authorize: a token the verifier rejects is 401', async () => {
@@ -51,17 +64,38 @@ test('authorize: a token the verifier rejects is 401', async () => {
   )
   assert.equal(result.ok, false)
   assert.equal(result.status, 401)
+  assert.equal(result.headers['WWW-Authenticate'], CHALLENGE)
 })
 
-test('authorize: a wrong Origin is rejected before the token is read', async () => {
+test('authorize: an expired token (verifier says no) is 401 with the same challenge', async () => {
+  const result = await authorize({ authorization: `Bearer ${MEMBER}` }, { verify: async () => null, allow: allowAll })
+  assert.equal(result.status, 401)
+  assert.equal(result.headers['WWW-Authenticate'], CHALLENGE)
+})
+
+test('authorize: a wrong Origin is rejected before the token is read, and logged by name', async () => {
   let verified = false
+  const warnings = []
   const result = await authorize(
     { origin: 'https://evil.example', authorization: 'Bearer good' },
-    { verify: async () => { verified = true; return 'user-1' }, allow: allowAll },
+    { verify: async () => { verified = true; return 'user-1' }, allow: allowAll, warn: (m) => warnings.push(m) },
   )
   assert.equal(result.ok, false)
   assert.equal(result.status, 403)
+  assert.deepEqual(result.body, { error: 'forbidden_origin' })
   assert.equal(verified, false)
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0], /https:\/\/evil\.example/)
+})
+
+test('authorize: each allowed Origin, and none at all, reaches the token check', async () => {
+  for (const origin of ['https://mcp.bcn-services.com', 'https://claude.ai', 'https://chatgpt.com', undefined]) {
+    const headers = { authorization: `Bearer ${MEMBER}`, ...(origin ? { origin } : {}) }
+    const warnings = []
+    const result = await authorize(headers, { verify: ok, allow: allowAll, warn: (m) => warnings.push(m) })
+    assert.equal(result.ok, true, String(origin))
+    assert.equal(warnings.length, 0)
+  }
 })
 
 test('authorize: over the rate limit is 429, and the token is never verified', async () => {

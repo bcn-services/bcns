@@ -1,14 +1,22 @@
-// Bearer-only auth for the MCP endpoint. There is no privileged credential here on purpose:
+// Bearer auth for the MCP endpoint. There is no privileged credential here on purpose:
 // the caller's own Supabase JWT is forwarded to Postgres and RLS is the only authorization.
-// Deliberate deviation from the OAuth 2.1 norm for v1 — see docs/architecture/chunk6-mcp-window.md.
+// Connectors obtain that JWT from the authorization server in oauth.ts — see
+// docs/architecture/chunk6c-mcp-launch.md §2.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createDataClient, type DataClient } from '@bcn-services/data-client'
 
 /** Same shape as platform/supabase/functions/_shared/guard.ts:44. */
 const BEARER_RE = /^Bearer\s+(\S+)$/i
 
-/** The one origin a browser-based client may claim. Anything else is a DNS-rebinding attempt. */
+/** This server's own origin; also the OAuth issuer and the only Origin POST /authorize accepts. */
 export const ALLOWED_ORIGIN = 'https://mcp.bcn-services.com'
+
+/** Origins that may reach /mcp from a browser: ours, and the two hosted connector UIs.
+ *  Anything else is a DNS-rebinding attempt. Absent Origin (CLI, server-side connector) is fine. */
+const MCP_ORIGINS: ReadonlySet<string> = new Set([ALLOWED_ORIGIN, 'https://claude.ai', 'https://chatgpt.com'])
+
+/** What a 401 points a connector at to discover the authorization server (RFC 9728). */
+export const RESOURCE_METADATA_URL = `${ALLOWED_ORIGIN}/.well-known/oauth-protected-resource/mcp`
 
 export type HeaderBag = Record<string, string | string[] | undefined>
 
@@ -32,7 +40,7 @@ export function bearer(headers: HeaderBag): string | null {
 /** Absent Origin is fine (a CLI has none). Present and wrong is rejected. */
 export function originAllowed(headers: HeaderBag): boolean {
   const origin = header(headers, 'origin')
-  return origin === undefined || origin === ALLOWED_ORIGIN
+  return origin === undefined || MCP_ORIGINS.has(origin)
 }
 
 export interface SupabaseEnv {
@@ -84,6 +92,8 @@ export interface AuthDeps {
   verify(token: string): Promise<string | null>
   /** True while the caller is under its per-minute budget. */
   allow(token: string): boolean
+  /** Called with the offending Origin so a surprise from a real connector shows up in the journal. */
+  warn?(message: string): void
 }
 
 export type AuthResult =
@@ -94,7 +104,7 @@ const UNAUTHORIZED = {
   ok: false as const,
   status: 401,
   body: { error: 'unauthorized' },
-  headers: { 'WWW-Authenticate': 'Bearer realm="bcns"' },
+  headers: { 'WWW-Authenticate': `Bearer resource_metadata="${RESOURCE_METADATA_URL}"` },
 }
 
 /**
@@ -114,7 +124,11 @@ export function hasClientClaim(token: string): boolean {
 
 /** Origin, then Bearer, then rate limit, then token verification, then the tenant claim. */
 export async function authorize(headers: HeaderBag, deps: AuthDeps): Promise<AuthResult> {
-  if (!originAllowed(headers)) return { ok: false, status: 403, body: { error: 'forbidden_origin' } }
+  if (!originAllowed(headers)) {
+    // JSON-quoted and clipped: the value is attacker-controlled and this lands in the journal.
+    deps.warn?.(`mcp: rejected Origin ${JSON.stringify(String(header(headers, 'origin')).slice(0, 200))}`)
+    return { ok: false, status: 403, body: { error: 'forbidden_origin' } }
+  }
 
   const token = bearer(headers)
   if (!token) return UNAUTHORIZED
