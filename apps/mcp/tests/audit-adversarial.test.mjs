@@ -33,8 +33,8 @@ function fake({ rows = [{ id: 'r1' }], settings = { share_customer_contact: fals
   return { client: { views, rpc }, reads, audits, filters, settingsReads: () => settingsReads }
 }
 
-async function connect(client) {
-  const server = buildServer(client)
+async function connect(client, opts) {
+  const server = buildServer(client, opts)
   const [a, b] = InMemoryTransport.createLinkedPair()
   const mcp = new Client({ name: 't', version: '0' })
   await Promise.all([server.connect(a), mcp.connect(b)])
@@ -173,12 +173,10 @@ test('prototype-pollution-shaped settings payloads do not grant', async () => {
   assert.equal({}.share_customer_contact, undefined) // nothing polluted Object.prototype
 })
 
-test('a settings payload with a granting prototype (not producible from JSON) -- informational', async () => {
-  const settings = Object.create({ share_customer_contact: true })
-  const f = fake({ settings: () => settings })
+test('a settings payload with a granting prototype does not grant (own property only)', async () => {
+  const f = fake({ settings: () => Object.create({ share_customer_contact: true }) })
   await call(f.client, cust())
-  // Documents behavior only: JSON.parse output can never have a custom prototype, so this is not exploitable.
-  console.log('inherited grant exposes email:', sel(f).includes('email'))
+  assert.ok(!sel(f).includes('email'))
 })
 
 test('every call logs exactly one audit row with only the five known keys; success and failure, concurrent', async () => {
@@ -211,16 +209,50 @@ test('audit error codes are stable short strings', async () => {
   assert.deepEqual(f.audits.map((x) => x.p_error_code), ['input', 'input'])
 })
 
-// KNOWN FAILURE (reported as bug): optionsFor() awaits get_ai_settings() with no timeout, so a hanging
-// settings read hangs the whole tool call, and no audit row is ever written. todo = documented, not red.
-test('a hanging settings read must not hang the tool call (fail closed)', { todo: 'BUG: no timeout around get_ai_settings' }, async () => {
+test('a hanging settings read must not hang the tool call: email hidden, audit row still written, no held timer', async () => {
   const f = fake({ settings: () => new Promise(() => {}) })
-  const mcp = await connect(f.client)
+  const mcp = await connect(f.client, { settingsTimeoutMs: 50 })
   let timer
+  const started = Date.now()
   const res = await Promise.race([
     mcp.callTool({ name: 'read_view', arguments: cust() }, undefined, { timeout: 1500 }),
     new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('tool call hung on the settings read')), 1000) }),
   ]).finally(() => { clearTimeout(timer); void mcp.close() })
+  assert.ok(Date.now() - started < 1000)
   assert.notEqual(res.isError, true)
   assert.ok(!sel(f).includes('email'))
+  await tick()
+  assert.deepEqual(f.audits, [{ p_tool: 'read_view', p_view: 'customers_v1', p_row_count: 1, p_ok: true, p_error_code: null }])
+})
+
+test('the default settings timeout is about 2 s', async () => {
+  const { SETTINGS_TIMEOUT_MS } = await import('../dist/mcp.js')
+  assert.equal(SETTINGS_TIMEOUT_MS, 2000)
+})
+
+test('a settings read that answers in time still grants (the timeout does not fire early)', async () => {
+  const f = fake({ settings: async () => { await new Promise((r) => setTimeout(r, 20)); return ON } })
+  const mcp = await connect(f.client, { settingsTimeoutMs: 500 })
+  await mcp.callTool({ name: 'read_view', arguments: cust() })
+  assert.ok(sel(f).includes('email'))
+})
+
+test('audit columns are canonical: an injected view, an unknown tool name and an empty name each still write a row', async () => {
+  const f = fake()
+  const mcp = await connect(f.client)
+  const injected = "customers_v1'; drop table data.mcp_tool_calls; --"
+  await mcp.callTool({ name: 'read_view', arguments: { view: injected } })
+  await mcp.callTool({ name: 'read_view', arguments: { view: 'memberships_v1' } }) // real view, not exposed
+  await mcp.callTool({ name: 'x'.repeat(500), arguments: { view: 'records_v1' } })
+  await mcp.callTool({ name: '', arguments: { view: 'records_v1' } })
+  await mcp.callTool({ name: 'read_view', arguments: { view: 'records_v1' } })
+  await tick()
+  assert.deepEqual(f.audits.map((a) => [a.p_tool, a.p_view, a.p_ok]), [
+    ['read_view', null, false],
+    ['read_view', null, false],
+    ['unknown', null, false],
+    ['unknown', null, false],
+    ['read_view', 'records_v1', true],
+  ])
+  assert.ok(!JSON.stringify(f.audits).includes('drop table'))
 })

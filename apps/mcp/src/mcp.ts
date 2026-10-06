@@ -22,6 +22,7 @@ import {
   CUSTOMER_CONTACT_COLUMN,
   MCP_COLUMNS,
   MCP_TOOL_OPTIONS,
+  MCP_VIEWS,
   RESULT_BYTE_CAP,
   TOOL_ANNOTATIONS,
   TOOL_TITLES,
@@ -106,8 +107,19 @@ export function auditCode(err: unknown): string {
 
 /** The view a read_view call names, or null. Only a string is ever logged. */
 function viewOf(args: unknown): string | null {
+  // Model input is untyped; only a string survives the check on the next line.
   const view = (args as { view?: unknown } | null)?.view
   return typeof view === 'string' ? view : null
+}
+
+/** Audit columns are canonical, never model-controlled free text: a tool outside the listed names
+ *  is 'unknown', and a view is logged only for read_view on an exposed view. */
+function auditTool(name: string): string {
+  return mcpTools().some((t) => t.name === name) ? name : 'unknown'
+}
+function auditView(name: string, args: unknown): string | null {
+  const view = viewOf(args)
+  return name === 'read_view' && view !== null && (MCP_VIEWS as string[]).includes(view) ? view : null
 }
 
 /** Fire-and-forget: one api.log_mcp_call as the caller (their own token, no privileged key). A
@@ -125,7 +137,7 @@ function audit(
     }
   }
   void (async () => {
-    // null is meaningful for view/row_count/error_code; the generated args type has no nulls.
+    // Cast: null is meaningful for view/row_count/error_code, but the generated args type has no nulls.
     await client.rpc.log_mcp_call({
       p_tool: entry.tool,
       p_view: entry.view,
@@ -136,13 +148,29 @@ function audit(
   })().catch(fail)
 }
 
+/** How long a customers_v1 read waits for the owner switch before failing closed. */
+export const SETTINGS_TIMEOUT_MS = 2000
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms)
+  })
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer))
+}
+
 /** Tool options for one call. A customers_v1 read asks the tenant's owner switch once; only an
- *  explicit `true` adds `email` to that view's allowlist. Any error or odd shape stays hidden. */
-async function optionsFor(client: DataClient, name: string, args: unknown): Promise<AgentToolsOptions> {
+ *  own, explicit `true` adds `email` to that view's allowlist. A timeout, an error or an odd
+ *  shape stays hidden. */
+async function optionsFor(client: DataClient, name: string, args: unknown, timeoutMs: number): Promise<AgentToolsOptions> {
   if (name !== 'read_view' || viewOf(args) !== 'customers_v1') return MCP_TOOL_OPTIONS
   try {
-    const settings = (await client.rpc.get_ai_settings()) as { share_customer_contact?: unknown } | null
-    if (settings?.share_customer_contact !== true) return MCP_TOOL_OPTIONS
+    const settings: unknown = await withTimeout(Promise.resolve(client.rpc.get_ai_settings()), timeoutMs)
+    // Cast: narrowed to a non-null object on the left of the &&, then read by own key only.
+    const granted =
+      typeof settings === 'object' && settings !== null && Object.hasOwn(settings, 'share_customer_contact') &&
+      (settings as { share_customer_contact?: unknown }).share_customer_contact === true
+    if (!granted) return MCP_TOOL_OPTIONS
   } catch {
     return MCP_TOOL_OPTIONS
   }
@@ -152,7 +180,7 @@ async function optionsFor(client: DataClient, name: string, args: unknown): Prom
   }
 }
 
-export function buildServer(client: DataClient): Server {
+export function buildServer(client: DataClient, opts: { settingsTimeoutMs?: number } = {}): Server {
   const server = new Server(SERVER_INFO, { capabilities: { tools: {} } })
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: mcpTools() }))
@@ -160,14 +188,15 @@ export function buildServer(client: DataClient): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name } = request.params
     const args = request.params.arguments ?? {}
-    const view = viewOf(args)
+    const tool = auditTool(name)
+    const view = auditView(name, args)
     try {
-      const result = await runTool(client, name, args, await optionsFor(client, name, args))
+      const result = await runTool(client, name, args, await optionsFor(client, name, args, opts.settingsTimeoutMs ?? SETTINGS_TIMEOUT_MS))
       const { text, count } = envelopeParts(result)
-      audit(client, { tool: name, view, rowCount: count, ok: true, errorCode: null })
+      audit(client, { tool, view, rowCount: count, ok: true, errorCode: null })
       return { content: [{ type: 'text' as const, text }] }
     } catch (err) {
-      audit(client, { tool: name, view, rowCount: null, ok: false, errorCode: auditCode(err) })
+      audit(client, { tool, view, rowCount: null, ok: false, errorCode: auditCode(err) })
       return toolError(err)
     }
   })

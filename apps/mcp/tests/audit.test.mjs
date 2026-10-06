@@ -67,11 +67,11 @@ test('error: rejected input still logs, with a short code and no row count', asy
   assert.equal(f.reads.length, 0)
 })
 
-test('an unknown tool logs too, and a non-string view is logged as null', async () => {
+test('an unknown tool logs too (as "unknown"), and a non-string view is logged as null', async () => {
   const f = fake()
   const res = await call(f.client, { view: { evil: true } }, 'drop_everything')
   assert.equal(res.isError, true)
-  assert.deepEqual(f.audits, [{ p_tool: 'drop_everything', p_view: null, p_row_count: null, p_ok: false, p_error_code: 'input' }])
+  assert.deepEqual(f.audits, [{ p_tool: 'unknown', p_view: null, p_row_count: null, p_ok: false, p_error_code: 'input' }])
 })
 
 test('an unexpected failure logs the generic code, never the message', async () => {
