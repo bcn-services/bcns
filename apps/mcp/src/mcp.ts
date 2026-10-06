@@ -59,16 +59,24 @@ export function envelope(result: unknown, cap = RESULT_BYTE_CAP): string {
   return envelopeParts(result, cap).text
 }
 
-/** envelope() plus how many rows survived the cap, for the audit row. */
+/** envelope() plus how many rows survived the cap, for the audit row. A summarize_view result also
+ *  carries scanned_rows / partial (and a note when partial); they pass through untouched. */
 function envelopeParts(result: unknown, cap = RESULT_BYTE_CAP): { text: string; count: number } {
-  const { rows, truncated } = result as { rows: unknown[]; truncated: boolean }
+  const { rows, truncated, scanned_rows, partial, note } = result as {
+    rows: unknown[]
+    truncated: boolean
+    scanned_rows?: number
+    partial?: boolean
+    note?: string
+  }
   const build = (n: number) =>
     JSON.stringify({
       untrusted_data: true,
-      note: UNTRUSTED_NOTE,
+      note: note ? `${UNTRUSTED_NOTE} ${note}` : UNTRUSTED_NOTE,
       rows: rows.slice(0, n),
       count: n,
       truncated: truncated || n < rows.length,
+      ...(scanned_rows === undefined ? {} : { scanned_rows, partial }),
     })
   let lo = 0
   let hi = rows.length
@@ -105,7 +113,7 @@ export function auditCode(err: unknown): string {
   return 'internal'
 }
 
-/** The view a read_view call names, or null. Only a string is ever logged. */
+/** The view a query-tool call names, or null. Only a string is ever logged. */
 function viewOf(args: unknown): string | null {
   // Model input is untyped; only a string survives the check on the next line.
   const view = (args as { view?: unknown } | null)?.view
@@ -113,13 +121,13 @@ function viewOf(args: unknown): string | null {
 }
 
 /** Audit columns are canonical, never model-controlled free text: a tool outside the listed names
- *  is 'unknown', and a view is logged only for read_view on an exposed view. */
+ *  is 'unknown', and a view is logged only for a query tool on an exposed view. */
 function auditTool(name: string): string {
   return mcpTools().some((t) => t.name === name) ? name : 'unknown'
 }
 function auditView(name: string, args: unknown): string | null {
   const view = viewOf(args)
-  return name === 'read_view' && view !== null && (MCP_VIEWS as string[]).includes(view) ? view : null
+  return (name === 'read_view' || name === 'summarize_view') && view !== null && (MCP_VIEWS as string[]).includes(view) ? view : null
 }
 
 /** Fire-and-forget: one api.log_mcp_call as the caller (their own token, no privileged key). A
@@ -159,11 +167,11 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer))
 }
 
-/** Tool options for one call. A customers_v1 read asks the tenant's owner switch once; only an
- *  own, explicit `true` adds `email` to that view's allowlist. A timeout, an error or an odd
- *  shape stays hidden. */
-async function optionsFor(client: DataClient, name: string, args: unknown, timeoutMs: number): Promise<AgentToolsOptions> {
-  if (name !== 'read_view' || viewOf(args) !== 'customers_v1') return MCP_TOOL_OPTIONS
+/** Tool options for one call. A customers_v1 read, by any tool naming that view, asks the tenant's
+ *  owner switch once; only an own, explicit `true` adds `email` to that view's allowlist. A
+ *  timeout, an error or an odd shape stays hidden. */
+async function optionsFor(client: DataClient, args: unknown, timeoutMs: number): Promise<AgentToolsOptions> {
+  if (viewOf(args) !== 'customers_v1') return MCP_TOOL_OPTIONS
   try {
     const settings: unknown = await withTimeout(Promise.resolve(client.rpc.get_ai_settings()), timeoutMs)
     // Cast: narrowed to a non-null object on the left of the &&, then read by own key only.
@@ -191,7 +199,7 @@ export function buildServer(client: DataClient, opts: { settingsTimeoutMs?: numb
     const tool = auditTool(name)
     const view = auditView(name, args)
     try {
-      const result = await runTool(client, name, args, await optionsFor(client, name, args, opts.settingsTimeoutMs ?? SETTINGS_TIMEOUT_MS))
+      const result = await runTool(client, name, args, await optionsFor(client, args, opts.settingsTimeoutMs ?? SETTINGS_TIMEOUT_MS))
       const { text, count } = envelopeParts(result)
       audit(client, { tool, view, rowCount: count, ok: true, errorCode: null })
       return { content: [{ type: 'text' as const, text }] }

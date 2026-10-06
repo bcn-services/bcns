@@ -143,7 +143,7 @@ test('ListTools carries title and read-only annotations', async () => {
   const { client } = fakeClient()
   const mcp = await connect(client)
   const { tools } = await mcp.listTools()
-  assert.deepEqual(tools.map((t) => t.name), ['read_view'], 'no write tool is exposed')
+  assert.deepEqual(tools.map((t) => t.name), ['read_view', 'summarize_view'], 'no write tool is exposed')
   for (const t of tools) {
     assert.equal(typeof t.title, 'string')
     assert.deepEqual(t.annotations, {

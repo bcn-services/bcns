@@ -116,7 +116,7 @@ test('date column is added only when allowlisted', async () => {
   await assert.rejects(runTool(b.client, 'read_view', { view: 'money_v1', columns: ['id'], order: 'desc' }, opts), /column not available on money_v1: occurred_at/)
   await runTool(b.client, 'read_view', { view: 'money_v1', columns: ['id'] }, opts)
   assert.equal(b.calls[0].cols, 'id', 'hidden date column not added to select')
-  assert.deepEqual(b.calls[0].order, [], 'no default ORDER BY on the hidden date column')
+  assert.deepEqual(b.calls[0].order, ['id'], 'no default ORDER BY on the hidden date column; only the key tie-breaker')
 })
 
 test('no `columns` option: identical to before', async () => {
@@ -146,7 +146,7 @@ test('view set: 16 defaults + customers_v1, no memberships_v1, no write tools', 
   const { client } = recClient()
   await assert.rejects(runTool(client, 'read_view', { view: 'memberships_v1' }, MCP_TOOL_OPTIONS))
   for (const n of ['save_record', 'update_media', 'bulk_tag', 'delete_record']) await assert.rejects(runTool(client, n, {}, MCP_TOOL_OPTIONS), n)
-  assert.deepEqual(mcpTools().map((t) => t.name), ['read_view'])
+  assert.deepEqual(mcpTools().map((t) => t.name), ['read_view', 'summarize_view'])
 })
 
 test('envelope: single oversized row yields zero rows, truncated, still valid JSON under cap', () => {
@@ -225,7 +225,7 @@ test('a date column hidden by the allowlist: explicit order is refused, default 
   assert.equal(calls.length, 0)
   await runTool(client, 'read_view', { view: 'money_v1' }, opts)
   assert.equal(calls[0].cols, 'id,amount_minor')
-  assert.deepEqual(calls[0].order, [], 'no ORDER BY on the hidden date column')
+  assert.deepEqual(calls[0].order, ['id'], 'no ORDER BY on the hidden date column; only the key tie-breaker')
 })
 
 test('columns: [] never produces select=* (the only unrestricted spelling)', async () => {

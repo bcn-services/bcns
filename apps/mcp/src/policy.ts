@@ -66,7 +66,10 @@ export const CONTACT_DESCRIPTION =
 /** Passed to both agentTools() and runTool(); no `rpcs`, so writes are off. */
 export const MCP_TOOL_OPTIONS: AgentToolsOptions = { views: MCP_VIEWS, columns: MCP_COLUMNS }
 
-export const TOOL_TITLES: Record<string, string> = { read_view: 'Read business data' }
+export const TOOL_TITLES: Record<string, string> = {
+  read_view: 'Read business data',
+  summarize_view: 'Summarize business data',
+}
 
 export const TOOL_ANNOTATIONS: AgentToolAnnotations = {
   readOnlyHint: true,
