@@ -64,6 +64,27 @@ corepack pnpm --filter @bcn-services/mcp test
 SUPABASE_URL=… SUPABASE_ANON_KEY=… PORT=3103 node apps/mcp/server.js
 ```
 
+## Tools
+
+Two read-only tools over the allowlisted views (`src/policy.ts`); no write tool is exposed.
+
+- `read_view` returns rows. `order_by` sorts by any allowed column (a hidden column is refused),
+  `filters` take an `op` of `eq` (default), `neq`, `gt`, `gte`, `lt`, `lte` or `contains` (a
+  case-insensitive substring, strings only), and `offset` (0-10000, needs an order) pages. The
+  view's unique key is always appended to the sort, so pages never repeat or skip rows.
+- `summarize_view` answers totals without the model adding rows up: `metric` count, sum, avg, min
+  or max (with a `column` except for count), `group_by` up to 3 columns, `period` day, month or
+  year (UTC, on the view's date column), the same `filters` and `date_from`/`date_to`, `order`
+  `value_desc` (default), `value_asc` or `key`, and `limit` 1-200 (default 50). Summing a `*_minor`
+  column splits by `currency` automatically, so currencies are never added together. Null values
+  are skipped; a non-numeric value in a sum/avg/min/max column is an input error.
+- Every column a call names (sort, filter, group, metric, period) goes through the same allowlist,
+  and `customers_v1.email` still needs the owner switch, for both tools.
+- `summarize_view` reads rows in pages of 1000 and aggregates in the server, up to 10,000 rows. Past
+  that the result carries `partial: true` and a note, with `scanned_rows` saying how many were
+  read. Ceiling: this is app-side, so a bigger answer needs a SQL aggregate view or RPC (a
+  migration) instead.
+
 ## Connecting an agent
 
 ```

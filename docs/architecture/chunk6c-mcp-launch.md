@@ -23,6 +23,7 @@ Principle (Nate, 2026-10-05): give clients their own data, safely. Industry patt
 - Column allowlists (new `agentTools`/`runTool` option `columns?: Partial<Record<ViewName,string[]>>` in data-client; policy set in apps/mcp). Rule: raw `attributes` blobs out where PII can hide (`money_v1`, `messages_v1`, `customers_v1`), kept where they are the tenant's own structured data (`products_v1` variants, `records_v1` ledger). `money_v1` keeps `customer_external_id`. `messages_v1` keeps `participants`. `media_v1` drops `uploaded_by` (internal uuid, no value). `customers_v1`: name, orders_count, total_spent_minor, currency, first_order_at, ids/timestamps; **`email` only when the tenant's owner switch is on** (§3b). Requested denied column → ToolInputError; no `columns` → select the allowlist.
 - Row cap stays 1–200, default 50. New response byte cap in apps/mcp (256 KB): drop trailing rows, set `truncated: true` (meeting transcripts × 200 would flood context).
 - Tool annotations: `title`, `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+- Query tools (PR-F): `read_view` gains `order_by`, filter ops (`neq`/`gt`/`gte`/`lt`/`lte`/`contains`) and `offset`, always sorted with the view's unique key as a tie-breaker; new `summarize_view` (count/sum/avg/min/max, `group_by`, day/month/year `period`) aggregates app-side over at most 10,000 rows (`partial: true` past that), splitting `*_minor` sums by currency. Every referenced column goes through the one allowlist helper; the email switch applies to both tools.
 
 **Read, out:** `memberships_v1` (internal user ids, no use to an AI).
 
@@ -89,6 +90,7 @@ B, C and D all edit `apps/mcp/src/mcp.ts` or `server.ts`, so whichever merges la
   5. Wait 15 minutes and ask again. Expect it to work without re-login (refresh).
   6. Ask for meeting notes. Expect body and participants, with no `attributes`.
      Ask "top 5 customers by spend". Expect names and totals, no emails.
+     Ask "refunds by month this year". Expect one row per month with a total, split by currency, no `partial` note.
      Flip the owner switch on `/access`, then ask again. Expect emails to appear.
      Sign in as a member. Expect the `/access` toggle to be unreachable.
   7. Read-only SQL on `data.mcp_tool_calls` for that tenant shows rows for each call.
