@@ -49,6 +49,7 @@ async function postShopRedact(deps) {
   const headers = {
     "X-Shopify-Hmac-Sha256": sign(BODY),
     "X-Shopify-Webhook-Id": "wh-1",
+    "X-Shopify-Shop-Domain": SHOP,
     "X-Shopify-Triggered-At": new Date().toISOString(),
     "X-Shopify-Topic": "shop/redact",
   };
@@ -166,6 +167,7 @@ test("customers/redact never forwards even when SHOP_REDACT_FUNCTION_URL is set"
     const headers = {
       "X-Shopify-Hmac-Sha256": sign(BODY),
       "X-Shopify-Webhook-Id": "wh-1",
+      "X-Shopify-Shop-Domain": SHOP,
       "X-Shopify-Triggered-At": new Date().toISOString(),
     };
     try {
@@ -188,6 +190,7 @@ test("customers/data_request never forwards even when SHOP_REDACT_FUNCTION_URL i
     const headers = {
       "X-Shopify-Hmac-Sha256": sign(BODY),
       "X-Shopify-Webhook-Id": "wh-1",
+      "X-Shopify-Shop-Domain": SHOP,
       "X-Shopify-Triggered-At": new Date().toISOString(),
     };
     try {
@@ -207,6 +210,7 @@ test("shop/redact: a bad HMAC 401s before any forward is attempted", async () =>
     const headers = {
       "X-Shopify-Hmac-Sha256": sign(BODY, "wrong"),
       "X-Shopify-Webhook-Id": "wh-1",
+      "X-Shopify-Shop-Domain": SHOP,
       "X-Shopify-Triggered-At": new Date().toISOString(),
     };
     const res = await gdprRoute(new Request("http://x/api", { method: "POST", headers, body: BODY }), "shop/redact", { fetchImpl: fwd.fetchImpl });
