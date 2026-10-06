@@ -267,7 +267,7 @@ Scope unchanged from the draft. Chunk 9 waited on 0-8 finishing and on real usag
 starts it. Two of its items are already done (dead cards removed 2026-09-19); card ordering is
 likely moot at six cards. Surfaces a pass would touch in `apps/connect`: `app/login`,
 `app/set-password`, `app/page.tsx` (source cards, health tones, egress line), `app/data/` (page,
-`DataTable`, `StatsStrip`), `app/team`, `app/access` (+ `MintForm`), `app/nav.tsx`,
+`DataTable`, `StatsStrip`), `app/team`, `app/access`, `app/nav.tsx`,
 `app/layout.tsx`, `app/globals.css`, plus the new sign-up and pending pages so they ship already
 tuned. Shared tokens live in `packages/ui`, which `apps/web` also uses; inference: either check the
 marketing site is visually unchanged or scope token changes to the app.

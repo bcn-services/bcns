@@ -56,7 +56,7 @@ export default async function AccessPage({
           </div>
           <div className="conn">
             <p className="h">Claude Code</p>
-            <p>Run this in your terminal, then sign in when it asks.</p>
+            <p>Run this in your terminal. Then start Claude Code, type /mcp, choose bcns and sign in.</p>
             <pre className="code">{`claude mcp add --transport http bcns ${MCP_URL}`}</pre>
           </div>
           <p className="t">
@@ -69,23 +69,30 @@ export default async function AccessPage({
 
       <section className="panel" aria-labelledby="share-h">
         <h2 id="share-h">Let AI see customer contact info</h2>
-        <p className="sub">Currently {share ? "on" : "off"}</p>
+        <p className="sub">{known ? `Currently ${share ? "on" : "off"}` : "Current setting unknown"}</p>
         <div className="body">
           <p className="t">
-            Turning this on makes customer email addresses visible to connected AI assistants. Off,
-            they still see customer names and totals, but no email addresses.
+            Turning this on makes customer email addresses visible to connected AI assistants. Off:
+            the AI sees customer names and totals but not the email addresses on your customer list.
+            Messages and notes can still contain addresses people typed in.
           </p>
           {known ? null : (
             <p role="alert" className="note note-alert">
-              Couldn&apos;t check the current setting, so it&apos;s shown as off.
+              Couldn&apos;t check the current setting. You can still turn it on or off below.
             </p>
           )}
-          <form action={setShareCustomerContact}>
-            <input type="hidden" name="share" value={share ? "off" : "on"} />
-            <button type="submit" className="btn">
-              {share ? "Turn off" : "Turn on"}
-            </button>
-          </form>
+          {/* Each form submits an absolute value, so an owner can always turn it off, even
+              when the current value couldn't be read. */}
+          <div className="flex flex-wrap gap-2">
+            {(known ? [share ? "off" : "on"] : ["on", "off"]).map((value) => (
+              <form key={value} action={setShareCustomerContact}>
+                <input type="hidden" name="share" value={value} />
+                <button type="submit" className={known || value === "off" ? "btn" : "btn btn-out"}>
+                  {value === "on" ? "Turn on" : "Turn off"}
+                </button>
+              </form>
+            ))}
+          </div>
         </div>
       </section>
     </>
