@@ -36,9 +36,10 @@ async function boot(over = {}) {
     },
     allowLogin: (ip) => (state.ips.push(ip), true),
     allowSignInUpstream: () => true,
+    allowSignInIp: () => true,
     allowRefreshUpstream: () => true,
-    refreshBlocked: () => false,
-    noteRefreshFailure: () => {},
+    allowUnknownIpRefresh: () => true,
+    allowUnknownRefresh: () => true,
     ...over,
   }
   const handle = createOAuthHandler(deps)
@@ -524,13 +525,15 @@ test('token errors: no stack/internals leak, always no-store, params from the qu
   t.close()
 })
 
-test('refresh failure modes: 4xx and a non-claim token are 400 invalid_grant; 0/429/5xx are 503 temporarily_unavailable; never a token', async () => {
+test('refresh failure modes: GoTrue 400/403 and a non-claim token are 400 invalid_grant; other 4xx and 0/429/5xx are 503; never a token', async () => {
   const pending = { ok: true, session: { access_token: jwt({ client_status: 'pending' }), refresh_token: 'x', expires_in: 1 } }
   const garbage = { ok: true, session: { access_token: 'garbage', refresh_token: 'x', expires_in: 1 } }
   const cases = [
     [{ ok: false, status: 400 }, 400, 'invalid_grant'],
-    [{ ok: false, status: 401 }, 400, 'invalid_grant'],
     [{ ok: false, status: 403 }, 400, 'invalid_grant'],
+    [{ ok: false, status: 401 }, 503, 'temporarily_unavailable'], // rotated key, not a dead token
+    [{ ok: false, status: 404 }, 503, 'temporarily_unavailable'], // wrong URL
+    [{ ok: false, status: 422 }, 503, 'temporarily_unavailable'],
     [pending, 400, 'invalid_grant'],
     [garbage, 400, 'invalid_grant'],
     [{ ok: false, status: 0 }, 503, 'temporarily_unavailable'],
@@ -748,8 +751,9 @@ test('e2e: full connector flow through real server.js + real supabase-js deps (r
       const p = authQuery({ client_id, ...over })
       p.set('email', email)
       p.set('password', password)
-      return post(p, { origin: ISS })
+      return post(p, { origin: ISS, 'x-forwarded-for': `203.0.113.${++ip}` }) // 2 upstream sign-ins/min per IP
     }
+    let ip = 0
     const wrong = await t.req('/authorize', login('owner@example.com', 'bad'))
     assert.equal(wrong.status, 401)
     const hook = await t.req('/authorize', login('nomember@x.co', 'bad'))
@@ -868,8 +872,9 @@ test('e2e: real-deps sign-in rejects GoTrue 400/403 without issuing a code; real
       const p = authQuery()
       p.set('email', email)
       p.set('password', password)
-      return t.req('/authorize', post(p, { origin: ISS }))
+      return t.req('/authorize', post(p, { origin: ISS, 'x-forwarded-for': `203.0.113.${++ip}` }))
     }
+    let ip = 0
     assert.equal((await attempt('owner@example.com', 'bad')).status, 401)
     assert.equal((await attempt('nomember@x.co', 'bad')).status, 403)
     const ok = await attempt('owner@example.com', 'good')

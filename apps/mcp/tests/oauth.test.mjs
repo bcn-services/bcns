@@ -14,9 +14,14 @@ import {
   MAX_CODES,
   MAX_BODY_BYTES,
   LOGIN_LIMIT_PER_MIN,
-  REFRESH_FAIL_LIMIT_PER_MIN,
   REFRESH_GLOBAL_LIMIT_PER_MIN,
+  REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN,
+  REFRESH_UNKNOWN_IP_LIMIT_PER_MIN,
   SIGNIN_GLOBAL_LIMIT_PER_MIN,
+  SIGNIN_IP_LIMIT_PER_MIN,
+  KNOWN_IP_TTL_MS,
+  KNOWN_IP_MAX,
+  RETRY_AFTER_BLIP_SECONDS,
   UPSTREAM_TIMEOUT_MS,
   RETRY_AFTER_SECONDS,
 } from '../dist/oauth.js'
@@ -54,9 +59,10 @@ async function boot(over = {}) {
     },
     allowLogin: (ip) => (state.ips.push(ip), true),
     allowSignInUpstream: () => true,
+    allowSignInIp: () => true,
     allowRefreshUpstream: () => true,
-    refreshBlocked: () => false,
-    noteRefreshFailure: () => {},
+    allowUnknownIpRefresh: () => true,
+    allowUnknownRefresh: () => true,
     ...over,
   }
   const handle = createOAuthHandler(deps)
@@ -572,9 +578,14 @@ test('limits and sizes are pinned by value', () => {
   assert.equal(MAX_CODES, 1000)
   assert.equal(MAX_BODY_BYTES, 16384)
   assert.equal(LOGIN_LIMIT_PER_MIN, 10)
-  assert.equal(REFRESH_FAIL_LIMIT_PER_MIN, 10)
   assert.equal(REFRESH_GLOBAL_LIMIT_PER_MIN, 15)
   assert.equal(SIGNIN_GLOBAL_LIMIT_PER_MIN, 3)
+  assert.equal(SIGNIN_IP_LIMIT_PER_MIN, 2)
+  assert.equal(REFRESH_UNKNOWN_IP_LIMIT_PER_MIN, 3)
+  assert.equal(REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN, 5)
+  assert.equal(KNOWN_IP_TTL_MS, 3_600_000)
+  assert.equal(KNOWN_IP_MAX, 1000)
+  assert.equal(RETRY_AFTER_BLIP_SECONDS, 5)
   assert.equal(UPSTREAM_TIMEOUT_MS, 8000)
   assert.equal(RETRY_AFTER_SECONDS, 60)
 })
@@ -624,64 +635,141 @@ test('login limiter key is the /64 for IPv6, so rotating inside a prefix buys no
 
 const refreshInit = (rt = 'rt') => tokenReq({ grant_type: 'refresh_token', refresh_token: rt })
 
-test('refresh: 0, 429 and 5xx from GoTrue are 503 temporarily_unavailable, not invalid_grant', async () => {
-  for (const status of [0, 429, 500, 503]) {
+test('refresh: 0, 429 and 5xx from GoTrue are 503 temporarily_unavailable, not invalid_grant; Retry-After 5 only when GoTrue was unreachable', async () => {
+  for (const [status, retry] of [[0, '5'], [429, '60'], [500, '60'], [503, '60']]) {
     const t = await boot({ refresh: async () => ({ ok: false, status }) })
     const res = await t.req('/token', refreshInit())
     assert.equal(res.status, 503, String(status))
     assert.equal(res.headers.get('cache-control'), 'no-store')
+    assert.equal(res.headers.get('retry-after'), retry, String(status))
     assert.deepEqual(await res.json(), { error: 'temporarily_unavailable' })
     t.close()
   }
 })
 
-test('refresh: a 4xx from GoTrue stays invalid_grant', async () => {
-  for (const status of [400, 401, 403, 404, 422]) {
+test('refresh: invalid_grant only for GoTrue 400 and 403; any other 4xx is our trouble and 503', async () => {
+  for (const status of [400, 403]) {
     const t = await boot({ refresh: async () => ({ ok: false, status }) })
     await assertGrantError(await t.req('/token', refreshInit()))
     t.close()
   }
+  for (const status of [401, 404, 422]) {
+    const t = await boot({ refresh: async () => ({ ok: false, status }) })
+    const res = await t.req('/token', refreshInit())
+    assert.equal(res.status, 503, String(status))
+    assert.equal(res.headers.get('retry-after'), '60')
+    assert.deepEqual(await res.json(), { error: 'temporarily_unavailable' })
+    t.close()
+  }
 })
 
-test('refresh: per-IP limiter counts FAILED refreshes only, then 503 + Retry-After before any upstream call', async () => {
-  const failures = createRateLimiter(REFRESH_FAIL_LIMIT_PER_MIN)
-  let upstream = 0
-  let ok = true
-  const t = await boot({
-    refresh: async () => (upstream++, ok ? { ok: true, session: { access_token: MEMBER_TOKEN, refresh_token: 'r', expires_in: 600 } } : { ok: false, status: 400 }),
-    refreshBlocked: (ip) => failures.exhausted(ip),
-    noteRefreshFailure: (ip) => failures.allow(ip),
-  })
-  // Far more successful refreshes than the failure budget: never throttled.
-  for (let i = 0; i < REFRESH_FAIL_LIMIT_PER_MIN * 3; i++) assert.equal((await t.req('/token', refreshInit())).status, 200)
-  ok = false
-  for (let i = 0; i < REFRESH_FAIL_LIMIT_PER_MIN; i++) await assertGrantError(await t.req('/token', refreshInit()))
-  const before = upstream
-  const blocked = await t.req('/token', refreshInit())
-  assert.equal(blocked.status, 503)
-  assert.equal(blocked.headers.get('retry-after'), '60')
-  assert.equal(blocked.headers.get('cache-control'), 'no-store')
-  assert.deepEqual(await blocked.json(), { error: 'temporarily_unavailable' })
-  assert.equal(upstream, before)
-  // Another IP is unaffected.
-  const other = await fetchWithXff(t, '203.0.113.50')
-  assert.equal(other.status, 400)
+const fetchWithXff = (t, ip, rt = 'rt') =>
+  t.req('/token', { ...refreshInit(rt), headers: { ...refreshInit(rt).headers, 'x-forwarded-for': ip } })
+
+/** The same limiter wiring server.ts builds, so the tests exercise the real admission policy. */
+function refreshCaps() {
+  const unknownIp = createRateLimiter(REFRESH_UNKNOWN_IP_LIMIT_PER_MIN)
+  const unknown = createRateLimiter(REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN)
+  const global = createRateLimiter(REFRESH_GLOBAL_LIMIT_PER_MIN)
+  return {
+    allowUnknownIpRefresh: (ip) => unknownIp.allow(ip),
+    allowUnknownRefresh: () => unknown.allow('global'),
+    allowRefreshUpstream: () => global.allow('global'),
+  }
+}
+
+/** 'good' refreshes, anything else is a dead token (400). Slow enough that bursts overlap. */
+function gotrueByToken(counter) {
+  return async (rt) => {
+    counter.n++
+    await new Promise((r) => setTimeout(r, 20))
+    return rt === 'good'
+      ? { ok: true, session: { access_token: MEMBER_TOKEN, refresh_token: 'r2', expires_in: 600 } }
+      : { ok: false, status: 400 }
+  }
+}
+
+test('refresh: 15 concurrent junk refreshes from one unknown IP reach GoTrue at most 3 times', async () => {
+  const up = { n: 0 }
+  const t = await boot({ ...refreshCaps(), refresh: gotrueByToken(up) })
+  const results = await Promise.all(Array.from({ length: 15 }, () => fetchWithXff(t, '203.0.113.7', 'junk')))
+  assert.equal(up.n, REFRESH_UNKNOWN_IP_LIMIT_PER_MIN)
+  const statuses = results.map((r) => r.status)
+  assert.equal(statuses.filter((s) => s === 400).length, REFRESH_UNKNOWN_IP_LIMIT_PER_MIN)
+  assert.equal(statuses.filter((s) => s === 503).length, 15 - REFRESH_UNKNOWN_IP_LIMIT_PER_MIN)
+  for (const r of results.filter((r) => r.status === 503)) assert.equal(r.headers.get('retry-after'), '60')
   t.close()
 })
 
-function fetchWithXff(t, ip) {
-  return t.req('/token', { ...refreshInit(), headers: { ...refreshInit().headers, 'x-forwarded-for': ip } })
-}
+test('refresh: junk spread over many unknown IPs reaches GoTrue at most 5 times a minute', async () => {
+  const up = { n: 0 }
+  const t = await boot({ ...refreshCaps(), refresh: gotrueByToken(up) })
+  const reqs = []
+  for (let ip = 1; ip <= 12; ip++) for (let i = 0; i < 3; i++) reqs.push(fetchWithXff(t, `203.0.113.${ip}`, 'junk'))
+  await Promise.all(reqs)
+  assert.equal(up.n, REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN)
+  t.close()
+})
 
-test('refresh: upstream trouble (0/5xx) does not count against the IP failure budget', async () => {
-  const failures = createRateLimiter(2)
-  const t = await boot({
-    refresh: async () => ({ ok: false, status: 500 }),
-    refreshBlocked: (ip) => failures.exhausted(ip),
-    noteRefreshFailure: (ip) => failures.allow(ip),
-  })
-  for (let i = 0; i < 6; i++) assert.equal((await t.req('/token', refreshInit())).status, 503)
-  assert.equal(failures.exhausted(ipKey('127.0.0.1')), false)
+test('refresh: a known IP keeps refreshing while the unknown budget is spent, and only the global cap applies to it', async () => {
+  const up = { n: 0 }
+  const t = await boot({ ...refreshCaps(), refresh: gotrueByToken(up) })
+  assert.equal((await fetchWithXff(t, '198.51.100.1', 'good')).status, 200) // now known
+  const flood = []
+  for (let ip = 1; ip <= 20; ip++) flood.push(fetchWithXff(t, `203.0.113.${ip}`, 'junk'))
+  await Promise.all(flood)
+  assert.equal(up.n, REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN) // 1 good + 4 junk spent the unknown budget
+  // The flood left 10 of the 15 slots: the known IP gets all of them, far past the 3/min unknown cap.
+  const known = await Promise.all(Array.from({ length: 10 }, () => fetchWithXff(t, '198.51.100.1', 'good')))
+  assert.deepEqual(known.map((r) => r.status), Array(10).fill(200))
+  const over = await fetchWithXff(t, '198.51.100.1', 'good')
+  assert.equal(over.status, 503) // global cap
+  assert.equal(over.headers.get('retry-after'), '60')
+  t.close()
+})
+
+test('refresh: a successful code exchange makes the IP known; a failed one does not', async () => {
+  const t = await boot({ allowUnknownIpRefresh: (ip) => (t.state.unknownChecks.push(ip), true) })
+  t.state.unknownChecks = []
+  const code = await getCode(t)
+  await assertGrantError(await t.req('/token', { ...exchange(code, { code_verifier: 'w'.repeat(43) }), headers: { ...exchange(code).headers, 'x-forwarded-for': '198.51.100.2' } }))
+  await fetchWithXff(t, '198.51.100.2')
+  assert.equal(t.state.unknownChecks.length, 1) // failed exchange: still unknown
+  const code2 = await getCode(t)
+  const ok = await t.req('/token', { ...exchange(code2), headers: { ...exchange(code2).headers, 'x-forwarded-for': '198.51.100.3' } })
+  assert.equal(ok.status, 200)
+  await fetchWithXff(t, '198.51.100.3')
+  assert.equal(t.state.unknownChecks.length, 1) // good exchange: known, skipped the unknown checks
+  t.close()
+})
+
+test('refresh: a failed refresh does not make an IP known', async () => {
+  const checks = []
+  const t = await boot({ allowUnknownIpRefresh: (ip) => (checks.push(ip), true), refresh: async () => ({ ok: false, status: 400 }) })
+  await fetchWithXff(t, '198.51.100.4')
+  await fetchWithXff(t, '198.51.100.4')
+  assert.equal(checks.length, 2)
+  t.close()
+})
+
+test('refresh: known status expires after the TTL and the table is bounded, evicting the oldest', async () => {
+  const checks = []
+  const t = await boot({ allowUnknownIpRefresh: (ip) => (checks.push(ip), true) })
+  await fetchWithXff(t, '198.51.100.9')
+  await fetchWithXff(t, '198.51.100.9')
+  assert.equal(checks.length, 1)
+  t.state.now += KNOWN_IP_TTL_MS + 1
+  await fetchWithXff(t, '198.51.100.9')
+  assert.equal(checks.length, 2) // expired: unknown again, and known again after this success
+  await fetchWithXff(t, '198.51.100.9')
+  assert.equal(checks.length, 2)
+  // Fill the table past its bound with other IPs: the oldest, .9, is evicted.
+  for (let i = 0; i < KNOWN_IP_MAX; i++) await fetchWithXff(t, `10.${i >> 8}.${i & 255}.1`)
+  checks.length = 0
+  await fetchWithXff(t, '198.51.100.9')
+  assert.deepEqual(checks, ['198.51.100.9'])
+  await fetchWithXff(t, `10.${(KNOWN_IP_MAX - 1) >> 8}.${(KNOWN_IP_MAX - 1) & 255}.1`)
+  assert.equal(checks.length, 1) // the most recent is still known
   t.close()
 })
 
@@ -715,15 +803,32 @@ test('sign-in: the global cap re-renders the form with 429 and never calls GoTru
   t.close()
 })
 
-test('sign-in: a request refused by the per-IP limit or with empty credentials spends none of the global budget', async () => {
+test('sign-in: a request refused by the per-IP limit or with empty credentials spends none of the upstream budgets', async () => {
   let spent = 0
-  const t = await boot({ allowLogin: () => false, allowSignInUpstream: () => (spent++, true) })
+  const spend = () => (spent++, true)
+  const t = await boot({ allowLogin: () => false, allowSignInIp: spend, allowSignInUpstream: spend })
   await t.req('/authorize', login())
   t.close()
-  const u = await boot({ allowSignInUpstream: () => (spent++, true) })
+  const u = await boot({ allowSignInIp: spend, allowSignInUpstream: spend })
   await u.req('/authorize', login({ password: '' }))
   u.close()
   assert.equal(spent, 0)
+})
+
+test('sign-in: one IP can spend only its own 2 upstream sign-ins a minute, never the global budget', async () => {
+  const perIp = createRateLimiter(SIGNIN_IP_LIMIT_PER_MIN)
+  const global = createRateLimiter(SIGNIN_GLOBAL_LIMIT_PER_MIN)
+  const t = await boot({ allowSignInIp: (ip) => perIp.allow(ip), allowSignInUpstream: () => global.allow('global') })
+  const from = (ip) => t.req('/authorize', login({}, { 'x-forwarded-for': ip }))
+  for (let i = 0; i < 10; i++) await from('203.0.113.1')
+  assert.equal(t.state.signIns.length, SIGNIN_IP_LIMIT_PER_MIN) // junk flood: capped at 2 upstream
+  const blocked = await from('203.0.113.1')
+  assert.equal(blocked.status, 429)
+  assert.match(await blocked.text(), /Too many sign-in attempts/)
+  // The global budget has one slot left for everyone else.
+  assert.equal((await from('203.0.113.2')).status, 302)
+  assert.equal((await from('203.0.113.3')).status, 429)
+  t.close()
 })
 
 // ---- real deps against a fake GoTrue: one attempt, bounded time -------------------------------
@@ -797,18 +902,42 @@ test('real deps: a new-format publishable key goes in apikey only, never as a Be
   g.close()
 })
 
+test('real deps: every non-2xx or unreachable answer logs one status-only JSON line, never a body or token', async () => {
+  const lines = []
+  const g = await fakeGotrue((req, res, n) => {
+    if (n === 4) return (res.writeHead(200, { 'content-type': 'application/json' }), res.end(JSON.stringify({ access_token: 'a', refresh_token: 'r', expires_in: 1 })))
+    res.writeHead([404, 400, 500][n - 1], { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ msg: 'SECRET-BODY', token: 'SECRET-TOKEN' }))
+  })
+  const deps = supabaseSessionDeps({ url: g.url, anonKey: 'anon' }, { log: (l) => lines.push(l) })
+  await deps.refresh('SECRET-REFRESH')
+  await deps.signIn('a@b.c', 'SECRET-PW')
+  await deps.refresh('rt')
+  await deps.refresh('rt') // 200: no line
+  assert.deepEqual(lines.map((l) => JSON.parse(l)), [
+    { level: 'error', event: 'gotrue_refresh_failed', status: 404 },
+    { level: 'error', event: 'gotrue_signin_failed', status: 400 },
+    { level: 'error', event: 'gotrue_refresh_failed', status: 500 },
+  ])
+  assert.doesNotMatch(lines.join('\n'), /SECRET/)
+  g.close()
+  const dead = supabaseSessionDeps({ url: g.url, anonKey: 'anon' }, { log: (l) => lines.push(l) })
+  await dead.refresh('rt')
+  assert.deepEqual(JSON.parse(lines.at(-1)), { level: 'error', event: 'gotrue_refresh_failed', status: 0 })
+})
+
 test('form page warns the user to continue only if they started the connection themselves', async () => {
   const t = await boot()
   for (const [redirect, label] of [
-    [CLAUDE, 'Claude \\(claude\\.ai\\)'],
-    [CLAUDE_COM, 'Claude \\(claude\\.com\\)'],
-    ['https://chatgpt.com/connector_platform_oauth_redirect', 'ChatGPT \\(chatgpt\\.com\\)'],
-    ['http://localhost:54321/cb', 'An app on your computer'],
+    [CLAUDE, 'your Claude'],
+    [CLAUDE_COM, 'your Claude'],
+    ['https://chatgpt.com/connector_platform_oauth_redirect', 'your ChatGPT'],
+    ['http://localhost:54321/cb', 'an app on this computer'],
   ]) {
     const html = await (await t.req(`/authorize?${authQuery({ redirect_uri: redirect })}`)).text()
     assert.match(
       html,
-      new RegExp(`Only continue if you started connecting from your own ${label} just now\\. If someone sent you this link, close this page\\.`),
+      new RegExp(`Only continue if you started connecting from ${label} just now\\. If someone sent you this link, close this page\\.`),
       redirect,
     )
   }
