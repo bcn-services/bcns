@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/sources.test.mjs tests/nav.test.mjs tests/request-connection.test.mjs tests/health.test.mjs tests/shopify-oauth.test.mjs tests/shopify-install.test.mjs tests/meta-monday-oauth.test.mjs tests/oauth-pick.test.mjs tests/quickbooks-oauth.test.mjs tests/data.test.mjs tests/data-reconnect.test.mjs tests/shop-redact-forward.test.mjs tests/auth-link.test.mjs tests/shopify-control.test.mjs tests/signup.test.mjs tests/signup-confirm.test.mjs tests/quickbooks-disconnect.test.mjs",
+    "test": "tsx --test tests/sources.test.mjs tests/nav.test.mjs tests/request-connection.test.mjs tests/health.test.mjs tests/shopify-oauth.test.mjs tests/shopify-install.test.mjs tests/meta-monday-oauth.test.mjs tests/oauth-pick.test.mjs tests/quickbooks-oauth.test.mjs tests/data.test.mjs tests/data-reconnect.test.mjs tests/shop-redact-forward.test.mjs tests/auth-link.test.mjs tests/shopify-control.test.mjs tests/signup.test.mjs tests/signup-confirm.test.mjs tests/quickbooks-disconnect.test.mjs tests/ai-settings.test.mjs",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {

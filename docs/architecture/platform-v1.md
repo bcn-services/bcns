@@ -267,7 +267,7 @@ Scope unchanged from the draft. Chunk 9 waited on 0-8 finishing and on real usag
 starts it. Two of its items are already done (dead cards removed 2026-09-19); card ordering is
 likely moot at six cards. Surfaces a pass would touch in `apps/connect`: `app/login`,
 `app/set-password`, `app/page.tsx` (source cards, health tones, egress line), `app/data/` (page,
-`DataTable`, `StatsStrip`), `app/team`, `app/access` (+ `MintForm`), `app/nav.tsx`,
+`DataTable`, `StatsStrip`), `app/team`, `app/access`, `app/nav.tsx`,
 `app/layout.tsx`, `app/globals.css`, plus the new sign-up and pending pages so they ship already
 tuned. Shared tokens live in `packages/ui`, which `apps/web` also uses; inference: either check the
 marketing site is visually unchanged or scope token changes to the app.
@@ -354,7 +354,7 @@ already present; `@modelcontextprotocol/sdk` **approved 2026-09-20**, that one i
 ## Deferred, with triggers
 
 - Own REST facade with API keys and metering — usage-based billing or leaving Supabase.
-- OAuth 2.1 on the MCP server — an agent product that cannot pass a bearer token.
+- OAuth 2.1 on the MCP server and retiring the /access "agent login" mint flow — now planned in `docs/architecture/chunk6c-mcp-launch.md`.
 - Google OAuth app with CASA verification — triggered by the first client with no Google
   Workspace of their own, or by a client admin who refuses to mark the bcns app Trusted.
   Decided 2026-09-23: SB stays Internal; every other client's Workspace admin marks one

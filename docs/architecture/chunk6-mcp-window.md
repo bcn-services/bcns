@@ -1,3 +1,5 @@
+> Note: the auth and launch path in this doc (agent login, bearer token) is superseded by `chunk6c-mcp-launch.md`.
+
 # Chunk 6 — the MCP server `apps/mcp`
 
 **Why this window exists.** Chunk 6 is the "agent/software access" half of the v1 decision
