@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { isIP } from 'node:net'
 import { authorize, clientForToken, supabaseEnv, verifyToken, type SupabaseEnv } from './auth.js'
 import { createRateLimiter, limitFromEnv } from './limit.js'
+import { createOAuthHandler, LOGIN_LIMIT_PER_MIN, realRandomBytes, supabaseSessionDeps } from './oauth.js'
 import { handleMcpPost } from './mcp.js'
 
 const PORT = Number(process.env.PORT ?? 3103)
@@ -26,13 +27,30 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
   const deps = {
     verify: (token: string) => verifyToken(token, env),
     allow: (token: string) => limiter.allow(token),
+    warn: (message: string) => console.error(message),
   }
+  const loginLimiter = createRateLimiter(LOGIN_LIMIT_PER_MIN)
+  const oauth = createOAuthHandler({
+    ...supabaseSessionDeps(env),
+    now: () => Date.now(),
+    randomBytes: realRandomBytes,
+    allowLogin: (ip: string) => loginLimiter.allow(ip),
+  })
 
   return createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const path = (req.url ?? '').split('?')[0]
 
     // deploy-app.yml's health check curls exactly this path. Unauthenticated by design.
     if (req.method === 'GET' && path === '/api/health') return json(res, 200, { ok: true })
+
+    // Unauthenticated by design: this is how a connector gets a token in the first place.
+    try {
+      if (await oauth(req, res)) return
+    } catch {
+      if (!res.headersSent) json(res, 500, { error: 'internal_error' })
+      else res.end()
+      return
+    }
 
     if (req.method !== 'POST' || path !== '/mcp') return json(res, 404, { error: 'not_found' })
 
