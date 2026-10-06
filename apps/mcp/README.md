@@ -25,7 +25,7 @@ not a filter this server could forget — there is no credential here that could
 | GET | `/.well-known/oauth-protected-resource[/mcp]`, `/.well-known/oauth-authorization-server` | none | OAuth discovery (`src/oauth.ts`) |
 | POST | `/register` | none | stateless DCR; redirect URIs must be on the allowlist |
 | GET, POST | `/authorize` | none | sign-in form; POST issues a 60 s single-use code |
-| POST | `/token` | none | `authorization_code` (PKCE S256) and `refresh_token` grants |
+| POST | `/token` | none | `authorization_code` (PKCE S256) and `refresh_token` grants; refresh answers `503 temporarily_unavailable` (+ `Retry-After: 60`) on a cap or an upstream blip, `400 invalid_grant` only when the token is dead |
 | * | anything else | — | `404 {"error":"not_found"}` |
 
 `/mcp` answers `401` with `WWW-Authenticate: Bearer resource_metadata="https://mcp.bcn-services.com/.well-known/oauth-protected-resource/mcp"`
@@ -78,6 +78,16 @@ see the sign-in snippet in the chunk 6 PR body and in `packages/data-client`'s `
 
 - The rate limit is an in-memory fixed window in one process. A second process doubles the
   effective limit; a restart forgets every counter.
+- Sign-in and refresh call GoTrue from the droplet IP, so they share its per-IP buckets with the
+  hub (`sign_in_sign_ups` 30/5 min, `token_refresh` 150/5 min). Process-wide caps on calls going
+  upstream protect the hub's headroom: 3 sign-ins/min (form re-renders with 429) and 15
+  refreshes/min (`503` + `Retry-After: 60`). Per client IP (IPv6 by /64): 10 sign-in attempts/min,
+  and 10 FAILED refreshes/min, so the shared egress IPs of Anthropic and OpenAI are not throttled
+  for successful ones. Each GoTrue call is one attempt with an 8 s timeout (Claude's is 10 s); a
+  timeout, network error, 429 or 5xx is `503 temporarily_unavailable`, never `invalid_grant`,
+  because the MCP SDK discards stored tokens on `invalid_grant`. All counters are in-memory, one
+  process. Past roughly 150 connected users the refresh cap will bite: raise it with the hosted
+  GoTrue limits.
 - Connectors sign in through the built-in OAuth 2.1 server (`src/oauth.ts`); its design, ceilings
   and deviations are in `docs/architecture/chunk6c-mcp-launch.md`. A raw Bearer JWT still works.
 - Tool names and descriptions come from `agentTools()`. Improving how a model picks a tool is an

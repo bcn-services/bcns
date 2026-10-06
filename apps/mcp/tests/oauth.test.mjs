@@ -4,11 +4,28 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { createOAuthHandler, redirectAllowed, clientIp, CODE_TTL_MS, MAX_CODES, MAX_BODY_BYTES } from '../dist/oauth.js'
+import {
+  createOAuthHandler,
+  redirectAllowed,
+  clientIp,
+  ipKey,
+  supabaseSessionDeps,
+  CODE_TTL_MS,
+  MAX_CODES,
+  MAX_BODY_BYTES,
+  LOGIN_LIMIT_PER_MIN,
+  REFRESH_FAIL_LIMIT_PER_MIN,
+  REFRESH_GLOBAL_LIMIT_PER_MIN,
+  SIGNIN_GLOBAL_LIMIT_PER_MIN,
+  UPSTREAM_TIMEOUT_MS,
+  RETRY_AFTER_SECONDS,
+} from '../dist/oauth.js'
+import { createRateLimiter } from '../dist/limit.js'
 
 const ISS = 'https://mcp.bcn-services.com'
 const RESOURCE = `${ISS}/mcp`
 const CLAUDE = 'https://claude.ai/api/mcp/auth_callback'
+const CLAUDE_COM = 'https://claude.com/api/mcp/auth_callback'
 const jwt = (claims) => `h.${Buffer.from(JSON.stringify({ sub: 'u1', ...claims })).toString('base64url')}.s`
 const MEMBER_TOKEN = jwt({ client_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc' })
 const PENDING_TOKEN = jwt({ client_status: 'pending' })
@@ -36,6 +53,10 @@ async function boot(over = {}) {
       return b
     },
     allowLogin: (ip) => (state.ips.push(ip), true),
+    allowSignInUpstream: () => true,
+    allowRefreshUpstream: () => true,
+    refreshBlocked: () => false,
+    noteRefreshFailure: () => {},
     ...over,
   }
   const handle = createOAuthHandler(deps)
@@ -141,6 +162,7 @@ test('routes it does not own fall through', async () => {
 test('redirectAllowed: exactly the spec list', () => {
   for (const ok of [
     CLAUDE,
+    CLAUDE_COM,
     'https://chatgpt.com/connector_platform_oauth_redirect',
     'https://chatgpt.com/connector/oauth/abc_DEF-123',
     'http://localhost:54321/callback',
@@ -151,6 +173,10 @@ test('redirectAllowed: exactly the spec list', () => {
     undefined,
     '',
     'https://claude.ai/api/mcp/auth_callback/',
+    'https://claude.com/api/mcp/auth_callback/',
+    'https://claude.com/api/mcp/auth_callback?x=1',
+    'https://www.claude.com/api/mcp/auth_callback',
+    'http://claude.com/api/mcp/auth_callback',
     'https://claude.ai/api/mcp/auth_callback?x=1',
     'https://claude.ai.evil.example/api/mcp/auth_callback',
     'http://claude.ai/api/mcp/auth_callback',
@@ -249,7 +275,9 @@ test('authorize GET: loopback redirect lists its own origin in form-action', asy
   const res = await t.req(`/authorize?${authQuery({ redirect_uri: 'http://localhost:54321/cb' })}`)
   assert.equal(res.status, 200)
   assert.match(res.headers.get('content-security-policy'), /form-action 'self' http:\/\/localhost:54321;/)
-  assert.match(await res.text(), /An app on your computer/)
+  const html = await res.text()
+  assert.match(html, /An app on your computer wants read-only access/)
+  assert.doesNotMatch(html, /Claude Code/)
   t.close()
 })
 
@@ -534,5 +562,255 @@ test('refresh: a session that lost its tenant claim is invalid_grant', async () 
 test('refresh: missing refresh_token is invalid_request', async () => {
   const t = await boot()
   await assertGrantError(await t.req('/token', tokenReq({ grant_type: 'refresh_token' })), 'invalid_request')
+  t.close()
+})
+
+// ---- review round: constants, labels, header, caps, upstream bounds ---------------------------
+
+test('limits and sizes are pinned by value', () => {
+  assert.equal(CODE_TTL_MS, 60_000)
+  assert.equal(MAX_CODES, 1000)
+  assert.equal(MAX_BODY_BYTES, 16384)
+  assert.equal(LOGIN_LIMIT_PER_MIN, 10)
+  assert.equal(REFRESH_FAIL_LIMIT_PER_MIN, 10)
+  assert.equal(REFRESH_GLOBAL_LIMIT_PER_MIN, 15)
+  assert.equal(SIGNIN_GLOBAL_LIMIT_PER_MIN, 3)
+  assert.equal(UPSTREAM_TIMEOUT_MS, 8000)
+  assert.equal(RETRY_AFTER_SECONDS, 60)
+})
+
+test('form page: Referrer-Policy is same-origin so the browser POSTs a real Origin', async () => {
+  const t = await boot()
+  const res = await t.req(`/authorize?${authQuery()}`)
+  assert.equal(res.headers.get('referrer-policy'), 'same-origin')
+  t.close()
+})
+
+test('claude.com callback: allowed everywhere and labelled Claude (claude.com)', async () => {
+  const t = await boot()
+  const reg = await t.req('/register', json({ redirect_uris: [CLAUDE_COM] }))
+  assert.equal(reg.status, 201)
+  const res = await t.req(`/authorize?${authQuery({ redirect_uri: CLAUDE_COM })}`)
+  assert.equal(res.status, 200)
+  assert.match(await res.text(), /Claude \(claude\.com\) wants read-only access/)
+  assert.match(res.headers.get('content-security-policy'), /form-action 'self' https:\/\/claude\.com;/)
+  const ok = await t.req('/authorize', login({ redirect_uri: CLAUDE_COM }))
+  assert.equal(ok.status, 302)
+  assert.equal(new URL(ok.headers.get('location')).origin, 'https://claude.com')
+  t.close()
+})
+
+test('ipKey: IPv4 whole, IPv4-mapped as IPv4, other IPv6 as its /64', () => {
+  assert.equal(ipKey('203.0.113.9'), '203.0.113.9')
+  assert.equal(ipKey('::ffff:203.0.113.9'), '203.0.113.9')
+  assert.equal(ipKey('::FFFF:cb00:7109'), '203.0.113.9')
+  assert.equal(ipKey('2001:db8:aaaa:bbbb:1:2:3:4'), ipKey('2001:db8:aaaa:bbbb:ffff:eeee:dddd:cccc'))
+  assert.equal(ipKey('2001:db8:aaaa:bbbb::1'), ipKey('2001:0db8:aaaa:bbbb:0:0:0:2'))
+  assert.notEqual(ipKey('2001:db8:aaaa:bbbb::1'), ipKey('2001:db8:aaaa:bbbc::1'))
+  assert.equal(ipKey('::1'), ipKey('0:0:0:0:5::9'))
+  assert.equal(ipKey('fe80::1%en0'), ipKey('fe80::2'))
+  assert.equal(ipKey('unknown'), 'unknown')
+})
+
+test('login limiter key is the /64 for IPv6, so rotating inside a prefix buys nothing', async () => {
+  const t = await boot()
+  await t.req('/authorize', login({}, { 'x-forwarded-for': '2001:db8:1:2:aaaa::1' }))
+  await t.req('/authorize', login({}, { 'x-forwarded-for': '2001:db8:1:2:bbbb::9' }))
+  await t.req('/authorize', login({}, { 'x-forwarded-for': '::ffff:198.51.100.4' }))
+  assert.equal(t.state.ips[0], t.state.ips[1])
+  assert.equal(t.state.ips[2], '198.51.100.4')
+  t.close()
+})
+
+const refreshInit = (rt = 'rt') => tokenReq({ grant_type: 'refresh_token', refresh_token: rt })
+
+test('refresh: 0, 429 and 5xx from GoTrue are 503 temporarily_unavailable, not invalid_grant', async () => {
+  for (const status of [0, 429, 500, 503]) {
+    const t = await boot({ refresh: async () => ({ ok: false, status }) })
+    const res = await t.req('/token', refreshInit())
+    assert.equal(res.status, 503, String(status))
+    assert.equal(res.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(await res.json(), { error: 'temporarily_unavailable' })
+    t.close()
+  }
+})
+
+test('refresh: a 4xx from GoTrue stays invalid_grant', async () => {
+  for (const status of [400, 401, 403, 404, 422]) {
+    const t = await boot({ refresh: async () => ({ ok: false, status }) })
+    await assertGrantError(await t.req('/token', refreshInit()))
+    t.close()
+  }
+})
+
+test('refresh: per-IP limiter counts FAILED refreshes only, then 503 + Retry-After before any upstream call', async () => {
+  const failures = createRateLimiter(REFRESH_FAIL_LIMIT_PER_MIN)
+  let upstream = 0
+  let ok = true
+  const t = await boot({
+    refresh: async () => (upstream++, ok ? { ok: true, session: { access_token: MEMBER_TOKEN, refresh_token: 'r', expires_in: 600 } } : { ok: false, status: 400 }),
+    refreshBlocked: (ip) => failures.exhausted(ip),
+    noteRefreshFailure: (ip) => failures.allow(ip),
+  })
+  // Far more successful refreshes than the failure budget: never throttled.
+  for (let i = 0; i < REFRESH_FAIL_LIMIT_PER_MIN * 3; i++) assert.equal((await t.req('/token', refreshInit())).status, 200)
+  ok = false
+  for (let i = 0; i < REFRESH_FAIL_LIMIT_PER_MIN; i++) await assertGrantError(await t.req('/token', refreshInit()))
+  const before = upstream
+  const blocked = await t.req('/token', refreshInit())
+  assert.equal(blocked.status, 503)
+  assert.equal(blocked.headers.get('retry-after'), '60')
+  assert.equal(blocked.headers.get('cache-control'), 'no-store')
+  assert.deepEqual(await blocked.json(), { error: 'temporarily_unavailable' })
+  assert.equal(upstream, before)
+  // Another IP is unaffected.
+  const other = await fetchWithXff(t, '203.0.113.50')
+  assert.equal(other.status, 400)
+  t.close()
+})
+
+function fetchWithXff(t, ip) {
+  return t.req('/token', { ...refreshInit(), headers: { ...refreshInit().headers, 'x-forwarded-for': ip } })
+}
+
+test('refresh: upstream trouble (0/5xx) does not count against the IP failure budget', async () => {
+  const failures = createRateLimiter(2)
+  const t = await boot({
+    refresh: async () => ({ ok: false, status: 500 }),
+    refreshBlocked: (ip) => failures.exhausted(ip),
+    noteRefreshFailure: (ip) => failures.allow(ip),
+  })
+  for (let i = 0; i < 6; i++) assert.equal((await t.req('/token', refreshInit())).status, 503)
+  assert.equal(failures.exhausted(ipKey('127.0.0.1')), false)
+  t.close()
+})
+
+test('refresh: the global cap answers 503 + Retry-After without calling GoTrue', async () => {
+  const global = createRateLimiter(REFRESH_GLOBAL_LIMIT_PER_MIN)
+  let upstream = 0
+  const t = await boot({
+    allowRefreshUpstream: () => global.allow('global'),
+    refresh: async () => (upstream++, { ok: true, session: { access_token: MEMBER_TOKEN, refresh_token: 'r', expires_in: 600 } }),
+  })
+  for (let i = 0; i < REFRESH_GLOBAL_LIMIT_PER_MIN; i++) assert.equal((await t.req('/token', refreshInit())).status, 200)
+  const over = await t.req('/token', refreshInit())
+  assert.equal(over.status, 503)
+  assert.equal(over.headers.get('retry-after'), '60')
+  assert.deepEqual(await over.json(), { error: 'temporarily_unavailable' })
+  assert.equal(upstream, REFRESH_GLOBAL_LIMIT_PER_MIN)
+  t.close()
+})
+
+test('sign-in: the global cap re-renders the form with 429 and never calls GoTrue', async () => {
+  const global = createRateLimiter(SIGNIN_GLOBAL_LIMIT_PER_MIN)
+  const t = await boot({ allowSignInUpstream: () => global.allow('global') })
+  for (let i = 0; i < SIGNIN_GLOBAL_LIMIT_PER_MIN; i++) assert.equal((await t.req('/authorize', login())).status, 302)
+  const over = await t.req('/authorize', login())
+  assert.equal(over.status, 429)
+  assert.equal(over.headers.get('location'), null)
+  const html = await over.text()
+  assert.match(html, /Too many sign-in attempts\. Try again in a minute\./)
+  assert.match(html, /name="code_challenge"/)
+  assert.equal(t.state.signIns.length, SIGNIN_GLOBAL_LIMIT_PER_MIN)
+  t.close()
+})
+
+test('sign-in: a request refused by the per-IP limit or with empty credentials spends none of the global budget', async () => {
+  let spent = 0
+  const t = await boot({ allowLogin: () => false, allowSignInUpstream: () => (spent++, true) })
+  await t.req('/authorize', login())
+  t.close()
+  const u = await boot({ allowSignInUpstream: () => (spent++, true) })
+  await u.req('/authorize', login({ password: '' }))
+  u.close()
+  assert.equal(spent, 0)
+})
+
+// ---- real deps against a fake GoTrue: one attempt, bounded time -------------------------------
+
+async function fakeGotrue(handler) {
+  const calls = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      calls.push({ url: req.url, headers: req.headers, body })
+      handler(req, res, calls.length)
+    })
+  })
+  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  return { calls, url: `http://127.0.0.1:${server.address().port}`, close: () => (server.close(), server.closeAllConnections()) }
+}
+
+test('real deps: a hung GoTrue is status 0 within the timeout, for both grants, with a single attempt', async () => {
+  const g = await fakeGotrue(() => {}) // never answers
+  const deps = supabaseSessionDeps({ url: g.url, anonKey: 'anon' }, { timeoutMs: 150 })
+  const started = Date.now()
+  assert.deepEqual(await deps.refresh('rt'), { ok: false, status: 0 })
+  assert.deepEqual(await deps.signIn('a@b.c', 'pw'), { ok: false, status: 0 })
+  assert.ok(Date.now() - started < 2000)
+  assert.equal(g.calls.length, 2) // no retry loop
+  g.close()
+})
+
+test('real deps: an unreachable GoTrue is status 0 immediately, one attempt', async () => {
+  const dead = createServer()
+  await new Promise((r) => dead.listen(0, '127.0.0.1', r))
+  const url = `http://127.0.0.1:${dead.address().port}`
+  await new Promise((r) => dead.close(r))
+  const started = Date.now()
+  assert.deepEqual(await supabaseSessionDeps({ url, anonKey: 'anon' }).refresh('rt'), { ok: false, status: 0 })
+  assert.ok(Date.now() - started < 2000)
+})
+
+test('real deps: GoTrue statuses pass through; success maps the session; request shape matches supabase-js', async () => {
+  const g = await fakeGotrue((req, res, n) => {
+    const send = (status, obj) => (res.writeHead(status, { 'content-type': 'application/json' }), res.end(JSON.stringify(obj)))
+    if (n === 1) return send(400, { error_code: 'invalid_credentials' })
+    if (n === 2) return send(429, {})
+    if (n === 3) return send(200, { access_token: 'a', refresh_token: 'r', expires_in: 600, token_type: 'bearer' })
+    if (n === 4) return send(200, { nope: true })
+    res.writeHead(200)
+    res.end('not json')
+  })
+  const deps = supabaseSessionDeps({ url: g.url + '/', anonKey: 'anon-key' })
+  assert.deepEqual(await deps.signIn('a@b.c', 'pw'), { ok: false, status: 400 })
+  assert.deepEqual(await deps.refresh('rt-1'), { ok: false, status: 429 })
+  assert.deepEqual(await deps.refresh('rt-2'), { ok: true, session: { access_token: 'a', refresh_token: 'r', expires_in: 600 } })
+  assert.deepEqual(await deps.refresh('rt-3'), { ok: false, status: 0 })
+  assert.deepEqual(await deps.refresh('rt-4'), { ok: false, status: 0 })
+  assert.equal(g.calls[0].url, '/auth/v1/token?grant_type=password')
+  assert.deepEqual(JSON.parse(g.calls[0].body), { email: 'a@b.c', password: 'pw' })
+  assert.equal(g.calls[1].url, '/auth/v1/token?grant_type=refresh_token')
+  assert.deepEqual(JSON.parse(g.calls[1].body), { refresh_token: 'rt-1' })
+  assert.equal(g.calls[0].headers.apikey, 'anon-key')
+  assert.equal(g.calls[0].headers.authorization, 'Bearer anon-key')
+  assert.equal(g.calls[0].headers.cookie, undefined)
+  g.close()
+})
+
+test('real deps: a new-format publishable key goes in apikey only, never as a Bearer token', async () => {
+  const g = await fakeGotrue((req, res) => (res.writeHead(400), res.end('{}')))
+  await supabaseSessionDeps({ url: g.url, anonKey: 'sb_publishable_abc' }).refresh('rt')
+  assert.equal(g.calls[0].headers.apikey, 'sb_publishable_abc')
+  assert.equal(g.calls[0].headers.authorization, undefined)
+  g.close()
+})
+
+test('form page warns the user to continue only if they started the connection themselves', async () => {
+  const t = await boot()
+  for (const [redirect, label] of [
+    [CLAUDE, 'Claude \\(claude\\.ai\\)'],
+    [CLAUDE_COM, 'Claude \\(claude\\.com\\)'],
+    ['https://chatgpt.com/connector_platform_oauth_redirect', 'ChatGPT \\(chatgpt\\.com\\)'],
+    ['http://localhost:54321/cb', 'An app on your computer'],
+  ]) {
+    const html = await (await t.req(`/authorize?${authQuery({ redirect_uri: redirect })}`)).text()
+    assert.match(
+      html,
+      new RegExp(`Only continue if you started connecting from your own ${label} just now\\. If someone sent you this link, close this page\\.`),
+      redirect,
+    )
+  }
   t.close()
 })

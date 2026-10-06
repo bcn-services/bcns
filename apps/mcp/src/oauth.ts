@@ -7,7 +7,7 @@
 // reaches this host, and nothing here may read or reuse it.
 import { createHash, randomBytes as nodeRandomBytes, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createClient } from '@supabase/supabase-js'
+import { isIP } from 'node:net'
 import { ALLOWED_ORIGIN, hasClientClaim, type SupabaseEnv } from './auth.js'
 
 const ISSUER = ALLOWED_ORIGIN
@@ -17,8 +17,19 @@ export const CODE_TTL_MS = 60_000
 /** Bound on live codes. Sign-in is rate limited per IP, so this only fills under attack. */
 export const MAX_CODES = 1000
 export const MAX_BODY_BYTES = 16 * 1024
-/** Failed or successful, every POST /authorize counts. */
+/** Failed or successful, every POST /authorize counts, per client IP (/64 for IPv6). */
 export const LOGIN_LIMIT_PER_MIN = 10
+/** Per client IP, FAILED refreshes only: Anthropic's and OpenAI's shared egress IPs refresh
+ *  successfully for many users and must not be throttled for it. */
+export const REFRESH_FAIL_LIMIT_PER_MIN = 10
+// Every sign-in and refresh hits GoTrue from the droplet IP, sharing its per-IP buckets with the
+// hub (sign_in_sign_ups 30/5 min, token_refresh 150/5 min). These process-wide caps on calls
+// going upstream are what keep the hub's headroom.
+export const SIGNIN_GLOBAL_LIMIT_PER_MIN = 3
+export const REFRESH_GLOBAL_LIMIT_PER_MIN = 15
+/** Sign-in and refresh each finish inside this, retries included; Claude's endpoint timeout is 10 s. */
+export const UPSTREAM_TIMEOUT_MS = 8000
+export const RETRY_AFTER_SECONDS = 60
 
 export interface Session {
   access_token: string
@@ -36,40 +47,59 @@ export interface OAuthDeps {
   randomBytes(size: number): Buffer
   /** True while this IP is under its sign-in budget. */
   allowLogin(ip: string): boolean
+  /** Global cap on password sign-ins sent to GoTrue; true = may go upstream. */
+  allowSignInUpstream(): boolean
+  /** Global cap on refreshes sent to GoTrue; true = may go upstream. */
+  allowRefreshUpstream(): boolean
+  /** True once this IP has used up its failed-refresh budget. Counts nothing. */
+  refreshBlocked(ip: string): boolean
+  /** Record one failed refresh against this IP. */
+  noteRefreshFailure(ip: string): void
 }
 
 // ---- Supabase-backed deps -------------------------------------------------------------------
 
-/** A fresh client per call: sign-in and refresh set in-memory session state on the client, and
- *  concurrent users must never share one. Anon key only; nothing is persisted or auto-refreshed. */
-export function supabaseSessionDeps(env: SupabaseEnv): Pick<OAuthDeps, 'signIn' | 'refresh'> {
-  const client = () =>
-    createClient(env.url, env.anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    })
-  const toResult = (r: {
-    data: { session: { access_token: string; refresh_token: string; expires_in: number } | null }
-    error: { status?: number } | null
-  }): SessionResult => {
-    const s = r.data.session
-    if (r.error || !s) return { ok: false, status: r.error?.status ?? 0 }
-    return { ok: true, session: { access_token: s.access_token, refresh_token: s.refresh_token, expires_in: s.expires_in } }
+/**
+ * Plain fetch to GoTrue's token endpoint, not supabase-js: refreshSession retries network errors
+ * with backoff (measured 25 s), far past Claude's 10 s endpoint timeout, and an `invalid_grant`
+ * caused by a blip makes the MCP SDK throw away a good refresh token. One attempt, hard timeout,
+ * and a timeout or network error is status 0 ("upstream unavailable"). Anon key only; the same
+ * headers supabase-js's auth client sends. Nothing is stored here.
+ */
+export function supabaseSessionDeps(
+  env: SupabaseEnv,
+  opts: { timeoutMs?: number; fetch?: typeof fetch } = {},
+): Pick<OAuthDeps, 'signIn' | 'refresh'> {
+  const timeoutMs = opts.timeoutMs ?? UPSTREAM_TIMEOUT_MS
+  const doFetch = opts.fetch ?? fetch
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', apikey: env.anonKey }
+  // New-format keys are not JWTs and must never be sent as a Bearer token.
+  if (!/^sb_(publishable|secret)_/.test(env.anonKey)) headers.Authorization = `Bearer ${env.anonKey}`
+
+  async function grant(type: 'password' | 'refresh_token', body: Record<string, string>): Promise<SessionResult> {
+    try {
+      const res = await doFetch(`${env.url.replace(/\/+$/, '')}/auth/v1/token?grant_type=${type}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (!res.ok) {
+        await res.body?.cancel()
+        return { ok: false, status: res.status }
+      }
+      const s = (await res.json()) as Partial<Session> | null
+      if (!s || typeof s.access_token !== 'string' || typeof s.refresh_token !== 'string' || typeof s.expires_in !== 'number') {
+        return { ok: false, status: 0 }
+      }
+      return { ok: true, session: { access_token: s.access_token, refresh_token: s.refresh_token, expires_in: s.expires_in } }
+    } catch {
+      return { ok: false, status: 0 } // timeout, DNS, refused, reset, bad JSON
+    }
   }
   return {
-    async signIn(email, password) {
-      try {
-        return toResult(await client().auth.signInWithPassword({ email, password }))
-      } catch {
-        return { ok: false, status: 0 }
-      }
-    },
-    async refresh(refreshToken) {
-      try {
-        return toResult(await client().auth.refreshSession({ refresh_token: refreshToken }))
-      } catch {
-        return { ok: false, status: 0 }
-      }
-    },
+    signIn: (email, password) => grant('password', { email, password }),
+    refresh: (refreshToken) => grant('refresh_token', { refresh_token: refreshToken }),
   }
 }
 
@@ -81,6 +111,7 @@ export function realRandomBytes(size: number): Buffer {
 
 const REDIRECT_EXACT = new Set([
   'https://claude.ai/api/mcp/auth_callback',
+  'https://claude.com/api/mcp/auth_callback',
   'https://chatgpt.com/connector_platform_oauth_redirect',
 ])
 const CHATGPT_CONNECTOR_RE = /^https:\/\/chatgpt\.com\/connector\/oauth\/[A-Za-z0-9_-]+$/
@@ -139,8 +170,9 @@ function esc(value: string): string {
 function appLabel(redirectUri: string): string {
   const host = new URL(redirectUri).hostname
   if (host === 'claude.ai') return 'Claude (claude.ai)'
+  if (host === 'claude.com') return 'Claude (claude.com)'
   if (host === 'chatgpt.com') return 'ChatGPT (chatgpt.com)'
-  return 'An app on your computer (Claude Code)'
+  return 'An app on your computer'
 }
 
 /** Chromium also applies form-action to the redirect that follows the POST, so the allowlisted
@@ -152,7 +184,9 @@ function pageHeaders(redirectUri?: string): Record<string, string> {
     'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; form-action ${formAction}; frame-ancestors 'none'`,
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
+    // same-origin, not no-referrer: with no-referrer the browser sends `Origin: null` on the form
+    // POST, which POST /authorize rightly refuses, so every real sign-in would be a 403.
+    'Referrer-Policy': 'same-origin',
     'Cache-Control': 'no-store',
   }
 }
@@ -172,6 +206,7 @@ function formHtml(p: AuthorizeParams, error?: string): string {
     'Sign in to bcns',
     `<h1>Sign in to bcns</h1>
 <p>${esc(appLabel(p.redirectUri))} wants read-only access to your bcns data.</p>
+<p>Only continue if you started connecting from your own ${esc(appLabel(p.redirectUri))} just now. If someone sent you this link, close this page.</p>
 <form method="post" action="/authorize">
 ${hidden('response_type', 'code')}${hidden('code_challenge_method', 'S256')}${hidden('client_id', p.clientId)}${hidden('redirect_uri', p.redirectUri)}${hidden('state', p.state)}${hidden('code_challenge', p.challenge)}${hidden('resource', p.resource)}
 <label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required maxlength="320">
@@ -243,6 +278,25 @@ export function clientIp(req: IncomingMessage): string {
   return last || req.socket.remoteAddress || 'unknown'
 }
 
+/** Limiter key for a client address: IPv4 whole, IPv4-mapped IPv6 as its IPv4, other IPv6 as its
+ *  /64 (one subscriber holds a whole /64, so per-address keys would be free to rotate). */
+export function ipKey(ip: string): string {
+  const addr = ip.split('%')[0]!.toLowerCase()
+  if (isIP(addr) !== 6) return addr
+  const mapped = addr.match(/^(?:0*:)*:ffff:(\d+\.\d+\.\d+\.\d+)$/) ?? addr.match(/^(?:0*:)*:ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (mapped) {
+    if (mapped[2] === undefined) return mapped[1]!
+    const hi = parseInt(mapped[1]!, 16)
+    const lo = parseInt(mapped[2], 16)
+    return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`
+  }
+  const [head, tail = ''] = addr.split('::')
+  const h = head ? head.split(':') : []
+  const t = addr.includes('::') && tail ? tail.split(':') : []
+  const groups = addr.includes('::') ? [...h, ...Array<string>(8 - h.length - t.length).fill('0'), ...t] : h
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':')}::/64`
+}
+
 function sha256b64u(input: string): string {
   return createHash('sha256').update(input).digest('base64url')
 }
@@ -297,12 +351,13 @@ export function createOAuthHandler(deps: OAuthDeps) {
     if (!params) return sendPage(res, 400, BAD_REQUEST_PAGE)
     const show = (status: number, error: string) => sendPage(res, status, formHtml(params, error), params.redirectUri)
 
-    if (!deps.allowLogin(clientIp(req))) return show(429, 'Too many attempts. Wait a minute and try again.')
+    if (!deps.allowLogin(ipKey(clientIp(req)))) return show(429, 'Too many attempts. Wait a minute and try again.')
 
     const email = form.get('email') ?? ''
     const password = form.get('password') ?? ''
     if (!email || !password || email.length > 320 || password.length > 1024) return show(401, 'Wrong email or password')
 
+    if (!deps.allowSignInUpstream()) return show(429, 'Too many sign-in attempts. Try again in a minute.')
     const result = await deps.signIn(email, password)
     if (!result.ok) {
       if (result.status === 403) return show(403, 'No active bcns membership')
@@ -347,8 +402,20 @@ export function createOAuthHandler(deps: OAuthDeps) {
     if (grant === 'refresh_token') {
       const refreshToken = form.get('refresh_token')
       if (!refreshToken) return tokenError(res, 'invalid_request')
+      // 503, never invalid_grant, for anything that is our or GoTrue's trouble rather than the
+      // token's: the MCP SDK discards stored tokens on invalid_grant, so a blip would sign every
+      // connected user out.
+      const unavailable = () => sendJson(res, 503, { error: 'temporarily_unavailable' }, { ...NO_STORE, 'Retry-After': String(RETRY_AFTER_SECONDS) })
+      const ip = ipKey(clientIp(req))
+      if (deps.refreshBlocked(ip) || !deps.allowRefreshUpstream()) return unavailable()
       const result = await deps.refresh(refreshToken)
-      if (!result.ok || !hasClientClaim(result.session.access_token)) return tokenError(res, 'invalid_grant')
+      if (!result.ok && (result.status === 0 || result.status === 429 || result.status >= 500)) {
+        return unavailable()
+      }
+      if (!result.ok || !hasClientClaim(result.session.access_token)) {
+        deps.noteRefreshFailure(ip)
+        return tokenError(res, 'invalid_grant')
+      }
       return sendJson(res, 200, tokenBody(result.session), NO_STORE)
     }
 

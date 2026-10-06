@@ -4,7 +4,15 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { isIP } from 'node:net'
 import { authorize, clientForToken, supabaseEnv, verifyToken, type SupabaseEnv } from './auth.js'
 import { createRateLimiter, limitFromEnv } from './limit.js'
-import { createOAuthHandler, LOGIN_LIMIT_PER_MIN, realRandomBytes, supabaseSessionDeps } from './oauth.js'
+import {
+  createOAuthHandler,
+  LOGIN_LIMIT_PER_MIN,
+  REFRESH_FAIL_LIMIT_PER_MIN,
+  REFRESH_GLOBAL_LIMIT_PER_MIN,
+  SIGNIN_GLOBAL_LIMIT_PER_MIN,
+  realRandomBytes,
+  supabaseSessionDeps,
+} from './oauth.js'
 import { handleMcpPost } from './mcp.js'
 
 const PORT = Number(process.env.PORT ?? 3103)
@@ -30,11 +38,18 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
     warn: (message: string) => console.error(message),
   }
   const loginLimiter = createRateLimiter(LOGIN_LIMIT_PER_MIN)
+  const refreshFailures = createRateLimiter(REFRESH_FAIL_LIMIT_PER_MIN)
+  const signInGlobal = createRateLimiter(SIGNIN_GLOBAL_LIMIT_PER_MIN)
+  const refreshGlobal = createRateLimiter(REFRESH_GLOBAL_LIMIT_PER_MIN)
   const oauth = createOAuthHandler({
     ...supabaseSessionDeps(env),
     now: () => Date.now(),
     randomBytes: realRandomBytes,
     allowLogin: (ip: string) => loginLimiter.allow(ip),
+    allowSignInUpstream: () => signInGlobal.allow('global'),
+    allowRefreshUpstream: () => refreshGlobal.allow('global'),
+    refreshBlocked: (ip: string) => refreshFailures.exhausted(ip),
+    noteRefreshFailure: (ip: string) => void refreshFailures.allow(ip),
   })
 
   return createServer(async (req: IncomingMessage, res: ServerResponse) => {

@@ -12,6 +12,9 @@ function key(token: string): string {
 export interface RateLimiter {
   /** True while the caller is under its budget for the current window. */
   allow(token: string, now?: number): boolean
+  /** True once the key has used its whole budget this window. Counts nothing: pair it with
+   *  `allow` called on the events that should spend the budget (e.g. failures only). */
+  exhausted(token: string, now?: number): boolean
 }
 
 /** Hard ceiling on tracked windows. The limit is checked before the token is verified — it has
@@ -43,6 +46,10 @@ export function createRateLimiter(limit = DEFAULT_LIMIT, windowMs = WINDOW_MS): 
       }
       seen.count += 1
       return seen.count <= limit
+    },
+    exhausted(token, now = Date.now()) {
+      const seen = windows.get(key(token))
+      return !!seen && now - seen.start < windowMs && seen.count >= limit
     },
   }
 }

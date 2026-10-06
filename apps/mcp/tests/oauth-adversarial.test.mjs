@@ -1,7 +1,6 @@
 // QA for PR-D: adversarial probes through the real OAuth handler (fake deps), plus an end-to-end
 // pass that boots the real server.js against a fake GoTrue so every /mcp auth path and the
-// Supabase-backed deps run un-mocked. Tests marked `todo` document a confirmed bug: they report
-// as todo (not a suite failure) until the bug is fixed, then flip to ordinary passes.
+// Supabase-backed deps run un-mocked.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
@@ -36,6 +35,10 @@ async function boot(over = {}) {
       return b
     },
     allowLogin: (ip) => (state.ips.push(ip), true),
+    allowSignInUpstream: () => true,
+    allowRefreshUpstream: () => true,
+    refreshBlocked: () => false,
+    noteRefreshFailure: () => {},
     ...over,
   }
   const handle = createOAuthHandler(deps)
@@ -258,14 +261,17 @@ test('every HTML response carries CSP / frame / no-store headers; JSON and 302 a
   t.close()
 })
 
-// BUG (blocker, verified in Chromium): with `Referrer-Policy: no-referrer` on the form page, a
-// browser sends `Origin: null` on the same-origin form POST (Fetch spec "append a request Origin
-// header"), so POST /authorize's `origin === ALLOWED_ORIGIN` check 403s every real sign-in.
-test('form page does not use Referrer-Policy: no-referrer (browser would send Origin: null on the POST)', { todo: 'BUG: no-referrer makes the browser send Origin: null, so the real login POST is 403 forbidden_origin' }, async () => {
+// Regression (was a blocker, verified in Chromium): with `Referrer-Policy: no-referrer` on the form
+// page a browser sends `Origin: null` on the same-origin form POST, which POST /authorize refuses
+// (and must keep refusing), so every real sign-in was a 403. Pinned to the exact value.
+test('form page sends Referrer-Policy: same-origin, never no-referrer (browser would POST Origin: null)', async () => {
   const t = await boot()
   try {
     const res = await t.req(`/authorize?${authQuery()}`)
-    assert.notEqual(res.headers.get('referrer-policy'), 'no-referrer')
+    assert.equal(res.headers.get('referrer-policy'), 'same-origin')
+    const post = await t.req('/authorize', login({}, { origin: 'null' }))
+    assert.equal(post.status, 403) // Origin: null stays rejected
+    assert.equal(t.state.signIns.length, 0)
   } finally {
     t.close()
   }
@@ -518,12 +524,26 @@ test('token errors: no stack/internals leak, always no-store, params from the qu
   t.close()
 })
 
-test('refresh failure modes: not-ok, throwing-as-500, non-claim token all end in 400 invalid_grant (or a clean 500), never a token', async () => {
-  for (const r of [{ ok: false, status: 400 }, { ok: false, status: 0 }, { ok: false, status: 500 }, { ok: true, session: { access_token: jwt({ client_status: 'pending' }), refresh_token: 'x', expires_in: 1 } }, { ok: true, session: { access_token: 'garbage', refresh_token: 'x', expires_in: 1 } }]) {
+test('refresh failure modes: 4xx and a non-claim token are 400 invalid_grant; 0/429/5xx are 503 temporarily_unavailable; never a token', async () => {
+  const pending = { ok: true, session: { access_token: jwt({ client_status: 'pending' }), refresh_token: 'x', expires_in: 1 } }
+  const garbage = { ok: true, session: { access_token: 'garbage', refresh_token: 'x', expires_in: 1 } }
+  const cases = [
+    [{ ok: false, status: 400 }, 400, 'invalid_grant'],
+    [{ ok: false, status: 401 }, 400, 'invalid_grant'],
+    [{ ok: false, status: 403 }, 400, 'invalid_grant'],
+    [pending, 400, 'invalid_grant'],
+    [garbage, 400, 'invalid_grant'],
+    [{ ok: false, status: 0 }, 503, 'temporarily_unavailable'],
+    [{ ok: false, status: 429 }, 503, 'temporarily_unavailable'],
+    [{ ok: false, status: 500 }, 503, 'temporarily_unavailable'],
+    [{ ok: false, status: 502 }, 503, 'temporarily_unavailable'],
+  ]
+  for (const [r, status, error] of cases) {
     const t = await boot({ refresh: async () => r })
     const res = await t.req('/token', post(new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'rt' })))
-    assert.equal(res.status, 400)
-    assert.deepEqual(await res.json(), { error: 'invalid_grant' })
+    assert.equal(res.status, status, JSON.stringify(r))
+    assert.equal(res.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(await res.json(), { error })
     t.close()
   }
 })
@@ -891,11 +911,9 @@ test('e2e: methods other than the routed ones on /mcp and the OAuth paths are 40
   }
 })
 
-// BUG (medium): supabase-js refreshSession retries a network failure with backoff, so with GoTrue
-// unreachable POST /token (refresh) blocks ~25 s before answering 400 invalid_grant (measured
-// 25.5 s). Connector HTTP clients commonly time out first, and the 400 tells them to drop the
-// refresh token. Sign-in (password grant) does not retry and answers 503 in ~30 ms.
-test('refresh answers promptly when GoTrue is unreachable', { todo: 'BUG: refreshSession retries ~25 s against a dead upstream before invalid_grant' }, async () => {
+// Regression: supabase-js refreshSession retried a network failure with backoff (measured 25.5 s),
+// past Claude's 10 s timeout, and answered invalid_grant, which makes the MCP SDK drop the token.
+test('refresh answers promptly (503, not invalid_grant) when GoTrue is unreachable', async () => {
   const port = await freePort()
   const dead = await freePort()
   const child = spawn(process.execPath, [fileURLToPath(new URL('../dist/server.js', import.meta.url))], {
@@ -904,8 +922,11 @@ test('refresh answers promptly when GoTrue is unreachable', { todo: 'BUG: refres
   })
   try {
     await new Promise((r) => child.stdout.on('data', (d) => String(d).includes('listening') && r()))
+    const started = Date.now()
     const res = await fetch(`http://127.0.0.1:${port}/token`, { ...post(new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'x' })), signal: AbortSignal.timeout(5000) })
-    assert.equal(res.status, 400)
+    assert.equal(res.status, 503)
+    assert.deepEqual(await res.json(), { error: 'temporarily_unavailable' })
+    assert.ok(Date.now() - started < 5000)
   } finally {
     child.kill()
   }
