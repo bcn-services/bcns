@@ -2,9 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DataClientError, ToolInputError, agentTools } from '@bcn-services/data-client'
 import { mcpTools, toolError } from '../dist/mcp.js'
+import { MCP_TOOL_OPTIONS } from '../dist/policy.js'
 
 test('every agentTools() entry survives the projection', () => {
-  const source = agentTools()
+  const source = agentTools(MCP_TOOL_OPTIONS)
   const mapped = mcpTools()
 
   assert.ok(source.length > 0)
@@ -23,7 +24,7 @@ test('every agentTools() entry survives the projection', () => {
 })
 
 test('the schema is passed through, not rebuilt', () => {
-  const [source] = agentTools()
+  const [source] = agentTools(MCP_TOOL_OPTIONS)
   const [mapped] = mcpTools()
   assert.deepEqual(mapped.inputSchema, source.input_schema)
 })

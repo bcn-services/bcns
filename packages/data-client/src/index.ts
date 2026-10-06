@@ -289,6 +289,10 @@ export type AgentRpcName = 'save_record' | 'update_media' | 'bulk_tag'
 export interface AgentToolsOptions {
   views?: AgentViewName[]
   rpcs?: AgentRpcName[]
+  /** Per-view column allowlist. A view listed here can only be read, filtered or range-queried on
+   *  these columns, and selects exactly them when the caller names none. A view not listed (or no
+   *  `columns` at all) behaves as before: any column, `select *`. */
+  columns?: Partial<Record<AgentViewName, string[]>>
 }
 
 export type JSONSchemaObject = {
@@ -298,10 +302,21 @@ export type JSONSchemaObject = {
   additionalProperties: false
 }
 
+/** MCP-style tool hints, carried untouched for adapters that want them (agentTools() sets none). */
+export interface AgentToolAnnotations {
+  title?: string
+  readOnlyHint?: boolean
+  destructiveHint?: boolean
+  idempotentHint?: boolean
+  openWorldHint?: boolean
+}
+
 export interface AgentTool {
   name: string
   description: string
   input_schema: JSONSchemaObject
+  title?: string
+  annotations?: AgentToolAnnotations
 }
 
 export class ToolInputError extends Error {}
@@ -385,7 +400,8 @@ function readViewTool(opts?: AgentToolsOptions): AgentTool {
   const views = agentViews(opts)
   const lines = views.map((v) => {
     const dateCol = VIEW_DATE_COLUMN[v as ViewName]
-    return `- ${v}: ${VIEW_DESCRIPTIONS[v as ViewName]}${dateCol ? ` (date column: ${dateCol})` : ''}`
+    const cols = opts?.columns?.[v as ViewName]
+    return `- ${v}: ${VIEW_DESCRIPTIONS[v as ViewName]}${dateCol ? ` (date column: ${dateCol})` : ''}${cols ? ` (columns: ${cols.join(', ')})` : ''}`
   })
   return {
     name: 'read_view',
@@ -502,18 +518,26 @@ async function runReadView(client: DataClient, input: any, opts?: AgentToolsOpti
   if ((dateFrom !== undefined || dateTo !== undefined || order !== undefined) && !dateCol) {
     throw new ToolInputError(`${view} has no date column for range/order`)
   }
+  const allow = opts?.columns?.[view as ViewName]
+  const deny = (c: string) => new ToolInputError(`column not available on ${view}: ${c}`)
   if (columns !== undefined) {
     if (!Array.isArray(columns)) throw new ToolInputError('columns must be an array')
-    for (const c of columns) checkColumn(c)
+    for (const c of columns) {
+      checkColumn(c)
+      if (allow && !allow.includes(c)) throw deny(c)
+    }
   }
   if (filters !== undefined) {
     if (!Array.isArray(filters) || filters.length > 10) throw new ToolInputError('filters must be an array of at most 10 entries')
     for (const f of filters) {
       if (typeof f !== 'object' || f === null || typeof f.column !== 'string') throw new ToolInputError('bad filter')
       checkColumn(f.column)
+      if (allow && !allow.includes(f.column)) throw deny(f.column)
       checkFilterValue(f.value)
     }
   }
+  // A range is a filter: on a hidden date column it would answer questions about hidden values.
+  if (allow && dateCol && (dateFrom !== undefined || dateTo !== undefined) && !allow.includes(dateCol)) throw deny(dateCol)
   if (order !== undefined && order !== 'asc' && order !== 'desc') throw new ToolInputError(`bad order: ${order}`)
   const rowLimit = limit === undefined ? 50 : limit
   if (typeof rowLimit !== 'number' || !Number.isInteger(rowLimit) || rowLimit < 1 || rowLimit > 200) {
@@ -525,8 +549,10 @@ async function runReadView(client: DataClient, input: any, opts?: AgentToolsOpti
   let selectCols = '*'
   if (columns !== undefined) {
     const needed = new Set<string>(columns)
-    if (dateCol && (dateFrom !== undefined || dateTo !== undefined || order !== undefined)) needed.add(dateCol)
+    if (dateCol && (!allow || allow.includes(dateCol)) && (dateFrom !== undefined || dateTo !== undefined || order !== undefined)) needed.add(dateCol)
     selectCols = [...needed].join(',')
+  } else if (allow) {
+    selectCols = allow.join(',')
   }
 
   let q: any = (client.views as Record<string, (columns?: string) => unknown>)[view](selectCols)
