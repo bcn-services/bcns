@@ -685,6 +685,13 @@ test('daily_metrics_v1.value split skips a dimension already grouped or pinned b
   assert.deepEqual(both.rows, [{ value: 100 }])
 })
 
+test('daily_metrics_v1.value split is not skipped for a non-eq filter on the split column', async () => {
+  const neq = await dm({ metric: 'sum', column: 'value', filters: [{ column: 'metric', op: 'neq', value: 'clicks' }], order: 'key' })
+  assert.deepEqual(neq.rows, [{ metric: 'spend', currency: 'eur', value: 50 }, { metric: 'spend', currency: 'usd', value: 100 }])
+  const contains = await dm({ metric: 'sum', column: 'value', filters: [{ column: 'currency', op: 'contains', value: 'u' }], order: 'key' })
+  assert.deepEqual(contains.rows.map((x) => [x.metric, x.currency, x.value]), [['clicks', 'usd', 10], ['spend', 'eur', 50], ['spend', 'usd', 100]])
+})
+
 test('daily_metrics_v1.value split only adds columns the allowlist shows', async () => {
   const columns = (...cols) => ({ views: ['daily_metrics_v1'], columns: { daily_metrics_v1: cols } })
   const base = ['day', 'source', 'entity_kind', 'entity_id', 'value']
