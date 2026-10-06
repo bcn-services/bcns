@@ -354,7 +354,7 @@ already present; `@modelcontextprotocol/sdk` **approved 2026-09-20**, that one i
 ## Deferred, with triggers
 
 - Own REST facade with API keys and metering — usage-based billing or leaving Supabase.
-- OAuth 2.1 on the MCP server — an agent product that cannot pass a bearer token.
+- OAuth 2.1 on the MCP server and retiring the /access "agent login" mint flow — now planned in `docs/architecture/chunk6c-mcp-launch.md`.
 - Google OAuth app with CASA verification — triggered by the first client with no Google
   Workspace of their own, or by a client admin who refuses to mark the bcns app Trusted.
   Decided 2026-09-23: SB stays Internal; every other client's Workspace admin marks one

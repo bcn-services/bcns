@@ -11,8 +11,9 @@ Connect differs from a client app in exactly two ways:
 
 - It is **multi-tenant read-only through RLS** — every query runs as the signed-in
   user through the `api` views. It never holds a service-role key.
-- Two **Edge Functions** (`invite-member`, `mint-agent-login`) carry the two
-  privileged writes. They live in the platform project, not on the droplet.
+- The `invite-member` **Edge Function** carries the one privileged write; it lives
+  in the platform project, not on the droplet. (`mint-agent-login` is no longer
+  called by the hub: AI assistants sign in through the MCP server.)
 
 ## Prerequisites
 
@@ -102,11 +103,10 @@ directory, not drift. Never answer it with `supabase migration repair`.
 supabase db push --workdir platform --project-ref cnsxbglhredokjbvudfd
 
 # 2. Edge Functions.
-supabase functions deploy invite-member mint-agent-login --workdir platform --project-ref cnsxbglhredokjbvudfd
+supabase functions deploy invite-member --workdir platform --project-ref cnsxbglhredokjbvudfd
 ```
 
-Order matters: `mint-agent-login` reads `api.client_v1` and both functions call
-`api.add_member`, so push the migrations first.
+Order matters: `invite-member` calls `api.add_member`, so push the migrations first.
 
 ### Why `api.add_member` exists
 
