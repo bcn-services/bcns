@@ -38,6 +38,7 @@ async function boot(over = {}) {
     allowSignInUpstream: () => true,
     allowSignInIp: () => true,
     allowRefreshUpstream: () => true,
+    allowKnownIpRefresh: () => true,
     allowUnknownIpRefresh: () => true,
     allowUnknownRefresh: () => true,
     ...over,
@@ -860,6 +861,51 @@ test('e2e: /mcp Origin matrix — absent, mcp host, claude.ai, chatgpt.com pass;
     assert.equal(t.calls.filter((c) => c.includes('/user')).length, before, 'bad-origin requests never reach GoTrue')
     await new Promise((r) => setTimeout(r, 100))
     assert.ok(t.stderr.join('').includes('rejected Origin "https://evil.com"'))
+  } finally {
+    await t.close()
+  }
+})
+
+test('e2e: a valid /mcp bearer marks the caller IP known for refresh; a failed bearer does not', async () => {
+  const t = await bootE2E()
+  try {
+    const p = authQuery()
+    p.set('email', 'owner@example.com')
+    p.set('password', 'good')
+    const ok = await t.req('/authorize', post(p, { origin: ISS, 'x-forwarded-for': '203.0.113.200' }))
+    const { access_token } = await (
+      await t.req('/token', exchange(new URL(ok.headers.get('location')).searchParams.get('code'), { client_id: 'client-1' }))
+    ).json()
+    const junk = async (ip) => {
+      const out = []
+      for (let i = 0; i < 5; i++) {
+        const r = await t.req('/token', post(new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'rt-bogus' }), { 'x-forwarded-for': ip }))
+        out.push(r.status)
+      }
+      return out
+    }
+    // Unknown IPs get 3 attempts a minute, known ones 10: five junk refreshes tell them apart.
+    assert.equal((await t.req('/mcp', mcp(access_token, { 'x-forwarded-for': '203.0.113.10' }))).status, 200)
+    assert.deepEqual(await junk('203.0.113.10'), [400, 400, 400, 400, 400])
+    assert.equal((await t.req('/mcp', mcp('not-a-token', { 'x-forwarded-for': '203.0.113.11' }))).status, 401)
+    assert.deepEqual(await junk('203.0.113.11'), [400, 400, 400, 503, 503])
+  } finally {
+    await t.close()
+  }
+})
+
+test('e2e: a valid token without a tenant (403 at /mcp) does not mark the IP known', async () => {
+  const t = await bootE2E() // fresh process: the unknown-IP budget is whole
+  try {
+    const pendingToken = jwt({ client_status: 'pending' })
+    t.issued.add(pendingToken)
+    assert.equal((await t.req('/mcp', mcp(pendingToken, { 'x-forwarded-for': '203.0.113.12' }))).status, 403)
+    const out = []
+    for (let i = 0; i < 5; i++) {
+      const r = await t.req('/token', post(new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'rt-bogus' }), { 'x-forwarded-for': '203.0.113.12' }))
+      out.push(r.status)
+    }
+    assert.deepEqual(out, [400, 400, 400, 503, 503])
   } finally {
     await t.close()
   }

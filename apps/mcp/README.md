@@ -25,7 +25,7 @@ not a filter this server could forget — there is no credential here that could
 | GET | `/.well-known/oauth-protected-resource[/mcp]`, `/.well-known/oauth-authorization-server` | none | OAuth discovery (`src/oauth.ts`) |
 | POST | `/register` | none | stateless DCR; redirect URIs must be on the allowlist |
 | GET, POST | `/authorize` | none | sign-in form; POST issues a 60 s single-use code |
-| POST | `/token` | none | `authorization_code` (PKCE S256) and `refresh_token` grants; refresh answers `503 temporarily_unavailable` (+ `Retry-After`, 60 s or 5 s) on a cap or an upstream problem, `400 invalid_grant` only when the token is dead (GoTrue 400/403) |
+| POST | `/token` | none | `authorization_code` (PKCE S256) and `refresh_token` grants; refresh answers `503 temporarily_unavailable` (+ `Retry-After`, 60 s or 1 s) on a cap or an upstream problem, `400 invalid_grant` only when the token is dead (GoTrue 400/403) |
 | * | anything else | — | `404 {"error":"not_found"}` |
 
 `/mcp` answers `401` with `WWW-Authenticate: Bearer resource_metadata="https://mcp.bcn-services.com/.well-known/oauth-protected-resource/mcp"`
@@ -86,8 +86,9 @@ see the sign-in snippet in the chunk 6 PR body and in `packages/data-client`'s `
     so a junk flood needs two IPs to lock everyone out. Over a cap the form re-renders with 429.
     Several people behind one office IP share the 2/min.
   - Refresh: an IP is "known" for 1 h (table of 1000, oldest evicted) after a successful code
-    exchange or refresh. Anthropic's and OpenAI's egress IPs are known, so they only count
-    against the global 15/min. An unknown IP is charged per attempt (3/min, junk or not) before
+    exchange or refresh, or a valid `/mcp` bearer (so a restart re-learns them without extra
+    GoTrue calls). Anthropic's and OpenAI's egress IPs are known, so they get 10 attempts/min per
+    IP, counted before the call, and the global 15/min. An unknown IP is charged per attempt (3/min, junk or not) before
     any upstream call, and all unknown IPs share 5/min, so a flood can take at most 5 of the 15
     slots and leaves 10/min for known IPs. Past roughly 150 connected users the refresh cap will
     bite: raise it with the hosted GoTrue limits.
@@ -95,11 +96,18 @@ see the sign-in snippet in the chunk 6 PR body and in `packages/data-client`'s `
     stored tokens on `invalid_grant`, so refresh answers `400 invalid_grant` only for a GoTrue 400
     or 403 (or a session with no tenant). A timeout, network error, 401, 404, 429 or 5xx, and any
     cap, is `503 temporarily_unavailable` with `Retry-After: 60`, except an unreachable GoTrue,
-    which is `Retry-After: 5` so the retry lands inside GoTrue's 10 s refresh-token reuse window.
+    which is `Retry-After: 1`: the 8 s timeout plus a 1 s retry stays inside GoTrue's 10 s
+    refresh-token reuse window if the client honours Retry-After.
   - Every non-2xx or unreachable GoTrue answer logs one line to stderr,
     `{"level":"error","event":"gotrue_refresh_failed"|"gotrue_signin_failed","status":N}`
     (0 = unreachable). Status only, never a body or token. A 401 or 404 there means a rotated
     key or a wrong `SUPABASE_URL`.
+- Accepted: an attacker rotating IPs (2+ per minute, /64s count separately) can keep the 3/min
+  global sign-in cap full and block NEW connector sign-ins while it lasts. Existing connections
+  keep refreshing and hub sign-in is unaffected. Upgrade: a free form challenge (e.g. Cloudflare
+  Turnstile) checked before the sign-in caps, or raise hosted GoTrue limits and the caps.
+- Known-IP set and all caps are in-memory per process; a restart forgets them until IPs refresh
+  or call /mcp again.
 - Connectors sign in through the built-in OAuth 2.1 server (`src/oauth.ts`); its design, ceilings
   and deviations are in `docs/architecture/chunk6c-mcp-launch.md`. A raw Bearer JWT still works.
 - Tool names and descriptions come from `agentTools()`. Improving how a model picks a tool is an

@@ -28,12 +28,15 @@ export const REFRESH_GLOBAL_LIMIT_PER_MIN = 15
  *  one IP can never spend the whole global budget, so a junk flood needs two IPs or /64s. */
 export const SIGNIN_IP_LIMIT_PER_MIN = 2
 // Refresh admission is split by whether the IP has recently done a good exchange. Anthropic's and
-// OpenAI's egress IPs do, for many users, and are "known": they only count against the global cap.
+// OpenAI's egress IPs do, for many users, and are "known": they get a roomier per-IP attempt cap
+// and count against the global cap.
 // An unknown IP is charged per ATTEMPT (junk and good alike) before any upstream call, and all
 // unknown IPs together draw on one shared budget, so a flood can take at most
 // REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN of the REFRESH_GLOBAL_LIMIT_PER_MIN slots.
 export const REFRESH_UNKNOWN_IP_LIMIT_PER_MIN = 3
 export const REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN = 5
+/** Per known IP, every attempt: a member's IP or NAT must not be able to drain the global cap alone. */
+export const REFRESH_KNOWN_IP_LIMIT_PER_MIN = 10
 export const KNOWN_IP_TTL_MS = 60 * 60_000
 export const KNOWN_IP_MAX = 1000
 /** Sign-in and refresh each finish inside this, retries included; Claude's endpoint timeout is 10 s. */
@@ -41,8 +44,9 @@ export const UPSTREAM_TIMEOUT_MS = 8000
 /** Retry-After on a 503 caused by a cap, or by GoTrue answering with an error. */
 export const RETRY_AFTER_SECONDS = 60
 /** Retry-After when GoTrue could not be reached (timeout, network): GoTrue accepts a re-used
- *  refresh token for 10 s, so a retry inside that window still works if the first call got through. */
-export const RETRY_AFTER_BLIP_SECONDS = 5
+ *  refresh token for 10 s. With the 8 s timeout plus this, the retry stays inside that window if
+ *  the client honours Retry-After and the first call got through. */
+export const RETRY_AFTER_BLIP_SECONDS = 1
 
 export interface Session {
   access_token: string
@@ -66,6 +70,8 @@ export interface OAuthDeps {
   allowSignInIp(ip: string): boolean
   /** Global cap on refreshes sent to GoTrue; true = may go upstream. */
   allowRefreshUpstream(): boolean
+  /** Per-IP ATTEMPT cap for a refresh from a "known" IP. Counts every call. */
+  allowKnownIpRefresh(ip: string): boolean
   /** Per-IP ATTEMPT cap for a refresh from an IP that is not "known". Counts every call. */
   allowUnknownIpRefresh(ip: string): boolean
   /** Budget shared by all unknown IPs; true = may go upstream. */
@@ -460,7 +466,10 @@ export function createOAuthHandler(deps: OAuthDeps) {
       const ip = ipKey(clientIp(req))
       // All checks are synchronous and run before the first await, so a burst of concurrent
       // requests is counted request by request, not after the first one finishes.
-      if (!isKnown(ip) && !(deps.allowUnknownIpRefresh(ip) && deps.allowUnknownRefresh())) return unavailable()
+      const admitted = isKnown(ip)
+        ? deps.allowKnownIpRefresh(ip)
+        : deps.allowUnknownIpRefresh(ip) && deps.allowUnknownRefresh()
+      if (!admitted) return unavailable()
       if (!deps.allowRefreshUpstream()) return unavailable()
       const result = await deps.refresh(refreshToken)
       if (!result.ok && result.status !== 400 && result.status !== 403) {
@@ -520,7 +529,7 @@ export function createOAuthHandler(deps: OAuthDeps) {
     )
   }
 
-  return async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
     const path = (req.url ?? '').split('?')[0]
     const get = req.method === 'GET'
     const post = req.method === 'POST'
@@ -546,4 +555,7 @@ export function createOAuthHandler(deps: OAuthDeps) {
     else return false
     return true
   }
+  // `markKnown` is for /mcp: a request that passed bearer validation proves the IP is a real
+  // connector, which re-fills the known set after a restart with no extra upstream call.
+  return Object.assign(handle, { markKnown })
 }

@@ -5,9 +5,12 @@ import { isIP } from 'node:net'
 import { authorize, clientForToken, supabaseEnv, verifyToken, type SupabaseEnv } from './auth.js'
 import { createRateLimiter, limitFromEnv } from './limit.js'
 import {
+  clientIp,
   createOAuthHandler,
+  ipKey,
   LOGIN_LIMIT_PER_MIN,
   REFRESH_GLOBAL_LIMIT_PER_MIN,
+  REFRESH_KNOWN_IP_LIMIT_PER_MIN,
   REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN,
   REFRESH_UNKNOWN_IP_LIMIT_PER_MIN,
   SIGNIN_GLOBAL_LIMIT_PER_MIN,
@@ -42,6 +45,7 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
   const loginLimiter = createRateLimiter(LOGIN_LIMIT_PER_MIN)
   const signInIp = createRateLimiter(SIGNIN_IP_LIMIT_PER_MIN)
   const signInGlobal = createRateLimiter(SIGNIN_GLOBAL_LIMIT_PER_MIN)
+  const refreshKnownIp = createRateLimiter(REFRESH_KNOWN_IP_LIMIT_PER_MIN)
   const refreshUnknownIp = createRateLimiter(REFRESH_UNKNOWN_IP_LIMIT_PER_MIN)
   const refreshUnknown = createRateLimiter(REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN)
   const refreshGlobal = createRateLimiter(REFRESH_GLOBAL_LIMIT_PER_MIN)
@@ -53,6 +57,7 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
     allowSignInUpstream: () => signInGlobal.allow('global'),
     allowSignInIp: (ip: string) => signInIp.allow(ip),
     allowRefreshUpstream: () => refreshGlobal.allow('global'),
+    allowKnownIpRefresh: (ip: string) => refreshKnownIp.allow(ip),
     allowUnknownIpRefresh: (ip: string) => refreshUnknownIp.allow(ip),
     allowUnknownRefresh: () => refreshUnknown.allow('global'),
   })
@@ -81,6 +86,7 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
 
     const auth = await authorize(req.headers, deps)
     if (!auth.ok) return json(res, auth.status, auth.body, auth.headers)
+    oauth.markKnown(ipKey(clientIp(req)))
 
     try {
       await handleMcpPost(req, res, clientForToken(auth.token, env))

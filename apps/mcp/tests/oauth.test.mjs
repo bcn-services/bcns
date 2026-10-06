@@ -17,6 +17,7 @@ import {
   REFRESH_GLOBAL_LIMIT_PER_MIN,
   REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN,
   REFRESH_UNKNOWN_IP_LIMIT_PER_MIN,
+  REFRESH_KNOWN_IP_LIMIT_PER_MIN,
   SIGNIN_GLOBAL_LIMIT_PER_MIN,
   SIGNIN_IP_LIMIT_PER_MIN,
   KNOWN_IP_TTL_MS,
@@ -61,6 +62,7 @@ async function boot(over = {}) {
     allowSignInUpstream: () => true,
     allowSignInIp: () => true,
     allowRefreshUpstream: () => true,
+    allowKnownIpRefresh: () => true,
     allowUnknownIpRefresh: () => true,
     allowUnknownRefresh: () => true,
     ...over,
@@ -585,7 +587,8 @@ test('limits and sizes are pinned by value', () => {
   assert.equal(REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN, 5)
   assert.equal(KNOWN_IP_TTL_MS, 3_600_000)
   assert.equal(KNOWN_IP_MAX, 1000)
-  assert.equal(RETRY_AFTER_BLIP_SECONDS, 5)
+  assert.equal(RETRY_AFTER_BLIP_SECONDS, 1)
+  assert.equal(REFRESH_KNOWN_IP_LIMIT_PER_MIN, 10)
   assert.equal(UPSTREAM_TIMEOUT_MS, 8000)
   assert.equal(RETRY_AFTER_SECONDS, 60)
 })
@@ -635,8 +638,8 @@ test('login limiter key is the /64 for IPv6, so rotating inside a prefix buys no
 
 const refreshInit = (rt = 'rt') => tokenReq({ grant_type: 'refresh_token', refresh_token: rt })
 
-test('refresh: 0, 429 and 5xx from GoTrue are 503 temporarily_unavailable, not invalid_grant; Retry-After 5 only when GoTrue was unreachable', async () => {
-  for (const [status, retry] of [[0, '5'], [429, '60'], [500, '60'], [503, '60']]) {
+test('refresh: 0, 429 and 5xx from GoTrue are 503 temporarily_unavailable, not invalid_grant; Retry-After 1 only when GoTrue was unreachable', async () => {
+  for (const [status, retry] of [[0, '1'], [429, '60'], [500, '60'], [503, '60']]) {
     const t = await boot({ refresh: async () => ({ ok: false, status }) })
     const res = await t.req('/token', refreshInit())
     assert.equal(res.status, 503, String(status))
@@ -668,10 +671,12 @@ const fetchWithXff = (t, ip, rt = 'rt') =>
 
 /** The same limiter wiring server.ts builds, so the tests exercise the real admission policy. */
 function refreshCaps() {
+  const knownIp = createRateLimiter(REFRESH_KNOWN_IP_LIMIT_PER_MIN)
   const unknownIp = createRateLimiter(REFRESH_UNKNOWN_IP_LIMIT_PER_MIN)
   const unknown = createRateLimiter(REFRESH_UNKNOWN_GLOBAL_LIMIT_PER_MIN)
   const global = createRateLimiter(REFRESH_GLOBAL_LIMIT_PER_MIN)
   return {
+    allowKnownIpRefresh: (ip) => knownIp.allow(ip),
     allowUnknownIpRefresh: (ip) => unknownIp.allow(ip),
     allowUnknownRefresh: () => unknown.allow('global'),
     allowRefreshUpstream: () => global.allow('global'),
@@ -725,6 +730,20 @@ test('refresh: a known IP keeps refreshing while the unknown budget is spent, an
   const over = await fetchWithXff(t, '198.51.100.1', 'good')
   assert.equal(over.status, 503) // global cap
   assert.equal(over.headers.get('retry-after'), '60')
+  t.close()
+})
+
+test('refresh: 15 concurrent junk refreshes from a known IP reach GoTrue at most 10 times; another known IP still refreshes', async () => {
+  const up = { n: 0 }
+  const t = await boot({ ...refreshCaps(), refresh: gotrueByToken(up) })
+  assert.equal((await fetchWithXff(t, '198.51.100.1', 'good')).status, 200) // known
+  assert.equal((await fetchWithXff(t, '198.51.100.2', 'good')).status, 200) // a second known IP
+  const before = up.n
+  const results = await Promise.all(Array.from({ length: 15 }, () => fetchWithXff(t, '198.51.100.1', 'junk')))
+  assert.equal(up.n - before, REFRESH_KNOWN_IP_LIMIT_PER_MIN)
+  assert.equal(results.filter((r) => r.status === 503).length, 15 - REFRESH_KNOWN_IP_LIMIT_PER_MIN)
+  for (const r of results.filter((r) => r.status === 503)) assert.equal(r.headers.get('retry-after'), '60')
+  assert.equal((await fetchWithXff(t, '198.51.100.2', 'good')).status, 200)
   t.close()
 })
 
