@@ -28,6 +28,8 @@ describe('tenant isolation', () => {
     await sql(`delete from data.records where client_id = $1 and external_id = 'rec-0' and source = 'dashboard' and id = any($2::uuid[])`, [CLIENTS.acme, acmeCreated])
     await sql(`delete from data.media_sets where client_id = $1 and name = 'rpc-scoped-test'`, [CLIENTS.acme])
     await sql(`delete from data.dashboard_versions where client_id = $1`, [CLIENTS.acme])
+    await sql(`delete from data.ai_settings where client_id = $1`, [CLIENTS.acme])
+    await sql(`delete from data.mcp_tool_calls where client_id = $1 and tool = 'rpc-scoped-test'`, [CLIENTS.acme])
   })
 
   it('forbidden_read_views', async () => {

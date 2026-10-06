@@ -1299,6 +1299,17 @@ export type Database = {
       delete_media_set: { Args: { set_id: string }; Returns: undefined }
       delete_record: { Args: { record_id: string }; Returns: undefined }
       download_url: { Args: { media_id: string }; Returns: Json }
+      get_ai_settings: { Args: never; Returns: Json }
+      log_mcp_call: {
+        Args: {
+          p_error_code: string
+          p_ok: boolean
+          p_row_count: number
+          p_tool: string
+          p_view: string
+        }
+        Returns: undefined
+      }
       register_upload: {
         Args: { path: string; tags?: string[]; title?: string }
         Returns: string
@@ -1323,6 +1334,10 @@ export type Database = {
           title?: string
         }
         Returns: string
+      }
+      set_ai_settings: {
+        Args: { p_share_customer_contact: boolean }
+        Returns: undefined
       }
       set_media_set_items: {
         Args: { action: string; media_ids: string[]; set_id: string }

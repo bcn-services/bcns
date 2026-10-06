@@ -115,10 +115,16 @@ const RPC_NAMES = [
   'download_url',
   'report_dashboard_version',
   'remove_member',
+  'log_mcp_call',
+  'get_ai_settings',
+  'set_ai_settings',
 ] as const satisfies readonly RpcName[]
 
+// A function with no arguments is generated as `Args: never`; it is called with none.
 type RpcNamespace = {
-  [K in (typeof RPC_NAMES)[number]]: (args: Functions[K]['Args']) => Promise<Functions[K]['Returns']>
+  [K in (typeof RPC_NAMES)[number]]: [Functions[K]['Args']] extends [never]
+    ? () => Promise<Functions[K]['Returns']>
+    : (args: Functions[K]['Args']) => Promise<Functions[K]['Returns']>
 }
 
 function buildRpc(client: SupabaseClient<Database, 'api'>): RpcNamespace {

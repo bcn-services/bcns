@@ -14,10 +14,15 @@ import {
   runTool,
   DataClientError,
   ToolInputError,
+  type AgentToolsOptions,
   type DataClient,
 } from '@bcn-services/data-client'
 import {
+  CONTACT_DESCRIPTION,
+  CUSTOMER_CONTACT_COLUMN,
+  MCP_COLUMNS,
   MCP_TOOL_OPTIONS,
+  MCP_VIEWS,
   RESULT_BYTE_CAP,
   TOOL_ANNOTATIONS,
   TOOL_TITLES,
@@ -40,7 +45,7 @@ export function mcpTools(): McpTool[] {
   return agentTools(MCP_TOOL_OPTIONS).map((tool) => ({
     name: tool.name,
     title: TOOL_TITLES[tool.name] ?? tool.name,
-    description: `${tool.description}\n${UNTRUSTED_DESCRIPTION}`,
+    description: `${tool.description}\n${UNTRUSTED_DESCRIPTION}\n${CONTACT_DESCRIPTION}`,
     inputSchema: tool.input_schema as unknown as Record<string, unknown>,
     annotations: TOOL_ANNOTATIONS,
   }))
@@ -51,6 +56,11 @@ export function mcpTools(): McpTool[] {
  *  ponytail: a single row over the cap yields zero rows (truncated) — add per-field clipping if a
  *  real tenant's one meeting transcript exceeds 256 KB. */
 export function envelope(result: unknown, cap = RESULT_BYTE_CAP): string {
+  return envelopeParts(result, cap).text
+}
+
+/** envelope() plus how many rows survived the cap, for the audit row. */
+function envelopeParts(result: unknown, cap = RESULT_BYTE_CAP): { text: string; count: number } {
   const { rows, truncated } = result as { rows: unknown[]; truncated: boolean }
   const build = (n: number) =>
     JSON.stringify({
@@ -67,7 +77,7 @@ export function envelope(result: unknown, cap = RESULT_BYTE_CAP): string {
     if (Buffer.byteLength(build(mid)) <= cap) lo = mid
     else hi = mid - 1
   }
-  return build(lo)
+  return { text: build(lo), count: lo }
 }
 
 // A type alias, not an interface: the SDK's ServerResult union has an index signature,
@@ -88,16 +98,105 @@ export function toolError(err: unknown): ToolErrorResult {
   return { content: [{ type: 'text', text }], isError: true }
 }
 
-export function buildServer(client: DataClient): Server {
+/** Short stable code for the audit row: never the message, which can carry raw upstream text. */
+export function auditCode(err: unknown): string {
+  if (err instanceof ToolInputError) return 'input'
+  if (err instanceof DataClientError) return err.code
+  return 'internal'
+}
+
+/** The view a read_view call names, or null. Only a string is ever logged. */
+function viewOf(args: unknown): string | null {
+  // Model input is untyped; only a string survives the check on the next line.
+  const view = (args as { view?: unknown } | null)?.view
+  return typeof view === 'string' ? view : null
+}
+
+/** Audit columns are canonical, never model-controlled free text: a tool outside the listed names
+ *  is 'unknown', and a view is logged only for read_view on an exposed view. */
+function auditTool(name: string): string {
+  return mcpTools().some((t) => t.name === name) ? name : 'unknown'
+}
+function auditView(name: string, args: unknown): string | null {
+  const view = viewOf(args)
+  return name === 'read_view' && view !== null && (MCP_VIEWS as string[]).includes(view) ? view : null
+}
+
+/** Fire-and-forget: one api.log_mcp_call as the caller (their own token, no privileged key). A
+ *  failure never reaches the tool response; it becomes one stderr JSON line with no token, no
+ *  tool arguments and no row data. */
+function audit(
+  client: DataClient,
+  entry: { tool: string; view: string | null; rowCount: number | null; ok: boolean; errorCode: string | null },
+): void {
+  const fail = (err: unknown) => {
+    try {
+      console.error(JSON.stringify({ level: 'error', event: 'mcp_audit_failed', code: auditCode(err) }))
+    } catch {
+      // stderr itself is gone; nothing left to tell.
+    }
+  }
+  void (async () => {
+    // Cast: null is meaningful for view/row_count/error_code, but the generated args type has no nulls.
+    await client.rpc.log_mcp_call({
+      p_tool: entry.tool,
+      p_view: entry.view,
+      p_row_count: entry.rowCount,
+      p_ok: entry.ok,
+      p_error_code: entry.errorCode,
+    } as unknown as Parameters<DataClient['rpc']['log_mcp_call']>[0])
+  })().catch(fail)
+}
+
+/** How long a customers_v1 read waits for the owner switch before failing closed. */
+export const SETTINGS_TIMEOUT_MS = 2000
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms)
+  })
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer))
+}
+
+/** Tool options for one call. A customers_v1 read asks the tenant's owner switch once; only an
+ *  own, explicit `true` adds `email` to that view's allowlist. A timeout, an error or an odd
+ *  shape stays hidden. */
+async function optionsFor(client: DataClient, name: string, args: unknown, timeoutMs: number): Promise<AgentToolsOptions> {
+  if (name !== 'read_view' || viewOf(args) !== 'customers_v1') return MCP_TOOL_OPTIONS
+  try {
+    const settings: unknown = await withTimeout(Promise.resolve(client.rpc.get_ai_settings()), timeoutMs)
+    // Cast: narrowed to a non-null object on the left of the &&, then read by own key only.
+    const granted =
+      typeof settings === 'object' && settings !== null && Object.hasOwn(settings, 'share_customer_contact') &&
+      (settings as { share_customer_contact?: unknown }).share_customer_contact === true
+    if (!granted) return MCP_TOOL_OPTIONS
+  } catch {
+    return MCP_TOOL_OPTIONS
+  }
+  return {
+    ...MCP_TOOL_OPTIONS,
+    columns: { ...MCP_COLUMNS, customers_v1: [...(MCP_COLUMNS.customers_v1 ?? []), CUSTOMER_CONTACT_COLUMN] },
+  }
+}
+
+export function buildServer(client: DataClient, opts: { settingsTimeoutMs?: number } = {}): Server {
   const server = new Server(SERVER_INFO, { capabilities: { tools: {} } })
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: mcpTools() }))
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name } = request.params
+    const args = request.params.arguments ?? {}
+    const tool = auditTool(name)
+    const view = auditView(name, args)
     try {
-      const result = await runTool(client, request.params.name, request.params.arguments ?? {}, MCP_TOOL_OPTIONS)
-      return { content: [{ type: 'text' as const, text: envelope(result) }] }
+      const result = await runTool(client, name, args, await optionsFor(client, name, args, opts.settingsTimeoutMs ?? SETTINGS_TIMEOUT_MS))
+      const { text, count } = envelopeParts(result)
+      audit(client, { tool, view, rowCount: count, ok: true, errorCode: null })
+      return { content: [{ type: 'text' as const, text }] }
     } catch (err) {
+      audit(client, { tool, view, rowCount: null, ok: false, errorCode: auditCode(err) })
       return toolError(err)
     }
   })

@@ -141,6 +141,12 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   // A non-quickbooks source fails validation before any write, so the probe never revokes
   // a real row. Tenant comes from the JWT, never an argument.
   disconnect_source: { args: { p_source: 'shopify' }, expect: 'BCNS3' },
+  // 'none' RPCs run as acmeOwner against the shared seed, so these are harmless on purpose:
+  // set false is what a missing row already means, log writes one acme audit row. tenant.test.ts
+  // deletes both afterwards. Tenant and user come from the JWT, never an argument.
+  get_ai_settings: { args: {}, expect: 'none' },
+  set_ai_settings: { args: { p_share_customer_contact: false }, expect: 'none' },
+  log_mcp_call: { args: { p_tool: 'rpc-scoped-test', p_view: null, p_row_count: 0, p_ok: true, p_error_code: null }, expect: 'none' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
@@ -163,6 +169,8 @@ export async function betaSnapshot() {
     (select count(*) from data.memberships where client_id = $1) memberships,
     (select count(*) from data.dashboard_versions where client_id = $1) dashboard_versions,
     (select count(*)||'/'||coalesce(sum(bytes),0) from data.egress_ledger where client_id = $1) egress,
-    (select count(*) from data.download_tickets where client_id = $1) tickets`, [CLIENTS.beta])
+    (select count(*) from data.download_tickets where client_id = $1) tickets,
+    (select count(*) from data.mcp_tool_calls where client_id = $1) mcp_tool_calls,
+    (select count(*)||'/'||coalesce(max(updated_at)::text,'') from data.ai_settings where client_id = $1) ai_settings`, [CLIENTS.beta])
   return r.rows[0]
 }
