@@ -472,7 +472,7 @@ function readViewTool(opts?: AgentToolsOptions): AgentTool {
     name: 'read_view',
     description:
       `Read rows from a bcns platform view, scoped to the caller's tenant by row-level security. ` +
-      `For "top N" use order_by + order + limit; use offset (with order_by or the date column) for the next page. ` +
+      `For "top N" use order_by + order + limit; use offset (with order_by or the date column) for the next page; pages are consistent only if the data does not change between requests. ` +
       `For totals or counts across many rows use summarize_view, not this tool.\n${viewLines(opts)}`,
     input_schema: {
       type: 'object',
@@ -505,8 +505,8 @@ function summarizeViewTool(opts?: AgentToolsOptions): AgentTool {
     description:
       `Count, sum, average, min or max a numeric column of a bcns platform view, optionally grouped by up to 3 columns ` +
       `and/or by day, month or year (UTC) of the view's date column. Use it for totals such as "refunds by month". ` +
-      `Money columns ending in _minor are in minor units and are grouped by currency automatically. ` +
-      `Scans at most ${SCAN_ROW_CAP} matching rows; if partial is true, narrow the date range or filters.\n${viewLines(opts)}`,
+      `Money columns ending in _minor are in minor units and are grouped by currency automatically; so is the value column of daily_metrics_v1, by metric and currency. Free-text and json columns cannot be grouped or aggregated. ` +
+      `Scans at most ${SCAN_ROW_CAP} matching rows, in several requests, so totals are exact only if the data does not change during the scan; if partial is true, narrow the date range or filters.\n${viewLines(opts)}`,
     input_schema: {
       type: 'object',
       properties: {
@@ -591,6 +591,12 @@ function checkFilterValue(value: unknown): void {
 
 function checkDate(value: unknown, field: string): string {
   if (typeof value !== 'string' || !DATE_RE.test(value)) throw new ToolInputError(`bad ${field}: ${JSON.stringify(value)}`)
+  // A real calendar day (2026-02-31 would roll over to March) in 0001-9998, so addOneDay stays a 4-digit year.
+  const year = Number(value.slice(0, 4))
+  const day = new Date(`${value}T00:00:00Z`)
+  if (year < 1 || year > 9998 || Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== value) {
+    throw new ToolInputError(`bad ${field}: ${JSON.stringify(value)}`)
+  }
   return value
 }
 
@@ -606,6 +612,8 @@ type Row = Record<string, unknown>
 interface ViewQuery extends PromiseLike<{ data: Row[] | null; error: PostgrestError | null }> {
   eq(column: string, value: unknown): ViewQuery
   neq(column: string, value: unknown): ViewQuery
+  is(column: string, value: null): ViewQuery
+  not(column: string, operator: 'is', value: null): ViewQuery
   gt(column: string, value: unknown): ViewQuery
   gte(column: string, value: unknown): ViewQuery
   lt(column: string, value: unknown): ViewQuery
@@ -664,15 +672,16 @@ function parseFilters(filters: unknown, guard: ViewContext['guard']): ParsedFilt
     if (typeof op !== 'string' || !(FILTER_OPS as readonly string[]).includes(op)) throw new ToolInputError(`bad filter op: ${JSON.stringify(op)}`)
     const filterOp = op as FilterOp
     if (filterOp === 'contains' && typeof value !== 'string') throw new ToolInputError('contains needs a string value')
-    if (filterOp !== 'eq' && value === null) throw new ToolInputError(`${filterOp} needs a non-null value`)
+    if (filterOp !== 'eq' && filterOp !== 'neq' && value === null) throw new ToolInputError(`${filterOp} needs a non-null value`)
     return { column: checked, op: filterOp, value }
   })
 }
 
 function applyFilter(q: ViewQuery, f: ParsedFilter): ViewQuery {
   switch (f.op) {
-    case 'eq': return q.eq(f.column, f.value)
-    case 'neq': return q.neq(f.column, f.value)
+    // PostgREST reads `eq.null` as the text 'null', so a null value is IS NULL / IS NOT NULL instead.
+    case 'eq': return f.value === null ? q.is(f.column, null) : q.eq(f.column, f.value)
+    case 'neq': return f.value === null ? q.not(f.column, 'is', null) : q.neq(f.column, f.value)
     case 'gt': return q.gt(f.column, f.value)
     case 'gte': return q.gte(f.column, f.value)
     case 'lt': return q.lt(f.column, f.value)
@@ -772,10 +781,12 @@ async function scanRows(
     return data ?? []
   }
   const rows: Row[] = []
+  // ponytail: ends on an empty page, not a short one (the server's max_rows may be below PAGE_SIZE), so
+  // every scan costs one extra empty request — upgrade to a Content-Range count if that matters.
   while (rows.length < SCAN_ROW_CAP) {
-    const got = await page(rows.length, PAGE_SIZE)
+    const got = await page(rows.length, Math.min(PAGE_SIZE, SCAN_ROW_CAP - rows.length))
+    if (got.length === 0) return { rows, partial: false }
     rows.push(...got)
-    if (got.length < PAGE_SIZE) return { rows, partial: false }
   }
   return { rows, partial: (await page(rows.length, 1)).length > 0 }
 }
@@ -798,9 +809,16 @@ function compareKeys(a: unknown[], b: unknown[]): number {
   return 0
 }
 
-/** Money columns are minor units in one currency per row; summing across currencies is wrong. */
-function currencyColumnFor(view: ViewName, column: string): string {
-  return view === 'daily_summary_v1' && column.startsWith('ad_') ? 'ad_currency' : 'currency'
+/** Columns whose values are too large (text or json/array) to group by or aggregate for up to SCAN_ROW_CAP rows in memory. */
+const LARGE_COLUMNS = new Set(['body', 'attributes', 'participants', 'tags', 'last_error'])
+
+/** Columns a non-count metric on `column` must also be split by, so unlike values are never added:
+ *  money in minor units is one currency per row; daily_metrics_v1.value holds sessions, spend, clicks...
+ *  one `metric` per row, with spend in minor units of `currency`. */
+function splitColumnsFor(view: ViewName, column: string): string[] {
+  if (view === 'daily_metrics_v1' && column === 'value') return ['metric', 'currency']
+  if (!column.endsWith('_minor')) return []
+  return [view === 'daily_summary_v1' && column.startsWith('ad_') ? 'ad_currency' : 'currency']
 }
 
 async function runSummarizeView(client: DataClient, input: unknown, opts?: AgentToolsOptions): Promise<unknown> {
@@ -820,6 +838,9 @@ async function runSummarizeView(client: DataClient, input: unknown, opts?: Agent
     throw new ToolInputError(`group_by must be an array of at most ${MAX_GROUP_BY} columns`)
   }
   const groupCols = ((groupBy ?? []) as unknown[]).map(guard)
+  for (const c of [...(metricCol ? [metricCol] : []), ...groupCols]) {
+    if (LARGE_COLUMNS.has(c)) throw new ToolInputError(`${c} is too large to group by or aggregate`)
+  }
   // The result row has fixed `period` and `value` keys; a grouped column of that name would be overwritten.
   for (const c of groupCols) if (c === 'value' || c === 'period') throw new ToolInputError(`cannot group by a column named ${c}`)
   if (period !== undefined && (typeof period !== 'string' || !(PERIODS as readonly string[]).includes(period))) {
@@ -840,11 +861,12 @@ async function runSummarizeView(client: DataClient, input: unknown, opts?: Agent
   // Dimensions of the answer, in output order: period, group_by, then the auto currency split.
   const dims: string[] = [...(bucket ? ['period'] : []), ...groupCols]
   const sourceCols = [...groupCols]
-  if (agg !== 'count' && metricCol?.endsWith('_minor')) {
-    const currencyCol = currencyColumnFor(view, metricCol)
-    if (!groupCols.includes(currencyCol) && (!allow || allow.includes(currencyCol))) {
-      dims.push(currencyCol)
-      sourceCols.push(currencyCol)
+  if (agg !== 'count' && metricCol) {
+    const pinned = parsed.filter((f) => f.op === 'eq').map((f) => f.column)
+    for (const c of splitColumnsFor(view, metricCol)) {
+      if (groupCols.includes(c) || pinned.includes(c) || (allow && !allow.includes(c))) continue
+      dims.push(c)
+      sourceCols.push(c)
     }
   }
   // An empty select= means `*` to PostgREST, so a bare count still names one (key) column.

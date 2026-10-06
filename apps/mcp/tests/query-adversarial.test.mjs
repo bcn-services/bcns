@@ -1,6 +1,5 @@
 // QA PR-F: adversarial probes for read_view order_by / filter ops / offset and summarize_view.
-// Tests marked `todo: 'BUG-n ...'` document a real defect (they fail today; node reports them as
-// todo and they do not fail the run). Remove `todo` when the product code is fixed.
+// BUG-n tests document defects found in review; all are fixed.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient } from '@supabase/supabase-js'
@@ -320,14 +319,14 @@ test('the wire carries order=col.dir,key.asc and offset/limit for read_view, a k
   assert.equal(s.get('select'), 'spend_minor,currency')
 })
 
-test('BUG-1: date_to on the last representable day sends a malformed date to the database', { todo: 'BUG-1 addOneDay("9999-12-31") -> "+010000-01"' }, async () => {
+test('BUG-1: date_to on the last representable day sends a malformed date to the database', async () => {
   const w = wire()
   await runTool(w.client, 'read_view', { view: 'money_v1', date_to: '9999-12-31' }, MCP_TOOL_OPTIONS).catch(() => {})
   const sent = w.urls[0]?.searchParams.get('occurred_at') ?? ''
   assert.ok(!/\+0/.test(sent), `malformed bound sent: ${sent}`)
 })
 
-test('BUG-3: an impossible calendar date (2026-02-31) is accepted and silently rolls over instead of ToolInputError', { todo: 'BUG-3 DATE_RE checks shape only' }, async () => {
+test('BUG-3: an impossible calendar date (2026-02-31) is accepted and silently rolls over instead of ToolInputError', async () => {
   const f = fake({ money_v1: [] })
   await rejects(direct(f, 'read_view', { view: 'money_v1', date_to: '2026-02-31' }))
   await rejects(direct(f, 'summarize_view', { view: 'money_v1', metric: 'count', date_from: '2026-13-45' }))
@@ -455,7 +454,7 @@ test('ad_* money on daily_summary_v1 splits on ad_currency, other minor columns 
   assert.deepEqual(camp.rows, [{ currency: 'eur', value: 6 }, { currency: 'usd', value: 5 }])
 })
 
-test('BUG-2: daily_metrics_v1.value (spend etc. in minor units) is summed across currencies and metrics without a split', { todo: 'BUG-2 currency guard keys on a *_minor suffix; daily_metrics_v1.value has none' }, async () => {
+test('BUG-2: daily_metrics_v1.value (spend etc. in minor units) is summed across currencies and metrics without a split', async () => {
   const rows = [
     { day: '2026-01-01', source: 'meta', entity_kind: 'campaign', entity_id: 'a', metric: 'spend', value: 100, currency: 'usd' },
     { day: '2026-01-01', source: 'meta', entity_kind: 'campaign', entity_id: 'b', metric: 'spend', value: 100, currency: 'eur' },
@@ -518,7 +517,7 @@ test('summarize filters narrow the scan and apply every op, with the same allowl
 })
 
 test('partial flag and scanned_rows around the 10,000 cap and at page boundaries', async () => {
-  for (const [n, partial, scanned, requests] of [[0, false, 0, 1], [999, false, 999, 1], [1000, false, 1000, 2], [1001, false, 1001, 2], [9999, false, 9999, 10], [10_000, false, 10_000, 11], [10_001, true, 10_000, 11]]) {
+  for (const [n, partial, scanned, requests] of [[0, false, 0, 1], [999, false, 999, 2], [1000, false, 1000, 2], [1001, false, 1001, 3], [9999, false, 9999, 11], [10_000, false, 10_000, 11], [10_001, true, 10_000, 11]]) {
     const f = fake({ money_v1: moneyRows(n) })
     const body = await summarize(f, { view: 'money_v1', metric: 'count' })
     assert.equal(body.partial, partial, `n=${n} partial`)
@@ -644,3 +643,112 @@ test('the audit row count of a summarize_view is the groups returned after the e
 })
 
 test('DAY constant sanity (fixture reuse)', () => assert.equal(DAY, 86_400_000))
+
+// ---- review fixes: dates, daily_metrics split, scan paging, null eq, large columns ---------------------
+
+test('dates: impossible calendar days and years outside 0001-9998 are input errors in both tools and both bounds', async () => {
+  const f = fake({ money_v1: [], daily_summary_v1: [] })
+  for (const bad of ['2026-02-31', '2026-04-31', '2025-02-29', '2026-00-10', '2026-01-00', '0000-05-05', '9999-12-31', '9999-01-01']) {
+    for (const field of ['date_from', 'date_to']) {
+      await rejects(direct(f, 'read_view', { view: 'money_v1', [field]: bad }))
+      await rejects(direct(f, 'summarize_view', { view: 'daily_summary_v1', metric: 'count', [field]: bad }))
+    }
+  }
+  const w = wire()
+  await runTool(w.client, 'read_view', { view: 'money_v1', date_from: '2024-02-29', date_to: '9998-12-31' }, MCP_TOOL_OPTIONS)
+  assert.deepEqual(w.urls[0].searchParams.getAll('occurred_at'), ['gte.2024-02-29', 'lt.9999-01-01'])
+})
+
+const metricRows = [
+  { day: '2026-01-01', source: 'meta', entity_kind: 'campaign', entity_id: 'a', metric: 'spend', value: 100, currency: 'usd' },
+  { day: '2026-01-01', source: 'meta', entity_kind: 'campaign', entity_id: 'b', metric: 'spend', value: 50, currency: 'eur' },
+  { day: '2026-01-01', source: 'meta', entity_kind: 'campaign', entity_id: 'a', metric: 'clicks', value: 7, currency: 'usd' },
+  { day: '2026-01-02', source: 'meta', entity_kind: 'campaign', entity_id: 'a', metric: 'clicks', value: 3, currency: 'usd' },
+]
+const dm = (input, opts) => direct(fake({ daily_metrics_v1: metricRows }), 'summarize_view', { view: 'daily_metrics_v1', ...input }, opts)
+
+test('daily_metrics_v1.value: sum/avg/min/max add metric and currency dimensions, count does not', async () => {
+  for (const metric of ['sum', 'avg', 'min', 'max']) {
+    const r = await dm({ metric, column: 'value', order: 'key' })
+    assert.deepEqual(r.rows.map((x) => [x.metric, x.currency]), [['clicks', 'usd'], ['spend', 'eur'], ['spend', 'usd']], metric)
+  }
+  assert.deepEqual((await dm({ metric: 'sum', column: 'value', order: 'key' })).rows.map((x) => x.value), [10, 50, 100])
+  assert.deepEqual((await dm({ metric: 'count' })).rows, [{ value: 4 }])
+})
+
+test('daily_metrics_v1.value split skips a dimension already grouped or pinned by an eq filter', async () => {
+  const grouped = await dm({ metric: 'sum', column: 'value', group_by: ['metric'], order: 'key' })
+  assert.deepEqual(grouped.rows, [{ metric: 'clicks', currency: 'usd', value: 10 }, { metric: 'spend', currency: 'eur', value: 50 }, { metric: 'spend', currency: 'usd', value: 100 }])
+  const pinned = await dm({ metric: 'sum', column: 'value', filters: [{ column: 'metric', value: 'spend' }], order: 'key' })
+  assert.deepEqual(pinned.rows, [{ currency: 'eur', value: 50 }, { currency: 'usd', value: 100 }])
+  const both = await dm({ metric: 'sum', column: 'value', filters: [{ column: 'metric', value: 'spend' }, { column: 'currency', value: 'usd' }] })
+  assert.deepEqual(both.rows, [{ value: 100 }])
+})
+
+test('daily_metrics_v1.value split only adds columns the allowlist shows', async () => {
+  const columns = (...cols) => ({ views: ['daily_metrics_v1'], columns: { daily_metrics_v1: cols } })
+  const base = ['day', 'source', 'entity_kind', 'entity_id', 'value']
+  const noCur = await dm({ metric: 'sum', column: 'value', order: 'key' }, columns(...base, 'metric'))
+  assert.deepEqual(noCur.rows.map((r) => Object.keys(r)), [['metric', 'value'], ['metric', 'value']])
+  const f = fake({ daily_metrics_v1: metricRows })
+  const none = await runTool(f.client, 'summarize_view', { view: 'daily_metrics_v1', metric: 'sum', column: 'value' }, columns(...base))
+  assert.deepEqual(none.rows, [{ value: 160 }])
+  for (const r of f.requests) assert.ok(!/metric|currency/.test(r.cols), `hidden column selected: ${r.cols}`)
+})
+
+test('scan: a PostgREST max_rows below the page size still reads every row; partial is right at the cap', async () => {
+  const rows = moneyRows(2500)
+  const f = fake({ money_v1: rows }, { maxRows: 300 })
+  const body = await summarize(f, { view: 'money_v1', metric: 'sum', column: 'amount_minor' })
+  assert.equal(body.partial, false)
+  assert.equal(body.scanned_rows, 2500)
+  assert.equal(body.rows[0].value, rows.reduce((t, r) => t + r.amount_minor, 0))
+  const exact = await summarize(fake({ money_v1: moneyRows(10_000) }, { maxRows: 300 }), { view: 'money_v1', metric: 'count' })
+  assert.deepEqual([exact.partial, exact.scanned_rows, exact.rows[0].value], [false, 10_000, 10_000])
+  const over = await summarize(fake({ money_v1: moneyRows(10_001) }, { maxRows: 300 }), { view: 'money_v1', metric: 'count' })
+  assert.deepEqual([over.partial, over.scanned_rows, over.rows[0].value], [true, 10_000, 10_000])
+})
+
+test('null value: eq / neq mean IS NULL / IS NOT NULL in both tools; the fake no longer reads eq.null as IS NULL', async () => {
+  const rows = cust([{ name: 'a', currency: null }, { name: 'b', currency: 'usd' }, { name: 'c', currency: null }, { name: 'null', currency: 'null' }])
+  const f = fake({ customers_v1: rows })
+  const names = async (tool, op) => {
+    const filters = [{ column: 'currency', op, value: null }]
+    const input = tool === 'read_view' ? { view: 'customers_v1', filters, columns: ['name'], order_by: 'name', order: 'asc' } : { view: 'customers_v1', metric: 'count', group_by: ['name'], filters, order: 'key' }
+    const body = await ask(f, tool, input)
+    return body.rows.map((r) => r.name)
+  }
+  for (const tool of ['read_view', 'summarize_view']) {
+    assert.deepEqual(await names(tool, 'eq'), ['a', 'c'], `${tool} eq null`)
+    assert.deepEqual(await names(tool, 'neq'), ['b', 'null'], `${tool} neq null`)
+  }
+  const w = wire()
+  for (const op of ['eq', 'neq']) {
+    for (const tool of ['read_view', 'summarize_view']) {
+      const filters = [{ column: 'currency', op, value: null }]
+      await runTool(w.client, tool, tool === 'read_view' ? { view: 'customers_v1', filters } : { view: 'customers_v1', metric: 'count', filters }, MCP_TOOL_OPTIONS)
+    }
+  }
+  assert.deepEqual(w.urls.map((u) => u.searchParams.get('currency')), ['is.null', 'is.null', 'not.is.null', 'not.is.null'])
+})
+
+test('null value is refused for gt/gte/lt/lte/contains in both tools', async () => {
+  const f = fake({ customers_v1: [] })
+  for (const op of ['gt', 'gte', 'lt', 'lte', 'contains']) {
+    const filters = [{ column: 'name', op, value: null }]
+    await rejects(direct(f, 'read_view', { view: 'customers_v1', filters }))
+    await rejects(direct(f, 'summarize_view', { view: 'customers_v1', metric: 'count', filters }))
+  }
+})
+
+test('summarize_view refuses large or non-scalar columns as group_by or metric column', async () => {
+  const f = fake({ messages_v1: [], records_v1: [], media_v1: [] })
+  for (const [view, col] of [['messages_v1', 'body'], ['records_v1', 'attributes'], ['messages_v1', 'participants'], ['records_v1', 'body'], ['media_v1', 'tags']]) {
+    await rejects(direct(f, 'summarize_view', { view, metric: 'count', group_by: [col] }))
+    await rejects(direct(f, 'summarize_view', { view, metric: 'count', column: col }))
+    await rejects(direct(f, 'summarize_view', { view, metric: 'max', column: col }))
+  }
+  assert.equal(f.requests.length, 0, 'refused before any request')
+  await direct(f, 'summarize_view', { view: 'messages_v1', metric: 'count', group_by: ['kind'] })
+  await direct(f, 'read_view', { view: 'messages_v1', columns: ['body'] })
+})

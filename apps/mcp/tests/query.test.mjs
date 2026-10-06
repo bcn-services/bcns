@@ -110,7 +110,7 @@ test('sum and count by month are right across pages', async () => {
   const filters = [{ column: 'kind', value: 'refund' }]
   const sum = await summarize(f, { view: 'money_v1', metric: 'sum', column: 'amount_minor', period: 'month', filters, order: 'key', limit: 200 })
   assert.equal(refunds.length, 1100)
-  assert.equal(f.requests.length, 2, 'the 1100 matching rows were read in two pages')
+  assert.equal(f.requests.length, 3, 'the 1100 matching rows were read in two pages, then an empty page ended the scan')
   assert.equal(sum.scanned_rows, 1100)
   assert.equal(sum.partial, false)
   assert.deepEqual(sum.rows, [...expectSum].sort((a, b) => cmp(a[0], b[0])).map(([period, value]) => ({ period, currency: 'usd', value })))
@@ -125,8 +125,8 @@ test('sum and count by month are right across pages', async () => {
 test('the scan reads in key order, one page per request, selecting only what it needs', async () => {
   const f = fake({ money_v1: moneyRows(2300) })
   await summarize(f, { view: 'money_v1', metric: 'sum', column: 'amount_minor', group_by: ['kind'] })
-  assert.equal(f.requests.length, 3)
-  assert.deepEqual(f.requests.map((r) => r.range), [[0, 999], [1000, 1999], [2000, 2999]])
+  assert.equal(f.requests.length, 4, 'three pages with rows, then an empty one')
+  assert.deepEqual(f.requests.map((r) => r.range), [[0, 999], [1000, 1999], [2000, 2999], [2300, 3299]])
   for (const r of f.requests) {
     assert.deepEqual(r.orders, [['id', true]])
     assert.equal(r.cols, 'amount_minor,kind,currency')
@@ -235,7 +235,7 @@ test('non-numeric values, bad inputs and bad shapes are ToolInputError', async (
   await bad({ view: 'memberships_v1', metric: 'count' })
   await bad({ view: 'money_v1', metric: 'sum', column: 'Amount' })
   // (a bad date throws while the query is being built, so it never runs: no range was set)
-  assert.equal(f.requests.filter((r) => r.range).length, 2, 'only the two non-numeric checks scanned')
+  assert.equal(f.requests.filter((r) => r.range).length, 4, 'only the two non-numeric checks scanned (a page, then an empty page, each)')
   // amount nulls alone are fine (skipped), not an error
   const nulls = fake({ money_v1: [{ id: 'x', amount_minor: null, currency: 'usd' }] })
   assert.deepEqual((await summarize(nulls, { view: 'money_v1', metric: 'sum', column: 'amount_minor' })).rows, [])
@@ -312,7 +312,7 @@ test('customers_v1.email is denied with the switch off and allowed with it on, i
     assert.equal(ok.error, undefined, `${name} ${JSON.stringify(input)}`)
   }
   assert.equal(off.requests.length, 0)
-  assert.equal(on.requests.length, cases.length)
+  assert.equal(on.requests.length, cases.length + 3, 'each of the 3 summarize calls scans a page, then an empty page')
   // attributes stays hidden even with the switch on
   denied((await ask(on, 'summarize_view', { view: 'customers_v1', metric: 'count', group_by: ['attributes'] })).error, 'customers_v1', 'attributes')
   denied((await ask(on, 'read_view', { view: 'customers_v1', order_by: 'attributes' })).error, 'customers_v1', 'attributes')

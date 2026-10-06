@@ -5,6 +5,7 @@ import { ToolInputError, runTool } from '@bcn-services/data-client'
 import { buildServer } from '../dist/mcp.js'
 import { MCP_TOOL_OPTIONS } from '../dist/policy.js'
 
+/** PostgREST's default max_rows; a fake can lower it with the `maxRows` option. */
 const MAX_ROWS = 1000
 
 export const cmp = (a, b) => (a === b ? 0 : a < b ? -1 : 1)
@@ -26,8 +27,11 @@ const likeRegex = (pattern) => {
   return new RegExp(`^${re}$`, 'is')
 }
 const OPS = {
-  eq: (v, x) => v === x,
-  neq: (v, x) => v !== x,
+  // PostgREST reads `eq.null` as the text 'null', never as IS NULL (that is `is.null`).
+  eq: (v, x) => (x === null ? v === 'null' : v === x),
+  neq: (v, x) => (x === null ? v !== null && v !== 'null' : v !== x),
+  is: (v) => v === null,
+  notis: (v) => v !== null,
   gt: (v, x) => v !== null && v !== undefined && v > x,
   gte: (v, x) => v !== null && v !== undefined && v >= x,
   lt: (v, x) => v !== null && v !== undefined && v < x,
@@ -38,7 +42,7 @@ const OPS = {
 /** `tables` maps view name -> full rows (hidden columns included). Rows come back in an arbitrary
  *  (per-request shuffled) order unless sorted, like an unordered SELECT, then are projected to the
  *  selected columns, so a leak of a hidden column or an unstable page shows up in the result. */
-export function fake(tables, { settings = { share_customer_contact: false } } = {}) {
+export function fake(tables, { settings = { share_customer_contact: false }, maxRows = MAX_ROWS } = {}) {
   const requests = []
   const audits = []
   const run = (req, seq) => {
@@ -56,8 +60,8 @@ export function fake(tables, { settings = { share_customer_contact: false } } = 
       }
       return 0
     })
-    const [from, to] = req.range ?? [0, (req.limit ?? MAX_ROWS) - 1]
-    rows = rows.slice(from, Math.min(to + 1, from + MAX_ROWS))
+    const [from, to] = req.range ?? [0, (req.limit ?? maxRows) - 1]
+    rows = rows.slice(from, Math.min(to + 1, from + maxRows))
     if (req.cols === '*') return rows
     const cols = req.cols.split(',')
     return rows.map((r) => Object.fromEntries(cols.map((c) => [c, r[c]])))
@@ -70,6 +74,8 @@ export function fake(tables, { settings = { share_customer_contact: false } } = 
       const q = {
         eq: filter('eq'), neq: filter('neq'), gt: filter('gt'), gte: filter('gte'), lt: filter('lt'), lte: filter('lte'),
         ilike: filter('ilike'),
+        is: (c) => (req.filters.push(['is', c, null]), q),
+        not: (c, op) => (req.filters.push([`not${op}`, c, null]), q),
         order: (c, o) => (req.orders.push([c, o.ascending]), q),
         range: (a, b) => ((req.range = [a, b]), q),
         limit: (n) => ((req.limit = n), q),

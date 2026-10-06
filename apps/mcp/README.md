@@ -71,7 +71,8 @@ Two read-only tools over the allowlisted views (`src/policy.ts`); no write tool 
 - `read_view` returns rows. `order_by` sorts by any allowed column (a hidden column is refused),
   `filters` take an `op` of `eq` (default), `neq`, `gt`, `gte`, `lt`, `lte` or `contains` (a
   case-insensitive substring, strings only), and `offset` (0-10000, needs an order) pages. The
-  view's unique key is always appended to the sort, so pages never repeat or skip rows.
+  view's unique key is always appended to the sort, so pages are stable as long as no row is inserted
+  or deleted between requests (paging is by offset, with no snapshot).
 - `summarize_view` answers totals without the model adding rows up: `metric` count, sum, avg, min
   or max (with a `column` except for count), `group_by` up to 3 columns, `period` day, month or
   year (UTC, on the view's date column), the same `filters` and `date_from`/`date_to`, `order`
@@ -82,7 +83,9 @@ Two read-only tools over the allowlisted views (`src/policy.ts`); no write tool 
   and `customers_v1.email` still needs the owner switch, for both tools.
 - `summarize_view` reads rows in pages of 1000 and aggregates in the server, up to 10,000 rows. Past
   that the result carries `partial: true` and a note, with `scanned_rows` saying how many were
-  read. Ceiling: this is app-side, so a bigger answer needs a SQL aggregate view or RPC (a
+  read. The pages are separate requests, so totals are exact only if the data does not change during
+  the scan. Free-text and json columns (`body`, `attributes`, `participants`, `tags`, `last_error`) cannot
+  be grouped or aggregated. Summing `daily_metrics_v1.value` splits by `metric` and `currency`. Ceiling: this is app-side, so a bigger answer needs a SQL aggregate view or RPC (a
   migration) instead.
 
 ## Connecting an agent
