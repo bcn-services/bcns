@@ -7,6 +7,8 @@ import { getConfig } from "@/lib/env";
 import { connectPath } from "@/lib/oauth-config";
 import { reopenAppUrl } from "@/lib/shopify-oauth";
 import { formatDateTime } from "@/lib/data-format";
+import { readAiLastUsed } from "@/lib/ai-settings";
+import { firstRun, type MemberRow } from "@/lib/first-run";
 import {
   canDisconnect,
   composeSources,
@@ -44,13 +46,24 @@ export default async function SourcesPage({
   // Only Shopify's own app-open URL for a validated shop: never a typed-in domain (rule 2.3.1).
   const restartUrl = searchParams.error === "connect-expired" ? reopenAppUrl(searchParams.shop, config.shopifyAppHandle) : null;
 
-  const [health, egress] = await Promise.all([
+  const isOwner = membership.role === "owner";
+  // The checklist is owner-only, so members skip its two extra reads.
+  const [health, egress, members, aiLastUsedAt] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
     api.from("egress_status_v1").select("*").limit(1).maybeSingle(),
+    isOwner ? api.from("memberships_v1").select("user_id,role,is_smoke") : Promise.resolve({ data: null }),
+    isOwner ? readAiLastUsed(api) : Promise.resolve(null),
   ]);
 
   const cards = composeSources((health.data as HealthRow[] | null) ?? []);
   const usage = egressLine(egress.data as EgressRow | null);
+  const checklist = firstRun({
+    health: (health.data as HealthRow[] | null) ?? [],
+    members: (members.data as MemberRow[] | null) ?? [],
+    viewerUserId: membership.userId,
+    role: membership.role,
+    aiLastUsedAt,
+  });
 
   const pending = searchParams.email;
   const mailto = pending
@@ -135,7 +148,33 @@ export default async function SourcesPage({
         </p>
       ) : null}
 
-      <div className="grid-src">
+      {checklist.visible ? (
+        <section className="panel fr" aria-labelledby="fr-h">
+          <h2 id="fr-h">Get started</h2>
+          <p className="sub">{checklist.doneCount} of {checklist.steps.length} done</p>
+          <ol className="fr-list">
+            {checklist.steps.map((step) => (
+              <li key={step.id} className={step.done ? "fr-done" : undefined}>
+                <span className="fr-mark" aria-hidden="true">{step.done ? "✓" : ""}</span>
+                <div className="fr-text">
+                  <p className="fr-l">
+                    {step.label}
+                    {step.done ? <span className="sr-only"> (done)</span> : null}
+                  </p>
+                  {step.done ? null : <p className="fr-h">{step.hint}</p>}
+                </div>
+                {step.done ? null : (
+                  <a className="btn btn-out btn-sm" href={step.href}>
+                    {step.cta}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      <div className="grid-src" id="sources">
         {cards.map((card) => (
           <article key={card.source} data-source={card.source} className="sc">
             <div className="sc-h">

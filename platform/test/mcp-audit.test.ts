@@ -179,3 +179,39 @@ describe('api.log_mcp_call', () => {
     expect((await sql(`select count(*)::int n from data.mcp_tool_calls where client_id = $1`, [c])).rows[0].n).toBe(0)
   })
 })
+
+describe('api.ai_last_used_at', () => {
+  const call = { p_tool: 'read_view', p_view: 'money_v1', p_row_count: 1, p_ok: true, p_error_code: null }
+  const lastUsed = async (who: Who) => (await clientWithToken(who.jwt).rpc('ai_last_used_at'))
+
+  it('is null while the workspace has made no AI call', async () => {
+    const u = await mkUser(await mkClient(), 'member')
+    const r = await lastUsed(u)
+    expect(r.error).toBeNull()
+    expect(r.data).toBeNull()
+  })
+
+  it('returns the newest call time, whichever member made it', async () => {
+    const c = await mkClient()
+    const owner = await mkUser(c, 'owner'), member = await mkUser(c, 'member')
+    await sql(`insert into data.mcp_tool_calls (client_id, user_id, tool, ok, at) values ($1, $2, 'old', true, now() - interval '3 days')`, [c, owner.id])
+    await clientWithToken(member.jwt).rpc('log_mcp_call', call)
+    const newest = (await sql(`select max(at) m from data.mcp_tool_calls where client_id = $1`, [c])).rows[0].m as Date
+    const r = await lastUsed(owner)
+    expect(r.error).toBeNull()
+    expect(new Date(r.data as string).getTime()).toBe(newest.getTime())
+  })
+
+  it('tenant A never sees tenant B\'s latest call', async () => {
+    const a = await mkUser(await mkClient(), 'owner'), b = await mkUser(await mkClient(), 'owner')
+    await clientWithToken(b.jwt).rpc('log_mcp_call', call)
+    expect((await lastUsed(a)).data).toBeNull()
+    expect((await lastUsed(b)).data).not.toBeNull()
+  })
+
+  it('a token with no client claim gets BCNS0; the anon key is refused', async () => {
+    const u = await mkUser(await mkClient(), 'owner')
+    expect((await clientWithToken(await mintJwt(u.id)).rpc('ai_last_used_at')).error?.code).toBe('BCNS0')
+    expect(['42501', 'BCNS0']).toContain((await anonClient().rpc('ai_last_used_at')).error?.code)
+  })
+})

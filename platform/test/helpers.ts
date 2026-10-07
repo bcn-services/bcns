@@ -145,6 +145,7 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   // set false is what a missing row already means, log writes one acme audit row. tenant.test.ts
   // deletes both afterwards. Tenant and user come from the JWT, never an argument.
   get_ai_settings: { args: {}, expect: 'none' },
+  ai_last_used_at: { args: {}, expect: 'none' },
   set_ai_settings: { args: { p_share_customer_contact: false }, expect: 'none' },
   log_mcp_call: { args: { p_tool: 'rpc-scoped-test', p_view: null, p_row_count: 0, p_ok: true, p_error_code: null }, expect: 'none' },
   // A read of the caller's own billing row by auth.uid(); no argument to aim elsewhere.

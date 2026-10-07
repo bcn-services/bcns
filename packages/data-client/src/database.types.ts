@@ -1287,6 +1287,7 @@ export type Database = {
       }
     }
     Functions: {
+      ai_last_used_at: { Args: never; Returns: string }
       billing_self: { Args: never; Returns: Json }
       bulk_tag: {
         Args: { add?: string[]; media_ids: string[]; remove?: string[] }
