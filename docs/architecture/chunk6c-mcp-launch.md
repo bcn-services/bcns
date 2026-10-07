@@ -97,6 +97,31 @@ B, C and D all edit `apps/mcp/src/mcp.ts` or `server.ts`, so whichever merges la
   8. Repeat with Claude Code `claude mcp add`, then ChatGPT developer-mode connector (best-effort).
   9. Negative: a pending sign-up account gets the form error "no active bcns membership".
 
+### Launch verification 2026-10-06
+
+Run by Nate in claude.ai and Claude Code; evidence is read-only SQL on prod (`data.mcp_tool_calls`, `data.ai_settings`), times UTC 2026-10-07. Tenant: `bcns-oauth-test` (owner login), not the SB smoke user. No tenant had customer or order rows, so the data checks compare empty to empty.
+
+| Step | Result | Evidence |
+|---|---|---|
+| 1 | PASS | `/authorize` with the claude.ai callback rendered "Claude (claude.ai) wants read-only access to your bcns data" plus the "only continue if you started" warning. First attempt failed in Claude itself (`oauth_error=connect_request_unconfirmed`, never reached `/authorize`); retry worked. Claude auto-detected OAuth + DCR. |
+| 2 | SKIPPED | Wrong password not tried live; covered by #115 tests. |
+| 3 | PASS | Signed in, returned to Claude connected. Read-only label in the tool list not checked. |
+| 4 | PASS | 00:15:30 `read_view client_v1` 1 row ok → "bcns OAuth Test". A bare "what's my business name" got no tool call (Claude answered from memory); the prompt has to name bcns or the tool. |
+| 5 | PASS | Idle 00:24:32 → 00:43:43 (19 min, past the 10-min token), `read_view client_v1` ok, no re-login. |
+| 6 notes | SKIPPED | `messages_v1` empty for this tenant; meeting-notes column check not exercised. |
+| 6 top 5 | PASS | 00:18:56 `read_view customers_v1` 0 rows = SQL `api.customers_v1` 0 rows; no emails. |
+| 6 refunds | PASS | 00:19:16/18 `summarize_view money_v1` 0 rows = SQL `api.money_v1 kind='refund'` YTD 0; no `partial`. |
+| 6 switch | PASS | Off: 00:22:19 `read_view` and 00:22:20 `summarize_view` on `customers_v1` asking for `email` → `ok=false error_code=input` ("column not available on customers_v1: email"). On: `ai_settings.share_customer_contact=true` 00:24:16 by owner → same `read_view` ok 00:24:32. Back off 00:26:05. |
+| 6 member | SKIPPED | No member login for this tenant. |
+| 7 | PASS | 11 rows for `bcns-oauth-test` (7 `read_view`, 4 `summarize_view`, 2 `ok=false`), one per call above, including the two refusals. |
+| 8 Claude Code | PASS | `claude mcp add` + `/mcp` Authenticate; 00:56:12 three calls ok (`summarize_view`/`read_view messages_v1`, `read_view client_v1`). A leftover local-scope `bcns` entry with a static `Authorization` header (old mint snippet) blocks OAuth and 401s; remove it first. |
+| 8 ChatGPT | SKIPPED | Best-effort, not run. |
+| 9 | SKIPPED | No pending sign-up account used. |
+
+#116 hand-checks: (1) top 5 by spend — match (0 = 0); (2) refunds by month — match (0 = 0); (3) email with the switch off — refused on both tools. The PR body's `money` is the view `api.money_v1`, column `amount_minor`.
+
+§7: Supabase Auth rate limits read from the dashboard — token refresh 150/5 min per IP, sign-ups + sign-ins 30/5 min per IP, token verifications 30/5 min; matches §2's assumptions. Shopify protected-customer-data declaration: not read (Partners not signed in on the Work profile; app in review). Open: after review, confirm a listed reason covers the merchant's own AI assistant before any Shopify client connects an AI.
+
 ## 7. Nate by hand
 - `supabase db push --workdir platform` after C merges (his terminal; passkey account).
 - Merge commands `! GITHUB_TOKEN= gh pr merge <n> --squash --repo bcn-services/bcns`, timing vs Shopify review.
