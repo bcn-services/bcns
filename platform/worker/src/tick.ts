@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { acquireLease, envNum, releaseLease, sql, type Tick } from './db.js'
 import { claimAndRun } from './run.js'
 import { probeAuthFailed, refreshTokens } from './tokens.js'
-import { alerts, computeHealth, egressPooled } from './health.js'
+import { alerts, computeHealth, egressPooled, raiseWeeklyDigests } from './health.js'
 import { purge, thumbnails } from './media.js'
 import { renormalize } from './renormalize.js'
 import { shopRedact } from './privacy.js'
@@ -98,6 +98,8 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
     // data.notifications row (not just the ones alerts() itself just raised) — so an escalation
     // shopRedact() writes here goes out over email in this same tick instead of waiting one more.
     await step('shopRedact', () => shopRedact(t))
+    // Before alerts, same reason: alerts() ends with sendPending(), which flushes the digest this step raises.
+    await step('weeklyDigests', () => raiseWeeklyDigests(t))
     await step('alerts', () => alerts(t))
     await step('thumbnails', () => thumbnails(t))
     await step('renormalize', () => renormalize(t))

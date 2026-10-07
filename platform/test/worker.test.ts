@@ -6,7 +6,7 @@ import { closePool, type Tick } from '../worker/src/db.js'
 import { claim, contextFor, refreshOne, runOne, type ScheduleRow } from '../worker/src/run.js'
 import { tick, type TickResult } from '../worker/src/tick.js'
 import { refreshTokens } from '../worker/src/tokens.js'
-import { alerts, computeHealth } from '../worker/src/health.js'
+import { alerts, computeHealth, lastWeek } from '../worker/src/health.js'
 import { renormalize } from '../worker/src/renormalize.js'
 import { connectors, type Source } from '../worker/src/connectors/index.js'
 
@@ -268,6 +268,60 @@ describe('worker', () => {
         await sql(`update data.connector_health set status = $3, status_since = $4, last_error = $5, computed_at = $6 where client_id = $1 and source = $2`,
           [id, o.source, o.status, o.status_since, o.last_error, o.computed_at])
       await sql(`delete from data.notifications where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.gamma]])
+    }
+  })
+
+  it('weekly_digest_emails', async () => {
+    const calls: { url: string; headers: Record<string, string>; body: string }[] = []
+    const cap = (async (input: any, init?: any) => {
+      const url = String(input)
+      if (!url.startsWith('https://api.resend.com/')) return idleFetch(input, init)
+      calls.push({ url, headers: init?.headers ?? {}, body: String(init?.body ?? '') })
+      return json({ id: 'msg_x' })
+    }) as typeof globalThis.fetch
+    const digestBatches = () => calls.filter(c => c.url === 'https://api.resend.com/emails/batch' && c.headers['Idempotency-Key']?.startsWith('weekly_digest:'))
+    const rowsOf = async (client: string) => (await sql<{ dedupe_key: string; sent_at: Date | null; last_error: string | null }>(
+      `select dedupe_key, sent_at, last_error from data.notifications where client_id = $1 and kind = 'weekly_digest'`, [client])).rows
+    const run = () => tick({ taskIndex: 0, taskCount: 1, fetch: cap, log: () => {} })
+    const week = lastWeek(new Date(), 'America/New_York')
+    try {
+      await sql(`delete from data.notifications where kind = 'weekly_digest'`)
+      // Seeded acme/beta carry 50 days of synthetic money, sessions and ad rows ending today; gamma is paused with the same data.
+      const empty = await mkClient([{ source: 'shopify' }])
+      const inventoryOnly = await mkClient([{ source: 'shopify' }])
+      await sql(`insert into data.daily_metrics (client_id, source, day, entity_kind, entity_id, metric, value) values ($1, 'shopify', $2::date, 'store', 'store', 'inventory_units', 12)`,
+        [inventoryOnly, week.start])
+
+      const first = await run()
+      expect(first.housekeeping).toBe(true)
+      expect(first.steps.weeklyDigests).toBeGreaterThanOrEqual(2)
+      const acme = await rowsOf(CLIENTS.acme)
+      expect(acme.map(r => r.dedupe_key)).toEqual([`weekly_digest:${CLIENTS.acme}:${week.week}`])
+      expect(acme[0].sent_at).not.toBeNull()
+      expect((await rowsOf(CLIENTS.gamma)).length).toBe(0)       // paused: nothing
+      expect((await rowsOf(empty)).length).toBe(0)               // no rows at all: nothing
+      expect((await rowsOf(inventoryOnly)).length).toBe(0)       // inventory-only rows are not a number: nothing
+      const beta = await rowsOf(CLIENTS.beta)                    // active, data, but no owner member
+      expect(beta.length).toBe(1)
+      expect(beta[0].last_error).toBe('no owner to email')
+
+      expect(digestBatches().length).toBe(1)
+      const b = digestBatches()[0]
+      expect(b.headers['Idempotency-Key']).toBe(acme[0].dedupe_key)
+      const msgs = JSON.parse(b.body) as { to: string[]; subject: string; text: string }[]
+      expect(msgs.map(m => m.to)).toEqual([['acme-owner@example.com']])
+      expect(b.body).not.toMatch(/acme-member|acme-smoke/)
+      expect(msgs[0].subject).toMatch(/^Your week in numbers: /)
+      expect(msgs[0].text).toMatch(/Orders: \d+/)
+      expect(msgs[0].text).toContain('https://connect.bcn-services.com/')
+
+      // Same week again: no new row, no new email.
+      expect((await run()).housekeeping).toBe(true)   // it held the lease, so the dedupe key (not a skipped tick) is what stopped it
+      expect((await rowsOf(CLIENTS.acme)).length).toBe(1)
+      expect((await rowsOf(CLIENTS.beta)).length).toBe(1)
+      expect(digestBatches().length).toBe(1)
+    } finally {
+      await sql(`delete from data.notifications where kind = 'weekly_digest'`)
     }
   })
 
