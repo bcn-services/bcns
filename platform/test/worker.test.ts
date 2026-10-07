@@ -316,7 +316,7 @@ describe('worker', () => {
       expect(msgs[0].text).toContain('https://connect.bcn-services.com/')
 
       // Same week again: no new row, no new email.
-      await run()
+      expect((await run()).housekeeping).toBe(true)   // it held the lease, so the dedupe key (not a skipped tick) is what stopped it
       expect((await rowsOf(CLIENTS.acme)).length).toBe(1)
       expect((await rowsOf(CLIENTS.beta)).length).toBe(1)
       expect(digestBatches().length).toBe(1)

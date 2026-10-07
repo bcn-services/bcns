@@ -215,10 +215,9 @@ export function weeklyDigest(clientId: string, rows: DigestRow[], w: { start: st
   }
 }
 
-/** Minor units to display money, dividing by the currency's own fraction digits (JPY 0, USD 2). */
+/** Every connector stores money as round(amount * 100), whatever the currency, so always divide by 100; Intl then rounds to the currency's own digits (JPY 0, USD 2, KWD 3). */
 function fmtMoney(minor: number, currency: string): string {
-  const f = new Intl.NumberFormat('en-US', { style: 'currency', currency })
-  return f.format(minor / 10 ** f.resolvedOptions().maximumFractionDigits!)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(minor / 100)
 }
 const fmtDay = (ymd: string) => new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' })
 

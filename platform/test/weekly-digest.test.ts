@@ -87,10 +87,14 @@ describe('digestEmail', () => {
     expect(m.text).toContain('Ad sales for every 1 USD spent: 3.20')
     expect(m.text).toContain('https://connect.bcn-services.com/')
   })
-  it('a zero-decimal currency is not divided by 100', () => {
-    const m = digestEmail(weeklyDigest('c1', [row({ currency: 'JPY', orders: 2, revenue_minor: 5000 })], W)!.payload)
+  it('money is stored as amount * 100 in every currency: JPY 500000 minor is 5,000 yen', () => {
+    const m = digestEmail(weeklyDigest('c1', [row({ currency: 'JPY', orders: 2, revenue_minor: 500000 })], W)!.payload)
     expect(m.text).toContain('Sales: ¥5,000')
     expect(m.text).toContain('Average order: ¥2,500')
+  })
+  it('a three-decimal currency shows its own digits, still from minor / 100', () => {
+    const m = digestEmail(weeklyDigest('c1', [row({ currency: 'KWD', orders: 1, revenue_minor: 1234 })], W)!.payload)
+    expect(m.text).toContain('Sales: KWD\u00a012.340')   // Intl puts a no-break space (U+00A0) between the code and the amount
   })
   it('several currencies are labelled per line', () => {
     const m = digestEmail(weeklyDigest('c1', [row({ orders: 1, revenue_minor: 1000 }), row({ currency: 'EUR', orders: 2, revenue_minor: 4000 })], W)!.payload)
