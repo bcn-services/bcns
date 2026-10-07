@@ -12,7 +12,7 @@
  */
 
 /**
- * The five sources a connector actually runs for — `platform/worker/src/connectors`
+ * The six sources a connector actually runs for — `platform/worker/src/connectors`
  * exports exactly these, and `data.connector_health` rows only ever exist for a
  * `data.connector_schedule` row, which `add-source` gates on that same registry.
  *
