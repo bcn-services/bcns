@@ -1137,7 +1137,7 @@ row (`dedupe_key = 'notifications_stuck:<date>'`).
 if the same breakage (same `status_since`) is still broken 3 days after the first email was sent (an unsent row counts nothing yet), one
 `client_break_reminder` row with the matching key. `sendPending` sends these to the client's `owner`-role,
 non-smoke members (`ownerEmails`) via one Resend batch call (`sendClientEmail`, one message per owner,
-`Idempotency-Key = dedupe_key`), from `BCNS_ALERT_FROM` falling back to `BCNS_ALERT_EMAIL`, with `reply_to = BCNS_ALERT_EMAIL` so a client's reply lands in the bcns alert inbox, not the bot sender; the email links to the hub
+`Idempotency-Key = dedupe_key`), from `BCNS_ALERT_FROM` falling back to `BCNS_ALERT_EMAIL`. `reply_to` is set only from the optional `BCNS_CLIENT_REPLY_TO` (a human-read inbox); unset, the message carries no `reply_to` and a reply goes to the from address. It is never `BCNS_ALERT_EMAIL`: the alerts inbox is parsed by an automated fixer pipeline, not read by a person. The email links to the hub
 home. A client with no owner gets the row marked sent with `last_error = 'no owner to email'` (not retried, not
 counted by `notifications_stuck`); that `sent_at` still starts the 3-day reminder clock, so an owner added mid-breakage gets the reminder. bcns's own `auth_failed`/`stale` rows are unchanged. Only active clients are emailed.
 

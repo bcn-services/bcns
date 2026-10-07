@@ -78,6 +78,7 @@ beforeAll(async () => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = localKeys().service
   process.env.RESEND_API_KEY = 'test-resend-key'
   process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
+  delete process.env.BCNS_CLIENT_REPLY_TO
   schedules = (await sql(`select to_jsonb(s) j from data.connector_schedule s where client_id = any($1::uuid[])`, [SEEDED])).rows.map(r => r.j)
   tokens = (await sql(`select to_jsonb(t) j from data.source_tokens t where client_id = any($1::uuid[])`, [SEEDED])).rows.map(r => r.j)
   acmeMoney = (await sql(`select to_jsonb(m) j from data.money m where client_id = $1 and external_id = any($2::text[])`,
@@ -237,7 +238,7 @@ describe('worker', () => {
       expect(batches()[0].body).not.toMatch(/acme-member|acme-smoke/)
       expect(batches()[0].headers['Idempotency-Key']).toBe(first[0].dedupe_key)
       expect(msgs[0].text).toContain('https://connect.bcn-services.com/')
-      expect(msgs[0]).toMatchObject({ reply_to: 'alerts@example.test' })
+      expect('reply_to' in msgs[0]).toBe(false) // only BCNS_ALERT_EMAIL is set here; replies never go to the alerts inbox
 
       // bcns's own alert still goes out, to bcns only.
       const bcns = await rowsOf('auth_failed')

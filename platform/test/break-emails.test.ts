@@ -81,14 +81,15 @@ describe('breakEmail', () => {
   it('says what happened and when, and reminders say still not connected', () => {
     expect(breakEmail('client_break', 'drive', 'auth_failed', T0).text).toContain("can't reach your Google Drive account")
     expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain('hasn\'t updated since October 1, 2026')
-    expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain("If it doesn't, reply to this email")
-    expect(breakEmail('client_break', 'drive', 'auth_failed', T0).text).not.toContain('reply to this email')
+    expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain("If it doesn't, we get the same alert and will follow up.")
+    for (const [kind, status] of [['client_break', 'stale'], ['client_break', 'auth_failed'], ['client_break_reminder', 'stale'], ['client_break_reminder', 'auth_failed']] as const)
+      expect(breakEmail(kind, 'drive', status, T0).text.toLowerCase()).not.toContain('reply')
     expect(breakEmail('client_break_reminder', 'drive', 'auth_failed', T0).text).toContain('still not connected')
   })
 })
 
 describe('sendClientEmail', () => {
-  const ENV = ['RESEND_API_KEY', 'BCNS_ALERT_FROM', 'BCNS_ALERT_EMAIL']
+  const ENV = ['RESEND_API_KEY', 'BCNS_ALERT_FROM', 'BCNS_ALERT_EMAIL', 'BCNS_CLIENT_REPLY_TO']
   const saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]))
   afterEach(() => { for (const k of ENV) saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]) })
   const send = async (to: string[]) => {
@@ -101,21 +102,23 @@ describe('sendClientEmail', () => {
     return { call: calls[0], msgs: JSON.parse(calls[0].body) as Record<string, unknown>[] }
   }
 
-  it('one batch message per owner, replies to the bcns alert inbox, Idempotency-Key set', async () => {
+  it('one batch message per owner, reply_to from BCNS_CLIENT_REPLY_TO only, Idempotency-Key set', async () => {
     process.env.RESEND_API_KEY = 'rk'
     process.env.BCNS_ALERT_FROM = 'bot@example.test'
     process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
+    process.env.BCNS_CLIENT_REPLY_TO = 'people@example.test'
     const { call, msgs } = await send(['a@example.com', 'b@example.com'])
     expect(call.url).toBe('https://api.resend.com/emails/batch')
     expect(call.headers['Idempotency-Key']).toBe('k1')
     expect(msgs.map(m => m.to)).toEqual([['a@example.com'], ['b@example.com']])
-    for (const m of msgs) expect(m).toMatchObject({ from: 'bot@example.test', reply_to: 'alerts@example.test', subject: 'Subj', text: 'Body' })
+    for (const m of msgs) expect(m).toMatchObject({ from: 'bot@example.test', reply_to: 'people@example.test', subject: 'Subj', text: 'Body' })
   })
 
-  it('no BCNS_ALERT_EMAIL: no reply_to key at all', async () => {
+  it('only BCNS_ALERT_EMAIL set: no reply_to key at all (never the alerts inbox)', async () => {
     process.env.RESEND_API_KEY = 'rk'
     process.env.BCNS_ALERT_FROM = 'bot@example.test'
-    delete process.env.BCNS_ALERT_EMAIL
+    process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
+    delete process.env.BCNS_CLIENT_REPLY_TO
     expect('reply_to' in (await send(['a@example.com'])).msgs[0]).toBe(false)
   })
 })

@@ -48,6 +48,7 @@ everything runs nothing at all, which is a safe way to read what it would do.
 | | |
 |---|---|
 | `--set-env-vars` | `SUPABASE_URL`, `BCNS_ALERT_EMAIL`, `BCNS_ALERT_FROM`, `SHOPIFY_CLIENT_ID` (public half of the Shopify app; the worker refreshes every merchant's one-hour Admin token with it), `TASK_COUNT` (2 — must match the workflow's `--tasks`, because `tick()` shards claims by `hashtext(client_id) % TASK_COUNT` against `CLOUD_RUN_TASK_INDEX`) |
+| optional, not set by the script | `BCNS_CLIENT_REPLY_TO` — a human-read inbox that client break emails use as `reply_to`; unset → no `reply_to`, replies go to the from address. Never the alerts inbox (an automated fixer parses it). A Cloud Run job's env is create-time only, so add it to an existing job with `gcloud run jobs update bcns-data-worker --update-env-vars BCNS_CLIENT_REPLY_TO=<inbox>`. |
 | `--set-secrets` | `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `SHOPIFY_CLIENT_SECRET`, each `<name>:latest` |
 | unset on purpose | `RUN_BUDGET_MS`, `CLAIM_LIMIT`, `EGRESS_ALLOWANCE_BYTES`, `RENORMALIZE_BUDGET_MS` — the worker's own defaults in `worker/src` are the intended production values. `.env.example` carries the same four, but it is a local-dev file and not authoritative (its `TASK_COUNT=1` is deliberately not the job's 2). Set one with `gcloud run jobs update` if it ever needs to differ. |
 | set by Cloud Run | `CLOUD_RUN_TASK_INDEX` |

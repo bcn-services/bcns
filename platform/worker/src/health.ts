@@ -175,7 +175,7 @@ export function breakEmail(kind: BreakNotice['kind'], source: string, status: st
     : `The ${label} information in your bcns Connect hasn't updated since ${since}.`
   const fix = status === 'auth_failed'
     ? 'Reconnecting fixes it, and your information picks up again on its own.'
-    : "Reconnecting usually fixes it. If it doesn't, reply to this email and we'll sort it out."
+    : "Reconnecting usually fixes it. If it doesn't, we get the same alert and will follow up."
   const lead = kind === 'client_break_reminder'
     ? `A quick reminder: ${label} is still not connected. ${problem}`
     : problem
@@ -185,11 +185,11 @@ export function breakEmail(kind: BreakNotice['kind'], source: string, status: st
   }
 }
 
-/** One Resend batch call, one message per recipient so owners never see each other's address; Idempotency-Key makes a retry safe. Replies go to the bcns alert inbox, not the bot sender. */
+/** One Resend batch call, one message per recipient so owners never see each other's address; Idempotency-Key makes a retry safe. reply_to is only the optional human-read BCNS_CLIENT_REPLY_TO, never the alerts inbox (a bot parses that one). */
 export async function sendClientEmail(t: Tick, to: string[], subject: string, text: string, idempotencyKey: string): Promise<void> {
   const key = envStr('RESEND_API_KEY')
-  const replyTo = envStr('BCNS_ALERT_EMAIL')
-  const from = envStr('BCNS_ALERT_FROM') || replyTo
+  const replyTo = envStr('BCNS_CLIENT_REPLY_TO')
+  const from = envStr('BCNS_ALERT_FROM') || envStr('BCNS_ALERT_EMAIL')
   if (!key || !from) throw new Error('RESEND_API_KEY and BCNS_ALERT_FROM or BCNS_ALERT_EMAIL are required to email clients')
   const r = await t.fetch('https://api.resend.com/emails/batch', {
     method: 'POST',
