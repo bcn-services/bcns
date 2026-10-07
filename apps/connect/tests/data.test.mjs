@@ -534,10 +534,10 @@ test("stats catalog: only connected sources, one count per view, ids are source/
   assert.equal(cat.filter((s) => s.id !== "shopify/revenue").length, DATA_VIEWS.filter((v) => v.source === "shopify").length);
   assert.ok(!cat.some((s) => s.id === "meta/spend"));
   assert.deepEqual(buildCatalog([], inputs()), []);
-  assert.equal(STAT_IDS.length, 14); // 12 views + shopify/revenue + meta/spend
-  assert.equal(new Set(STAT_IDS).size, 14);
-  const all = buildCatalog(["shopify", "meta", "monday", "meet", "drive"], inputs());
-  assert.equal(all.length, 14);
+  assert.equal(STAT_IDS.length, 15); // 13 views + shopify/revenue + meta/spend
+  assert.equal(new Set(STAT_IDS).size, 15);
+  const all = buildCatalog(["shopify", "meta", "monday", "meet", "drive", "quickbooks"], inputs());
+  assert.equal(all.length, 15);
   for (const s of all) assert.ok(STAT_IDS.includes(s.id), s.id);
 });
 
@@ -559,7 +559,7 @@ test("stats pins: round trip, none is empty, undefined is no choice, junk and re
   assert.deepEqual(parsePins("shopify/orders,evil/x,,shopify/orders,../etc,meta/spend"), ["shopify/orders", "meta/spend"]);
   assert.equal(parsePins("junk,more junk"), null); // nothing usable: back to defaults, not an empty strip
   assert.equal(parsePins(""), null);
-  assert.equal(parsePins(STAT_IDS.join(",")).length, 14);
+  assert.equal(parsePins(STAT_IDS.join(",")).length, 15);
 });
 
 test("stats pins: resolved against today's catalog, unconnected sources drop out silently", () => {

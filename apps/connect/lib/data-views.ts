@@ -8,7 +8,8 @@
  * Columns are an allow-list: only these keys are ever selected. That is what keeps
  * `storage_path` / `thumb_path` (media, creatives) off the page. `attributes` is exposed only
  * for monday and drive `records_v1`, as a collapsed Details cell (pretty JSON, same client's
- * rows only) — never as a raw dump column.
+ * rows only) — never as a raw dump column. QuickBooks exposes only allow-listed attribute keys as
+ * named columns, never the blob.
  */
 
 import { formatDateTime } from "./data-format";
@@ -23,6 +24,11 @@ export interface Column {
   type: ColType;
   /** For `money`: the column holding this row's ISO currency code. */
   currencyKey?: string;
+  /**
+   * For `money`: decimal places of the stored integer, when it is not the currency's own
+   * (QuickBooks stores value x 100 for every currency, JPY included). Default: the currency's digits.
+   */
+  minorDigits?: number;
 }
 
 export interface ViewConfig {
@@ -44,6 +50,11 @@ export interface ViewConfig {
   searchColumns: string[];
   /** Secondary sort key so pages and CSV chunks never overlap or skip. */
   tieBreak: string;
+  /**
+   * Allow-list of JSON attribute keys exposed as named columns: output key -> `attributes` field.
+   * Static constants only (never user input): they are spliced into PostgREST select/or strings.
+   */
+  attrs?: Readonly<Record<string, string>>;
   columns: Column[];
 }
 
@@ -284,6 +295,36 @@ export const DATA_VIEWS: readonly ViewConfig[] = [
       ATTRIBUTES,
     ],
   },
+  {
+    source: "quickbooks",
+    id: "expenses",
+    label: "Expenses",
+    view: "records_v1",
+    extra: { column: "kind", value: "qbo_expense" },
+    dateColumn: "occurred_at",
+    dateKind: "timestamptz",
+    searchColumns: ["vendor", "memo"],
+    tieBreak: "id",
+    attrs: {
+      date: "date",
+      vendor: "vendor",
+      amount: "amount_cents",
+      currency: "currency",
+      account: "account",
+      txn_type: "txn_type",
+      payment_type: "payment_type",
+      memo: "memo",
+    },
+    columns: [
+      { key: "date", label: "Date", type: "date" },
+      { key: "vendor", label: "Vendor", type: "text" },
+      { key: "amount", label: "Amount", type: "money", currencyKey: "currency", minorDigits: 2 },
+      { key: "account", label: "Account", type: "text" },
+      { key: "txn_type", label: "Type", type: "text" },
+      { key: "payment_type", label: "Payment type", type: "text" },
+      { key: "memo", label: "Memo", type: "text" },
+    ],
+  },
 ];
 
 export function viewsFor(source: string): ViewConfig[] {
@@ -294,14 +335,26 @@ export function findView(source: string | null | undefined, id: string | null | 
   return DATA_VIEWS.find((v) => v.source === source && v.id === id) ?? null;
 }
 
+/** `key` as a PostgREST select item: `alias:attributes->>name` when the view allow-lists it as an attribute. */
+function selectItem(cfg: ViewConfig, key: string): string {
+  const attr = cfg.attrs?.[key];
+  return attr ? `${key}:attributes->>${attr}` : key;
+}
+
+/** A logical column as a PostgREST filter target: `attributes->>name` for an allow-listed attribute. */
+export function filterColumn(cfg: ViewConfig, key: string): string {
+  const attr = cfg.attrs?.[key];
+  return attr ? `attributes->>${attr}` : key;
+}
+
 /** Every key a query for this view selects: displayed columns, currency codes, and the tie-break. No `*`. */
 export function selectKeys(cfg: ViewConfig): string[] {
   const keys = new Set<string>();
   for (const c of cfg.columns) {
-    keys.add(c.key);
-    if (c.currencyKey) keys.add(c.currencyKey);
+    keys.add(selectItem(cfg, c.key));
+    if (c.currencyKey) keys.add(selectItem(cfg, c.currencyKey));
   }
-  keys.add(cfg.tieBreak);
+  keys.add(selectItem(cfg, cfg.tieBreak));
   return [...keys];
 }
 
