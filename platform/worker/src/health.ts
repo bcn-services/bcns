@@ -95,7 +95,7 @@ export async function alerts(t: Tick): Promise<number> {
 // ------------------------------------------------------- client break emails
 
 /** Hub home: the reconnect link in every client break email (no per-card anchor exists). */
-const HUB_URL = 'https://connect.bcn-services.com/'
+export const HUB_URL = 'https://connect.bcn-services.com/'
 const STALE_GRACE_MS = 6 * 3600_000   // same grace as the bcns stale alert
 const REMINDER_AFTER_MS = 3 * 86_400_000
 // Mirrors the hub's labels (apps/connect); the worker cannot import the app.
@@ -145,6 +145,130 @@ async function raiseClientBreaks(t: Tick): Promise<number> {
     h.rows.map(r => ({ ...r, initial_sent_at: createdAt.get(breakKey('client_break', r)) ?? null })), t.now())
   let raised = 0
   for (const n of notices) {
+    const r = await sql(
+      `insert into data.notifications (client_id, kind, dedupe_key, payload) values ($1, $2, $3, $4::jsonb)
+       on conflict (dedupe_key) do nothing`,
+      [n.client_id, n.kind, n.dedupe_key, JSON.stringify(n.payload)])
+    raised += r.rowCount ?? 0
+  }
+  return raised
+}
+
+// ------------------------------------------------------------ weekly digest
+
+export interface DigestRow {
+  revenue_minor: number | string | null; orders: number | string | null; refunds_minor: number | string | null
+  payouts_minor: number | string | null; currency: string | null; sessions: number | string | null
+  ad_spend_minor: number | string | null; ad_purchase_value_minor: number | string | null; ad_currency: string | null
+}
+export interface DigestPayload {
+  week: string; start: string; end: string
+  money: { currency: string; orders: number; revenue_minor: number; refunds_minor: number; payouts_minor: number; aov_minor: number | null }[]
+  sessions: number | null
+  ads: { currency: string; spend_minor: number; purchase_value_minor: number; roas: number | null }[]
+}
+export interface DigestNotice { kind: 'weekly_digest'; client_id: string; dedupe_key: string; payload: DigestPayload }
+
+const DIGEST_ROLLOVER_HOURS = 9   // the week turns over Monday 09:00 local, so Sunday's late syncs land first
+const DAY_MS = 86_400_000
+
+/** Pure: the last full Mon-Sun week as of `now` in `timeZone`, with its ISO label. Local time minus 9h falls in the "current" week; last week is the one before. */
+export function lastWeek(now: Date, timeZone: string): { start: string; end: string; week: string } {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+  }).formatToParts(now).map(x => [x.type, Number(x.value)]))
+  const eff = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - DIGEST_ROLLOVER_HOURS * 3600_000
+  const dow = new Date(eff).getUTCDay()
+  const startMs = Math.floor(eff / DAY_MS) * DAY_MS - ((dow + 6) % 7) * DAY_MS - 7 * DAY_MS
+  const thu = new Date(startMs + 3 * DAY_MS)   // the ISO year and week number are the Thursday's
+  const week = Math.floor((thu.getTime() - Date.UTC(thu.getUTCFullYear(), 0, 1)) / DAY_MS / 7) + 1
+  const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+  return { start: ymd(startMs), end: ymd(startMs + 6 * DAY_MS), week: `${thu.getUTCFullYear()}-W${String(week).padStart(2, '0')}` }
+}
+
+/** Pure: null unless the week carries a number (money, sessions or ad spend). Inventory/conversion alone is not data. The key is client + ISO week only, never the clock. */
+export function weeklyDigest(clientId: string, rows: DigestRow[], w: { start: string; end: string; week: string }): DigestNotice | null {
+  const n = (v: number | string | null) => Number(v ?? 0)
+  const money = new Map<string, DigestPayload['money'][number]>()
+  const ads = new Map<string, DigestPayload['ads'][number]>()
+  let sessions: number | null = null
+  for (const r of rows) {
+    if (r.currency) {
+      const m = money.get(r.currency) ?? { currency: r.currency, orders: 0, revenue_minor: 0, refunds_minor: 0, payouts_minor: 0, aov_minor: null }
+      m.orders += n(r.orders); m.revenue_minor += n(r.revenue_minor); m.refunds_minor += n(r.refunds_minor); m.payouts_minor += n(r.payouts_minor)
+      money.set(r.currency, m)
+    }
+    if (r.sessions != null) sessions = (sessions ?? 0) + n(r.sessions)
+    const cur = r.ad_currency ?? r.currency
+    if (r.ad_spend_minor != null && cur) {
+      const a = ads.get(cur) ?? { currency: cur, spend_minor: 0, purchase_value_minor: 0, roas: null }
+      a.spend_minor += n(r.ad_spend_minor); a.purchase_value_minor += n(r.ad_purchase_value_minor)
+      ads.set(cur, a)
+    }
+  }
+  for (const m of money.values()) m.aov_minor = m.orders > 0 ? Math.round(m.revenue_minor / m.orders) : null
+  for (const a of ads.values()) a.roas = a.spend_minor > 0 ? Math.round(a.purchase_value_minor / a.spend_minor * 100) / 100 : null
+  if (!money.size && sessions == null && !ads.size) return null
+  return {
+    kind: 'weekly_digest', client_id: clientId, dedupe_key: `weekly_digest:${clientId}:${w.week}`,
+    payload: { week: w.week, start: w.start, end: w.end, money: [...money.values()], sessions, ads: [...ads.values()] },
+  }
+}
+
+/** Minor units to display money, dividing by the currency's own fraction digits (JPY 0, USD 2). */
+function fmtMoney(minor: number, currency: string): string {
+  const f = new Intl.NumberFormat('en-US', { style: 'currency', currency })
+  return f.format(minor / 10 ** f.resolvedOptions().maximumFractionDigits!)
+}
+const fmtDay = (ymd: string) => new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' })
+
+/** Pure plain-English copy: numbers only, a line only when its source reported. Promises nothing the code does not do. */
+export function digestEmail(p: DigestPayload): { subject: string; text: string } {
+  const many = p.money.length > 1 || p.ads.length > 1
+  const lines: string[] = []
+  for (const m of p.money) {
+    const tag = many ? ` (${m.currency})` : ''
+    lines.push(`Orders${tag}: ${m.orders}`, `Sales${tag}: ${fmtMoney(m.revenue_minor, m.currency)}`)
+    if (m.aov_minor != null) lines.push(`Average order${tag}: ${fmtMoney(m.aov_minor, m.currency)}`)
+    if (m.refunds_minor) lines.push(`Refunded${tag}: ${fmtMoney(Math.abs(m.refunds_minor), m.currency)}`)
+    if (m.payouts_minor) lines.push(`Paid out to your bank${tag}: ${fmtMoney(m.payouts_minor, m.currency)}`)
+  }
+  if (p.sessions != null) lines.push(`Visits to your site: ${p.sessions.toLocaleString('en-US')}`)
+  for (const a of p.ads) {
+    const tag = many ? ` (${a.currency})` : ''
+    lines.push(`Ad spend${tag}: ${fmtMoney(a.spend_minor, a.currency)}`)
+    if (a.roas != null) lines.push(`Ad sales for every 1 ${a.currency} spent${tag}: ${a.roas.toFixed(2)}`)
+  }
+  const range = `${fmtDay(p.start)} to ${fmtDay(p.end)}`
+  return {
+    subject: `Your week in numbers: ${range}`,
+    text: `Hi,\n\nHere is how last week went (${range}):\n\n${lines.join('\n')}\n\nSee the full picture: ${HUB_URL}\n\nThe bcns team\n`,
+  }
+}
+
+/** Active clients only; one digest per client per week. The key pre-check skips the data query, on conflict do nothing is the real gate. */
+export async function raiseWeeklyDigests(t: Tick): Promise<number> {
+  const all = await sql<{ id: string; timezone: string }>(`select id, timezone from data.clients where status = 'active'`)
+  const weeks = new Map<string, ReturnType<typeof lastWeek>>()
+  for (const c of all.rows) {
+    try { weeks.set(c.id, lastWeek(t.now(), c.timezone)) } catch { t.log('digest_bad_timezone', { client_id: c.id }) }   // one bad tz must not stop everyone else's digest
+  }
+  const cs = { rows: all.rows.filter(c => weeks.has(c.id)) }
+  const have = await sql<{ dedupe_key: string }>(
+    `select dedupe_key from data.notifications where dedupe_key = any($1::text[])`,
+    [cs.rows.map(c => `weekly_digest:${c.id}:${weeks.get(c.id)!.week}`)])
+  const done = new Set(have.rows.map(r => r.dedupe_key))
+  let raised = 0
+  // ponytail: one range query per not-yet-digested client per tick — batch by (week) if clients reach the hundreds
+  for (const c of cs.rows) {
+    const w = weeks.get(c.id)!
+    if (done.has(`weekly_digest:${c.id}:${w.week}`)) continue
+    const d = await sql<DigestRow>(
+      `select revenue_minor, orders, refunds_minor, payouts_minor, currency, sessions,
+              ad_spend_minor, ad_purchase_value_minor, ad_currency
+       from api.daily_summary_v1 where client_id = $1 and day between $2::date and $3::date`, [c.id, w.start, w.end])
+    const n = weeklyDigest(c.id, d.rows, w)
+    if (!n) continue
     const r = await sql(
       `insert into data.notifications (client_id, kind, dedupe_key, payload) values ($1, $2, $3, $4::jsonb)
        on conflict (dedupe_key) do nothing`,
@@ -224,14 +348,15 @@ export async function sendPending(t: Tick): Promise<number> {
   for (const n of rows.rows) {
     let error: string | null = null
     try {
-      if (n.kind === 'client_break' || n.kind === 'client_break_reminder') {
+      if (n.kind === 'client_break' || n.kind === 'client_break_reminder' || n.kind === 'weekly_digest') {
         const owners = n.client_id ? await ownerEmails(n.client_id) : []
         if (!owners.length) {
           await sql(`update data.notifications set sent_at = now(), last_error = 'no owner to email' where id = $1`, [n.id])
           continue
         }
-        const p = n.payload as { source: string; status: string; status_since: string }
-        const m = breakEmail(n.kind, p.source, p.status, new Date(p.status_since))
+        const m = n.kind === 'weekly_digest'
+          ? digestEmail(n.payload as unknown as DigestPayload)
+          : breakEmail(n.kind, (n.payload as { source: string }).source, (n.payload as { status: string }).status, new Date((n.payload as { status_since: string }).status_since))
         await sendClientEmail(t, owners, m.subject, m.text, n.dedupe_key)
       } else {
         if (!key || !to) throw new Error('RESEND_API_KEY and BCNS_ALERT_EMAIL are required to send alerts')

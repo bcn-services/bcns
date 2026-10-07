@@ -38,7 +38,7 @@ Recorded so the build does not re-decide them. Each is reversible on a concrete 
 | D20 | Google access tokens (1 h) are refreshed by the worker's `refreshTokens` step when `expires_at < now() + 10 min`, under a row lock; a run whose token is already expired calls the same routine before its first request. Shopify custom-app, Monday personal, and Meta system-user tokens do not expire and have no refresh. R30's "24 h" is read as "a refresh never waits more than one tick". | Only Google has a refresh flow among SB's sources. A 24-hour lookahead against a 1-hour token would refresh on every tick (288×/day) and, under refresh-token rotation, race itself into `invalid_grant`. |
 | D21 | R1's "every table has a policy" is read as: every table has RLS **enabled + forced**, and every table **granted to `authenticated`** has a policy whose qual is exactly `client_id = (select data.active_client_id())` (`id = …` on `clients`). Tables with no grant (`raw*`, `source_tokens`, `connector_schedule`, `connector_runs`, `notifications`, `worker_leases`, `download_tickets`, `raw_latest`) have no policy. | No grant is a stronger deny than a policy; CI asserts the exact qual, not a substring. |
 | D22 | Every `data`/`api` object is owned by `postgres` (Supabase's `BYPASSRLS` role). Security-definer helpers and RPCs work under `force row level security` only because of that attribute. | Stated so the migration role is never swapped for one without `BYPASSRLS`; CI asserts `pg_roles.rolbypassrls` for the owner. |
-| D23 | Housekeeping steps (partitions, token refresh, health, alerts, thumbnails, renormalize, purge, pooled egress) run under a row lease in `data.worker_leases`; only one execution holds it. The claim step needs no lease (SKIP LOCKED). Cloud Run Job `taskCount = N` shards the claim by `hashtext(client_id::text) % N`. | Overlapping executions are allowed, so every non-idempotent step needs its own mutex. Row leases work through the transaction-mode pooler; session advisory locks do not. |
+| D23 | Housekeeping steps (partitions, token refresh, health, weekly digests, alerts, thumbnails, renormalize, purge, pooled egress) run under a row lease in `data.worker_leases`; only one execution holds it. The claim step needs no lease (SKIP LOCKED). Cloud Run Job `taskCount = N` shards the claim by `hashtext(client_id::text) % N`. | Overlapping executions are allowed, so every non-idempotent step needs its own mutex. Row leases work through the transaction-mode pooler; session advisory locks do not. |
 | D24 | An original is readable only with a **download ticket**: `api.download_url` charges the ledger, then inserts `data.download_tickets(client_id, storage_path, expires_at = now() + 5 min)`; the Storage SELECT policy on `orig/` requires a live ticket. Budget is checked **before** charging (`used >= quota` → `BCNS1`), so one download may cross the line and the next is denied. | Without the ticket a dashboard can call `createSignedUrl` directly and download unmetered; with charge-after-check the ledger can never exceed the quota and the deny never fires. |
 | D25 | `daily_metrics` stores no all-zero rows (an insight row with `spend = impressions = clicks = 0` is skipped) and ad-level rows are kept unbounded; the metric registry is a lookup table `data.metric_defs`, not a `CHECK`. Ceiling: ~10⁸ rows on one Pro instance; past it, partition by `hashtext(client_id)`. | Meta returns rows only for ads with delivery, so ad-level volume tracks active ads, not the ad catalogue. A `CHECK` registry needs an `ACCESS EXCLUSIVE` validation scan on the biggest table for every new metric. |
 
@@ -212,7 +212,7 @@ row (`is distinct from`), so a healthy fleet produces no churn.
 ```sql
 id          bigint generated always as identity primary key,
 client_id   uuid references data.clients(id) on delete set null,
-kind        text not null,            -- 'auth_failed' | 'stale' | 'egress_pooled_80' | 'egress_client_quota' | 'backfill_done' | 'client_break' | 'client_break_reminder'
+kind        text not null,            -- 'auth_failed' | 'stale' | 'egress_pooled_80' | 'egress_client_quota' | 'backfill_done' | 'client_break' | 'client_break_reminder' | 'weekly_digest'
 dedupe_key  text not null unique,
 payload     jsonb not null default '{}',
 created_at  timestamptz not null default now(),
@@ -1011,6 +1011,7 @@ task 0 skips them (they are all retried next tick). Step 7 takes its own per-cli
 | 3 | `claimAndRun` | §5.3 (all tasks, sharded) |
 | 4 | `computeHealth` | §5.5 |
 | 5 | `shopRedact` | claims pending `data.privacy_requests` rows and deletes or escalates them — before `alerts` so an escalation this step raises is emailed in the same tick, since `alerts` ends by flushing every unsent `data.notifications` row, not only its own; see retention-30d-shop-redact.md |
+| 5a | `weeklyDigests` | §5.6 weekly digest — before `alerts` so its `sendPending` flushes the digest in the same tick |
 | 6 | `alerts` | §5.6 (including the unsent-notification retry) |
 | 7 | `thumbnails` | §5.7 |
 | 8 | `renormalize` | §5.8 |
@@ -1141,10 +1142,13 @@ non-smoke members (`ownerEmails`) via one Resend batch call (`sendClientEmail`, 
 home. A client with no owner gets the row marked sent with `last_error = 'no owner to email'` (not retried, not
 counted by `notifications_stuck`); that `sent_at` still starts the 3-day reminder clock, so an owner added mid-breakage gets the reminder. bcns's own `auth_failed`/`stale` rows are unchanged. Only active clients are emailed.
 
+**Weekly digest.** `raiseWeeklyDigests` (housekeeping, before `alerts`) gives each `active` client one `weekly_digest` row per ISO week: the previous Mon-Sun week in `data.clients.timezone`, which only turns over Monday 09:00 local (`lastWeek`). It reads `api.daily_summary_v1` for that range and sums it; the row is skipped, and no notification is written, unless some day carries a number: money (`currency` non-null), `sessions`, or `ad_spend_minor`. `inventory_units` and `conversion_rate` alone are not data. The payload is numbers only (per currency: orders, sales, refunds, payouts, average order; sessions; per ad currency: spend, ad sales, ratio). `sendPending` sends it down the same owner-only branch and `sendClientEmail` call as `client_break` (`digestEmail` renders it; no owner marks it sent with `last_error = 'no owner to email'`). A client whose key already exists is not re-queried; `on conflict (dedupe_key) do nothing` is the real gate. A client that has no data this week is re-checked each tick until the week turns over.
+
 | kind | when | dedupe_key |
 |---|---|---|
 | `auth_failed` | health row `auth_failed` | `auth_failed:<client>:<source>:<status_since>` |
 | `stale` | health row `stale` with `status_since < now() − 6 h` | `stale:<client>:<source>:<status_since::date>` |
+| `weekly_digest` | an active client's last full week carries money, sessions or ad spend | `weekly_digest:<client>:<ISO week, e.g. 2026-W40>` |
 | `egress_client_quota` | `egress_exceeded(client)` first true this month | `egress_client:<client>:<month>` |
 | `egress_pooled_80` | `sum(egress_ledger.bytes) for the current calendar month ≥ 0.8 * EGRESS_ALLOWANCE_BYTES` | `egress_pooled:<month>` |
 | `backfill_done` | §5.3 step 4 | `backfill_done:<client>:<source>` |
