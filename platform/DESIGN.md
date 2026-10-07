@@ -64,7 +64,7 @@ Types:
 create schema data;  create schema api;
 create extension if not exists btree_gin;
 create type data.source        as enum ('shopify','meta','monday','meet','upload','dashboard','platform','drive');
-create type data.client_status as enum ('active','paused','churned');
+create type data.client_status as enum ('active','paused','churned'); -- 'pending' added later by migration 20261001000100 (signed up, not yet activated)
 create type data.member_role   as enum ('member','owner');
 create type data.token_kind    as enum ('shopify_admin','monday_personal','meta_system_user','google_oauth_refresh');
 create type data.token_status  as enum ('active','auth_failed','revoked');
@@ -1122,7 +1122,7 @@ where (h.status, h.last_error, h.last_success_at, h.last_run_at)
 ```
 `status_since` therefore changes only on a status transition (so alert dedupe keys built from it are
 stable). `last_error` is the redacted `connector_schedule.last_error` when status ∈ {error,
-auth_failed, stale}, else null. Paused/churned clients keep their last row; `computeHealth` skips them.
+auth_failed, stale}, else null. Pending/paused/churned clients keep their last row; `computeHealth` skips them (it joins only `clients.status = 'active'`).
 
 ### 5.6 Alerts (R23, R33)
 

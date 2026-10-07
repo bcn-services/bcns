@@ -167,7 +167,7 @@ If Declan sends credentials before chunk 1 lands: deploy the frozen `bcns-client
 - Sign in at the hub → open SB → no second login; sign out propagates.
 - Independence drill: stop the hub unit; every `bcn-services.com` route still serves.
 - Worker tick green after the first post-merge deploy; RLS forbidden-read green on `main`.
-- Status 2026-10-01: the hosted gates above (sign-in to SB with no second login, independence drill, post-merge worker tick) are **not yet proven on the hosted stack**. Open PR `docs/v1-layout-chunk8` (unmerged) covers only this repo's CLAUDE.md/README and the `hosted-web-model.md` status; the os updates (`hosting-reference.md`, client READMEs, memory) and repo archiving are not started.
+- Status 2026-10-01: the hosted gates above (sign-in to SB with no second login, independence drill, post-merge worker tick) are **not yet proven on the hosted stack**. PR #92 `docs/v1-layout-chunk8` (merged) covered only this repo's CLAUDE.md/README and the `hosted-web-model.md` status; the os updates (`hosting-reference.md`, client READMEs, memory) and repo archiving are not started.
 - Docs: this repo's CLAUDE.md rewritten for the layout; `hosted-web-model.md` marked superseded; `hosting-reference.md`, os client READMEs, and the "bcns-data is bcns Connect" memory updated; repos archived.
 
 ### 9. Final UX + visual polish pass on `apps/connect` (deferred, not scoped)
@@ -226,7 +226,7 @@ What exists today (read from `origin/main`):
   already holds a Shopify source is refused when installing on a different shop. With no
   account-creation path, a Shopify reviewer or an App Store merchant has no bcns account and no
   way to make one. That is a second reason for self-service (one shop = one live tenant still holds).
-- Existing cost and abuse levers: `data.clients.status` (`active` / `paused` / `churned`),
+- Existing cost and abuse levers: `data.clients.status` (`pending` / `active` / `paused` / `churned`: `pending` is signed up and not yet activated, `paused` was active and stopped),
   `egress_quota_bytes`, `OAUTH_APPROVED_SOURCES` on the droplet, the "Request connection" email.
   There is no trial or plan column and no per-client source limit.
 
@@ -239,8 +239,8 @@ with automatic activation, and waiting for Stripe before shipping any sign-up.)
 Scope: a `/signup` page on the hub (email, business name, password); Supabase email confirmation;
 on confirm, one database function creates the `data.clients` row and the owner membership in one
 transaction, with a slug derived from the name and de-duplicated. The service role is needed for
-that, so it runs in an Edge Function, not on the droplet. New workspaces start `paused` (an
-existing status value) and show a "pending" page. A Resend email to Nate per confirmed sign-up
+that, so it runs in an Edge Function, not on the droplet. New workspaces start `pending` (a new
+status value, added by `20261001000100_client_status_pending.sql`) and show a "pending" page. A Resend email to Nate per confirmed sign-up
 (reuse `lib/request-connection.ts`) and one approve script. One migration plus one Edge Function.
 Out of scope: billing UI, plan tiers, self-service Shopify shop binding, several workspaces per
 user, account deletion.
@@ -258,7 +258,7 @@ Shopify policy rulings (Nate, 2026-09-30; the doc has no Shopify policy section,
 Follow-ups from the Shopify billing work (verified in this run, 2026-09-30):
 - Nothing ends hub access when a Shopify paid period ends: the Partner API end time is only logged. Needs a stored `paid_until`, a worker or cron re-check and a migration. Accepted as a gap for now by Nate.
 - After a paid period ends, the plan page behaviour is untested.
-- The worker revoked-to-`auth_failed` guard: no such branch exists; it is being written fresh on `fix/worker-revoked-guard` (open PR, unmerged).
+- The worker revoked-to-`auth_failed` guard: no such branch exists; it was written fresh on `fix/worker-revoked-guard` (PR #98, merged).
 - Stale comment at `apps/connect/lib/env.ts:38-45` (the `shopifyAppHandle` doc block).
 
 #### 10b. Connect visual tuning (chunk 9, promoted from "not scoped")
@@ -278,14 +278,15 @@ Out of scope: new features, connector logic, Shopify listing assets.
 
 The tuning list was not captured from Nate during this run; not started. Known so far:
 - The home "Financial Information" card needs Shopify AND Meta by design; not a bug.
-- Revenue currency symbol, sync-time timezone, export 503 and Inventory budget: earlier text here said these shipped in #81. That was wrong: #81 ("F2 follow-ups", merged) changed no file under `apps/sb` (checked with `gh pr view 81 --json files`). Status of these four on `main` is unverified; the audit-bug fixes for `apps/sb` are in open PR `fix/sb-audit-bugs`.
+- Revenue currency symbol, sync-time timezone, export 503 and Inventory budget: earlier text here said these shipped in #81. That was wrong: #81 ("F2 follow-ups", merged) changed no file under `apps/sb` (checked with `gh pr view 81 --json files`). Status of these four on `main` is unverified; the audit-bug fixes for `apps/sb` are in PR #97 `fix/sb-audit-bugs` (merged).
 
-#### Overnight run 2026-10-01 (PRs open, unmerged)
+#### Overnight run 2026-10-01 (PR status checked 2026-10-06)
 
-Nothing below is merged, deployed or db-pushed. Each branch is an open PR (or a draft) waiting on Nate.
+Status per `gh pr list -R bcn-services/bcns --state all`. Deploy and `db push` state is not recorded here.
 
-- Open PRs: `feat/signup-pending`, `fix/worker-revoked-guard`, `chore/hygiene-comments-sso-tests`, `fix/platform-test-flake-seed`, `fix/sb-audit-bugs`, `docs/v1-layout-chunk8`, `chore/quickbooks-worker-env`, `feat/site-signin-button`.
-- Drafts: `feat/shopify-paid-period-end`, `draft/site-services-sections`, `draft/legal-acceptance-wording`.
+- Merged: #99 `feat/signup-pending`, #98 `fix/worker-revoked-guard`, #91 `chore/hygiene-comments-sso-tests`, #96 `fix/platform-test-flake-seed`, #97 `fix/sb-audit-bugs`, #92 `docs/v1-layout-chunk8`, #90 `chore/quickbooks-worker-env`, #94 `draft/legal-acceptance-wording`.
+- Closed, not merged: #93 `feat/site-signin-button`, #95 `draft/site-services-sections`.
+- Open (held draft): #106 `feat/shopify-paid-period-end`.
 
 Rulings made by recommendation (Nate may overrule):
 - Sign-up adds a new `pending` client status. A pending owner signs in to a pending-only page. Ships dark behind `SIGNUP_ENABLED`.
