@@ -1,6 +1,7 @@
 import { cn } from "@bcn-services/ui";
 import { requestConnectionAction } from "./actions";
 import { DashboardButton } from "./nav";
+import { DisconnectControl } from "./disconnect";
 import { loadClient, requireHub } from "@/lib/session";
 import { mailtoLink } from "@/lib/request-connection";
 import { getConfig } from "@/lib/env";
@@ -12,6 +13,8 @@ import { firstRun, type MemberRow } from "@/lib/first-run";
 import {
   canDisconnect,
   composeSources,
+  disconnectedNote,
+  googleSiblingConnected,
   shopifyControl,
   egressLine,
   type EgressRow,
@@ -48,14 +51,18 @@ export default async function SourcesPage({
 
   const isOwner = membership.role === "owner";
   // The checklist is owner-only, so members skip its two extra reads.
-  const [health, egress, members, aiLastUsedAt] = await Promise.all([
+  const [health, disconnecting, egress, members, aiLastUsedAt] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
+    api.rpc("disconnecting_sources_v1"),
     api.from("egress_status_v1").select("*").limit(1).maybeSingle(),
     isOwner ? api.from("memberships_v1").select("user_id,role,is_smoke") : Promise.resolve({ data: null }),
     isOwner ? readAiLastUsed(api) : Promise.resolve(null),
   ]);
 
-  const cards = composeSources((health.data as HealthRow[] | null) ?? []);
+  const cards = composeSources(
+    (health.data as HealthRow[] | null) ?? [],
+    disconnecting.error ? null : (disconnecting.data as string[] | null),
+  );
   const usage = egressLine(egress.data as EgressRow | null);
   const checklist = firstRun({
     health: (health.data as HealthRow[] | null) ?? [],
@@ -111,9 +118,9 @@ export default async function SourcesPage({
           {cards.find((c) => c.source === searchParams.connected)?.title ?? searchParams.connected} is connected. The first pull starts within the hour.
         </p>
       ) : null}
-      {searchParams.disconnected === "quickbooks" ? (
+      {disconnectedNote(searchParams.disconnected) ? (
         <p role="status" className="note">
-          QuickBooks is disconnected. bcns is revoking its access at Intuit and deleting the QuickBooks data it stored.
+          {disconnectedNote(searchParams.disconnected)}
         </p>
       ) : null}
       {searchParams.error ? (
@@ -131,7 +138,7 @@ export default async function SourcesPage({
                     : searchParams.error === "shop-mismatch"
                       ? "This bcns account is already connected to a different Shopify store, and one account connects one store. Email us to switch stores."
                       : searchParams.error === "disconnect-failed"
-                        ? "QuickBooks could not be disconnected. Nothing was changed. Try again."
+                        ? "That source could not be disconnected. Nothing was changed. Try again."
                         : "Something went wrong. Try again."}
           {searchParams.error === "connect-expired" ? (
             restartUrl ? (
@@ -184,61 +191,57 @@ export default async function SourcesPage({
               </h2>
               <span className={cn("st", TONE[card.tone])}>{card.label}</span>
             </div>
-            <p className="meta">{card.pending ? "First sync pending" : `Last success: ${when(card.lastSuccessAt, client?.timezone)}`}</p>
+            <p className="meta">
+              {card.disconnectingNote ?? (card.pending ? "First sync pending" : `Last success: ${when(card.lastSuccessAt, client?.timezone)}`)}
+            </p>
             {card.lastError ? (
               <p className="err" title={card.lastError}>
                 {card.lastError}
               </p>
             ) : null}
-            <div className="sc-f">
-              {card.connected ? (
-                <span className="flow" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              ) : connectPath(config, card.source) && membership.role === "owner" ? (
-                /**
-                 * Self-serve: the source's app is approved and configured. Owners only
-                 * (api.connect_source is owner-gated in the database). Shopify never
-                 * shows a shop-domain field (App Store rule 2.3.1): see shopifyControl.
-                 * Meta and Monday are POST so a third-party page cannot force a
-                 * reconnect (W5b #3).
-                 */
-                card.source === "shopify" ? (
-                  <ShopifyControlView
-                    ctl={shopifyControl(card, searchParams.shop, searchParams.error, config.shopifyAppHandle)}
-                    action={connectPath(config, "shopify")!}
-                  />
+            {/* Disconnecting: no Connect, Request connection or Disconnect until the worker's delete is done. */}
+            {card.disconnecting ? null : (
+              <div className="sc-f">
+                {card.connected ? (
+                  <span className="flow" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                ) : connectPath(config, card.source) && membership.role === "owner" ? (
+                  /**
+                   * Self-serve: the source's app is approved and configured. Owners only
+                   * (api.connect_source is owner-gated in the database). Shopify never
+                   * shows a shop-domain field (App Store rule 2.3.1): see shopifyControl.
+                   * Meta and Monday are POST so a third-party page cannot force a
+                   * reconnect (W5b #3).
+                   */
+                  card.source === "shopify" ? (
+                    <ShopifyControlView
+                      ctl={shopifyControl(card, searchParams.shop, searchParams.error, config.shopifyAppHandle)}
+                      action={connectPath(config, "shopify")!}
+                    />
+                  ) : (
+                    <form action={connectPath(config, card.source)!} method="POST">
+                      <button type="submit" className="btn btn-out btn-sm">
+                        Connect
+                      </button>
+                    </form>
+                  )
                 ) : (
-                  <form action={connectPath(config, card.source)!} method="POST">
+                  /* Unapproved, unconfigured, or a non-owner: chunk 4 behaviour, unchanged. */
+                  <form action={requestConnectionAction}>
+                    <input type="hidden" name="source" value={card.source} />
                     <button type="submit" className="btn btn-out btn-sm">
-                      Connect
+                      Request connection
                     </button>
                   </form>
-                )
-              ) : (
-                /* Unapproved, unconfigured, or a non-owner: chunk 4 behaviour, unchanged. */
-                <form action={requestConnectionAction}>
-                  <input type="hidden" name="source" value={card.source} />
-                  <button type="submit" className="btn btn-out btn-sm">
-                    Request connection
-                  </button>
-                </form>
-              )}
-              {canDisconnect(card, membership.role) ? (
-                /* Two steps without JS: the summary opens the confirm, the button inside submits. */
-                <details className="disc">
-                  <summary>Disconnect</summary>
-                  <form action="/api/oauth/quickbooks/disconnect" method="POST">
-                    <p>This disconnects QuickBooks and deletes the QuickBooks data bcns has stored for this workspace.</p>
-                    <button type="submit" className="btn btn-sm btn-danger">
-                      Disconnect and delete data
-                    </button>
-                  </form>
-                </details>
-              ) : null}
-            </div>
+                )}
+                {canDisconnect(card, membership.role) ? (
+                  <DisconnectControl source={card.source} siblingConnected={googleSiblingConnected(card.source, cards)} />
+                ) : null}
+              </div>
+            )}
           </article>
         ))}
       </div>

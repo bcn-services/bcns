@@ -138,9 +138,11 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   connect_source: { args: { p_source: 'shopify', p_kind: 'shopify_admin', p_secret: '', p_config: {}, p_interval: '1 hour', p_backfill_depth: '13 months' }, expect: 'BCNS3' },
   // A read: one boolean about the caller's own tenant, no shop or client argument to aim elsewhere.
   shopify_shop_mismatch: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
-  // A non-quickbooks source fails validation before any write, so the probe never revokes
+  // Shopify fails validation before any write, so the probe never revokes
   // a real row. Tenant comes from the JWT, never an argument.
   disconnect_source: { args: { p_source: 'shopify' }, expect: 'BCNS3' },
+  // A read: the caller's own tenant's pending-delete source names, nothing else.
+  disconnecting_sources_v1: { args: {}, expect: 'none' },
   // 'none' RPCs run as acmeOwner against the shared seed, so these are harmless on purpose:
   // set false is what a missing row already means, log writes one acme audit row. tenant.test.ts
   // deletes both afterwards. Tenant and user come from the JWT, never an argument.

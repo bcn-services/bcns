@@ -22,6 +22,7 @@
  * so they are deliberately not listed here (platform-v1 §9, dropped 2026-09-19).
  */
 import { normalizeShop } from "./shopify-oauth";
+import { BCNS_EMAIL } from "./request-connection";
 
 export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive", "quickbooks"] as const;
 
@@ -54,6 +55,10 @@ export interface SourceCard {
   lastSuccessAt: string | null;
   /** Truncated — a connector error can be a whole stack trace. */
   lastError: string | null;
+  /** Owner disconnected it and the worker has not deleted its data yet (api.disconnecting_sources_v1). */
+  disconnecting: boolean;
+  /** What the card says instead of "Last success" while disconnecting, else null. */
+  disconnectingNote: string | null;
 }
 
 export const TITLES: Record<HubSource, string> = {
@@ -92,11 +97,30 @@ export function truncate(value: string | null | undefined, max = 140): string | 
  * client has a health row for it. A row for a source the hub does not show
  * (e.g. 'platform') is ignored rather than rendered.
  */
-export function composeSources(rows: readonly HealthRow[] | null | undefined): SourceCard[] {
+export function composeSources(
+  rows: readonly HealthRow[] | null | undefined,
+  disconnecting?: readonly string[] | null,
+): SourceCard[] {
   const bySource = new Map<string, HealthRow>();
   for (const row of rows ?? []) if (!bySource.has(row.source)) bySource.set(row.source, row);
 
   return HUB_SOURCES.map((source) => {
+    if (disconnecting?.includes(source)) {
+      // disconnect_source deletes the health row, so there is nothing else to show.
+      return {
+        source,
+        title: TITLES[source],
+        connected: false,
+        pending: false,
+        status: "none",
+        label: "Disconnecting",
+        tone: "idle",
+        lastSuccessAt: null,
+        lastError: null,
+        disconnecting: true,
+        disconnectingNote: disconnectingNote(source),
+      };
+    }
     const row = bySource.get(source);
     const status = row ? asStatus(row.status) : "none";
     const { label, tone } = STATES[status];
@@ -114,8 +138,16 @@ export function composeSources(rows: readonly HealthRow[] | null | undefined): S
       tone,
       lastSuccessAt: row?.last_success_at ?? null,
       lastError: truncate(row?.last_error ?? null),
+      disconnecting: false,
+      disconnectingNote: null,
     };
   });
+}
+
+/** Between Disconnect and the worker's delete: the data is going, so no reconnect is offered yet. */
+export function disconnectingNote(source: HubSource): string {
+  // A stuck upstream revoke keeps this up with no Connect button, so it always names a way out.
+  return `bcns is deleting the ${TITLES[source]} data it stored for this workspace. You can connect it again once that is done. If this still shows tomorrow, email ${BCNS_EMAIL}.`;
 }
 
 export interface ClientRow {
@@ -186,10 +218,81 @@ export function shopifyControl(
 }
 
 /**
- * Whether the card offers Disconnect: QuickBooks only (the one source with an
- * owner disconnect, api.disconnect_source), owners only, and only when something
- * is stored — including "Reconnect needed", whose token the owner may want gone.
+ * Sources an owner can disconnect (api.disconnect_source's allow-list, migration
+ * 20261007000500; the worker's DISCONNECT_SOURCES). Never Shopify: its own uninstall
+ * flow owns that.
  */
-export function canDisconnect(card: Pick<SourceCard, "source" | "status">, role: string | null | undefined): boolean {
-  return card.source === "quickbooks" && role === "owner" && card.status !== "none";
+export const DISCONNECTABLE = ["quickbooks", "meet", "drive", "monday", "meta"] as const;
+
+export type Disconnectable = (typeof DISCONNECTABLE)[number];
+
+export function isDisconnectable(value: unknown): value is Disconnectable {
+  return typeof value === "string" && (DISCONNECTABLE as readonly string[]).includes(value);
+}
+
+/** The hub route that disconnects `source` (app/api/sources/[source]/disconnect). */
+export function disconnectPath(source: Disconnectable): string {
+  return `/api/sources/${source}/disconnect`;
+}
+
+/**
+ * Whether to offer Disconnect: a disconnectable source, owners only, and only when
+ * something is stored — including "Reconnect needed", whose token the owner may want gone.
+ */
+export function canDisconnect<C extends Pick<SourceCard, "source" | "status">>(
+  card: C,
+  role: string | null | undefined,
+): card is C & { source: Disconnectable } {
+  return isDisconnectable(card.source) && role === "owner" && card.status !== "none";
+}
+
+/**
+ * Whether the other Google source (meet <-> drive) is connected: its card is not "Not
+ * connected". A health row exists while that token is active or auth_failed (disconnect and
+ * the worker's health step drop it for a revoked one), the rule
+ * platform/worker/src/disconnect.ts googleRevokeNeeded uses to keep the shared grant.
+ */
+export function googleSiblingConnected(
+  source: string,
+  cards: readonly Pick<SourceCard, "source" | "status">[],
+): boolean {
+  const other = source === "meet" ? "drive" : source === "drive" ? "meet" : null;
+  return other !== null && cards.some((c) => c.source === other && c.status !== "none");
+}
+
+const GOOGLE_BOTH = `Google removes bcns's access once both ${TITLES.meet} and ${TITLES.drive} are disconnected.`;
+
+/**
+ * The confirm text behind Disconnect, one paragraph per entry. Promises only what
+ * platform/worker/src/disconnect.ts does: deletes that source's stored data, cancels
+ * access upstream where the provider allows it (for meet/drive, only when the other
+ * Google source is not connected; null = unknown), and a reconnect starts from scratch.
+ */
+export function disconnectCopy(source: Disconnectable, opts: { siblingConnected?: boolean | null } = {}): string[] {
+  const title = TITLES[source];
+  const lines = [
+    `This disconnects ${title} and deletes the ${title} data bcns has stored for this workspace. Reconnecting later re-imports everything from the start.`,
+  ];
+  if (source === "quickbooks" || source === "meta") {
+    lines.push(`bcns also cancels its access to your ${title} account.`);
+  } else if (source === "monday") {
+    lines.push(
+      "Monday has no way for bcns to cancel its access, so remove it in Monday as well. If you connected with the Connect button, uninstall bcns (your profile picture, then Administration, then Apps, then Uninstall). If you gave bcns an API token, regenerate it (your profile picture, then Developers, then My access tokens); anything else using that token stops working too.",
+    );
+  } else if (opts.siblingConnected === null) {
+    // Could not read the other Google source: only the sentence that is true either way.
+    lines.push(GOOGLE_BOTH);
+  } else if (opts.siblingConnected) {
+    const other = TITLES[source === "meet" ? "drive" : "meet"];
+    lines.push(`${other} stays connected: it is connected separately. ${GOOGLE_BOTH}`);
+  } else {
+    lines.push("bcns also cancels its access to your Google account.");
+  }
+  return lines;
+}
+
+/** The banner after a disconnect, or null for anything that is not a disconnectable source. */
+export function disconnectedNote(source: string | undefined): string | null {
+  if (!isDisconnectable(source)) return null;
+  return `${TITLES[source]} is disconnected. bcns is deleting the ${TITLES[source]} data it stored for this workspace.`;
 }
