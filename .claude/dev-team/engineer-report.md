@@ -57,5 +57,5 @@
 
 ## Flags for Reviewer
 - Migration must be applied to hosted by Nate before the page works; until then the RPC calls 404 and the page shows the failure copy.
-- connector_runs_v1 is limit 20 on (client_id, source) ordered by started_at — check an index covers it as runs grow.
+- connector_runs_v1 limit 20 is covered by the existing index connector_runs (client_id, source, started_at desc).
 - set_source_folder is deliberately not hour-limited; abuse ceiling is one backfill per click by an owner, lease-guarded.
