@@ -64,6 +64,15 @@ function serveFiles(files: typeof FILES, thumbStatus = 500, thumbs: string[] = [
   }) as unknown as typeof globalThis.fetch
 }
 
+/** Per-parent listing for the folder walk: the `'<id>' in parents` clause picks the folder's children. */
+function serveTree(tree: Record<string, object[]>): typeof globalThis.fetch {
+  return (async (url: unknown) => {
+    const u = new URL(String(url))
+    if (u.pathname.endsWith('/drive/v3/files')) return json({ files: tree[/^'([^']+)' in parents/.exec(u.searchParams.get('q')!)![1]] ?? [] })
+    return json({})
+  }) as unknown as typeof globalThis.fetch
+}
+
 function mkTick(fetch: typeof globalThis.fetch): Tick {
   return {
     taskIndex: 0, taskCount: 1, owner: `test-${randomUUID().slice(0, 8)}`, fetch, stubbed: true,
@@ -121,5 +130,28 @@ describe('drive tombstone', () => {
     expect(byId.f1.thumb_path).toBe(`${c}/thumb/f1.jpg`)
     expect(byId.f1.deleted_at).toBeNull()
     expect(byId.f2.deleted_at).toBeNull()
+  })
+
+  it('a nested tree lands live across pages; a file gone from a subfolder is tombstoned', async () => {
+    const c = await mkClient()
+    const sub = { id: 'sub', name: 'Sub', mimeType: 'application/vnd.google-apps.folder', modifiedTime: '2026-09-10T12:00:00.000Z' }
+    const deep = { id: 'deep', name: 'Deep', mimeType: 'application/vnd.google-apps.folder', modifiedTime: '2026-09-10T12:00:00.000Z' }
+    const tree = { f1: [file('top', 'Top'), sub], sub: [file('n1', 'N1'), deep], deep: [file('n2', 'N2')] }
+
+    await runOne(mkTick(serveTree(tree)), await scheduleRow(c))
+    let rows = await mediaRows(c)
+    expect(rows.map(r => r.external_id)).toEqual(['n1', 'n2', 'top'])
+    expect(rows.every(r => r.deleted_at === null)).toBe(true)
+
+    // second complete walk: files seen on earlier pages of the tree are not tombstoned by the final page.
+    await runOne(mkTick(serveTree(tree)), await scheduleRow(c))
+    rows = await mediaRows(c)
+    expect(rows.every(r => r.deleted_at === null)).toBe(true)
+
+    await runOne(mkTick(serveTree({ ...tree, deep: [] })), await scheduleRow(c))
+    const byId = Object.fromEntries((await mediaRows(c)).map(r => [r.external_id, r]))
+    expect(byId.n2.deleted_at).not.toBeNull()
+    expect(byId.n1.deleted_at).toBeNull()
+    expect(byId.top.deleted_at).toBeNull()
   })
 })

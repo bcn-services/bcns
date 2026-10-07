@@ -210,14 +210,14 @@ where client_id = (select id from data.clients where slug = 'sb') and source = '
 - A **refresh token** minted from that consent, scope `drive.readonly` only (least privilege — no
   write scope needed, the connector only reads).
 - The Drive **folder id** holding the Gemini notes docs (the id segment of the folder URL) and the
-  folder URL itself.
+  folder URL itself. Docs in subfolders (e.g. date-named ones) are found too, same caps as §6.1.
 
 ### 5.2 Checklist items that can fail
 
 | id | means | fix |
 |---|---|---|
 | G1 | OAuth client is bcns's own (`BCNS_OAUTH_CLIENT_ID` env match), or refresh fails, or token audience ≠ `oauth_client_id` | app must live in SB's Workspace project, not ours; re-consent if `invalid_grant` |
-| G2 | no readable Gemini notes doc in the folder | confirm the folder id, and that the token's scope/consent actually covers that folder |
+| G2 | no Gemini notes doc or subfolder in the folder | confirm the folder id, and that the token's scope/consent actually covers that folder |
 
 ### 5.3 Exact command + prompts
 
@@ -257,8 +257,9 @@ where client_id = (select id from data.clients where slug = 'sb') and source = '
 - Same OAuth app as Meet (DESIGN §4.6), but a **separate refresh token** — mint a second consent
   on the same app so the `meet` and `drive` token rows never share one.
 - `oauth_client_id` (same app id as Meet) and `oauth_client_secret`.
-- The Drive **folder id** of the marketing/content library folder (flat folder only — no
-  subfolders indexed).
+- The Drive **folder id** of the marketing/content library folder. Subfolders are indexed too
+  (up to 8 levels deep and 500 folders; past that the run fails with `folder walk stopped`);
+  shortcuts are skipped.
 
 ### 6.2 Checklist items that can fail
 

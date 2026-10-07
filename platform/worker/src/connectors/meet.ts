@@ -2,12 +2,11 @@
 // behaviour; the note format (title suffix, participant block) is unverified until a sample lands.
 import { z } from 'zod'
 import {
-  type CanonicalWrites, type Connector, type Json, type MessageRow, type Page, type RawRow, type RunContext,
-  SourceError,
+  type CanonicalWrites, type Connector, type MessageRow, type Page, type RawRow, type RunContext,
 } from './index.js'
+import { DRIVE, FOLDER, googleFetch, refreshGoogleToken, walkFolder } from './google.js'
 
-const DRIVE = 'https://www.googleapis.com/drive/v3'
-const TOKEN_URL = 'https://oauth2.googleapis.com/token'
+const FIELDS = 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,webViewLink,owners)'
 
 const configSchema = z.object({
   folder_id: z.string(),
@@ -15,47 +14,24 @@ const configSchema = z.object({
   notes_url: z.string().optional(),
 }).passthrough()
 
-async function drive(ctx: RunContext, url: string): Promise<Response> {
-  const r = await ctx.fetch(url, { headers: { Authorization: `Bearer ${ctx.token.secret}` } })
-  if (!r.ok) {
-    const body = await r.json().catch(() => ({}))
-    throw new SourceError('meet', String(body?.error?.message ?? `HTTP ${r.status}`), r.status, body)
-  }
-  return r
-}
-
+/** Walks the folder tree; `since` filters docs at every level, subfolders are always listed. */
 async function* pull(ctx: RunContext, since: Date | null): AsyncGenerator<Page> {
-  let pageToken: string | undefined
   let latest = since ? since.getTime() : 0
-  for (;;) {
-    const q = [
-      `'${ctx.config.folder_id}' in parents`,
-      `mimeType='application/vnd.google-apps.document'`,
-      'trashed=false',
-      ...(since ? [`modifiedTime > '${since.toISOString()}'`] : []),
-    ].join(' and ')
-    const u = new URL(`${DRIVE}/files`)
-    u.searchParams.set('q', q)
-    u.searchParams.set('fields', 'nextPageToken,files(id,name,createdTime,modifiedTime,webViewLink,owners)')
-    u.searchParams.set('pageSize', '100')
-    if (pageToken) u.searchParams.set('pageToken', pageToken)
-    const b: Json = await (await drive(ctx, u.toString())).json()
-
+  const doc = `mimeType='application/vnd.google-apps.document'`
+  const match = `(mimeType='${FOLDER}' or ${since ? `(${doc} and modifiedTime > '${since.toISOString()}')` : doc})`
+  for await (const { files, last } of walkFolder(ctx, 'meet', String(ctx.config.folder_id), { match, fields: FIELDS })) {
     const raw: RawRow[] = []
-    for (const f of b.files ?? []) {
+    for (const f of files) {
       raw.push({ entity: 'drive_file', externalId: String(f.id), sourceUpdatedAt: new Date(f.modifiedTime), payload: f })
-      const text = await (await drive(ctx, `${DRIVE}/files/${f.id}/export?mimeType=text%2Fplain`)).text()
+      const text = await (await googleFetch(ctx, 'meet', `${DRIVE}/files/${f.id}/export?mimeType=text%2Fplain`)).text()
       raw.push({ entity: 'doc', externalId: String(f.id), sourceUpdatedAt: new Date(f.modifiedTime), payload: { ...f, text } })
       latest = Math.max(latest, new Date(f.modifiedTime).getTime())
     }
-    pageToken = b.nextPageToken ?? undefined
-    const done = !pageToken
     yield {
       raw, entity: 'drive_file',
-      cursor: done ? { modified_time: new Date(latest || Date.now()).toISOString() } : { pageToken },
-      entityDone: done, done,
+      cursor: last ? { modified_time: new Date(latest || Date.now()).toISOString() } : {},
+      entityDone: last, done: last,
     }
-    if (done) return
   }
 }
 
@@ -84,21 +60,7 @@ export const meet: Connector = {
     return pull(ctx, c ? new Date(c) : null)
   },
 
-  async refreshToken(ctx): Promise<{ secret: string; expiresAt: Date }> {
-    const r = await ctx.fetch(TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: ctx.token.refresh_secret ?? '',
-        client_id: ctx.config.oauth_client_id ?? '',
-        client_secret: ctx.token.attributes?.oauth_client_secret ?? '',
-      }).toString(),
-    })
-    const b: Json = await r.json().catch(() => ({}))
-    if (!r.ok || b.error) throw new SourceError('meet', String(b.error_description ?? b.error ?? `HTTP ${r.status}`), r.status, b)
-    return { secret: String(b.access_token), expiresAt: new Date(Date.now() + Number(b.expires_in ?? 3600) * 1000) }
-  },
+  refreshToken(ctx) { return refreshGoogleToken(ctx, 'meet') },
 
   normalize(_ctx: RunContext, rows: RawRow[]): CanonicalWrites {
     const messages: MessageRow[] = []
