@@ -95,11 +95,20 @@ describe('catalog', () => {
       `select public.custom_access_token_hook(jsonb_build_object('user_id', $1::text, 'claims', '{"role":"authenticated"}'::jsonb)) out`, [uid])).rows[0].out
     const ok = await call(USERS.acmeMember.id)
     expect(ok.claims).toMatchObject({ client_id: CLIENTS.acme, client_role: 'member', role: 'authenticated' })
-    expect((await call(USERS.gammaMember.id)).error).toMatchObject({ http_code: 403 })
+    // gamma is the seeded paused client. Since 20261007000100 paused signs in tenant-less (so a
+    // lapsed owner can pay to resume): the status marker only, never a tenant claim.
+    const paused = await call(USERS.gammaMember.id)
+    expect(paused.error).toBeUndefined()
+    expect(paused.claims).toEqual({ role: 'authenticated', client_status: 'paused' })
     expect((await call(USERS.nobody.id)).error).toMatchObject({ http_code: 403 })
     const live = await signIn(USERS.acmeOwner)
     expect(live.claims).toMatchObject({ client_id: CLIENTS.acme, client_role: 'owner' })
-    await expect(signIn(USERS.gammaMember)).rejects.toThrow()
+    const gamma = await signIn(USERS.gammaMember)
+    expect(gamma.claims).toMatchObject({ client_status: 'paused' })
+    expect(gamma.claims).not.toHaveProperty('client_id')
+    expect(gamma.claims).not.toHaveProperty('client_role')
+    // gamma has seeded rows; a paused token still reads none of them.
+    for (const v of await apiViews()) expect((await rest(`${v}?limit=5`, gamma.token)).body, v).toEqual([])
   })
 
   it('api_views_security_invoker', async () => {
