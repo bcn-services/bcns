@@ -1125,7 +1125,7 @@ Navigation card grid linking to the main pages. Fixed tuple of 4.
 SEO `<title>` and `<meta name="description">` for each page. All values are
 filled as of the C1 pass. Edit in place if positioning language changes.
 
-Titles: the layout template appends " · bcns", so a title never ends in "| bcns" (that rendered "Pricing | bcns · bcns"). Home and About set their own full title. Descriptions: ≤155 chars (Google truncates past that), prices kept. Descriptions also feed the Service JSON-LD (`lib/seo.ts`).
+Titles: the layout template appends " · bcns", so a title never ends in "| bcns" (that rendered "Pricing | bcns · bcns"). Home's title is not templated (same route segment as the layout); every other title gets the suffix, so write it without one. Descriptions: ≤155 chars (Google truncates past that), prices kept. Descriptions also feed the Service JSON-LD (`lib/seo.ts`).
 
 ### pageMeta.home
 
