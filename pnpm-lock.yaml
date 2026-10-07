@@ -78,6 +78,9 @@ importers:
 
   apps/connect:
     dependencies:
+      '@bcn-services/app-core':
+        specifier: workspace:*
+        version: link:../../packages/app-core
       '@bcn-services/tenant':
         specifier: workspace:*
         version: link:../../packages/tenant

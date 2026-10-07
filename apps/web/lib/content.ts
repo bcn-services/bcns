@@ -874,6 +874,11 @@ export const siteContent: SiteContent = {
         answer:
           "Yes. Only you and your team can see your data, and we'll hand over a full copy any time, free.",
       },
+      {
+        question: "How do I pay?",
+        answer:
+          "By card, through Stripe. Sign up, pay $200 a month, and your workspace opens right away. If a payment ever fails, your workspace stays open for a month while you update your card. If you added bcns Connect from the Shopify App Store, Shopify bills you instead, so you're never charged twice.",
+      },
     ],
   },
 
@@ -943,9 +948,10 @@ export const siteContent: SiteContent = {
   // box plus a hub "By signing in you agree" line) is NOT YET BUILT. When
   // both ship, swap the sentence to name them, and restore "the same way
   // you accepted them the first time" in "Changes to the service and these
-  // terms". The "Who we share it with" list's Stripe entry, the terms'
-  // "Fees and billing" line, and the FAQ deliberately omit or soften Stripe
-  // until Checkout is live.
+  // terms". Stripe Checkout itself is built (hub /pending, 2026-10-06): the
+  // Stripe subprocessor entry, "Fees and billing" and the "How do I pay?" FAQ
+  // describe it, including the one-month grace on a failed payment (the
+  // `stripe-webhook` Edge Function sets grace_until; the worker pauses after).
   // MAINTAINER NOTE (not rendered): the QuickBooks Online entry in "What we
   // collect" is checked against platform/worker/src/connectors/quickbooks.ts:
   // `select *` over Purchase and Bill (full record stored as raw), 24-month
@@ -960,7 +966,7 @@ export const siteContent: SiteContent = {
       title: "Privacy Policy",
       description:
         "How bcns collects, uses, and protects the information that runs through bcns Connect, the hub, and the MCP server.",
-      effectiveDate: "Last updated October 2, 2026.",
+      effectiveDate: "Last updated October 6, 2026.",
       sections: [
         {
           heading: "Who we are",
@@ -986,6 +992,7 @@ export const siteContent: SiteContent = {
             "monday.com, if you connect it: the one board you point us at, its name, columns, groups, and every item's name, dates, group and column values. Whatever your team keeps in those columns, including names or emails, comes with it.",
             "QuickBooks Online, if you connect it: through Intuit's com.intuit.quickbooks.accounting permission, we read (and never write) your Purchase and Bill records going back 24 months: the full record as QuickBooks returns it, including date, amounts and currency, the payee (a vendor, customer or employee name), memo, line descriptions and accounts, document number, and any address QuickBooks attaches to a bill or check.",
             "Google Drive and meeting notes, if you connect them: for a meeting-notes folder, the full text of the notes, which can include the names of people in the meeting and what they said. For a Drive folder, file names, types, sizes, dates, links, and thumbnail images we copy and store. We don't touch the underlying file contents in Drive.",
+            "Billing: if you pay by card, Stripe handles your card details. We keep only your Stripe customer and subscription IDs and when you last paid.",
             "Access tokens: for each source you connect, we store a token that lets our sync service read that source on your behalf. See \"Security\" below for how we protect it.",
           ],
         },
@@ -1016,7 +1023,7 @@ export const siteContent: SiteContent = {
             "Web3Forms: delivers the marketing site's contact form",
             "Cloudflare: provides DNS and TLS for some client apps",
             "Vercel: hosts this marketing site",
-            "Stripe: will process subscription payments once we take card payments; card details go to Stripe, never to bcns",
+            "Stripe: processes subscription payments; card details go to Stripe, never to bcns",
           ],
         },
         {
@@ -1093,7 +1100,7 @@ export const siteContent: SiteContent = {
       title: "Terms of Service",
       description:
         "The agreement between BCNS LLC and any business using bcns Connect, a Deluxe build, or AI consulting.",
-      effectiveDate: "Last updated September 22, 2026.",
+      effectiveDate: "Last updated October 6, 2026.",
       sections: [
         {
           heading: "Agreement and acceptance",
@@ -1160,8 +1167,8 @@ export const siteContent: SiteContent = {
         {
           heading: "Fees and billing",
           body: [
-            "bcns Connect is $200 a month with no setup fee. Deluxe builds and AI consulting are billed per their Order Form.",
-            "You're responsible for any taxes on top of the listed price. If a payment fails, we may suspend the Services until it's resolved.",
+            "bcns Connect is $200 a month with no setup fee, paid by card through Stripe and renewed each month until you cancel. If you installed it from the Shopify App Store, Shopify bills you instead. Deluxe builds and AI consulting are billed per their Order Form.",
+            "You're responsible for any taxes on top of the listed price. If a payment fails, the Services stay on for one month so you can update your card; after that we pause them until the payment goes through, and your data is kept while they're paused.",
             "If we change our pricing, we'll give you reasonable advance notice before the new price takes effect.",
           ],
         },

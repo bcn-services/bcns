@@ -950,7 +950,7 @@ Addresses objections and reduces friction before the visitor contacts you.
 
 #### Seeded questions (current `faq.items` order)
 
-The ten pre-seeded entries, in order, are:
+The eleven pre-seeded entries, in order, are:
 
 0. **Do you use AI?** — Yes, as a tool that lets bcns build faster and better; not magic.
 1. **Do I need to be technical to work with you?** — No; questions are about the business, and communication stays plain.
@@ -962,6 +962,7 @@ The ten pre-seeded entries, in order, are:
 7. **Can I use my data with other tools?** — Yes; the data is the client's, and they can plug in the third-party AI tools and apps they like.
 8. **What does a Deluxe build add?** — Something custom on top of Connect, scoped and quoted as a fixed price before work starts.
 9. **Is my data private?** — Only the client's team sees it, and a full export is handed over any time, free.
+10. **How do I pay?** — By card through Stripe, $200 a month, workspace opens right away; a failed payment keeps the workspace open a month while the card is updated; Shopify App Store installs are billed by Shopify, never twice.
 
 New entries are appended, never inserted, so existing indexes stay stable.
 
@@ -1087,7 +1088,7 @@ Every sentence in these two objects must trace to a fact or a Nate decision in `
 
 > Connected-source coverage: "What we collect" has one entry per connectable source (Shopify, Meta Ads, monday.com, QuickBooks Online, Google Drive/meeting notes), and "The two roles we play" names the same set. The QuickBooks entry states what `platform/worker/src/connectors/quickbooks.ts` actually stores (full Purchase/Bill record, 24-month backfill, read-only use of the read/write `com.intuit.quickbooks.accounting` scope). Add the owner-disconnect sentence (revokes at Intuit, deletes stored QuickBooks data) when the hub disconnect ships. When a source is added or removed in `apps/connect/lib/sources.ts`, update both places and the `effectiveDate`.
 
-> Maintainer-only, not rendered: six comments directly above `legal:` in `content.ts` flag facts tied to other work (the sixth records the QuickBooks entry's code-checked claims and the pending disconnect sentence). The "30 days" retention wording matches `hard-delete.ts` on `main` now that PR #60 has merged (main 558087c) — no longer conditional, but deletion is operator-run (nothing schedules the script; the operator runs it promptly, partly because Shopify §6.2.3 requires deletion within 30 days of uninstall). The 30-day post-cancellation access window is likewise an operating practice, not a platform state — the platform only has `clients.status = churned` (R34); the operator marks a client churned 30 days after the cancel email, so "account ends" = `churned_at`, and hard-delete becomes permitted 30 days after that (≈60 days after cancel total). "Stored in the United States" is confirmed (droplet/Spaces SFO3, Supabase N. Virginia, Cloud Run us-east4, checked 2026-09-22). The sentence in "Agreement and acceptance" describes acceptance as it works today (signed quote or Order Form, or use of the services); the decided stronger flow (Stripe Checkout consent box, hub sign-in acceptance) is not built — swap the sentence when both ship; the terms' "Fees and billing" line and the FAQ deliberately omit or soften Stripe until Checkout is live.
+> Maintainer-only, not rendered: six comments directly above `legal:` in `content.ts` flag facts tied to other work (the sixth records the QuickBooks entry's code-checked claims and the pending disconnect sentence). The "30 days" retention wording matches `hard-delete.ts` on `main` now that PR #60 has merged (main 558087c) — no longer conditional, but deletion is operator-run (nothing schedules the script; the operator runs it promptly, partly because Shopify §6.2.3 requires deletion within 30 days of uninstall). The 30-day post-cancellation access window is likewise an operating practice, not a platform state — the platform only has `clients.status = churned` (R34); the operator marks a client churned 30 days after the cancel email, so "account ends" = `churned_at`, and hard-delete becomes permitted 30 days after that (≈60 days after cancel total). "Stored in the United States" is confirmed (droplet/Spaces SFO3, Supabase N. Virginia, Cloud Run us-east4, checked 2026-09-22). The sentence in "Agreement and acceptance" describes acceptance as it works today (signed quote or Order Form, or use of the services); the decided stronger flow (Stripe Checkout consent box, hub sign-in acceptance) is not built — swap the sentence when both ship; Stripe Checkout itself is built (hub `/pending`, 2026-10-06), so the privacy Stripe subprocessor entry and "Billing" line in "What we collect", the terms' "Fees and billing" (card through Stripe, Shopify installs billed by Shopify, one-month grace then pause on a failed payment) and FAQ 10 describe it.
 
 ---
 
