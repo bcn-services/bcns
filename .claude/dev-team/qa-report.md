@@ -1,37 +1,41 @@
-VERDICT: PASS
-
-# QA Report
-**Task:** Item 1 re-verify after fix round #1 - Stripe self-serve Checkout + payment gate (caution: true)
-**Branch:** feat/stripe-gate @ fe916e2 (fix b6c38f7; engineer HEAD 5e239a1 + 1 test commit)
-**Date:** 2026-10-06
-**Gate mode:** tests+behavioral
-
 ## VERDICT: PASS
+Branch: feat/hub-first-run (head 950f130, no test additions needed, nothing committed by QA)
+Gate mode: tests+behavioral (signed-in render NOT possible, see Not Verifiable)
 
-## Gates (floor / run, all green, exit 0)
-connect 325 / 334 (333 claimed + my 1 added; wired in literal file list, count moved) - app-core 76 / 77 - platform 16 files/161 / 16 files/162 (DB tests skip, no stack) - tenant 43 / 43 - web 98 tests/87 pass / 98/87 - mcp 272 / 272. tsc clean. Done-when fixtures: webhook -> pending->active, grace month then paused, never-paid stays pending: covered (app-core, Deno edge, connect).
+## Criteria Checked
+- Checklist (source -> first sync -> invite team -> connect AI), real state, self-ticking, hides when all done, owner-only: first-run.test.mjs 12 tests + 6 mutations all RED on the intended test -- PASS
+- /access Claude steps + ChatGPT labelled "Not yet hand-verified" + copy button + 3-5 questions per connected source: source read of app/access/page.tsx, CopyUrl, test "3 to 5 each" -- PASS (no visual check)
+- Tests wired, count above 314: package.json list ends in tests/first-run.test.mjs; connect test 326 pass / 0 fail (+12); probe-inject (throwing test appended) -> 327 tests / 326 pass / 1 fail, restored byte-identical -- PASS
+- Design match: pure logic lib/first-run.ts; api.ai_last_used_at() migration 20261007000300 (max mcp_tool_calls.at for tenant_or_raise, authenticated-only grant); readAiLastUsed returns null on error/throw/non-string; sync ticks only on parseable last_success_at for a HUB_SOURCES row; team = non-smoke, not viewer; hidden when allDone; owner-only -- PASS
+- Untouched: git diff da54d22 --stat shows no layout.tsx, app/pending/*, lib/data-views.ts, platform/worker/src/connectors/* -- PASS
 
-## Mutations (cp backup, restore, shasum -c all OK, git status clean)
-- M1-M4 (sig compare, timestamp tolerance, churned reactivation, Shopify exemption): all still RED on intended tests, Node + Deno copies.
-- New guards each RED when removed: checkoutTarget live-sub check (fail-closed), flag_duplicate (Deno copy sha1-identical to Node), pendingScreen Shopify marker, stripeReady needing all 4 env values.
+## Gates
+- connect test 326/326/0; typecheck clean; lint clean; build ok (/ and /access compile, /access 486 B)
+- platform test 15 files / 146 / 0 fail (DB-backed skipped locally; new mcp-audit ai_last_used_at cases NOT run here, CI runs them)
+- mcp test 272/272/0, tsc clean (data-client changed)
 
-## Review findings
-- I1 (double subscription) CLOSED: added scenario test - pay, webhook lags, Pay again => waiting screen, one checkout; grace => portal; inside search lag the webhook flags the 2nd sub, never overwrites. RED without live-sub block and without flag_duplicate.
-- I2 (Shopify install shown Pay) CLOSED live: no marker => Pay + "don't pay here if Shopify" line; marker => review screen, no Pay.
-- Diff 98b1255..5e239a1 touches no forbidden file (shopify.app.toml, SHOPIFY_ALT_*, connectors/*, Shopify flow).
+## Mutations (each: cp backup, one condition rewritten, RED, restored, shasum identical, git status clean)
+- M1 (required) sync step drops the last_success_at check -> RED: "first sync: needs a non-null last_success_at, not just a row" (expected false, actual true)
+- M2 (required) starterQuestions drops .filter(connected) -> RED: "starter questions: none when nothing is connected" + "only connected sources, in hub order, 3 to 5 each"
+- Extra, all RED on the matching test, all guarded: smoke member counted (#82 invite team); viewer counted (#79, #82); `&& !allDone` removed (#84 all four done hides); owner-only check removed (#85 members never see); ai step ticks without timestamp (#79, #83, #84); source step ignores connected (#79, #80)
+- Probe-inject confirms first-run.test.mjs runs (tests 326 -> 327, fail 0 -> 1)
 
-## Behavioral (next start :3121, invented env, fake listener :3123, both killed by PID, ports free)
-- Webhook: 200 valid + 299s-old; 401 wrong v1, stale, future, missing header, tampered body; 405 GET; 2 forwards, signature + length intact.
-- /signup?from=shopify and /login?next=/api/oauth/shopify/finish render; hidden from=shopify input present; plain /login links to /signup; 0 console errors.
-- Marker bcns_shopify_install=1: path=/, httpOnly, SameSite=Lax, ~30d, secure only on https; set by real signUp (from=shopify) and signIn (next=finish) submits; never by GET (/signup, /login, /pending?from=shopify).
+## Starter questions vs data (cross-checked apps/mcp/src/policy.ts + worker connectors)
+- shopify: orders/refund/payout in money_v1, stock in products_v1.inventory_quantity; no best-sellers (line items excluded) -- OK
+- meta: spend/clicks per campaign/ad in daily_metrics -- OK; monday: jobs_v1 status/owner/priority/due_on/is_done -- OK
+- meet: messages_v1 meeting_note title/body -- OK; drive: media_v1 kind image/video, filename, created_at -- OK
+- quickbooks: records_v1 qbo_expense, vendor/account in attributes (attributes kept on records_v1) -- OK
+- Jargon: no "MCP/OAuth/sync cursor" in new client-facing copy. Only "mcp" strings are the address URL and the pre-existing Claude Code terminal block ("claude mcp add", "/mcp"), untouched by this item.
+- ChatGPT block: visible `.tag` "Not yet hand-verified" plus a sentence saying it is unverified. Copy button: URL is a plain <pre> (user-select: all), button failure shows "Couldn't copy..." text; clipboard error is try/caught.
 
-## Findings
-- MINOR - apps/connect/app/signup/actions.ts, apps/connect/app/login/actions.ts - marker is never cleared: a plain /signup owner in a browser that did the Shopify hand-off sees no Pay for 30 days (reproduced: plain signup left marker set, /pending showed review); signIn also sets it on a failed password - clear it in signUp without from and in signOut.
-- LOW - platform/test/stripe-billing.test.ts - SQL flag_duplicate/record_payment guards and grace-expiry pause verified only by the DB suite in CI (no local stack).
-- INFO - search-lag double-Checkout window remains (documented); flag_duplicate + alert email is the backstop. A pending owner with an incomplete live sub waits up to ~23h. Deno billingView protected only by byte parity. checkoutTarget ignores the marker (deferred). Fixtures hand-authored.
-
-## Tests Added
-- `apps/connect/tests/stripe-billing.test.mjs` - pay-lag scenario test (commit fe916e2). No new infra.
+## Behavioral (dev server on 3123, killed, port confirmed free)
+- GET / -> 307 /login?error=unconfigured; GET /access -> 307 /login?error=unconfigured; GET /login -> 200. Redirect only (no env configured); this is NOT a visual check.
+- Structural: pages pass firstRun()/starterQuestions() output straight into JSX; copy-url.tsx starts with "use client" and compiled in `next build`; css classes .fr-list/.steps/.tag/.copyurl/.qs exist in globals.css.
 
 ## Not Verifiable
-none (SQL guards: see LOW).
+- Signed-in render of / and /access, the copy click, tick states against live data (no Supabase stack, no env). Interpretation tested: lib outputs + test suite + build compile.
+- Claude/ChatGPT click-through steps match the live claude.ai/ChatGPT UIs: not hand-checked by anyone (ChatGPT labelled as such).
+- api.ai_last_used_at() against a real DB: platform DB tests skipped locally; migration not pushed (Nate runs db push; until then step 4 reads not-done by design).
+
+## Notes (non-blocking)
+- `sr-only` relies on Tailwind class generation; build passed but unrendered.
