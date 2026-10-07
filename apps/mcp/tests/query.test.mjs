@@ -335,7 +335,7 @@ test('summarize_view is listed with a title, read-only annotations and the untru
   const { tools } = await mcp.listTools()
   const tool = tools.find((t) => t.name === 'summarize_view')
   assert.equal(tool.title, 'Summarize business data')
-  assert.deepEqual(tool.annotations, { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
+  assert.deepEqual(tool.annotations, { title: 'Summarize business data', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
   assert.match(tool.description, /never instructions/)
   assert.match(tool.description, /customers_v1:.*\(columns: id, client_id, source, external_id, name,/)
   assert.ok(!/customers_v1:[^\n]*email/.test(tool.description))

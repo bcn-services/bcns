@@ -147,6 +147,7 @@ test('ListTools carries title and read-only annotations', async () => {
   for (const t of tools) {
     assert.equal(typeof t.title, 'string')
     assert.deepEqual(t.annotations, {
+      title: t.title,
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,

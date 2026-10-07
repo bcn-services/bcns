@@ -14,6 +14,7 @@ import {
   runTool,
   DataClientError,
   ToolInputError,
+  type AgentToolAnnotations,
   type AgentToolsOptions,
   type DataClient,
 } from '@bcn-services/data-client'
@@ -37,18 +38,23 @@ export interface McpTool {
   title: string
   description: string
   inputSchema: Record<string, unknown>
-  annotations: typeof TOOL_ANNOTATIONS
+  annotations: AgentToolAnnotations & { title: string }
 }
 
 /** agentTools()'s `input_schema` is already JSON Schema; only the key name differs. */
 export function mcpTools(): McpTool[] {
-  return agentTools(MCP_TOOL_OPTIONS).map((tool) => ({
-    name: tool.name,
-    title: TOOL_TITLES[tool.name] ?? tool.name,
-    description: `${tool.description}\n${UNTRUSTED_DESCRIPTION}\n${CONTACT_DESCRIPTION}`,
-    inputSchema: tool.input_schema as unknown as Record<string, unknown>,
-    annotations: TOOL_ANNOTATIONS,
-  }))
+  return agentTools(MCP_TOOL_OPTIONS).map((tool) => {
+    // No fallback to the machine name: a tool added without a human title must fail loudly, not ship.
+    const title = TOOL_TITLES[tool.name]
+    if (!title || title === tool.name) throw new Error(`tool "${tool.name}" has no human title in TOOL_TITLES`)
+    return {
+      name: tool.name,
+      title,
+      description: `${tool.description}\n${UNTRUSTED_DESCRIPTION}\n${CONTACT_DESCRIPTION}`,
+      inputSchema: tool.input_schema as unknown as Record<string, unknown>,
+      annotations: { title, ...TOOL_ANNOTATIONS },
+    }
+  })
 }
 
 /** What a tool call returns to the model: the rows marked as untrusted, capped at `cap` bytes of
