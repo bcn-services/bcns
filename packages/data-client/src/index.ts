@@ -119,6 +119,10 @@ const RPC_NAMES = [
   'get_ai_settings',
   'ai_last_used_at',
   'set_ai_settings',
+  'source_settings_v1',
+  'connector_runs_v1',
+  'reset_source_cursors',
+  'set_source_folder',
 ] as const satisfies readonly RpcName[]
 
 // A function with no arguments is generated as `Args: never`; it is called with none.

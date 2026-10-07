@@ -1293,6 +1293,39 @@ export type Database = {
         Args: { add?: string[]; media_ids: string[]; remove?: string[] }
         Returns: number
       }
+      connector_runs_v1: {
+        Args: {
+          p_source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+        }
+        Returns: {
+          error: string
+          finished_at: string
+          mode: "backfill" | "incremental" | "renormalize"
+          rows_fetched: number
+          rows_upserted: number
+          source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+          started_at: string
+          status: "running" | "ok" | "error" | "auth_failed"
+        }[]
+      }
       create_media_set: {
         Args: { description?: string; name: string }
         Returns: string
@@ -1325,6 +1358,21 @@ export type Database = {
         Args: { api_version: string; app_version: string }
         Returns: undefined
       }
+      reset_source_cursors: {
+        Args: {
+          p_source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+        }
+        Returns: undefined
+      }
       restore_media: { Args: { media_ids: string[] }; Returns: number }
       save_record: {
         Args: {
@@ -1344,6 +1392,48 @@ export type Database = {
       set_media_set_items: {
         Args: { action: string; media_ids: string[]; set_id: string }
         Returns: number
+      }
+      set_source_folder: {
+        Args: {
+          p_folder_id: string
+          p_folder_url?: string
+          p_source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+        }
+        Returns: undefined
+      }
+      source_settings_v1: {
+        Args: never
+        Returns: {
+          enabled: boolean
+          folder_changed_at: string
+          last_reset_at: string
+          last_run_at: string
+          last_success_at: string
+          next_reset_allowed_at: string
+          next_run_at: string
+          source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+          sync_interval: unknown
+          sync_running: boolean
+          target: Json
+        }[]
       }
       update_media: {
         Args: { media_id: string; tags?: string[]; title?: string }

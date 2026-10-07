@@ -150,6 +150,12 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   log_mcp_call: { args: { p_tool: 'rpc-scoped-test', p_view: null, p_row_count: 0, p_ok: true, p_error_code: null }, expect: 'none' },
   // A read of the caller's own billing row by auth.uid(); no argument to aim elsewhere.
   billing_self: { args: {}, expect: 'none' },
+  // Source settings (20261007000400): the two reads are harmless as acmeOwner. Both writes get
+  // shopify, which each refuses before any write, so the probe never resets a seed schedule.
+  source_settings_v1: { args: {}, expect: 'none' },
+  connector_runs_v1: { args: { p_source: 'shopify' }, expect: 'none' },
+  reset_source_cursors: { args: { p_source: 'shopify' }, expect: 'BCNS3' },
+  set_source_folder: { args: { p_source: 'shopify', p_folder_id: 'rpc-scoped-folder', p_folder_url: null }, expect: 'BCNS3' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
