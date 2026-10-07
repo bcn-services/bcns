@@ -206,6 +206,56 @@ describe('worker', () => {
     expect((await one()).length).toBe(1)
   })
 
+  it('client_break_emails', async () => {
+    const orig = (await sql(`select * from data.connector_health where client_id = $1 order by source limit 1`, [CLIENTS.acme])).rows[0]
+    const calls: { url: string; headers: Record<string, string>; body: string }[] = []
+    const cap = (async (input: any, init?: any) => {
+      calls.push({ url: String(input), headers: init?.headers ?? {}, body: String(init?.body ?? '') })
+      return json({ id: 'msg_x' })
+    }) as typeof globalThis.fetch
+    const batches = () => calls.filter(c => c.url === 'https://api.resend.com/emails/batch')
+    const rowsOf = async (kind: string) => (await sql<{ dedupe_key: string; sent_at: Date | null }>(
+      `select dedupe_key, sent_at from data.notifications where client_id = $1 and kind = $2`, [CLIENTS.acme, kind])).rows
+    try {
+      await sql(`delete from data.notifications where client_id = $1`, [CLIENTS.acme])
+      await sql(`update data.connector_health set status = 'auth_failed', status_since = $3 where client_id = $1 and source = $2`,
+        [CLIENTS.acme, orig.source, new Date(Date.now() - 60_000)])
+      await alerts(mkTick(cap))
+      await alerts(mkTick(cap))
+
+      const first = await rowsOf('client_break')
+      expect(first.length).toBe(1)
+      expect(first[0].sent_at).not.toBeNull()
+      expect(batches().length).toBe(1)
+      const msgs = JSON.parse(batches()[0].body) as { to: string[]; subject: string; text: string }[]
+      expect(msgs.map(m => m.to)).toEqual([['acme-owner@example.com']])
+      expect(batches()[0].body).not.toMatch(/acme-member|acme-smoke/)
+      expect(batches()[0].headers['Idempotency-Key']).toBe(first[0].dedupe_key)
+      expect(msgs[0].text).toContain('https://connect.bcn-services.com/')
+
+      // bcns's own alert still goes out, to bcns only.
+      const bcns = await rowsOf('auth_failed')
+      expect(bcns.length).toBe(1)
+      expect(bcns[0].sent_at).not.toBeNull()
+      const own = calls.filter(c => c.url === 'https://api.resend.com/emails').map(c => JSON.parse(c.body))
+      expect(own.some(b => b.to[0] === 'alerts@example.test' && b.text.startsWith('auth_failed:'))).toBe(true)
+
+      // Reminder: not at 2 days, one at 3 days + 1 minute, never twice.
+      await sql(`update data.notifications set created_at = now() - interval '2 days' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await alerts(mkTick(cap))
+      expect((await rowsOf('client_break_reminder')).length).toBe(0)
+      await sql(`update data.notifications set created_at = now() - interval '3 days 1 minute' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await alerts(mkTick(cap))
+      await alerts(mkTick(cap))
+      expect((await rowsOf('client_break_reminder')).length).toBe(1)
+      expect(batches().length).toBe(2)
+    } finally {
+      await sql(`update data.connector_health set status = $3, status_since = $4, last_error = $5, computed_at = $6 where client_id = $1 and source = $2`,
+        [CLIENTS.acme, orig.source, orig.status, orig.status_since, orig.last_error, orig.computed_at])
+      await sql(`delete from data.notifications where client_id = $1`, [CLIENTS.acme])
+    }
+  })
+
   it('worker_claim_no_double_process', async () => {
     const pick = async (shard: number, n: number) => (await sql<{ id: string }>(
       `select id from (select gen_random_uuid() as id from generate_series(1, 2000)) x

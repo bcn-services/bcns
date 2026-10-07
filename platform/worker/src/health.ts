@@ -87,8 +87,111 @@ export async function alerts(t: Tick): Promise<number> {
      where e.month = date_trunc('month', now() at time zone c.timezone)::date
        and e.bytes >= c.egress_quota_bytes
      on conflict (dedupe_key) do nothing`)
+  const breaks = await raiseClientBreaks(t)
   await sendPending(t)
-  return raised.rowCount ?? 0
+  return (raised.rowCount ?? 0) + breaks
+}
+
+// ------------------------------------------------------- client break emails
+
+/** Hub home: the reconnect link in every client break email (no per-card anchor exists). */
+const HUB_URL = 'https://connect.bcn-services.com/'
+const STALE_GRACE_MS = 6 * 3600_000   // same grace as the bcns stale alert
+const REMINDER_AFTER_MS = 3 * 86_400_000
+// Mirrors the hub's labels (apps/connect); the worker cannot import the app.
+const LABELS: Record<string, string> = {
+  shopify: 'Shopify', meta: 'Meta Ads', monday: 'Monday.com', meet: 'Google Meet', drive: 'Google Drive', quickbooks: 'QuickBooks',
+}
+const labelOf = (source: string) => LABELS[source] ?? source
+
+export interface BreakRow { client_id: string; source: string; status: string; status_since: Date; initial_created_at: Date | null }
+export interface BreakNotice { kind: 'client_break' | 'client_break_reminder'; client_id: string; dedupe_key: string; payload: { source: string; status: string; status_since: string } }
+
+/** Stable per breakage: built from status_since (changes only on a status transition), never from the clock. */
+export const breakKey = (kind: BreakNotice['kind'], r: Pick<BreakRow, 'client_id' | 'source' | 'status_since'>) =>
+  `${kind}:${r.client_id}:${r.source}:${r.status_since.toISOString()}`
+
+/** Pure: which client break rows a set of broken-source health rows calls for at `now`. */
+export function clientBreakNotices(rows: BreakRow[], now: Date): BreakNotice[] {
+  const out: BreakNotice[] = []
+  for (const r of rows) {
+    if (r.status !== 'auth_failed' && r.status !== 'stale') continue
+    const payload = { source: r.source, status: r.status, status_since: r.status_since.toISOString() }
+    const age = now.getTime() - r.status_since.getTime()
+    if (r.status === 'auth_failed' || age > STALE_GRACE_MS) {
+      out.push({ kind: 'client_break', client_id: r.client_id, dedupe_key: breakKey('client_break', r), payload })
+    }
+    // The reminder counts from the first email, so a long-broken source never gets both at once.
+    if (r.initial_created_at && now.getTime() - r.initial_created_at.getTime() >= REMINDER_AFTER_MS) {
+      out.push({ kind: 'client_break_reminder', client_id: r.client_id, dedupe_key: breakKey('client_break_reminder', r), payload })
+    }
+  }
+  return out
+}
+
+/** Reads the broken sources of active clients, inserts the notices; the unique dedupe_key makes every tick after the first a no-op. */
+async function raiseClientBreaks(t: Tick): Promise<number> {
+  const h = await sql<Omit<BreakRow, 'initial_created_at'>>(
+    `select h.client_id, h.source::text as source, h.status::text as status, h.status_since
+     from data.connector_health h join data.clients c on c.id = h.client_id and c.status = 'active'
+     where h.status in ('auth_failed', 'stale')`)
+  if (!h.rows.length) return 0
+  const first = await sql<{ dedupe_key: string; created_at: Date }>(
+    `select dedupe_key, created_at from data.notifications where dedupe_key = any($1::text[])`,
+    [h.rows.map(r => breakKey('client_break', r))])
+  const createdAt = new Map(first.rows.map(r => [r.dedupe_key, r.created_at]))
+  const notices = clientBreakNotices(
+    h.rows.map(r => ({ ...r, initial_created_at: createdAt.get(breakKey('client_break', r)) ?? null })), t.now())
+  let raised = 0
+  for (const n of notices) {
+    const r = await sql(
+      `insert into data.notifications (client_id, kind, dedupe_key, payload) values ($1, $2, $3, $4::jsonb)
+       on conflict (dedupe_key) do nothing`,
+      [n.client_id, n.kind, n.dedupe_key, JSON.stringify(n.payload)])
+    raised += r.rowCount ?? 0
+  }
+  return raised
+}
+
+/** Pure: owner-role, non-smoke, non-empty, deduped. Exported so the weekly digest reuses the same audience. */
+export function ownerRecipients(rows: { email: string | null; role: string; is_smoke: boolean }[]): string[] {
+  return [...new Set(rows.filter(r => r.role === 'owner' && !r.is_smoke && r.email).map(r => r.email!))]
+}
+
+export async function ownerEmails(clientId: string): Promise<string[]> {
+  const r = await sql<{ email: string | null; role: string; is_smoke: boolean }>(
+    `select u.email, m.role::text as role, m.is_smoke
+     from data.memberships m join auth.users u on u.id = m.user_id where m.client_id = $1`, [clientId])
+  return ownerRecipients(r.rows)
+}
+
+/** Pure plain-English copy; no tenant data beyond the source's label and a date. */
+export function breakEmail(kind: BreakNotice['kind'], source: string, status: string, statusSince: Date): { subject: string; text: string } {
+  const label = labelOf(source)
+  const since = statusSince.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })
+  const problem = status === 'auth_failed'
+    ? `We can't reach your ${label} account right now, so the information in your bcns Connect has stopped updating.`
+    : `The ${label} information in your bcns Connect hasn't updated since ${since}.`
+  const lead = kind === 'client_break_reminder'
+    ? `A quick reminder: ${label} is still not connected. ${problem}`
+    : problem
+  return {
+    subject: kind === 'client_break_reminder' ? `Reminder: reconnect ${label}` : `Action needed: reconnect ${label}`,
+    text: `Hi,\n\n${lead}\n\nReconnecting fixes it, and your information picks up again on its own.\n\nReconnect ${label}: ${HUB_URL}\n\nThe bcns team\n`,
+  }
+}
+
+/** One Resend batch call, one message per recipient so owners never see each other's address; Idempotency-Key makes a retry safe. */
+export async function sendClientEmail(t: Tick, to: string[], subject: string, text: string, idempotencyKey: string): Promise<void> {
+  const key = envStr('RESEND_API_KEY')
+  const from = envStr('BCNS_ALERT_FROM') || envStr('BCNS_ALERT_EMAIL')
+  if (!key || !from) throw new Error('RESEND_API_KEY and BCNS_ALERT_FROM or BCNS_ALERT_EMAIL are required to email clients')
+  const r = await t.fetch('https://api.resend.com/emails/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}`, 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(to.map(addr => ({ from, to: [addr], subject, text }))),
+  })
+  if (!r.ok) throw new Error(`resend HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`)
 }
 
 /** §5.6 step 9 — the pooled allowance is a platform-level number, so the row has no client. */
@@ -116,17 +219,28 @@ export async function sendPending(t: Tick): Promise<number> {
   for (const n of rows.rows) {
     let error: string | null = null
     try {
-      if (!key || !to) throw new Error('RESEND_API_KEY and BCNS_ALERT_EMAIL are required to send alerts')
-      const r = await t.fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-        body: JSON.stringify({
-          from: envStr('BCNS_ALERT_FROM', to), to: [to],
-          subject: `[bcns-data] ${n.kind}${n.client_id ? ` — ${n.client_id}` : ''}`,
-          text: `${n.dedupe_key}\n\n${JSON.stringify(n.payload, null, 2)}`,
-        }),
-      })
-      if (!r.ok) throw new Error(`resend HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`)
+      if (n.kind === 'client_break' || n.kind === 'client_break_reminder') {
+        const owners = n.client_id ? await ownerEmails(n.client_id) : []
+        if (!owners.length) {
+          await sql(`update data.notifications set sent_at = now(), last_error = 'no owner to email' where id = $1`, [n.id])
+          continue
+        }
+        const p = n.payload as { source: string; status: string; status_since: string }
+        const m = breakEmail(n.kind, p.source, p.status, new Date(p.status_since))
+        await sendClientEmail(t, owners, m.subject, m.text, n.dedupe_key)
+      } else {
+        if (!key || !to) throw new Error('RESEND_API_KEY and BCNS_ALERT_EMAIL are required to send alerts')
+        const r = await t.fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            from: envStr('BCNS_ALERT_FROM', to), to: [to],
+            subject: `[bcns-data] ${n.kind}${n.client_id ? ` — ${n.client_id}` : ''}`,
+            text: `${n.dedupe_key}\n\n${JSON.stringify(n.payload, null, 2)}`,
+          }),
+        })
+        if (!r.ok) throw new Error(`resend HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`)
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e)
     }
