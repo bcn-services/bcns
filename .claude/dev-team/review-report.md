@@ -1,25 +1,28 @@
 REVIEW: 0C/0I/5M
-**Branch:** feat/hub-first-run
 # Review Report
 **Date:** 2026-10-06
-**Files Reviewed:** 13
+**Files Reviewed:** 4 (health.ts, break-emails.test.ts, worker.test.ts, DESIGN.md) — diff da54d22..0aeaf28
 
 ## Findings
 
 ### Minor
-Minor — platform/test/tenant.test.ts:23 (with helpers.ts:148) — `ai_last_used_at` is `expect: 'none'` and returns a timestamp string once acme has any `data.mcp_tool_calls` row; the loop pushes it into `acmeCreated` and the cleanup `$2::uuid[]` throws 22P02. It is safe today only because `ai_` sorts before `log_mcp_call` and the cleanup deletes the rows. A local re-run after a mid-loop failure (cleanup skipped), or a future acme seed row, turns the test red with a misleading uuid error — fix: push only uuid-shaped strings (`/^[0-9a-f-]{36}$/`), or skip the push for this fn.
-Minor — apps/connect/app/access/page.tsx:19-23 — `health.error` is ignored, so a failed read of connector_health_v1 shows an owner whose sources are connected "Connect a source on the Sources page…" — fix: when `health.error` is set, show "Couldn't load your sources right now" instead of the empty-state line.
-Minor — apps/connect/lib/first-run.ts:59,68 — visibility depends on live state only, so the checklist comes back after all four steps are done when one reverses. Example: an established owner removes their only teammate, or disconnects their only source, and the hub shows "Get started 3 of 4" again. Fix: accept and say so in the PR body, or hide for good once all four have been done (needs a stored marker, so it is out of scope here).
-Minor — apps/connect/lib/first-run.ts:64 — the "Get your first data in" hint says "This happens on its own within the hour" even when the only connected source's first run failed (status error, last_success_at null), so the owner is told to wait for something that won't happen — fix: when a connected card has tone error, change the hint to "A source needs attention, see its card."
-Minor — apps/connect/app/access/copy-url.tsx:21-26 — a successful copy is never announced to screen readers: the role=status span is only filled on failure, and a change to the button label is not announced. "Copied" also never resets — fix: put "Copied" in the status span (keep the destructive colour for failure only), and go back to idle after about 2 s.
+Minor — platform/worker/src/health.ts:180 — a `stale` that comes from failing runs (provider outage, a connector bug) or from computeHealth's zero_now rule (a Monday board or Drive folder that really is empty) emails "Reconnecting fixes it, and your information picks up again on its own." The owner reconnects, nothing changes, and three days later they get the reminder anyway. — for `stale`, soften the line to "Reconnecting usually fixes it. If it doesn't, reply to this email and we'll sort it out."
+Minor — platform/worker/src/health.ts:111 — the key is per `status_since`, and status_since changes on every status change. One outage that never recovers, going stale (email 1, "hasn't updated since") and then auth_failed when the token dies (email 2, sent at once), sends the owner two "reconnect" emails and two reminders. Prod history shows re-breaks only after ok runs, so this has not happened yet. — key the breakage on `connector_health.last_success_at` (with 'never' when null), which only moves when a sync succeeds; the bcns alert keys stay as they are.
+Minor — platform/worker/src/health.ts:125 — the reminder only checks the client_break row's created_at, not whether that row was ever sent. If Resend is misconfigured for 5 ticks, the first email gets stuck at attempts=5. After 3 days the owner gets "A quick reminder: … still not connected" as their first and only email. — gate the reminder on `sent_at is not null and last_error is distinct from 'no owner to email'` from the initial row, or let the reminder's wording fall back to the first-email copy.
+Minor — platform/worker/src/health.ts:191 — the Idempotency-Key is reused on retry while the body is rebuilt from the current owner list. Scenario: Resend accepts the request but the response times out, and an owner is added before the next tick. Resend then answers 409 (same key, different payload) on every retry until attempts=5, and the row sits in notifications_stuck even though the email went out. Low odds. — on a 409 `invalid_idempotent_request`, mark the row sent.
+Minor — platform/worker/src/health.ts:136 — nothing tests the `c.status = 'active'` filter. Deleting it leaves all 158 tests green, because seeded gamma is paused but its health is never_ran. DESIGN.md claims "Only active clients are emailed." — in client_break_emails, also set a gamma health row to auth_failed and assert that no client_break row exists for gamma.
 
-## Verified clean (no finding)
-- Migration matches `get_ai_settings` exactly: security definer, `search_path = ''`, `data.tenant_or_raise()`, revoke from public/anon/service_role, grant to authenticated. Prediction for the CI catalog/tenant tests: `function_privileges`, `function_search_path_pinned`, `no_claim_zero_rows` (BCNS0) and `rpc_every_write_scoped` (RPC_ARGS entry present) all pass.
-- The data-client RPC_NAMES and database.types (`Args: never`) entries agree. After a data-client build, `tsc --noEmit` passes for apps/sb and apps/_template. apps/mcp passes no rpcs to the AI, so this function is not reachable by the AI.
-- The `memberships_v1` view is security_invoker over the `tenant` select policy, so an owner sees every membership row in their tenant. Members skip both extra reads.
-- Prod (aggregate SELECT): no user is a non-smoke member of more than one tenant, so the team step cannot tick on its own. Smoke rows are excluded.
-- Every starter question can be answered from synced fields. QuickBooks vendor and account come from `records_v1.attributes`, which MCP keeps. For Shopify: refund and payout kinds, and `products_v1.inventory_quantity`. For Meta: `insight_ad_day` clicks. For Monday: owner, priority, due_on.
-- Connect tests run 326/0 and first-run.test.mjs is in the test list. QA's mutations went RED. Off-limits files (layout.tsx, pending/*, data-views.ts, connectors) are untouched. No new code reads source_tokens. The copy has no jargon.
+Probes run (no finding):
+- Resend batch: the default strict validation is all-or-nothing, so a batch never partly succeeds. The key is about 95 chars, under the 256 limit. One message per owner.
+- Key precision: the key is built in JS from the pg-parsed Date at both the insert site and the lookup site, so it is identical across ticks. A microsecond-to-millisecond collision would need two transitions in the same millisecond.
+- bcns path: the bcns rows are untouched. When BCNS_ALERT_EMAIL is unset, bcns rows fail as before. Client rows send if BCNS_ALERT_FROM is set and fail with attempts++ otherwise. They never take a bcns row's attempts.
+- No owner: the row is marked sent with last_error, so it stays out of notifications_stuck and out of the 50-row window. The sendPending order and limit are unchanged.
+- Callers of `alerts()`: only tick.ts step logging uses the return value, and no test asserts `steps.alerts`.
+- Prod (SELECT only): 0 sources are auth_failed or stale today, so deploy sends no burst of emails. The worker logs in as the postgres role, which can read auth.users. The shopify-review tenant has 1 owner, who will be emailed if its source breaks.
+- DB test in CI: acme has 1 owner, 1 member and 1 smoke member in the seed. The leftover auth_failed client from alert_retry has no owner, so it is marked sent and makes no batch call, and the batch count of 1 then 2 holds. `finally` restores acme's health row and deletes acme's notifications, so health_one_row's row count is unaffected. alert_retry still passes: it filters by its own dedupe_key, and its client_break row takes the no-owner path with no fetch.
+- Wiring: vitest includes `test/**/*.test.ts`, and break-emails.test.ts does not import ./helpers. 146 → 158.
 
 ## STANDARDS.md Updates
-none (caller instructed: edit nothing). Proposed: "A new api RPC needs entries in packages/data-client RPC_NAMES + database.types.ts and platform/test/helpers.ts RPC_ARGS; a non-uuid string return under expect 'none' must not reach tenant.test's acmeCreated cleanup."
+- Platform Worker / Outbound email goes through data.notifications
+- Platform Worker / Dedupe keys come from row state, never the clock
+- Platform Worker / Pure layer in its own test file

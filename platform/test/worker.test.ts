@@ -78,6 +78,7 @@ beforeAll(async () => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = localKeys().service
   process.env.RESEND_API_KEY = 'test-resend-key'
   process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
+  delete process.env.BCNS_CLIENT_REPLY_TO
   schedules = (await sql(`select to_jsonb(s) j from data.connector_schedule s where client_id = any($1::uuid[])`, [SEEDED])).rows.map(r => r.j)
   tokens = (await sql(`select to_jsonb(t) j from data.source_tokens t where client_id = any($1::uuid[])`, [SEEDED])).rows.map(r => r.j)
   acmeMoney = (await sql(`select to_jsonb(m) j from data.money m where client_id = $1 and external_id = any($2::text[])`,
@@ -204,6 +205,70 @@ describe('worker', () => {
 
     await alerts(mkTick(stub(() => ({ id: 'msg_2' }))))
     expect((await one()).length).toBe(1)
+  })
+
+  it('client_break_emails', async () => {
+    const orig = (await sql(`select * from data.connector_health where client_id = $1 order by source limit 1`, [CLIENTS.acme])).rows[0]
+    const calls: { url: string; headers: Record<string, string>; body: string }[] = []
+    const cap = (async (input: any, init?: any) => {
+      calls.push({ url: String(input), headers: init?.headers ?? {}, body: String(init?.body ?? '') })
+      return json({ id: 'msg_x' })
+    }) as typeof globalThis.fetch
+    const batches = () => calls.filter(c => c.url === 'https://api.resend.com/emails/batch')
+    const rowsOf = async (kind: string) => (await sql<{ dedupe_key: string; sent_at: Date | null }>(
+      `select dedupe_key, sent_at from data.notifications where client_id = $1 and kind = $2`, [CLIENTS.acme, kind])).rows
+    const gamma = (await sql(`select * from data.connector_health where client_id = $1 order by source limit 1`, [CLIENTS.gamma])).rows[0]
+    try {
+      await sql(`delete from data.notifications where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.gamma]])
+      // Gamma is paused: its break must raise nothing (pins the active-client filter).
+      await sql(`update data.connector_health set status = 'auth_failed', status_since = now() - interval '1 minute' where client_id = $1 and source = $2`,
+        [CLIENTS.gamma, gamma.source])
+      await sql(`update data.connector_health set status = 'auth_failed', status_since = $3 where client_id = $1 and source = $2`,
+        [CLIENTS.acme, orig.source, new Date(Date.now() - 60_000)])
+      await alerts(mkTick(cap))
+      await alerts(mkTick(cap))
+
+      const first = await rowsOf('client_break')
+      expect(first.length).toBe(1)
+      expect((await sql(`select 1 from data.notifications where client_id = $1 and kind like 'client_break%'`, [CLIENTS.gamma])).rowCount).toBe(0)
+      expect(first[0].sent_at).not.toBeNull()
+      expect(batches().length).toBe(1)
+      const msgs = JSON.parse(batches()[0].body) as { to: string[]; subject: string; text: string; reply_to?: string }[]
+      expect(msgs.map(m => m.to)).toEqual([['acme-owner@example.com']])
+      expect(batches()[0].body).not.toMatch(/acme-member|acme-smoke/)
+      expect(batches()[0].headers['Idempotency-Key']).toBe(first[0].dedupe_key)
+      expect(msgs[0].text).toContain('https://connect.bcn-services.com/')
+      expect('reply_to' in msgs[0]).toBe(false) // only BCNS_ALERT_EMAIL is set here; replies never go to the alerts inbox
+
+      // bcns's own alert still goes out, to bcns only.
+      const bcns = await rowsOf('auth_failed')
+      expect(bcns.length).toBe(1)
+      expect(bcns[0].sent_at).not.toBeNull()
+      const own = calls.filter(c => c.url === 'https://api.resend.com/emails').map(c => JSON.parse(c.body))
+      expect(own.some(b => b.to[0] === 'alerts@example.test' && b.text.startsWith('auth_failed:'))).toBe(true)
+
+      // Reminder: not at 2 days, one at 3 days + 1 minute, never twice.
+      await sql(`update data.notifications set created_at = now() - interval '2 days', sent_at = now() - interval '2 days' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await alerts(mkTick(cap))
+      expect((await rowsOf('client_break_reminder')).length).toBe(0)
+      await sql(`update data.notifications set created_at = now() - interval '3 days 1 minute', sent_at = now() - interval '3 days 1 minute' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await alerts(mkTick(cap))
+      await alerts(mkTick(cap))
+      expect((await rowsOf('client_break_reminder')).length).toBe(1)
+      expect(batches().length).toBe(2)
+
+      // An owner added after a 'no owner to email' initial row still gets the reminder.
+      await sql(`delete from data.notifications where client_id = $1 and kind = 'client_break_reminder'`, [CLIENTS.acme])
+      await sql(`update data.notifications set last_error = 'no owner to email' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await alerts(mkTick(cap))
+      expect((await rowsOf('client_break_reminder')).length).toBe(1)
+      expect(batches().length).toBe(3)
+    } finally {
+      for (const [id, o] of [[CLIENTS.acme, orig], [CLIENTS.gamma, gamma]] as const)
+        await sql(`update data.connector_health set status = $3, status_since = $4, last_error = $5, computed_at = $6 where client_id = $1 and source = $2`,
+          [id, o.source, o.status, o.status_since, o.last_error, o.computed_at])
+      await sql(`delete from data.notifications where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.gamma]])
+    }
   })
 
   it('worker_claim_no_double_process', async () => {
