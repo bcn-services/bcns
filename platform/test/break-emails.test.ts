@@ -5,7 +5,7 @@ import { breakEmail, clientBreakNotices, ownerRecipients, type BreakRow } from '
 const T0 = new Date('2026-10-01T12:00:00.000Z')
 const H = 3600_000, D = 24 * H, MIN = 60_000
 const row = (o: Partial<BreakRow> = {}): BreakRow =>
-  ({ client_id: 'c1', source: 'drive', status: 'auth_failed', status_since: T0, initial_created_at: null, ...o })
+  ({ client_id: 'c1', source: 'drive', status: 'auth_failed', status_since: T0, initial_sent_at: null, ...o })
 const at = (ms: number) => new Date(T0.getTime() + ms)
 
 describe('clientBreakNotices', () => {
@@ -32,14 +32,14 @@ describe('clientBreakNotices', () => {
 
   it('ok / error / never_ran raise nothing, even with a prior email', () => {
     for (const status of ['ok', 'error', 'never_ran'])
-      expect(clientBreakNotices([row({ status, initial_created_at: at(-10 * D) })], at(1 * D))).toEqual([])
+      expect(clientBreakNotices([row({ status, initial_sent_at: at(-10 * D) })], at(1 * D))).toEqual([])
   })
 
-  it('reminder: absent with no initial, absent at 3d-1min, present at 3d+1min, own stable key', () => {
+  it('reminder: absent with no sent initial (unsent / no-owner), absent at 3d-1min, present at 3d+1min, own stable key', () => {
     expect(clientBreakNotices([row()], at(30 * D)).map(n => n.kind)).toEqual(['client_break'])
     const init = at(0)
-    expect(clientBreakNotices([row({ initial_created_at: init })], at(3 * D - MIN)).map(n => n.kind)).toEqual(['client_break'])
-    const due = clientBreakNotices([row({ initial_created_at: init })], at(3 * D + MIN))
+    expect(clientBreakNotices([row({ initial_sent_at: init })], at(3 * D - MIN)).map(n => n.kind)).toEqual(['client_break'])
+    const due = clientBreakNotices([row({ initial_sent_at: init })], at(3 * D + MIN))
     expect(due.map(n => n.kind)).toEqual(['client_break', 'client_break_reminder'])
     expect(due[1].dedupe_key).toBe('client_break_reminder:c1:drive:2026-10-01T12:00:00.000Z')
   })
@@ -80,6 +80,8 @@ describe('breakEmail', () => {
   it('says what happened and when, and reminders say still not connected', () => {
     expect(breakEmail('client_break', 'drive', 'auth_failed', T0).text).toContain("can't reach your Google Drive account")
     expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain('hasn\'t updated since October 1, 2026')
+    expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain("If it doesn't, reply to this email")
+    expect(breakEmail('client_break', 'drive', 'auth_failed', T0).text).not.toContain('reply to this email')
     expect(breakEmail('client_break_reminder', 'drive', 'auth_failed', T0).text).toContain('still not connected')
   })
 })

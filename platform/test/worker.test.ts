@@ -216,8 +216,12 @@ describe('worker', () => {
     const batches = () => calls.filter(c => c.url === 'https://api.resend.com/emails/batch')
     const rowsOf = async (kind: string) => (await sql<{ dedupe_key: string; sent_at: Date | null }>(
       `select dedupe_key, sent_at from data.notifications where client_id = $1 and kind = $2`, [CLIENTS.acme, kind])).rows
+    const gamma = (await sql(`select * from data.connector_health where client_id = $1 order by source limit 1`, [CLIENTS.gamma])).rows[0]
     try {
-      await sql(`delete from data.notifications where client_id = $1`, [CLIENTS.acme])
+      await sql(`delete from data.notifications where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.gamma]])
+      // Gamma is paused: its break must raise nothing (pins the active-client filter).
+      await sql(`update data.connector_health set status = 'auth_failed', status_since = now() - interval '1 minute' where client_id = $1 and source = $2`,
+        [CLIENTS.gamma, gamma.source])
       await sql(`update data.connector_health set status = 'auth_failed', status_since = $3 where client_id = $1 and source = $2`,
         [CLIENTS.acme, orig.source, new Date(Date.now() - 60_000)])
       await alerts(mkTick(cap))
@@ -225,6 +229,7 @@ describe('worker', () => {
 
       const first = await rowsOf('client_break')
       expect(first.length).toBe(1)
+      expect((await sql(`select 1 from data.notifications where client_id = $1 and kind like 'client_break%'`, [CLIENTS.gamma])).rowCount).toBe(0)
       expect(first[0].sent_at).not.toBeNull()
       expect(batches().length).toBe(1)
       const msgs = JSON.parse(batches()[0].body) as { to: string[]; subject: string; text: string }[]
@@ -241,18 +246,19 @@ describe('worker', () => {
       expect(own.some(b => b.to[0] === 'alerts@example.test' && b.text.startsWith('auth_failed:'))).toBe(true)
 
       // Reminder: not at 2 days, one at 3 days + 1 minute, never twice.
-      await sql(`update data.notifications set created_at = now() - interval '2 days' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await sql(`update data.notifications set created_at = now() - interval '2 days', sent_at = now() - interval '2 days' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
       await alerts(mkTick(cap))
       expect((await rowsOf('client_break_reminder')).length).toBe(0)
-      await sql(`update data.notifications set created_at = now() - interval '3 days 1 minute' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await sql(`update data.notifications set created_at = now() - interval '3 days 1 minute', sent_at = now() - interval '3 days 1 minute' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
       await alerts(mkTick(cap))
       await alerts(mkTick(cap))
       expect((await rowsOf('client_break_reminder')).length).toBe(1)
       expect(batches().length).toBe(2)
     } finally {
-      await sql(`update data.connector_health set status = $3, status_since = $4, last_error = $5, computed_at = $6 where client_id = $1 and source = $2`,
-        [CLIENTS.acme, orig.source, orig.status, orig.status_since, orig.last_error, orig.computed_at])
-      await sql(`delete from data.notifications where client_id = $1`, [CLIENTS.acme])
+      for (const [id, o] of [[CLIENTS.acme, orig], [CLIENTS.gamma, gamma]] as const)
+        await sql(`update data.connector_health set status = $3, status_since = $4, last_error = $5, computed_at = $6 where client_id = $1 and source = $2`,
+          [id, o.source, o.status, o.status_since, o.last_error, o.computed_at])
+      await sql(`delete from data.notifications where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.gamma]])
     }
   })
 

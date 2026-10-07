@@ -104,7 +104,7 @@ const LABELS: Record<string, string> = {
 }
 const labelOf = (source: string) => LABELS[source] ?? source
 
-export interface BreakRow { client_id: string; source: string; status: string; status_since: Date; initial_created_at: Date | null }
+export interface BreakRow { client_id: string; source: string; status: string; status_since: Date; initial_sent_at: Date | null }
 export interface BreakNotice { kind: 'client_break' | 'client_break_reminder'; client_id: string; dedupe_key: string; payload: { source: string; status: string; status_since: string } }
 
 /** Stable per breakage: built from status_since (changes only on a status transition), never from the clock. */
@@ -121,8 +121,8 @@ export function clientBreakNotices(rows: BreakRow[], now: Date): BreakNotice[] {
     if (r.status === 'auth_failed' || age > STALE_GRACE_MS) {
       out.push({ kind: 'client_break', client_id: r.client_id, dedupe_key: breakKey('client_break', r), payload })
     }
-    // The reminder counts from the first email, so a long-broken source never gets both at once.
-    if (r.initial_created_at && now.getTime() - r.initial_created_at.getTime() >= REMINDER_AFTER_MS) {
+    // The reminder counts from when the first email was actually sent (null: unsent or no owner), so a long-broken source never gets both at once.
+    if (r.initial_sent_at && now.getTime() - r.initial_sent_at.getTime() >= REMINDER_AFTER_MS) {
       out.push({ kind: 'client_break_reminder', client_id: r.client_id, dedupe_key: breakKey('client_break_reminder', r), payload })
     }
   }
@@ -131,17 +131,19 @@ export function clientBreakNotices(rows: BreakRow[], now: Date): BreakNotice[] {
 
 /** Reads the broken sources of active clients, inserts the notices; the unique dedupe_key makes every tick after the first a no-op. */
 async function raiseClientBreaks(t: Tick): Promise<number> {
-  const h = await sql<Omit<BreakRow, 'initial_created_at'>>(
+  const h = await sql<Omit<BreakRow, 'initial_sent_at'>>(
     `select h.client_id, h.source::text as source, h.status::text as status, h.status_since
      from data.connector_health h join data.clients c on c.id = h.client_id and c.status = 'active'
      where h.status in ('auth_failed', 'stale')`)
   if (!h.rows.length) return 0
-  const first = await sql<{ dedupe_key: string; created_at: Date }>(
-    `select dedupe_key, created_at from data.notifications where dedupe_key = any($1::text[])`,
+  // sent_at only counts when someone was actually emailed: the 'no owner to email' row is marked sent but reached nobody.
+  const first = await sql<{ dedupe_key: string; sent_at: Date | null }>(
+    `select dedupe_key, case when last_error is distinct from 'no owner to email' then sent_at end as sent_at
+     from data.notifications where dedupe_key = any($1::text[])`,
     [h.rows.map(r => breakKey('client_break', r))])
-  const createdAt = new Map(first.rows.map(r => [r.dedupe_key, r.created_at]))
+  const createdAt = new Map(first.rows.map(r => [r.dedupe_key, r.sent_at]))
   const notices = clientBreakNotices(
-    h.rows.map(r => ({ ...r, initial_created_at: createdAt.get(breakKey('client_break', r)) ?? null })), t.now())
+    h.rows.map(r => ({ ...r, initial_sent_at: createdAt.get(breakKey('client_break', r)) ?? null })), t.now())
   let raised = 0
   for (const n of notices) {
     const r = await sql(
@@ -172,12 +174,15 @@ export function breakEmail(kind: BreakNotice['kind'], source: string, status: st
   const problem = status === 'auth_failed'
     ? `We can't reach your ${label} account right now, so the information in your bcns Connect has stopped updating.`
     : `The ${label} information in your bcns Connect hasn't updated since ${since}.`
+  const fix = status === 'auth_failed'
+    ? 'Reconnecting fixes it, and your information picks up again on its own.'
+    : "Reconnecting usually fixes it. If it doesn't, reply to this email and we'll sort it out."
   const lead = kind === 'client_break_reminder'
     ? `A quick reminder: ${label} is still not connected. ${problem}`
     : problem
   return {
     subject: kind === 'client_break_reminder' ? `Reminder: reconnect ${label}` : `Action needed: reconnect ${label}`,
-    text: `Hi,\n\n${lead}\n\nReconnecting fixes it, and your information picks up again on its own.\n\nReconnect ${label}: ${HUB_URL}\n\nThe bcns team\n`,
+    text: `Hi,\n\n${lead}\n\n${fix}\n\nReconnect ${label}: ${HUB_URL}\n\nThe bcns team\n`,
   }
 }
 
