@@ -152,6 +152,7 @@ export type BillingAction =
   | { action: "activate" } // pending -> active
   | { action: "resume" } // paused (after paying before) -> active
   | { action: "record_payment" } // active stays active; clears any grace
+  | { action: "flag_duplicate" } // a second live subscription: keep the stored one, alert bcns
   | { action: "start_grace"; graceUntil: number } // active, access ends at graceUntil
   | { action: "ignore"; reason: string };
 
@@ -166,7 +167,15 @@ export function decideBilling(state: BillingState, signal: BillingSignal): Billi
 
   if (signal.kind === "paid") {
     if (state.status === "pending") return { action: "activate" };
-    if (state.status === "active") return { action: "record_payment" };
+    if (state.status === "active") {
+      // The first subscription applied wins. A payment on a different one while the stored one is
+      // still live (no lapse seen, so no grace) is a second subscription billing the same client:
+      // keep the stored one and alert bcns, never overwrite it silently. In grace or paused the
+      // stored one has lapsed, so a new one replaces it.
+      const second = state.graceUntil === null && state.subscriptionId !== null &&
+        signal.subscriptionId !== null && signal.subscriptionId !== state.subscriptionId;
+      return second ? { action: "flag_duplicate" } : { action: "record_payment" };
+    }
     // A pause bcns set by hand (never paid through Stripe) is not lifted by a payment.
     return state.paidAt !== null ? { action: "resume" } : { action: "ignore", reason: "paused_by_hand" };
   }

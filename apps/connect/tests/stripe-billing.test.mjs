@@ -18,7 +18,7 @@ const react = require("react");
 react.cache ??= (fn) => fn; // server-only in React 18; absent outside Next
 globalThis.React = react;
 
-const { parseBillingSelf, checkoutTarget, portalTarget, stripeWebhookRoute, safeStripeUrl, formatDay } = await import("../lib/stripe-billing.ts");
+const { parseBillingSelf, checkoutTarget, portalTarget, stripeWebhookRoute, safeStripeUrl, formatDay, pendingScreen, stripeReady } = await import("../lib/stripe-billing.ts");
 const { BillingBanner } = await import("../app/billing-banner.tsx");
 const { config: middlewareConfig } = await import("../middleware.ts");
 
@@ -33,8 +33,25 @@ const EVENT_AT = JSON.parse(FIXTURE).created;
 const row = (over = {}) => ({ client_id: CLIENT, role: "owner", status: "pending", paid_at: null, grace_until: null, shopify_billed: false, stripe_customer_id: null, ...over });
 const billing = (over) => parseBillingSelf(row(over));
 
+const API = "https://api.stripe.com/v1";
+const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_x";
+const PORTAL_URL = "https://billing.stripe.com/p/session/x";
+const fixture = (name) => JSON.parse(readFileSync(new URL(`../../../packages/app-core/tests/fixtures/stripe/${name}`, import.meta.url), "utf8"));
+const SEARCH = fixture("subscriptions.search.json"); // one active subscription, found by client id
+const LIST = fixture("subscriptions.list.json"); // the stored customer's: one unpaid, one canceled
+const NONE = { ...SEARCH, data: [] };
+/** A page of `page` whose subscriptions have exactly these statuses (fixture shape, fake ids). */
+const withStatuses = (page, ...statuses) => ({ ...page, data: statuses.map((status, i) => ({ ...page.data[0], id: `sub_TestStatus${i}`, status })) });
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
+/** Stripe's API by path: the subscription lookups answer `subs` (a page, or a reply function); Checkout and the portal a hosted URL. */
+const stripeApi = (subs = NONE) => (url) => {
+  const u = String(url);
+  if (u.startsWith(`${API}/subscriptions`)) return typeof subs === "function" ? subs() : json(subs);
+  return json({ url: u === `${API}/billing_portal/sessions` ? PORTAL_URL : CHECKOUT_URL });
+};
+
 /** A fetch that records each call and answers with `reply`. */
-function recorder(reply = () => new Response(JSON.stringify({ url: "https://checkout.stripe.com/c/pay/cs_test_x" }), { status: 200 })) {
+function recorder(reply = stripeApi()) {
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ url: String(url), init });
@@ -59,11 +76,13 @@ test("parseBillingSelf: the view follows the status, and a missing Shopify flag 
 test("checkoutTarget: a $200/mo subscription session for the signed-in owner's own client", async () => {
   const { calls, fetchImpl } = recorder();
   const target = await checkoutTarget(billing(), "owner@acme.example", CONFIG, fetchImpl);
-  assert.equal(target, "https://checkout.stripe.com/c/pay/cs_test_x");
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://api.stripe.com/v1/checkout/sessions");
-  assert.equal(calls[0].init.headers.Authorization, "Bearer sk_test_fixture");
-  const form = new URLSearchParams(calls[0].init.body);
+  assert.equal(target, CHECKOUT_URL);
+  assert.equal(calls.length, 2, "one lookup for a live subscription, then the session");
+  assert.equal(new URL(calls[0].url).pathname, "/v1/subscriptions/search");
+  assert.equal(calls[1].url, `${API}/checkout/sessions`);
+  assert.equal(calls[1].init.method, "POST");
+  assert.equal(calls[1].init.headers.Authorization, "Bearer sk_test_fixture");
+  const form = new URLSearchParams(calls[1].init.body);
   assert.equal(form.get("mode"), "subscription");
   assert.equal(form.get("line_items[0][price]"), "price_Fixture200");
   assert.equal(form.get("line_items[0][quantity]"), "1");
@@ -75,10 +94,12 @@ test("checkoutTarget: a $200/mo subscription session for the signed-in owner's o
   assert.equal(form.get("customer"), null);
 });
 
-test("checkoutTarget: reuses the customer, and a grace payment returns home", async () => {
-  const { calls, fetchImpl } = recorder();
-  await checkoutTarget(billing({ status: "active", paid_at: 1, grace_until: 2, stripe_customer_id: "cus_Ok1" }), "owner@acme.example", CONFIG, fetchImpl);
-  const form = new URLSearchParams(calls[0].init.body);
+test("checkoutTarget: in grace with only ended subscriptions, a new one on the stored customer, returning home", async () => {
+  const { calls, fetchImpl } = recorder(stripeApi(withStatuses(LIST, "canceled", "incomplete_expired")));
+  const target = await checkoutTarget(billing({ status: "active", paid_at: 1, grace_until: 2, stripe_customer_id: "cus_Ok1" }), "owner@acme.example", CONFIG, fetchImpl);
+  assert.equal(target, CHECKOUT_URL);
+  assert.equal(calls[1].url, `${API}/checkout/sessions`);
+  const form = new URLSearchParams(calls[1].init.body);
   assert.equal(form.get("customer"), "cus_Ok1");
   assert.equal(form.get("customer_email"), null);
   assert.equal(form.get("success_url"), `${HUB}/`);
@@ -91,8 +112,17 @@ test("checkoutTarget: refuses without calling Stripe for a member, a non-paying 
   assert.equal(await checkoutTarget(billing({ status: "active", paid_at: 1 }), null, CONFIG, fetchImpl), "/pending");
   assert.equal(await checkoutTarget(billing({ status: "paused" }), null, CONFIG, fetchImpl), "/pending");
   assert.equal(await checkoutTarget(billing(), null, { ...CONFIG, stripePriceId: undefined }, fetchImpl), "/pending");
+  assert.equal(await checkoutTarget(billing(), null, { ...CONFIG, stripeWebhookSecret: undefined }, fetchImpl), "/pending", "no way to hear the payment");
+  assert.equal(await checkoutTarget(billing(), null, { ...CONFIG, stripeWebhookFunctionUrl: undefined }, fetchImpl), "/pending", "no way to hear the payment");
   assert.equal(await checkoutTarget(null, null, CONFIG, fetchImpl), "/login?error=signed-out");
   assert.equal(calls.length, 0);
+});
+
+test("stripeReady: needs the key, the price, the webhook secret and the webhook function URL", () => {
+  assert.equal(stripeReady(CONFIG), true);
+  for (const key of ["stripeSecretKey", "stripePriceId", "stripeWebhookSecret", "stripeWebhookFunctionUrl"]) {
+    assert.equal(stripeReady({ ...CONFIG, [key]: undefined }), false, key);
+  }
 });
 
 test("checkoutTarget: a Stripe error, a timeout, or a non-Stripe URL never redirects anywhere else", async () => {
@@ -104,8 +134,99 @@ test("checkoutTarget: a Stripe error, a timeout, or a non-Stripe URL never redir
       throw new DOMException("timed out", "TimeoutError");
     },
   ];
-  for (const reply of bad) assert.equal(await checkoutTarget(billing(), null, CONFIG, recorder(reply).fetchImpl), "/pending?error=billing");
+  // The lookup answers "none", so each bad reply is the session's own.
+  for (const reply of bad) {
+    const { calls, fetchImpl } = recorder((url, init) => (String(url).startsWith(`${API}/subscriptions`) ? json(NONE) : reply(url, init)));
+    assert.equal(await checkoutTarget(billing(), null, CONFIG, fetchImpl), "/pending?error=billing");
+    assert.equal(calls[1].url, `${API}/checkout/sessions`);
+  }
   assert.equal(safeStripeUrl("https://checkout.stripe.com.evil.example/x", "checkout.stripe.com"), null);
+});
+
+/* ------------------------------------------------- never a second subscription */
+
+const GRACE = { status: "active", paid_at: 1, grace_until: 2, stripe_customer_id: "cus_Ok1" };
+const sessions = (calls) => calls.filter((c) => c.init?.method === "POST");
+
+test("checkoutTarget: a pending owner Stripe already has a subscription for goes to the confirming screen, no second Checkout", async () => {
+  const { calls, fetchImpl } = recorder(stripeApi(SEARCH));
+  assert.equal(await checkoutTarget(billing(), "owner@acme.example", CONFIG, fetchImpl), "/pending?paid=1&waiting=1");
+  assert.equal(calls.length, 1);
+  const lookup = new URL(calls[0].url);
+  assert.equal(`${lookup.origin}${lookup.pathname}`, `${API}/subscriptions/search`);
+  assert.equal(lookup.searchParams.get("query"), `metadata["client_id"]:"${CLIENT}"`, "by the client id Checkout stamps on the subscription");
+  assert.equal(calls[0].init.method, undefined, "a GET");
+  assert.equal(calls[0].init.headers.Authorization, "Bearer sk_test_fixture");
+});
+
+test("checkoutTarget: every status that still bills or can be paid blocks a new Checkout; ended ones do not", async () => {
+  for (const status of ["active", "trialing", "past_due", "unpaid", "incomplete"]) {
+    const { calls, fetchImpl } = recorder(stripeApi(withStatuses(SEARCH, "canceled", status)));
+    assert.equal(await checkoutTarget(billing(), null, CONFIG, fetchImpl), "/pending?paid=1&waiting=1", status);
+    assert.equal(sessions(calls).length, 0, status);
+  }
+  const { calls, fetchImpl } = recorder(stripeApi(withStatuses(SEARCH, "canceled", "incomplete_expired")));
+  assert.equal(await checkoutTarget(billing(), null, CONFIG, fetchImpl), CHECKOUT_URL);
+  assert.equal(sessions(calls)[0].url, `${API}/checkout/sessions`);
+});
+
+test("checkoutTarget: in grace or paused with a live subscription, Pay opens the billing portal for it instead", async () => {
+  const grace = recorder(stripeApi(LIST)); // unpaid + canceled
+  assert.equal(await checkoutTarget(billing(GRACE), null, CONFIG, grace.fetchImpl), PORTAL_URL);
+  const lookup = new URL(grace.calls[0].url);
+  assert.equal(lookup.pathname, "/v1/subscriptions", "by the stored customer, not search");
+  assert.equal(lookup.searchParams.get("customer"), "cus_Ok1");
+  assert.equal(lookup.searchParams.get("status"), "all");
+  assert.equal(grace.calls.length, 2);
+  assert.equal(grace.calls[1].url, `${API}/billing_portal/sessions`);
+  assert.equal(new URLSearchParams(grace.calls[1].init.body).get("customer"), "cus_Ok1");
+
+  const paused = recorder(stripeApi(withStatuses(LIST, "past_due")));
+  assert.equal(await checkoutTarget(billing({ status: "paused", paid_at: 1, stripe_customer_id: "cus_Ok1" }), null, CONFIG, paused.fetchImpl), PORTAL_URL);
+  assert.equal(paused.calls[1].url, `${API}/billing_portal/sessions`);
+
+  // No customer stored (the payment's webhook never landed): the portal for the one Stripe found.
+  const found = recorder(stripeApi(withStatuses(SEARCH, "unpaid")));
+  assert.equal(await checkoutTarget(billing({ status: "paused", paid_at: 1 }), null, CONFIG, found.fetchImpl), PORTAL_URL);
+  assert.equal(new URLSearchParams(found.calls[1].init.body).get("customer"), "cus_TestFixture0001");
+  const nameless = recorder(stripeApi({ ...SEARCH, data: [{ ...SEARCH.data[0], customer: null }] }));
+  assert.equal(await checkoutTarget(billing({ status: "paused", paid_at: 1 }), null, CONFIG, nameless.fetchImpl), "/pending?error=billing");
+  assert.equal(sessions(nameless.calls).length, 0);
+});
+
+test("checkoutTarget: fails closed, no session, when Stripe can't say whether a live subscription exists", async () => {
+  const unknown = [
+    () => json({ error: { type: "api_error" } }, 500),
+    () => {
+      throw new DOMException("timed out", "TimeoutError");
+    },
+    () => new Response("<html>", { status: 200 }),
+    () => json({ object: "list" }),
+    () => json({ ...withStatuses(SEARCH, "canceled"), has_more: true }), // the live one may be on the next page
+  ];
+  for (const [i, reply] of unknown.entries()) {
+    for (const over of [{}, GRACE]) {
+      const { calls, fetchImpl } = recorder(stripeApi(reply));
+      assert.equal(await checkoutTarget(billing(over), null, CONFIG, fetchImpl), "/pending?error=billing", `reply ${i}`);
+      assert.equal(calls.length, 1, `reply ${i}: the lookup only`);
+    }
+  }
+  // A client id that isn't a UUID never reaches the search query.
+  const { calls, fetchImpl } = recorder();
+  assert.equal(await checkoutTarget(billing({ client_id: 'x" OR status:"active' }), null, CONFIG, fetchImpl), "/pending?error=billing");
+  assert.equal(calls.length, 0);
+});
+
+test("pendingScreen: a Shopify App Store install never sees Pay; everyone else who may pay does", () => {
+  assert.equal(pendingScreen(billing(), true, false), "pay");
+  assert.equal(pendingScreen(billing(), true, true), "review", "Shopify bills them: the bcns-reviews-every-workspace screen");
+  assert.equal(pendingScreen(billing({ status: "paused", paid_at: 1 }), true, false), "pay");
+  assert.equal(pendingScreen(billing({ status: "paused", paid_at: 1 }), true, true), "paused");
+  assert.equal(pendingScreen(billing(), false, false), "review", "Stripe not set up");
+  assert.equal(pendingScreen(billing({ status: "paused", paid_at: 1 }), false, false), "paused");
+  assert.equal(pendingScreen(billing({ shopify_billed: true }), true, false), "review");
+  assert.equal(pendingScreen(billing({ status: "paused" }), true, false), "paused");
+  assert.equal(pendingScreen(null, true, false), "review");
 });
 
 test("portalTarget: the owner's own customer, billing.stripe.com only", async () => {

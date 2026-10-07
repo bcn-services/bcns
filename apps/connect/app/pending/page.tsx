@@ -1,8 +1,9 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentMembership } from "@/lib/session";
 import { getConfig } from "@/lib/env";
 import { BCNS_EMAIL } from "@/lib/request-connection";
-import { formatDay, loadBilling, PRICE_LABEL, stripeReady, type BillingSelf } from "@/lib/stripe-billing";
+import { formatDay, loadBilling, pendingScreen, PRICE_LABEL, SHOPIFY_INSTALL_COOKIE, stripeReady, type BillingSelf } from "@/lib/stripe-billing";
 import { signOut } from "../login/actions";
 import { Frame } from "../login/frame";
 import { finishActivation, openBillingPortal, startCheckout } from "./actions";
@@ -66,9 +67,13 @@ function GraceCard({ billing, canPay, error }: { billing: BillingSelf; canPay: b
       {billing.role !== "owner" ? (
         <p className="meta">Ask your workspace owner to update the payment.</p>
       ) : canPay ? (
-        <div className="flex flex-wrap gap-3">
-          <PayButtons billing={billing} />
-        </div>
+        // One button: the server opens the billing portal for the subscription that lapsed, and only
+        // starts a new subscription when Stripe has none left that can still be paid.
+        <form action={startCheckout}>
+          <button type="submit" className="btn">
+            Update payment
+          </button>
+        </form>
       ) : (
         <p className="meta">
           Email <a href={`mailto:${BCNS_EMAIL}`}>{BCNS_EMAIL}</a> and we&apos;ll sort it out.
@@ -117,7 +122,8 @@ export default async function PendingPage({ searchParams }: { searchParams: { pa
     );
   }
 
-  if (billing?.view === "pay" && canPay) {
+  const screen = pendingScreen(billing, canPay, cookies().get(SHOPIFY_INSTALL_COOKIE)?.value === "1");
+  if (screen === "pay" && billing) {
     const paused = billing.status === "paused";
     return (
       <Frame
@@ -140,12 +146,13 @@ export default async function PendingPage({ searchParams }: { searchParams: { pa
       >
         <Notice error={searchParams.error} />
         {billing.role === "owner" ? <PayButtons billing={billing} /> : <p className="meta">Ask your workspace owner to pay to open it.</p>}
+        {paused ? null : <p className="meta">Adding bcns Connect from the Shopify App Store? Shopify bills you for it, so don&apos;t pay here.</p>}
         <SignOut />
       </Frame>
     );
   }
 
-  if (billing?.status === "paused") {
+  if (screen === "paused") {
     return (
       <Frame
         title={

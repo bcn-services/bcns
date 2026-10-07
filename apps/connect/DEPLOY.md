@@ -168,6 +168,11 @@ Turning it on, in order:
    Deployed without the secret it stays dark. Hand-check: `curl -s -X POST
    https://cnsxbglhredokjbvudfd.supabase.co/functions/v1/signup` prints `{"error":"not_found"}` (the
    gateway's own 404 for a missing function has a different body, `{"code":"NOT_FOUND",...}`).
+   Stripe billing's function deploys the same way, also with `--no-verify-jwt` (without it the
+   gateway 401s every forward from the hub's `/api/webhooks/stripe`, the hub answers 502, and no
+   payment ever opens a workspace), plus its signing secret, set by name:
+   `supabase functions deploy stripe-webhook --workdir platform --project-ref cnsxbglhredokjbvudfd --no-verify-jwt`
+   `supabase secrets set STRIPE_WEBHOOK_SECRET=<signing secret> --workdir platform --project-ref cnsxbglhredokjbvudfd`
 3. Hosted Auth (dashboard):
    - "Confirm email" ON. Public sign-ups ("Allow new users to sign up") OFF: the function uses the
      admin API, and the `resend` (type=signup) it calls has no sign-ups-disabled check. Public

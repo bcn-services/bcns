@@ -29,7 +29,7 @@ create table data.stripe_events (
   client_id     uuid not null references data.clients(id) on delete cascade,
   event_type    text not null check (length(event_type) between 1 and 100),
   event_created timestamptz not null,
-  action        text not null check (action in ('activate', 'resume', 'record_payment', 'start_grace')),
+  action        text not null check (action in ('activate', 'resume', 'record_payment', 'start_grace', 'flag_duplicate')),
   received_at   timestamptz not null default now()
 );
 create index stripe_events_client_created on data.stripe_events (client_id, event_created desc);
@@ -104,14 +104,21 @@ grant execute on function api.stripe_billing_state(uuid, text) to service_role;
 -- Edge Function write. Returns 'applied', 'duplicate' (event id already applied) or 'conflict'
 -- (a precondition no longer holds: nothing changed, the event row is removed so Stripe's retry
 -- is decided afresh against the new state).
+--
+-- Two subscriptions for one client: the first one applied wins. A payment naming a different
+-- subscription while the stored one is still live (active, no grace) is 'flag_duplicate': the
+-- client row keeps its customer and subscription, and one data.notifications row per extra
+-- subscription tells bcns to cancel one (the worker's alert pass emails it). 'record_payment'
+-- refuses that case, so the stored subscription is never overwritten silently. In grace or
+-- paused the stored one has lapsed and a new payment replaces it (record_payment / resume).
 create function api.stripe_apply_billing(
   p_event_id text, p_event_type text, p_event_created timestamptz, p_client uuid,
   p_action text, p_customer text, p_subscription text, p_grace_until timestamptz)
 returns text language plpgsql security definer set search_path = '' as $$
-declare n int;
+declare n int; kept text;
 begin
   if p_client is null or p_event_created is null
-     or p_action not in ('activate', 'resume', 'record_payment', 'start_grace')
+     or p_action not in ('activate', 'resume', 'record_payment', 'start_grace', 'flag_duplicate')
      or (p_action = 'start_grace' and p_grace_until is null) then
     raise exception using errcode = 'BCNS3', message = 'validation', detail = 'action';
   end if;
@@ -125,11 +132,11 @@ begin
 
   update data.clients c set
     status = case when p_action in ('activate', 'resume') then 'active'::data.client_status else c.status end,
-    paid_at = case when p_action = 'start_grace' then c.paid_at else greatest(c.paid_at, p_event_created) end,
-    grace_until = case when p_action = 'start_grace' then p_grace_until end,
-    stripe_customer_id = case when p_action = 'start_grace' then c.stripe_customer_id
+    paid_at = case when p_action in ('start_grace', 'flag_duplicate') then c.paid_at else greatest(c.paid_at, p_event_created) end,
+    grace_until = case when p_action = 'start_grace' then p_grace_until when p_action = 'flag_duplicate' then c.grace_until end,
+    stripe_customer_id = case when p_action in ('start_grace', 'flag_duplicate') then c.stripe_customer_id
                               else coalesce(p_customer, c.stripe_customer_id) end,
-    stripe_subscription_id = case when p_action = 'start_grace' then c.stripe_subscription_id
+    stripe_subscription_id = case when p_action in ('start_grace', 'flag_duplicate') then c.stripe_subscription_id
                                   else coalesce(p_subscription, c.stripe_subscription_id) end
   where c.id = p_client
     -- The activation guard: only pending -> active and (paid before) paused -> active. Never churned.
@@ -139,13 +146,26 @@ begin
     and (p_action <> 'resume' or c.paid_at is not null)
     and (p_action <> 'start_grace' or (c.paid_at is not null and c.grace_until is null
          and (c.stripe_subscription_id is null or c.stripe_subscription_id = p_subscription)))
+    -- Never overwrite a stored, still-live subscription with another one (see flag_duplicate).
+    and (p_action <> 'record_payment' or p_subscription is null or c.stripe_subscription_id is null
+         or c.stripe_subscription_id = p_subscription or c.grace_until is not null)
+    and (p_action <> 'flag_duplicate' or (c.grace_until is null and c.stripe_subscription_id is not null
+         and p_subscription is not null and c.stripe_subscription_id <> p_subscription))
     and not data.shopify_billed(c.id)
     and not exists (select 1 from data.stripe_events e
-                    where e.client_id = p_client and e.event_id <> p_event_id and e.event_created > p_event_created);
+                    where e.client_id = p_client and e.event_id <> p_event_id and e.event_created > p_event_created)
+  returning c.stripe_subscription_id into kept;
   get diagnostics n = row_count;
   if n = 0 then
     delete from data.stripe_events where event_id = p_event_id;
     return 'conflict';
+  end if;
+  if p_action = 'flag_duplicate' then
+    insert into data.notifications (client_id, kind, dedupe_key, payload)
+    values (p_client, 'stripe_second_subscription',
+            'stripe_second_subscription:' || p_client || ':' || p_subscription,
+            jsonb_build_object('kept', kept, 'other', p_subscription, 'event', p_event_id))
+    on conflict (dedupe_key) do nothing;
   end if;
   return 'applied';
 end $$;

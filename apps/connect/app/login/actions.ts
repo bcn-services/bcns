@@ -1,10 +1,12 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@bcn-services/tenant";
 import { FINISH_PATH } from "@/lib/shopify-oauth";
 import { requestResetTarget } from "@/lib/auth-link";
 import { getConfig } from "@/lib/env";
+import { SHOPIFY_INSTALL_COOKIE, shopifyInstallCookie } from "@/lib/stripe-billing";
 
 export async function signIn(form: FormData): Promise<void> {
   const supabase = createServerSupabase();
@@ -17,6 +19,8 @@ export async function signIn(form: FormData): Promise<void> {
   // with a valid password but no membership still lands back here with a reason.
   // `next` is an allowlist of one, never a URL we echo: anything else is an open redirect.
   const next = form.get("next") === FINISH_PATH ? FINISH_PATH : null;
+  // Came from a Shopify App Store install: Shopify bills them, so /pending must not offer Pay.
+  if (next) cookies().set(SHOPIFY_INSTALL_COOKIE, "1", shopifyInstallCookie(getConfig().hubBaseUrl));
   if (error) redirect(next ? `/login?error=invalid&next=${encodeURIComponent(next)}` : "/login?error=invalid");
   redirect(next ?? "/");
 }

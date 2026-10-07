@@ -108,6 +108,16 @@ test("decideBilling: a payment activates pending, records on active, resumes a l
   assert.deepEqual(decideBilling(state({ status: "paused", paidAt: 1 }), paid), { action: "resume" });
 });
 
+test("decideBilling: a payment on a second live subscription keeps the stored one and flags it; after a lapse a new one replaces it", () => {
+  const live = state({ status: "active", paidAt: 1, subscriptionId: "sub_kept" });
+  assert.deepEqual(decideBilling(live, paid), { action: "flag_duplicate" });
+  assert.deepEqual(decideBilling(state({ status: "active", paidAt: 1, subscriptionId: "sub_1" }), paid), { action: "record_payment" }, "the same subscription renewing");
+  assert.deepEqual(decideBilling(state({ status: "active", paidAt: 1, subscriptionId: "sub_kept", graceUntil: NOW + 5 }), paid), { action: "record_payment" }, "in grace the stored one lapsed");
+  assert.deepEqual(decideBilling(state({ status: "active", paidAt: 1 }), paid), { action: "record_payment" }, "none stored yet");
+  assert.deepEqual(decideBilling(live, { ...paid, subscriptionId: null }), { action: "record_payment" }, "a payment naming no subscription");
+  assert.deepEqual(decideBilling(state({ status: "paused", paidAt: 1, subscriptionId: "sub_kept" }), paid), { action: "resume" }, "paused: the stored one ended");
+});
+
 test("decideBilling: a churned client is never reactivated", () => {
   assert.equal(decideBilling(state({ status: "churned", paidAt: 1 }), paid).action, "ignore");
 });

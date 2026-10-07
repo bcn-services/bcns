@@ -75,9 +75,42 @@ export function formatDay(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-/** Every Stripe value the hub needs to take a payment; any unset = no Pay button. */
+/**
+ * Every Stripe value the hub needs to take a payment AND to hear that it landed; any unset = no
+ * Pay button (a payment whose webhook cannot reach the platform would leave the owner waiting).
+ */
 export function stripeReady(config: HubConfig): config is HubConfig & { stripeSecretKey: string; stripePriceId: string } {
-  return Boolean(config.stripeSecretKey && config.stripePriceId);
+  return Boolean(config.stripeSecretKey && config.stripePriceId && config.stripeWebhookSecret && config.stripeWebhookFunctionUrl);
+}
+
+/**
+ * Set by the sign-in and sign-up actions when the visitor came from a Shopify App Store install
+ * (/login?next=/api/oauth/shopify/finish). Shopify bills those merchants, so /pending never shows
+ * them Pay. A hint for that screen only, never an authorization: forging it only hides your own
+ * Pay button. Path "/" because the Shopify flow's own cookie is scoped to /api/oauth/shopify,
+ * where /pending cannot see it.
+ */
+export const SHOPIFY_INSTALL_COOKIE = "bcns_shopify_install";
+/** /login's "Create account" link carries `?from=shopify` to /signup during that hand-off. */
+export const SHOPIFY_FROM = "shopify";
+export const shopifyInstallCookie = (hubBaseUrl: string) => ({
+  path: "/",
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: hubBaseUrl.startsWith("https://"),
+  maxAge: 30 * 24 * 60 * 60,
+});
+
+export type PendingScreen = "pay" | "paused" | "review";
+
+/**
+ * Which /pending screen a signed-in user with no open workspace sees. A merchant who arrived from
+ * a Shopify App Store install never sees Pay (Shopify bills them): a new one gets the review
+ * screen and bcns opens it by hand, a paused one the "email us" screen.
+ */
+export function pendingScreen(billing: BillingSelf | null, canPay: boolean, fromShopifyInstall: boolean): PendingScreen {
+  if (billing?.view === "pay" && canPay && !fromShopifyInstall) return "pay";
+  return billing?.status === "paused" ? "paused" : "review";
 }
 
 /** A Stripe-hosted page URL on exactly `host`, or null: never redirect a user anywhere else. */
@@ -118,11 +151,67 @@ async function stripePost(
   }
 }
 
+/** Stripe statuses that still bill or can still be paid: a second Checkout beside one would double-charge. */
+const LIVE_SUBSCRIPTION = ["active", "trialing", "past_due", "unpaid", "incomplete"];
+const CLIENT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const CUSTOMER = /^cus_[A-Za-z0-9]+$/;
+
+/**
+ * This client's live subscription in Stripe: `{ customer }` when there is one, null when there is
+ * none, undefined when Stripe could not answer (the caller fails closed). By the stored customer
+ * when there is one (read-after-write); otherwise by the client id Checkout put in the
+ * subscription's metadata. Search is eventually consistent: a subscription made in the last
+ * minute (up to an hour in a Stripe outage) can be missed, so a second Pay click inside that
+ * window can still open a second Checkout; the webhook then flags it (flag_duplicate) instead of
+ * overwriting the first.
+ */
+async function liveSubscription(
+  billing: BillingSelf,
+  secretKey: string,
+  fetchImpl: typeof fetch
+): Promise<{ customer: string | null } | null | undefined> {
+  let path: string;
+  if (billing.customerId) {
+    path = `subscriptions?${new URLSearchParams({ customer: billing.customerId, status: "all", limit: "100" })}`;
+  } else if (CLIENT_UUID.test(billing.clientId)) {
+    path = `subscriptions/search?${new URLSearchParams({ query: `metadata["client_id"]:"${billing.clientId}"`, limit: "100" })}`;
+  } else {
+    return undefined;
+  }
+  try {
+    const response = await fetchImpl(`${STRIPE_API}/${path}`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(STRIPE_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      console.warn(`[connect] stripe ${path.split("?")[0]} failed: ${response.status}`);
+      return undefined;
+    }
+    const body = (await response.json()) as { data?: unknown; has_more?: unknown };
+    if (!Array.isArray(body.data)) return undefined;
+    const live = body.data.find((sub) => LIVE_SUBSCRIPTION.includes((sub as { status?: string })?.status ?? ""));
+    if (live) {
+      const customer = (live as { customer?: unknown }).customer;
+      return { customer: typeof customer === "string" && CUSTOMER.test(customer) ? customer : null };
+    }
+    // An unread page could hold the live one.
+    return body.has_more === false ? null : undefined;
+  } catch (error) {
+    console.warn(`[connect] stripe subscriptions failed: ${error instanceof Error ? error.name : "error"}`);
+    return undefined;
+  }
+}
+
 /**
  * Where "Pay" sends this user: a Stripe Checkout URL, or a hub path carrying the
  * reason it can't. Owners only, and only in a state that may pay (pending, paused
  * after paying before, or in grace). The client id rides on the session and on
  * the subscription's metadata, which is how the webhook finds the client.
+ *
+ * Never a second subscription: when Stripe already has a live one for this client, a pending
+ * owner goes to the "confirming your payment" screen (the webhook is on its way) and a grace or
+ * paused owner to the billing portal to fix the card on that one. Stripe unreachable = no session.
  */
 export async function checkoutTarget(
   billing: BillingSelf | null,
@@ -133,6 +222,12 @@ export async function checkoutTarget(
   if (!billing) return "/login?error=signed-out";
   if (billing.role !== "owner") return "/pending?error=owner";
   if (!canStartCheckout(billing.view) || !stripeReady(config)) return "/pending";
+  const live = await liveSubscription(billing, config.stripeSecretKey, fetchImpl);
+  if (live === undefined) return "/pending?error=billing";
+  if (live) {
+    if (billing.status === "pending") return "/pending?paid=1&waiting=1";
+    return openPortal(billing.customerId ?? live.customer, config.stripeSecretKey, config.hubBaseUrl, fetchImpl);
+  }
   const hub = config.hubBaseUrl;
   const form = new URLSearchParams({
     mode: "subscription",
@@ -149,13 +244,18 @@ export async function checkoutTarget(
   return (await stripePost(fetchImpl, config.stripeSecretKey, "checkout/sessions", form, "checkout.stripe.com")) ?? "/pending?error=billing";
 }
 
+async function openPortal(customerId: string | null, secretKey: string, hub: string, fetchImpl: typeof fetch): Promise<string> {
+  if (!customerId) return "/pending?error=billing";
+  const form = new URLSearchParams({ customer: customerId, return_url: `${hub}/pending` });
+  return (await stripePost(fetchImpl, secretKey, "billing_portal/sessions", form, "billing.stripe.com")) ?? "/pending?error=billing";
+}
+
 /** "Update card": Stripe's billing portal for this owner's own customer, or a hub path. */
 export async function portalTarget(billing: BillingSelf | null, config: HubConfig, fetchImpl: typeof fetch = fetch): Promise<string> {
   if (!billing) return "/login?error=signed-out";
   if (billing.role !== "owner") return "/pending?error=owner";
   if (!billing.customerId || !config.stripeSecretKey) return "/pending";
-  const form = new URLSearchParams({ customer: billing.customerId, return_url: `${config.hubBaseUrl}/pending` });
-  return (await stripePost(fetchImpl, config.stripeSecretKey, "billing_portal/sessions", form, "billing.stripe.com")) ?? "/pending?error=billing";
+  return openPortal(billing.customerId, config.stripeSecretKey, config.hubBaseUrl, fetchImpl);
 }
 
 const json = (status: number, body: Record<string, string>) =>

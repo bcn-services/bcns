@@ -1,0 +1,33 @@
+{
+  "object": "list",
+  "url": "/v1/subscriptions",
+  "has_more": false,
+  "data": [
+    {
+      "id": "sub_TestFixture0002",
+      "object": "subscription",
+      "customer": "cus_TestFixture0001",
+      "status": "unpaid",
+      "livemode": false,
+      "metadata": {
+        "client_id": "c0000000-0000-4000-8000-0000000000c1"
+      },
+      "cancel_at_period_end": false,
+      "canceled_at": null,
+      "ended_at": null
+    },
+    {
+      "id": "sub_TestFixture0001",
+      "object": "subscription",
+      "customer": "cus_TestFixture0001",
+      "status": "canceled",
+      "livemode": false,
+      "metadata": {
+        "client_id": "c0000000-0000-4000-8000-0000000000c1"
+      },
+      "cancel_at_period_end": false,
+      "canceled_at": 1789990000,
+      "ended_at": 1789990000
+    }
+  ]
+}

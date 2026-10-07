@@ -102,6 +102,16 @@ describe('stripe-webhook: handler', () => {
     expect(neverPaid.applied).toEqual([])
   })
 
+  it('a payment on a second live subscription is flag_duplicate (stored one kept, bcns alerted); the stored one renewing is record_payment', async () => {
+    const body = fixture('invoice.paid')
+    const second = harness(row({ status: 'active', paid_at: NOW - 86400, subscription_id: 'sub_TestKept0001' }))
+    expect((await handle(post(body), SECRET, second.deps)).status).toBe(200)
+    expect(second.applied.map((a) => [a.action, a.customerId, a.subscriptionId])).toEqual([['flag_duplicate', 'cus_TestFixture0001', 'sub_TestFixture0001']])
+    const renewal = harness(row({ status: 'active', paid_at: NOW - 86400, subscription_id: 'sub_TestFixture0001' }))
+    expect((await handle(post(body), SECRET, renewal.deps)).status).toBe(200)
+    expect(renewal.applied.map((a) => a.action)).toEqual(['record_payment'])
+  })
+
   it('a churned client is not reactivated by a payment', async () => {
     const h = harness(row({ status: 'churned', paid_at: NOW - 86400 }))
     expect((await handle(post(fixture('invoice.paid')), SECRET, h.deps)).status).toBe(200)

@@ -1,0 +1,21 @@
+{
+  "object": "search_result",
+  "url": "/v1/subscriptions/search",
+  "has_more": false,
+  "next_page": null,
+  "data": [
+    {
+      "id": "sub_TestFixture0001",
+      "object": "subscription",
+      "customer": "cus_TestFixture0001",
+      "status": "active",
+      "livemode": false,
+      "metadata": {
+        "client_id": "c0000000-0000-4000-8000-0000000000c1"
+      },
+      "cancel_at_period_end": false,
+      "canceled_at": null,
+      "ended_at": null
+    }
+  ]
+}

@@ -36,7 +36,8 @@ export interface ApplyInput {
   /** Unix seconds. */
   eventCreated: number;
   clientId: string;
-  action: "activate" | "resume" | "record_payment" | "start_grace";
+  /** flag_duplicate: a second live subscription; the RPC keeps the stored one and raises a data.notifications alert. */
+  action: "activate" | "resume" | "record_payment" | "start_grace" | "flag_duplicate";
   customerId: string | null;
   subscriptionId: string | null;
   graceUntil: number | null;

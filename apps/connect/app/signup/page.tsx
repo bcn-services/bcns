@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getConfig } from "@/lib/env";
+import { SHOPIFY_FROM } from "@/lib/stripe-billing";
 import { signUp } from "./actions";
 import { Frame } from "../login/frame";
 
@@ -11,7 +12,7 @@ const ERRORS: Record<string, string> = {
   failed: "Something went wrong creating your account. Please try again in a few minutes.",
 };
 
-export default function SignupPage({ searchParams }: { searchParams: { error?: string; ok?: string } }) {
+export default function SignupPage({ searchParams }: { searchParams: { error?: string; ok?: string; from?: string } }) {
   if (!getConfig().signupEnabled) notFound();
   if (searchParams.ok === "check-email") {
     return (
@@ -36,6 +37,8 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
       description="Start a bcns Connect workspace for your business."
     >
       <form action={signUp}>
+        {/* Reached from /login during a Shopify App Store install: Shopify bills them, not us. */}
+        {searchParams.from === SHOPIFY_FROM ? <input type="hidden" name="from" value={SHOPIFY_FROM} /> : null}
         <label className="field" htmlFor="name">
           Business name
           <input id="name" name="name" type="text" autoComplete="organization" required maxLength={100} />

@@ -109,6 +109,28 @@ describe('api.stripe_apply_billing', () => {
     expect(row.grace_until).toBeNull()
   })
 
+  it('a second live subscription never overwrites the stored one: record_payment conflicts, flag_duplicate keeps it and alerts once', async () => {
+    const id = await client('active', { paid_at: new Date(Date.now() - 86400_000).toISOString(), sub: 'sub_zzKept' })
+    const sub = async () => (await sql<{ s: string }>(`select stripe_subscription_id s from data.clients where id = $1`, [id])).rows[0].s
+    expect((await apply(id, 'record_payment', { p_subscription: 'sub_zzOther' })).data).toBe('conflict')
+    expect(await sub()).toBe('sub_zzKept')
+    expect((await apply(id, 'flag_duplicate', { p_subscription: 'sub_zzOther' })).data).toBe('applied')
+    expect((await apply(id, 'flag_duplicate', { p_subscription: 'sub_zzOther' })).data).toBe('applied')
+    expect(await sub()).toBe('sub_zzKept')
+    const alerts = await sql<{ kind: string; payload: Record<string, string> }>(
+      `select kind, payload from data.notifications where client_id = $1`, [id])
+    expect(alerts.rows).toHaveLength(1)
+    expect(alerts.rows[0].kind).toBe('stripe_second_subscription')
+    expect([alerts.rows[0].payload.kept, alerts.rows[0].payload.other]).toEqual(['sub_zzKept', 'sub_zzOther'])
+    // Same subscription is not a duplicate; in grace the stored one has lapsed and a new one replaces it.
+    expect((await apply(id, 'flag_duplicate', { p_subscription: 'sub_zzKept' })).data).toBe('conflict')
+    await sql(`update data.clients set grace_until = now() + interval '1 day' where id = $1`, [id])
+    expect((await apply(id, 'flag_duplicate', { p_subscription: 'sub_zzNew' })).data).toBe('conflict')
+    expect((await apply(id, 'record_payment', { p_subscription: 'sub_zzNew' })).data).toBe('applied')
+    expect(await sub()).toBe('sub_zzNew')
+    expect((await status(id)).grace_until).toBeNull()
+  })
+
   it('only service_role can call the write path', async () => {
     const id = await client('pending')
     const token = await mintJwt(randomUUID())

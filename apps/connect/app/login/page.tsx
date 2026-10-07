@@ -1,5 +1,6 @@
 import { requestReset, signIn } from "./actions";
 import { FINISH_PATH } from "@/lib/shopify-oauth";
+import { SHOPIFY_FROM } from "@/lib/stripe-billing";
 import { BCNS_EMAIL } from "@/lib/request-connection";
 import { getConfig } from "@/lib/env";
 import { Frame } from "./frame";
@@ -102,7 +103,7 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
           Forgot password?
         </a>
         {getConfig().signupEnabled ? (
-          <a href="/signup" className="lnk">
+          <a href={finishingShopify ? `/signup?from=${SHOPIFY_FROM}` : "/signup"} className="lnk">
             Create account
           </a>
         ) : null}
