@@ -81,7 +81,7 @@ describe('breakEmail', () => {
   it('says what happened and when, and reminders say still not connected', () => {
     expect(breakEmail('client_break', 'drive', 'auth_failed', T0).text).toContain("can't reach your Google Drive account")
     expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain('hasn\'t updated since October 1, 2026')
-    expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain("If it doesn't, we get the same alert and will follow up.")
+    expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain("If it doesn't, we've been alerted too.")
     for (const [kind, status] of [['client_break', 'stale'], ['client_break', 'auth_failed'], ['client_break_reminder', 'stale'], ['client_break_reminder', 'auth_failed']] as const)
       expect(breakEmail(kind, 'drive', status, T0).text.toLowerCase()).not.toContain('reply')
     expect(breakEmail('client_break_reminder', 'drive', 'auth_failed', T0).text).toContain('still not connected')

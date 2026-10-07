@@ -175,7 +175,7 @@ export function breakEmail(kind: BreakNotice['kind'], source: string, status: st
     : `The ${label} information in your bcns Connect hasn't updated since ${since}.`
   const fix = status === 'auth_failed'
     ? 'Reconnecting fixes it, and your information picks up again on its own.'
-    : "Reconnecting usually fixes it. If it doesn't, we get the same alert and will follow up."
+    : "Reconnecting usually fixes it. If it doesn't, we've been alerted too."
   const lead = kind === 'client_break_reminder'
     ? `A quick reminder: ${label} is still not connected. ${problem}`
     : problem
