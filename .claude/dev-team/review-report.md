@@ -1,15 +1,23 @@
-REVIEW: 0C/0I/4M
 # Review Report
 **Date:** 2026-10-06
-**Files Reviewed:** 4
+**Files Reviewed:** 6
 
 ## Findings
 
 ### Minor
-Minor — docs/architecture/platform-v1.md:261 — this is a line the engineer edited, and it still reads "no such branch exists; it was written fresh … (PR #98, merged)". The present tense is now false: the guard exists on main — change it to "no such branch existed".
-Minor — docs/architecture/platform-v1.md:204-214 — the section "What exists today (read from origin/main)" still says client rows come only from onboard.ts and that there is "no sign-up route". Both are stale since #99 merged. The lever bullet at :229 now lists `pending` as current, so the section contradicts itself — date-stamp the heading (e.g. "as of 2026-09-30") or update those bullets (follow-up, pre-existing).
-Minor — platform/DESIGN.md:389-390 — the hook spec returns a 403 for every status other than `active`. Since 20261001000200_signup_pending.sql, a `pending` user gets a token with `client_status: 'pending'` and no tenant claims. Line 67 now says `pending` exists while the hook spec is silent about it — add a matching one-line SQL comment pointing to 20261001000200 (follow-up).
-Minor — docs/architecture/platform-v1.md:70,316 — "Actions minutes exhausted until 2026-10-01" is past its date as of 2026-10-06. This stale claim was already there and is unrelated to this item — re-verify, or mark it as historical (follow-up).
+MINOR — apps/connect/lib/data-stats.ts:54 — a QuickBooks-only client with no pins cookie opens /data and the pinned strip is empty: `defaultPins` only names shopify/meta ids, so "Expenses, 30 days" exists in the catalog (and the tab badge) but is not shown until pinned by hand (same pre-existing gap for monday/meet/drive) — if the done-when "stat strip includes it" means visible by default, add `quickbooks/expenses` to `defaultPins`.
+
+## Probes run
+- Callers: selectKeys (data-query fetchPage, data-csv export), filterColumn (applyFilters only), tieBreak (counts head select, order, DataTable row key) — all unchanged for views without `attrs`; `attrs` keys (date, vendor, amount, currency, account, txn_type, payment_type, memo) collide with no records_v1 column used by the view, tieBreak `id`, dateColumn `occurred_at`, or extra `kind`.
+- Allow-list: QBO selects 8 named attributes + id; `accounts`, `credit`, `attributes` never selected (test asserts no blob).
+- Money: existing views pass `minorDigits` undefined -> `?? currencyDigits` path byte-identical; QBO USD/JPY/EUR/negative correct in formatCell and csvCell; negative CSV money not formula-guarded.
+- Injection: attr names static; search term goes through pre-existing cleanSearch/searchFilter double escaping; QA verified hostile terms against live PostgREST v16.
+- Tenant scoping: records_v1 is security_invoker over data.records (RLS); no client_id param path added; `source` enum has 'quickbooks' (20260924000100).
+- page.tsx:80 `views[0]!`: quickbooks now has a view; a test asserts every HUB_SOURCE has one.
+- Wiring: `pnpm test` = 323 pass / 0 fail (base 314; +8 engineer, +1 QA); file is in the literal package.json list.
+- Mutations (throwaway detached worktree, cp-restored, cmp identical, removed): filterColumn ignores attrs -> 3 RED; selectItem ignores attrs -> 5 RED; csvCell drops minorDigits -> 1 RED; QBO config drops minorDigits -> 1 RED; selectKeys drops tieBreak -> 7 RED.
+- No external calls, retries, or money writes in the diff.
 
 ## STANDARDS.md Updates
-none (scoped by caller: no repo edits)
+- Connect /data Views: JSON attributes reach the hub only through a per-view `attrs` allow-list
+- Connect /data Views: money columns carry their scale explicitly (`minorDigits`)
