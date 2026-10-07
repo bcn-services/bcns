@@ -38,3 +38,35 @@ VERDICT: PASS
 
 ## Not Verifiable
 - none beyond the DB-backed tests above. No tests added by QA; nothing committed.
+
+# Fix round 2 delta QA (4ce59f2 vs 7a92f5c)
+**Date:** 2026-10-06 | **Gate mode:** tests
+
+## VERDICT: PASS
+
+## Gates (run by me)
+- `pnpm --filter ./platform exec vitest run` (non-DB): 17 files / 174 passed (floor 17 / 174).
+- `pnpm --filter @bcn-services/connect test`: 341 pass, 0 fail (floor 341).
+- root `pnpm typecheck` and `pnpm lint`: green (11 / 10 tasks successful).
+- `git diff feat/hub-first-run -- platform/test/worker.test.ts`: exactly one hunk, the new `empty_full_list_fails_not_tombstones` (+39 lines, no helper added, no base line changed). `stale_no_false_alarm`, lease_lost, worker_isolation fixtures are back to base, including the real empty-board Monday run asserting `status ok, rows_fetched 1, entity_rows {board:1,item:0}`.
+
+## Drive DB test vs connectors (read, not run; needs the local stack)
+- Token row: `mkClient([{source:'drive'}])` inserts kind `google_oauth_refresh` (KIND map), secret 'test-token', expires_at null, so no refresh path; config `{folder_id:'f1'}` satisfies drive configSchema `/^[\w-]+$/`.
+- Fetch: walkFolder calls `googleFetch` -> `https://www.googleapis.com/drive/v3/files?...`; stub matches `url.includes('/drive/v3/files')` and returns `{files}` with no `nextPageToken`, so one page, `last = true` for both file lists and the empty list (root queue empties). Non-matching URLs get `{}`. File shape (id, name, mimeType pdf, size '1024', modifiedTime, webViewLink, no thumbnailLink) matches `pull`/`normalize`: kind 'file', bytes 1024, thumb skipped, media upsert on (client, 'drive', external_id).
+- Empty walk: yields `{files:[], last:true}` -> `entityDone` -> `seen.get('media')` empty and 'file' finished -> guard throws SourceError -> `finishError` writes `connector_runs.error` (message unchanged by redact, matches `^found nothing to sync: the folder is empty or not shared`), schedule `consecutive_failures` 1, lease cleared (lease_owner is re-set before each `run`, owner changes per `mkTick`). Media untouched because applyTombstones is skipped.
+- Third walk with only d1: ok path resets `consecutive_failures 0`, `last_error null`; applyTombstones sets d2 `deleted_at` + `purge_after` (media branch), d1 stays live. Folder id 'f1' vs file ids d1/d2 do not collide. Reasoned to pass in CI; no defect found.
+
+## Mutations (cp backup, restore, `cmp` byte-identical, `git status` clean after each)
+- (a) `if (false && emptyFullListTables(...))` in run.ts: only RED = `runOne with a complete but empty listing > fails the run and tombstones nothing` (173/174).
+- (b) media-only `.filter(t => t === 'media')` removed: only RED = `emptyFullListTables > never guards Monday jobs or Meta records: an emptied board or account tombstones (and heals) as usual`, "expected [ 'jobs' ] to deeply equal []" (173/174).
+- (c1) owner check `if false` in api.reset_source_cursors: RED `api.reset_source_cursors: owner only`.
+- (c2) hour clause replaced by `and true`: RED `reset_source_cursors: once an hour, in the same update`.
+- (c3) source_settings_v1 allow-list broken (`|| s.config` appended): RED `source_settings_v1: target is built from the allow-list only, never from config itself`.
+- (c4) set_source_folder cursor reset removed: RED `set_source_folder: writes folder_id + notes_url and resets the cursors in the same statement`.
+- Each of (c1-c4) exactly 1 failed / 19 passed in source-settings-migration.test.ts.
+
+## Sweep
+- `grep -rnI "found nothing to sync|board is empty|ad account|EMPTY_NOUN" platform apps docs`: no "board is empty" or `EMPTY_NOUN` left; "found nothing to sync" only in Drive-worded places (run.ts, friendlyError, tests, DESIGN s4.1/test table, NOTES #7); remaining "ad account" hits are unrelated Meta text, or DESIGN/NOTES explicitly saying Monday/Meta are NOT guarded.
+
+## Findings
+- none. Not executed locally: DB-backed `platform/test/worker.test.ts` (barred; CI runs it).
