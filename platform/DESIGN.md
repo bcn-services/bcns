@@ -714,6 +714,10 @@ Errors use custom SQLSTATEs so the dashboard can branch on `error.code`:
 | `BCNS3` | `validation` | bad argument (detail names the field) |
 | `BCNS4` | `not_found` | id not in tenant |
 | `BCNS5` | `too_large` | file > 100 MB or attributes > 256 KB |
+| `BCNS6` | `shop_in_use` | that Shopify store is already connected to another client |
+| `BCNS7` | `shop_mismatch` | reconnect points at a different Shopify store than the saved one |
+| `BCNS8` | `signup_capped` | too many pending self-serve sign-ups in the last hour (10) |
+| `BCNS9` | `rate_limited` / `sync_running` | source re-sync or folder change refused: `rate_limited` (detail = next allowed time, ISO UTC; one re-sync per source per hour) or `sync_running` (a worker holds the lease) |
 
 PostgREST returns these as HTTP 400 with `{code, message, details, hint}`.
 
@@ -733,6 +737,10 @@ PostgREST returns these as HTTP 400 with `{code, message, details, hint}`.
 | `api.download_url` | `(media_id uuid) returns jsonb` | Reads media where `id = media_id and client_id = tenant and deleted_at is null and storage_path is not null` → else `BCNS4`. Computes client-local month; locks the ledger row (`insert … on conflict do update set bytes = egress_ledger.bytes returning bytes` — a no-op upsert that takes the row lock); **if `used >= quota` → `BCNS1`** with detail `{used, quota}` (nothing charged, whole statement rolls back). Else `update egress_ledger set bytes = bytes + media.bytes` (this download may push the total past the quota; the next call is denied — D24), then `insert into download_tickets (client_id, storage_path, expires_at = now() + interval '5 minutes') on conflict do update set expires_at = excluded.expires_at`. Returns `{"path": storage_path, "bytes": bytes, "expires_in": 300, "egress": {"used": …, "quota": …}}`. Thumbnails never go through this RPC (R21). |
 | `api.report_dashboard_version` | `(app_version text, api_version text) returns void` | Upsert `dashboard_versions`. Any role. (D17) |
 | `api.remove_member` | `(target_user_id uuid) returns void` | Requires `data.active_client_role() = 'owner'` → else `BCNS2`. Refuses to remove self or an `is_smoke` row (`BCNS3`). `delete from memberships where user_id = target_user_id and client_id = tenant` → 0 rows ⇒ `BCNS4` (an owner cannot touch another tenant's users). R4 takes effect on the target's next request. Smoke rows are removed/rotated only by `scripts/rotate-smoke` (service role, §5.10). |
+| `api.source_settings_v1` | `() returns table(source, enabled, sync_interval, last_run_at, last_success_at, next_run_at, last_reset_at, next_reset_allowed_at, folder_changed_at, sync_running, target jsonb)` | Any role. Security-definer function, not a view (`connector_schedule` is internal). `target` is built from an allow-list of `config` keys (`folder_id, notes_url, board_url, board_id, admin_url, shop, realm_id`), never `config` itself. |
+| `api.connector_runs_v1` | `(p_source data.source) returns table(source, mode, status, started_at, finished_at, rows_fetched, rows_upserted, error)` | Any role. Last 20 runs of that source, newest first; no `lease_owner`. |
+| `api.reset_source_cursors` | `(p_source data.source) returns void` | Owner only (`BCNS2`); Shopify refused (`BCNS3` detail `source`). Same cursor reset as `add-source --reset-cursors` (`backfill_cursor = incremental_cursor = '{}'`, `next_run_at = now()`) in one guarded UPDATE: enabled row, `last_reset_at` older than 1 h, no live lease — else `BCNS4` / `BCNS9`. |
+| `api.set_source_folder` | `(p_source data.source, p_folder_id text, p_folder_url text default null) returns void` | Owner only. `meet`/`drive` only; id `^[A-Za-z0-9_-]{10,128}$`, url `https://drive.google.com/…` ≤ 500 chars (`BCNS3` detail `folder_id`/`folder_url`). Writes `config.folder_id` + `notes_url` and resets the cursors in the same UPDATE; not held to the 1-hour limit; refused while leased (`BCNS9`). |
 
 No RPC takes `client_id` as an argument (R16). Every RPC that writes checks `W`; `download_url` and
 `report_dashboard_version` accept any role. `data.register_media(client uuid, path, title, tags,
@@ -1218,6 +1226,7 @@ marker, an ambiguous shop→client match, or a shopify token not confirmed dead 
 | `rotate-smoke --slug` | Sets a new random password on the smoke user, updates the password manager entry and the dashboard repo's CI secret via `gh secret set`. Run at onboarding and on any suspected leak; `--remove` deletes the membership + auth user (the only path that can, §3.3). |
 | `renormalize` | §5.8 |
 | `set-quota --slug --gb <n>` | `clients.egress_quota_bytes`. |
+| `add-source --slug --source <s> [--reset-cursors]` | Attaches or rotates one source's credential (connection-day.md). `--reset-cursors` re-backfills a changed target. Stays the operator path; an owner can now do the same reset and the meet/drive folder change from the hub page `/sources/<source>` (`api.reset_source_cursors`, `api.set_source_folder`). |
 
 ## 6. SB panel map — quote § 2 → views
 
@@ -1357,7 +1366,7 @@ Recorded by `scripts/onboard`; a failed item stops the script.
 | M3 | Meta | `timezone_name == clients.timezone` (warn, not fail; see N2). |
 | D1 | Monday | Personal token; board id; column autodetect found `Status` (others optional). |
 | G1 | Meet | OAuth client lives in the **client's** Workspace project, user type **Internal**; consented by the owner or a role account; refresh token pasted. A bcns-org client id fails. |
-| G2 | Meet | Drive folder id of the Gemini notes; at least one doc readable through the token. |
+| G2 | Meet | Drive folder id of the Gemini notes; at least one doc readable through the token. The owner can repoint it later from the hub (`/sources/meet` → Change folder); the hub cannot check readability, the next worker run does. |
 | U1 | all | Smoke user created and `is_smoke = true`. |
 | U2 | all | `clients.timezone` confirmed with the owner ("which timezone does your Shopify admin show?") **and** equal to S5's `store_timezone` and M3's `timezone_name`; if the three disagree, record which one the owner chose in `clients.notes` before continuing. |
 | Q1 | QuickBooks | OAuth self-serve only (no manual token prompt): hub Connect completed, `config.realm_id` set from the callback's `realmId`, not typed by hand. |
