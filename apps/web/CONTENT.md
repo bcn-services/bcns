@@ -1022,6 +1022,10 @@ Each founder entry has:
 - **Constraint:** Renders as a single `<p>` — the field is one string, so paragraph breaks are not possible. Multi-paragraph bios would require `bio: string[]` plus a `.map()` in the component.
 - **Length:** 100-300 words; shorter is better if every sentence earns its place. Keep the two within ~10 words of each other — the cards sit side by side and a length mismatch reads as one founder having less to say.
 
+#### founders[n].sameAs[] (optional)
+- **Field:** `about.founders[n].sameAs`
+- **Purpose:** Profile URLs (LinkedIn) for the Person `sameAs` in the Organization JSON-LD. Not rendered on the page.
+
 #### founders[n].credentials[] (open-ended array)
 - **Field:** `about.founders[n].credentials`
 - **Purpose:** Bullet list of credentials (degrees, former employers, notable achievements)
@@ -1121,6 +1125,8 @@ Navigation card grid linking to the main pages. Fixed tuple of 4.
 SEO `<title>` and `<meta name="description">` for each page. All values are
 filled as of the C1 pass. Edit in place if positioning language changes.
 
+Titles: the layout template appends " · bcns", so a title never ends in "| bcns" (that rendered "Pricing | bcns · bcns"). Home and About set their own full title. Descriptions: ≤155 chars (Google truncates past that), prices kept. Descriptions also feed the Service JSON-LD (`lib/seo.ts`).
+
 ### pageMeta.home
 
 #### pageMeta.home.title
@@ -1129,47 +1135,47 @@ filled as of the C1 pass. Edit in place if positioning language changes.
 
 #### pageMeta.home.description
 - **Field:** `pageMeta.home.description`
-- **Length:** 140-160 chars
+- **Length:** ≤155 chars
 
 ### pageMeta.services
 
 #### pageMeta.services.title
 - **Field:** `pageMeta.services.title`
-- **Length:** 50-60 chars
+- **Length:** ≤50 chars before the " · bcns" suffix
 
 #### pageMeta.services.description
 - **Field:** `pageMeta.services.description`
-- **Length:** 140-160 chars
+- **Length:** ≤155 chars
 
 ### pageMeta.work
 
 #### pageMeta.work.title
 - **Field:** `pageMeta.work.title`
-- **Length:** 50-60 chars
+- **Length:** ≤50 chars before the " · bcns" suffix
 
 #### pageMeta.work.description
 - **Field:** `pageMeta.work.description`
-- **Length:** 140-160 chars
+- **Length:** ≤155 chars
 
 ### pageMeta.pricing
 
 #### pageMeta.pricing.title
 - **Field:** `pageMeta.pricing.title`
-- **Length:** 50-60 chars
+- **Length:** ≤50 chars before the " · bcns" suffix
 
 #### pageMeta.pricing.description
 - **Field:** `pageMeta.pricing.description`
-- **Length:** 140-160 chars
+- **Length:** ≤155 chars
 
 ### pageMeta.about
 
 #### pageMeta.about.title
 - **Field:** `pageMeta.about.title`
-- **Length:** 50-60 chars
+- **Length:** ≤50 chars before the " · bcns" suffix
 
 #### pageMeta.about.description
 - **Field:** `pageMeta.about.description`
-- **Length:** 140-160 chars
+- **Length:** ≤155 chars
 
 ### pageMeta.connect, pageMeta.deluxe, pageMeta.aiConsulting
 

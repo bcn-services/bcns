@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
+import { serviceJsonLd } from "@/lib/seo";
 import { SiteHeader } from "@/components/site-header";
 import { CtaBand } from "@/components/cta-band";
 import { ConnectHead } from "@/components/services/connect-head";
@@ -18,6 +20,7 @@ export default function ConnectPage() {
   const { contactSection, connect, connectDemo, tools } = siteContent;
   return (
     <div className="flex min-h-dvh flex-col">
+      <JsonLd data={serviceJsonLd("connect")} />
       <SiteHeader />
       <main className="flex-1">
         <ConnectHead />

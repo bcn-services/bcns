@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
+import { JsonLd } from "@/components/json-ld";
 import { siteConfig } from "@/lib/site";
+import { siteJsonLd } from "@/lib/seo";
 import "./globals.css";
 
 // Fonts are SELF-HOSTED (next/font/local), not fetched from Google at build time.
@@ -35,6 +37,8 @@ export const metadata: Metadata = {
     template: `%s · ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  // Resolved per route against metadataBase, so each page points at itself.
+  alternates: { canonical: "./" },
   keywords: [
     "custom software",
     "small business software",
@@ -79,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <noscript>
           <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
         </noscript>
+        <JsonLd data={siteJsonLd()} />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>

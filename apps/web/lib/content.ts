@@ -173,6 +173,8 @@ export interface FounderItem {
   photo?: string;
   bio: string;
   credentials: string[];
+  /** Profile URLs for the Person JSON-LD `sameAs`; not rendered. */
+  sameAs?: string[];
 }
 
 export interface AboutContent {
@@ -883,6 +885,7 @@ export const siteContent: SiteContent = {
       {
         name: "Nate Seluga",
         roleLine: "Engineering",
+        sameAs: ["https://www.linkedin.com/in/nate-seluga/"],
         photo: "/founders/nate-seluga.jpg",
         bio: "Nate builds the tools. He is drawn to efficiency, and to software that optimizes your workflow exactly how you want it to. Time spent inside day-to-day operations showed him how much of a workday goes to operations that could be automated but weren't, due to the inconvenience of change and hesitation to pay for outside solutions that aren't tailored to the existing process. He has extensive experience creating tools to reduce friction in his own work. bcns exists because that toolbox should not stop with the person who built it.",
         credentials: [
@@ -893,6 +896,7 @@ export const siteContent: SiteContent = {
         // No `photo` yet. The component falls back to initials until one exists.
         name: "Brandon Chung",
         roleLine: "Business & clients",
+        sameAs: ["https://www.linkedin.com/in/brandon-chung1/"],
         bio: "Brandon studies economics at New York University and has worked in business evaluation and optimization, including time as an investor. That work comes down to one question asked repeatedly: what enables a business to make money, and what is quietly slowing down that process. He has spent time finding the businesses and projects that already work and identifying what would make them work better. On a bcns project he owns scoping and communication, meaning he is the one who advises you on solutions that are worth building.",
         credentials: [
           "Economics, New York University",
@@ -1264,22 +1268,22 @@ export const siteContent: SiteContent = {
     home: {
       title: "bcns: Get Your Small Business Ready for AI",
       description:
-        "bcns Connect brings the tools your small business already uses into one organized place, ready for AI and custom software. $200/month, no setup fee. Book a free 30-minute consult.",
+        "bcns Connect brings your small business's tools into one organized place, ready for AI and custom software. $200/month, no setup fee.",
     },
     services: {
-      title: "What We Offer | bcns",
+      title: "What We Offer",
       description:
         "bcns Connect, custom Deluxe builds and AI consulting for small businesses. Three building blocks for a business that's ready for AI.",
     },
     work: {
-      title: "Past Work | bcns",
+      title: "Past Work",
       description:
-        "Case studies from bcns client builds. Each one covers the problem, what we built, and what changed. First projects in progress now.",
+        "Case studies from bcns client builds: a restaurant revenue dashboard and an auto detailer's booking site. The problem, what we built, what changed.",
     },
     pricing: {
-      title: "Pricing | bcns",
+      title: "Pricing",
       description:
-        "bcns Connect is $200/month with no setup fee. Deluxe builds start at $5,000 setup plus $300/month on top of Connect. AI consulting at $1,000 per day. Fixed quotes, no hourly surprises.",
+        "bcns Connect is $200/month, no setup fee. Deluxe builds from $5,000 setup plus $300/month. AI consulting at $1,000 a day. Fixed quotes.",
     },
     about: {
       title: "About bcns | Two Founders, Custom Software",
@@ -1292,12 +1296,12 @@ export const siteContent: SiteContent = {
         "bcns Connect plugs into the tools your small business already uses and keeps everything organized in one place. $200/month, no setup fee.",
     },
     deluxe: {
-      title: "Deluxe Builds | bcns",
+      title: "Deluxe Builds",
       description:
         "Custom AI agents, apps and dashboards built on top of your bcns Connect data. From $5,000 setup plus $300/month, with a fixed quote before work starts.",
     },
     aiConsulting: {
-      title: "AI Consulting | bcns",
+      title: "AI Consulting",
       description:
         "One day on your business: we find where AI actually helps, build a workflow with you watching, and get your team using it. $1,000 a day.",
     },
