@@ -13,6 +13,7 @@ import {
   type RunRow,
   type SettingsRow,
 } from "@/lib/source-settings";
+import type { HealthRow } from "@/lib/sources";
 import { changeFolderAction, resyncAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +34,10 @@ export default async function SourceSettingsPage({
   const tz = client?.timezone ?? undefined;
   const at = (iso: string | null) => (iso && !Number.isNaN(new Date(iso).getTime()) ? formatDateTime(iso, tz) : "never");
 
-  const [settings, runs] = await Promise.all([
+  const [settings, runs, health] = await Promise.all([
     api.rpc("source_settings_v1"),
     api.rpc("connector_runs_v1", { p_source: source }),
+    api.from("connector_health_v1").select("source,status,last_success_at,last_error"),
   ]);
   const page = sourcePage({
     source,
@@ -43,6 +45,7 @@ export default async function SourceSettingsPage({
     runs: runs.data as RunRow[] | null,
     role: membership.role,
     now: new Date(),
+    health: health.error ? null : (health.data as HealthRow[] | null),
   });
   const ok = searchParams.ok ? OK_MESSAGES[searchParams.ok] : undefined;
 
@@ -80,10 +83,17 @@ export default async function SourceSettingsPage({
             <span className="dot" aria-hidden="true" />
             Status
           </h2>
-          <span className={cn("st", page.connected ? (page.syncRunning ? "st-warn" : "st-ok") : "st-idle")}>
-            {page.connected ? (page.syncRunning ? "Syncing now" : "Connected") : "Not connected"}
-          </span>
+          <span className={cn("st", TONE[page.status.tone])}>{page.status.label}</span>
         </div>
+        {page.lastError ? (
+          <div>
+            <p className="err">{page.lastError.problem}</p>
+            <details className="ss-why">
+              <summary>Details</summary>
+              <code className="m">{page.lastError.raw}</code>
+            </details>
+          </div>
+        ) : null}
         {page.connected ? (
           <dl className="ss-dl">
             <div className="ss-row">

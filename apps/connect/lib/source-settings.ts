@@ -8,7 +8,7 @@
  * database re-checks owner, tenant, the one-hour limit and the folder id. Everything here is
  * the friendly layer on top.
  */
-import { HUB_SOURCES, TITLES, type HubSource } from "./sources";
+import { HUB_SOURCES, TITLES, composeSources, type HealthRow, type HubSource, type Tone } from "./sources";
 import { normalizeShop } from "./shopify-oauth";
 
 /** The only config keys the page ever reads, matching TARGET_KEYS in the migration. */
@@ -262,7 +262,12 @@ export interface SettingsRow {
 export interface SourcePage {
   source: HubSource;
   title: string;
+  /** An enabled schedule: gates the owner controls. */
   connected: boolean;
+  /** The Status badge: the Sources card's label and tone (connector health), or Syncing now. */
+  status: { label: string; tone: Tone };
+  /** The health row's last error: plain words plus the raw text for "Details". */
+  lastError: { problem: string; raw: string } | null;
   isOwner: boolean;
   lastRunAt: string | null;
   lastSuccessAt: string | null;
@@ -285,6 +290,8 @@ export function sourcePage(input: {
   runs: readonly RunRow[] | null | undefined;
   role: string | null | undefined;
   now: Date;
+  /** connector_health_v1 rows; null or absent when the read failed. */
+  health?: readonly HealthRow[] | null;
 }): SourcePage {
   const { source, now } = input;
   const row = (input.settings ?? []).find((s) => s.source === source && s.enabled) ?? null;
@@ -293,10 +300,22 @@ export function sourcePage(input: {
   const syncRunning = row?.sync_running === true;
   const runs = (input.runs ?? []).slice(0, 20);
   const target = row ? targetFor(source, row.target) : [];
+  const healthRow = (input.health ?? []).find((h) => h.source === source) ?? null;
+  const card = composeSources(healthRow ? [healthRow] : []).find((c) => c.source === source);
+  const lastErrorRaw = healthRow?.last_error?.trim() ? healthRow.last_error.trim() : null;
   return {
     source,
     title: TITLES[source],
     connected,
+    status:
+      connected && syncRunning
+        ? { label: "Syncing now", tone: "warn" }
+        : card && card.status !== "none"
+          ? { label: card.label, tone: card.tone }
+          : connected
+            ? { label: "Connected", tone: "ok" }
+            : { label: "Not connected", tone: "idle" },
+    lastError: lastErrorRaw ? { problem: friendlyError(lastErrorRaw) ?? lastErrorRaw, raw: lastErrorRaw } : null,
     isOwner,
     lastRunAt: row?.last_run_at ?? null,
     lastSuccessAt: row?.last_success_at ?? null,

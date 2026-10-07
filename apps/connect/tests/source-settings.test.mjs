@@ -315,3 +315,41 @@ test("isHubSource is the route's allow-list", () => {
   for (const s of ["shopify", "meta", "monday", "meet", "drive", "quickbooks"]) assert.equal(isHubSource(s), true);
   for (const s of ["upload", "platform", "dashboard", "", "MEET", null, "drive/../x"]) assert.equal(isHubSource(s), false);
 });
+
+test("sourcePage: Status follows connector health like the Sources card, with its last error in plain words", () => {
+  const health = (over = {}) => ({ source: "drive", status: "ok", last_success_at: null, last_error: null, ...over });
+  const drive = sourcePage({
+    source: "drive", settings: [settings()], runs: [], role: "owner", now: NOW,
+    health: [health({ status: "error", last_error: "404 File not found: folder 1AbC" })],
+  });
+  assert.deepEqual(drive.status, { label: "Error", tone: "error" });
+  assert.match(drive.lastError.problem, /couldn't find that folder/);
+  assert.equal(drive.lastError.raw, "404 File not found: folder 1AbC");
+
+  const meta = sourcePage({
+    source: "meta", settings: [settings({ source: "meta" })], runs: [], role: "member", now: NOW,
+    health: [health(), health({ source: "meta", status: "stale" })],
+  });
+  assert.deepEqual(meta.status, { label: "Stale", tone: "warn" });
+  assert.equal(meta.lastError, null);
+
+  const failed = sourcePage({
+    source: "quickbooks", settings: [settings({ source: "quickbooks" })], runs: [], role: "owner", now: NOW,
+    health: [health({ source: "quickbooks", status: "auth_failed", last_error: "invalid_grant" })],
+  });
+  assert.deepEqual(failed.status, { label: "Reconnect needed", tone: "error" });
+  assert.match(failed.lastError.problem, /signed out/);
+
+  const syncing = sourcePage({
+    source: "drive", settings: [settings({ sync_running: true })], runs: [], role: "owner", now: NOW,
+    health: [health({ status: "error" })],
+  });
+  assert.deepEqual(syncing.status, { label: "Syncing now", tone: "warn" });
+
+  // No health read (or it failed): an enabled schedule still reads Connected, a disabled one Not connected.
+  assert.deepEqual(sourcePage({ source: "drive", settings: [settings()], runs: [], role: "owner", now: NOW }).status,
+    { label: "Connected", tone: "ok" });
+  assert.deepEqual(
+    sourcePage({ source: "drive", settings: [settings({ enabled: false })], runs: [], role: "owner", now: NOW, health: null }).status,
+    { label: "Not connected", tone: "idle" });
+});
