@@ -125,13 +125,9 @@ test("friendlyError points at the fix, never at the jargon", () => {
 });
 
 test("friendlyError: the worker's empty-listing failure reads as the empty-folder warning", () => {
+  // Exact text platform/worker/src/run.ts throws (Drive is the only guarded source).
   const drive = "found nothing to sync: the folder is empty or not shared with the connected account, so nothing was removed";
-  const monday = "found nothing to sync: the board is empty or not shared with the connected account, so nothing was removed";
   assert.equal(friendlyError(drive), EMPTY_FOLDER_WARNING);
-  assert.equal(
-    friendlyError(monday),
-    "We didn't find anything to bring in. Check that it is shared with the account you connected."
-  );
 });
 
 const run = (over) => ({

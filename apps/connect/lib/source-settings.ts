@@ -174,12 +174,8 @@ export function friendlyError(raw: string | null | undefined): string | null {
   const text = typeof raw === "string" ? raw.trim() : "";
   if (!text) return null;
   const t = text.toLowerCase();
-  // The worker's empty-listing guard (§4.1): nothing listed, so nothing was removed.
-  if (/found nothing to sync/.test(t)) {
-    return /\bfolder\b/.test(t)
-      ? EMPTY_FOLDER_WARNING
-      : "We didn't find anything to bring in. Check that it is shared with the account you connected.";
-  }
+  // The worker's empty-listing guard (§4.1, Drive only): nothing listed, so nothing was removed.
+  if (/found nothing to sync/.test(t)) return EMPTY_FOLDER_WARNING;
   if (/invalid_grant|token (has been )?(expired|revoked)|unauthori[sz]ed|\b401\b/.test(t)) {
     return "The connection was signed out. Reconnect it from the Sources page.";
   }

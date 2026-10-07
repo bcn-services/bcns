@@ -777,12 +777,16 @@ interface CanonicalWrites { money?: MoneyRow[]; products?: …; jobs?: …; mess
 accumulates every `externalId` it saw during the run; when the run ends with `done: true` (not a
 budget stop, not an error) it sets `deleted_at = now()` on tenant rows of `table` for that `source`
 whose `external_id` is not in the set, and clears `deleted_at` on any that reappeared. A partial run
-never tombstones. A complete run whose set for a table is **empty** (every `fullList` entity of that
-table done, zero ids) tombstones nothing and fails the run instead (`SourceError` "found nothing to
-sync: the folder/board/ad account is empty or not shared with the connected account, so nothing was
-removed"; class `error`, cursors kept, next run retries): an empty or unshared Drive folder or Monday
-board is far likelier than a client deleting everything. Cost: a table really emptied at the source
-is never tombstoned; health shows `error` (and `stale` once 3 intervals pass since an earlier success) until something is in it again. `normalize` cannot produce a DB-generated id; cross-entity references use source
+never tombstones. **Empty-listing guard, `media` (Drive) only:** a complete run whose `media` set is
+**empty** (every `fullList` entity of that table done, zero ids) tombstones nothing and fails the run
+instead (`SourceError` "found nothing to sync: the folder is empty or not shared with the connected
+account, so nothing was removed"; class `error`, cursors kept, next run retries). Drive lists an
+unshared or wrong folder as an empty one, and a `media` tombstone is lossy (30-day purge of the row,
+its thumbnail and its `media_set_items`). Monday and Meta are not guarded: an unshared board or ad
+account already throws upstream (board not found, Graph permission error), and their tombstones heal
+when the ids come back, so a guard would only fail a really-emptied board or all-archived account on
+every run. Cost (Drive): a folder really emptied is never tombstoned; health shows `error` (and
+`stale` once 3 intervals pass since an earlier success) until something is in it again. `normalize` cannot produce a DB-generated id; cross-entity references use source
 keys (`image_hash`, `campaign_id`), and views join on those.
 `RunContext` gives the connector its token, `config`, `clients.timezone`, an HTTP client with the
 source's rate limiter, and a logger. It has no scheduler, no DB handle, no Storage handle except
@@ -1065,7 +1069,7 @@ Per claimed row:
 2. Load token + config; build `RunContext`.
 3. Iterate `backfill(from, cursor)` or `incremental(since)`. Per page, in one transaction:
    insert raw (`on conflict do nothing`), `normalize`, upsert canonical, apply tombstone if
-   present (on `done`; a complete listing with zero ids for a table throws instead, §4.1) (a `media` tombstone also sets `purge_after = now() + 30 days`, cleared if the id returns), `update connector_schedule set backfill_cursor|incremental_cursor = page.cursor`,
+   present (on `done`; a complete Drive walk with zero files throws instead, §4.1) (a `media` tombstone also sets `purge_after = now() + 30 days`, cleared if the id returns), `update connector_schedule set backfill_cursor|incremental_cursor = page.cursor`,
    bump `connector_runs.pages/rows_*`. Stop when `page.done` or `RUN_BUDGET_MS` elapsed.
 4. Finish: `status='ok'`, `finished_at`. Schedule: if backfill finished → `backfill_cursor = null`,
    `next_run_at = now()` (first incremental follows immediately), notification
@@ -1119,7 +1123,7 @@ upsert `connector_health` **only where the result is distinct** from the stored 
 | `auth_failed` | `source_tokens.status = 'auth_failed'` or last finished run `status = 'auth_failed'` |
 | `never_ran` | no run with `finished_at` |
 | `error` | last finished run `status = 'error'` and `consecutive_failures >= 1` and not stale |
-| `stale` | `last_success_at < now() − 3 * interval` (missed ≥ 3 runs), **or** — only for sources whose connector declares a `fullList` entity (Monday, Meta, Drive) — the last finished `ok` run fetched 0 rows for that entity while the previous 10 `ok` runs each fetched > 0 (a complete listing with zero ids for a whole table now fails the run under §4.1 instead, so this mostly catches Meta's per-entity case). Never applied to `updated_at`-filtered incrementals (Shopify, Meet): an idle store legitimately returns 0 rows at night. |
+| `stale` | `last_success_at < now() − 3 * interval` (missed ≥ 3 runs), **or** — only for sources whose connector declares a `fullList` entity (Monday, Meta, Drive) — the last finished `ok` run fetched 0 rows for that entity while the previous 10 `ok` runs each fetched > 0 (a complete Drive walk with zero files fails the run under §4.1 instead, so for Drive this rule never sees that run). Never applied to `updated_at`-filtered incrementals (Shopify, Meet): an idle store legitimately returns 0 rows at night. |
 | `ok` | otherwise |
 
 ```sql
@@ -1309,8 +1313,8 @@ have a fixture that is not the one under test.
 | `raw_partitioned` | `data.raw` is partitioned by range on `fetched_at`; `ensure_raw_partitions()` creates month+2; no default partition exists; calling it twice concurrently (two connections) succeeds. (R6) |
 | `raw_dedupe` | inserting the same fixture page twice yields one `raw` row per key and one `raw_latest` row; changing one payload byte yields a second `raw` row and an updated `raw_latest.payload_hash`. (D5) |
 | `tombstone_only_on_done` | Monday fixture with 25 items, then a run whose page reports `done: false` with 20 items → 0 `jobs` tombstoned; then `done: true` with 20 → exactly 5 `deleted_at` set; re-run with 25 → all cleared. (§4.1) |
-| `stale_no_false_alarm` | Shopify row with 10 consecutive `ok` runs then one `ok, rows_fetched = 0` → health stays `ok`; Monday `item` full-list `ok` run with 0 rows (fabricated, shaped like a real empty-board run) after 10 positive → `stale`. (§5.5) |
-| `empty_full_list_fails_not_tombstones` | Monday client with 2 live `jobs`; a complete run against an empty board → run `error` "found nothing to sync…", `entity_rows {board:1,item:0}`, 0 jobs tombstoned, schedule `consecutive_failures 1`; next run with 1 item → `ok`, failures reset, the missing item tombstoned. Pure twin: `test/empty-full-list.test.ts`. (§4.1) |
+| `stale_no_false_alarm` | Shopify row with 10 consecutive `ok` runs then one `ok, rows_fetched = 0` → health stays `ok`; Monday `item` full-list run with 0 rows after 10 positive → `stale`. (§5.5) |
+| `empty_full_list_fails_not_tombstones` | Drive client with 2 live `media` rows; a complete walk of an empty folder → run `error` "found nothing to sync: the folder…", 0 media tombstoned, `purge_after` null, schedule `consecutive_failures 1`, lease cleared; next walk with 1 file → `ok`, failures reset, the missing file tombstoned with `purge_after` set. Pure twin: `test/empty-full-list.test.ts` (also pins that Monday `jobs` and Meta `records` are never guarded). (§4.1) |
 | `alert_retry` | with Resend stubbed to fail: `notifications` row has `sent_at null, attempts 1`; unstub, next tick sends it and sets `sent_at`; a second identical alert inserts nothing. (R33) |
 | `normalize_idempotent` | run each connector's `normalize` twice over the fixture pages (`fixtures/*-sample.json`); the second upsert changes 0 rows (`xmax` check / `updated_at` unchanged). (R7, R8) |
 | `money_metric_disjoint` | no `daily_metrics.metric` is in `('revenue','orders','refunds','payouts')`; no `money.kind` outside `('order','refund','payout')`. (R11) |

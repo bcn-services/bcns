@@ -85,3 +85,25 @@
 - Empty-listing guard: a genuinely emptied folder/board stays in error and keeps its rows; health 'error' sends no email.
 - connector_runs_v1 limit 20 is covered by index connector_runs (client_id, source, started_at desc).
 - set_source_folder is deliberately not hour-limited; abuse ceiling is one backfill per click by an owner, lease-guarded.
+
+## Fix round 2 (2026-10-06): empty-listing guard on Drive `media` only
+Source: delta review-report.md, 1 Important (+ the Minor Meta health flap it subsumes). Supersedes the "guard also covers Meta" note and the "folder/board" reviewer flag above.
+
+### Changes Made
+- platform/worker/src/run.ts — emptyFullListTables filters to table `media`; EMPTY_NOUN dropped; throw text fixed to "found nothing to sync: the folder is empty or not shared with the connected account, so nothing was removed" — review Important (+ Minor Meta flap).
+- platform/test/empty-full-list.test.ts — new pure case "never guards Monday jobs or Meta records"; two-entity union case moved to a media fixture; runOne cases moved to a Drive fixture (files.list `{files}`, google_oauth_refresh token, media tombstone SQL) — review Important.
+- platform/test/worker.test.ts — base text restored for stale_no_false_alarm (REAL empty-board run, ok / rows_fetched 1 / {board:1,item:0}), lease_lost_write_ignored `mkTick()`, worker_isolation meta stub, `emptyBoard` const; empty_full_list_fails_not_tombstones rewritten on Drive (2 live media → empty walk → error, 0 tombstoned, purge_after null, failures 1, lease cleared → 1 file → ok, failures reset, d2 tombstoned with purge_after set) — review Important.
+- apps/connect/lib/source-settings.ts — friendlyError's non-folder "found nothing to sync" branch removed (worker never emits it now); marker maps straight to EMPTY_FOLDER_WARNING.
+- apps/connect/tests/source-settings.test.mjs — dropped the monday-message assertion for that dead branch; drive assertion kept (test count unchanged).
+- platform/DESIGN.md — §4.1 rationale (Drive only; Monday/Meta unguarded: unshared board/account errors upstream, tombstones self-heal, media purge is lossy); §5.3 step 3; §5.5 stale parenthetical; catalog rows stale_no_false_alarm (base text) and empty_full_list_fails_not_tombstones (Drive fixture).
+- platform/NOTES.md — #7 resolved for Drive only with the reason; #8 notes the guard is Drive-only.
+
+### Verify
+- Platform non-DB `pnpm --filter ./platform exec vitest run`: before 17 files / 173 pass → after 17 files / 174 pass.
+- Connect `pnpm --filter @bcn-services/connect test`: 341 pass / 0 fail / 0 skip (unchanged; one assertion removed inside an existing test).
+- Root `pnpm typecheck` 11/11, `pnpm lint` 10/10 green. Platform tsconfig includes test/, so worker.test.ts typechecks.
+- worker.test.ts DB cases not run locally (no stack, per instructions); CI runs them.
+
+### Mutations (cp backup, restore, cmp identical, git status clean of extras)
+- M-R2a throw line deleted in run.ts → red "runOne with a complete but empty listing > fails the run and tombstones nothing" (AssertionError: expected true to be false — the media tombstone ran); 7 others green.
+- M-R2b `.filter(t => t === 'media')` dropped (re-guards jobs/records) → red "emptyFullListTables > never guards Monday jobs or Meta records: an emptied board or account tombstones (and heals) as usual"; 7 others green.

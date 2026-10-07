@@ -41,9 +41,7 @@ const emptyShopify = (q: string) =>
   : /products\(first:/.test(q) ? { data: { products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
   : { data: {} }
 
-const board = (items: unknown[]) => ({ data: { boards: [{ id: '1001', name: 'Board 1', columns: [], groups: [], items_page: { cursor: null, items } }] } })
-const emptyBoard = board([])
-const mondayItem = (id: string) => ({ id, name: `Item ${id}`, created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z', group: { id: 'g', title: 'G' }, column_values: [] })
+const emptyBoard = { data: { boards: [{ id: '1001', name: 'Board 1', columns: [], groups: [], items_page: { cursor: null, items: [] } }] } }
 
 const idleFetch = stub((url, body) =>
   url.includes('myshopify.com') ? emptyShopify(body)
@@ -161,12 +159,17 @@ describe('worker', () => {
           [c, source, 60 - i * 5, JSON.stringify(source === 'monday' ? { board: 1, item: 100 } : { order: 100 })])
       }
     }
-    // Shopify: a fabricated idle run. Monday: a fabricated ok run counted the way a real empty-board run counts
-    // (board meta row: rows_fetched = 1, item = 0; empty_full_list_fails_not_tombstones pins that shape). A real
-    // empty-board run now fails instead (§4.1), but an ok zero-item run must still trip the rule.
-    await sql(`insert into data.connector_runs (client_id, source, mode, status, started_at, finished_at, rows_fetched, entity_rows)
-               values ($1, 'shopify', 'incremental', 'ok', now(), now(), 0, '{}'::jsonb),
-                      ($1, 'monday', 'incremental', 'ok', now(), now(), 1, '{"board":1,"item":0}'::jsonb)`, [c])
+    // Shopify: a fabricated idle run. Monday: a REAL run against an empty board, so the `board` meta row is
+    // counted exactly as in production (rows_fetched = 1, item = 0) and the rule must still fire.
+    await sql(`insert into data.connector_runs (client_id, source, mode, status, started_at, finished_at, rows_fetched)
+               values ($1, 'shopify', 'incremental', 'ok', now(), now(), 0)`, [c])
+    const t = mkTick()
+    await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1 and source = 'monday'`, [c, t.owner])
+    const row = (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1 and source = 'monday'`, [c])).rows[0]
+    await runOne(t, row)
+    const real = (await sql<{ status: string; rows_fetched: number; entity_rows: Record<string, number> }>(
+      `select status, rows_fetched, entity_rows from data.connector_runs where client_id = $1 and source = 'monday' order by started_at desc limit 1`, [c])).rows[0]
+    expect(real).toMatchObject({ status: 'ok', rows_fetched: 1, entity_rows: { board: 1, item: 0 } })
     await sql(`update data.connector_schedule set last_run_at = now(), last_success_at = now() where client_id = $1`, [c])
     await computeHealth(mkTick())
     const h = await sql<{ source: string; status: string }>(
@@ -177,35 +180,42 @@ describe('worker', () => {
   })
 
   it('empty_full_list_fails_not_tombstones', async () => {
-    // §4.1: a complete listing with no ids is an empty or unshared board/folder; it must not tombstone every row.
-    const c = await mkClient([{ source: 'monday' }])
+    // §4.1: a complete Drive walk with no files is an empty or unshared folder; it must not tombstone (and purge) every media row.
+    const c = await mkClient([{ source: 'drive' }])
+    const file = (id: string) => ({ id, name: `File ${id}`, mimeType: 'application/pdf', size: '1024', modifiedTime: '2026-09-01T00:00:00.000Z', webViewLink: `https://drive.example.test/file/${id}/view` })
+    const folder = (files: object[]) => stub(url => url.includes('/drive/v3/files') ? { files } : {})
     const run = async (fetch: typeof globalThis.fetch) => {
       const t = mkTick(fetch)
       await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1`, [c, t.owner])
       await runOne(t, (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1`, [c])).rows[0])
     }
-    const live = async () => Number((await sql(`select count(*) from data.jobs where client_id = $1 and deleted_at is null`, [c])).rows[0].count)
+    const media = async () => (await sql<{ external_id: string; deleted_at: Date | null; purge_after: Date | null }>(
+      `select external_id, deleted_at, purge_after from data.media where client_id = $1 and source = 'drive' order by external_id`, [c])).rows
 
-    await run(stub(() => board([mondayItem('1'), mondayItem('2')])))
-    expect(await live()).toBe(2)
+    await run(folder([file('d1'), file('d2')]))
+    expect((await media()).filter(m => !m.deleted_at).map(m => m.external_id)).toEqual(['d1', 'd2'])
 
-    await run(stub(() => emptyBoard))
-    const r = (await sql<{ status: string; error: string; rows_fetched: number; entity_rows: Record<string, number> }>(
-      `select status, error, rows_fetched, entity_rows from data.connector_runs where client_id = $1 order by started_at desc limit 1`, [c])).rows[0]
-    expect(r).toMatchObject({ status: 'error', rows_fetched: 1, entity_rows: { board: 1, item: 0 } })
-    expect(r.error).toMatch(/^found nothing to sync: the board is empty or not shared/)
-    expect(await live()).toBe(2)
-    const s = (await sql<{ last_error: string; consecutive_failures: number; lease_owner: string | null; last_success_at: Date | null }>(
-      `select last_error, consecutive_failures, lease_owner, last_success_at from data.connector_schedule where client_id = $1`, [c])).rows[0]
+    await run(folder([]))
+    const r = (await sql<{ status: string; error: string }>(
+      `select status, error from data.connector_runs where client_id = $1 order by started_at desc limit 1`, [c])).rows[0]
+    expect(r.status).toBe('error')
+    expect(r.error).toMatch(/^found nothing to sync: the folder is empty or not shared/)
+    expect(await media()).toMatchObject([{ external_id: 'd1', deleted_at: null, purge_after: null }, { external_id: 'd2', deleted_at: null, purge_after: null }])
+    const s = (await sql<{ last_error: string; consecutive_failures: number; lease_owner: string | null }>(
+      `select last_error, consecutive_failures, lease_owner from data.connector_schedule where client_id = $1`, [c])).rows[0]
     expect(s).toMatchObject({ consecutive_failures: 1, lease_owner: null })
     expect(s.last_error).toMatch(/found nothing to sync/)
 
-    // The next run retries normally: items back -> ok, failures reset, a missing item is tombstoned as before.
-    await run(stub(() => board([mondayItem('1')])))
+    // The next walk retries normally: a file back -> ok, failures reset, the missing file tombstoned with its purge scheduled.
+    await run(folder([file('d1')]))
     const after = (await sql<{ consecutive_failures: number; last_error: string | null }>(
       `select consecutive_failures, last_error from data.connector_schedule where client_id = $1`, [c])).rows[0]
     expect(after).toEqual({ consecutive_failures: 0, last_error: null })
-    expect(await live()).toBe(1)
+    const [d1, d2] = await media()
+    expect(d1).toMatchObject({ external_id: 'd1', deleted_at: null, purge_after: null })
+    expect(d2.external_id).toBe('d2')
+    expect(d2.deleted_at).not.toBeNull()
+    expect(d2.purge_after).not.toBeNull()
   })
 
   it('alert_retry', async () => {
@@ -386,7 +396,7 @@ describe('worker', () => {
   it('lease_lost_write_ignored', async () => {
     // A lease reaped and re-claimed by another worker: the original worker finishes its run but writes nothing to the schedule row.
     const c = await mkClient([{ source: 'monday' }])
-    const a = mkTick(stub(() => board([mondayItem('1')])))
+    const a = mkTick()
     await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1`, [c, a.owner])
     const row = (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1`, [c])).rows[0]
     await sql(`update data.connector_schedule set lease_owner = 'other-worker', lease_until = now() + interval '8 minutes' where client_id = $1`, [c])
@@ -641,8 +651,6 @@ describe('worker', () => {
     const fetch = stub((url, body) =>
       url.includes('acme-test.myshopify.com') ? json({ errors: [{ message: 'connector exploded' }] }, 500)
       : url.includes('myshopify.com') ? emptyShopify(body)
-      // acme meta must list something: a complete listing with no campaigns or ads now fails the run (§4.1).
-      : url.includes('/act_1/campaigns') ? { data: [{ id: 'camp-0', name: 'Campaign 0', status: 'ACTIVE', effective_status: 'ACTIVE', objective: 'OUTCOME_SALES' }], paging: {} }
       : url.includes('graph.facebook.com') ? { data: [], paging: {} }
       : {})
     await tick({ taskIndex: 0, taskCount: 1, fetch, log: () => {} })

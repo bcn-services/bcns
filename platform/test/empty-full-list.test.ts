@@ -1,5 +1,5 @@
-// §4.1 empty-listing guard: a complete run whose fullList listing held no ids fails instead of
-// tombstoning every row. DB-free: sql/tx are mocked, so this runs without the local Supabase stack.
+// §4.1 empty-listing guard: a complete Drive walk with no files fails instead of tombstoning every
+// media row. Monday and Meta are deliberately unguarded (their tombstones heal). DB-free: sql/tx are mocked, so this runs without the local Supabase stack.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls: string[] = []
@@ -9,7 +9,7 @@ vi.mock('../worker/src/db.js', () => ({
     calls.push(text); params.push(p)
     if (text.includes('insert into data.connector_runs')) return { rows: [{ id: '1' }], rowCount: 1 }
     if (text.includes('from data.source_tokens')) {
-      return { rows: [{ client_id: 'c1', source: 'monday', kind: 'monday_personal', secret: 'tok', refresh_secret: null, expires_at: null, attributes: {} }], rowCount: 1 }
+      return { rows: [{ client_id: 'c1', source: 'drive', kind: 'google_oauth_refresh', secret: 'tok', refresh_secret: null, expires_at: null, attributes: {} }], rowCount: 1 }
     }
     if (text.includes('select timezone')) return { rows: [{ timezone: 'UTC' }], rowCount: 1 }
     return { rows: [], rowCount: 1 }
@@ -21,7 +21,9 @@ vi.mock('../worker/src/db.js', () => ({
 const { emptyFullListTables, runOne } = await import('../worker/src/run.js')
 
 const meta = [{ entity: 'campaign', table: 'records' }, { entity: 'ad', table: 'records' }]
+const monday = [{ entity: 'item', table: 'jobs' }]
 const drive = [{ entity: 'file', table: 'media' }]
+const twoEntityMedia = [{ entity: 'file', table: 'media' }, { entity: 'image', table: 'media' }]
 
 describe('emptyFullListTables', () => {
   it('reports a finished table whose listing held no ids', () => {
@@ -34,22 +36,25 @@ describe('emptyFullListTables', () => {
     expect(emptyFullListTables(drive, new Map([['media', new Set<string>()]]), new Set())).toEqual([])
   })
   it('judges a two-entity table on the union of its ids', () => {
-    expect(emptyFullListTables(meta, new Map([['records', new Set<string>()]]), new Set(['campaign', 'ad']))).toEqual(['records'])
-    expect(emptyFullListTables(meta, new Map([['records', new Set(['c1'])]]), new Set(['campaign', 'ad']))).toEqual([])
-    expect(emptyFullListTables(meta, new Map([['records', new Set<string>()]]), new Set(['campaign']))).toEqual([])
+    expect(emptyFullListTables(twoEntityMedia, new Map([['media', new Set<string>()]]), new Set(['file', 'image']))).toEqual(['media'])
+    expect(emptyFullListTables(twoEntityMedia, new Map([['media', new Set(['f1'])]]), new Set(['file', 'image']))).toEqual([])
+    expect(emptyFullListTables(twoEntityMedia, new Map([['media', new Set<string>()]]), new Set(['file']))).toEqual([])
+  })
+  it('never guards Monday jobs or Meta records: an emptied board or account tombstones (and heals) as usual', () => {
+    expect(emptyFullListTables(monday, new Map([['jobs', new Set<string>()]]), new Set(['item']))).toEqual([])
+    expect(emptyFullListTables(meta, new Map([['records', new Set<string>()]]), new Set(['campaign', 'ad']))).toEqual([])
   })
   it('is empty for a source with no fullList', () => {
     expect(emptyFullListTables(undefined, new Map(), new Set())).toEqual([])
   })
 })
 
-const board = (items: unknown[]) => ({
-  data: { boards: [{ id: '1001', name: 'Board 1', columns: [], groups: [], items_page: { cursor: null, items } }] },
-})
-const item = { id: '1', name: 'Item 1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', group: { id: 'g', title: 'G' }, column_values: [] }
+// Drive files.list answer (connectors/google.ts walkFolder reads `files` and `nextPageToken`).
+const folder = (files: unknown[]) => ({ files })
+const file = { id: 'f1', name: 'One', mimeType: 'application/pdf', size: '1024', modifiedTime: '2026-01-01T00:00:00.000Z', webViewLink: 'https://drive.example.test/file/f1/view' }
 const row = {
-  client_id: 'c1', source: 'monday', interval: '1 hour', backfill_from: new Date(), backfill_cursor: null,
-  incremental_cursor: {}, config: { board_id: '1001' }, lease_owner: 'o',
+  client_id: 'c1', source: 'drive', interval: '1 hour', backfill_from: new Date(), backfill_cursor: null,
+  incremental_cursor: {}, config: { folder_id: 'f1' }, lease_owner: 'o',
 } as never
 const tick = (body: unknown) => ({
   owner: 'o', stubbed: true, log: () => {}, budgetMs: 60_000, claimLimit: 1, taskIndex: 0, taskCount: 1, now: () => new Date(),
@@ -60,16 +65,16 @@ describe('runOne with a complete but empty listing', () => {
   beforeEach(() => { calls.length = 0; params.length = 0 })
 
   it('fails the run and tombstones nothing', async () => {
-    await runOne(tick(board([])), row)
-    expect(calls.some(c => /update data\.jobs set deleted_at = now\(\)/.test(c))).toBe(false)
+    await runOne(tick(folder([])), row)
+    expect(calls.some(c => /update data\.media set deleted_at = now\(\)/.test(c))).toBe(false)
     expect(calls.some(c => /set status = 'ok'/.test(c))).toBe(false)
     const i = calls.findIndex(c => /update data\.connector_runs set status = \$2/.test(c))
-    expect(params[i]).toEqual([1, 'error', expect.stringMatching(/^found nothing to sync: the board is empty or not shared/)])
+    expect(params[i]).toEqual([1, 'error', expect.stringMatching(/^found nothing to sync: the folder is empty or not shared/)])
   })
 
   it('still tombstones and succeeds when the listing has ids', async () => {
-    await runOne(tick(board([item])), row)
-    expect(calls.some(c => /update data\.jobs set deleted_at = now\(\)/.test(c))).toBe(true)
+    await runOne(tick(folder([file])), row)
+    expect(calls.some(c => /update data\.media set deleted_at = now\(\)/.test(c))).toBe(true)
     expect(calls.some(c => /set status = 'ok'/.test(c))).toBe(true)
   })
 })
