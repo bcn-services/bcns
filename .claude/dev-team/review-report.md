@@ -1,30 +1,28 @@
-REVIEW: 0C/1I/1M
+REVIEW: 0C/0I/0M
 # Review Report
 **Date:** 2026-10-06
-**Files Reviewed:** 10 (delta 01bb408..6294fd6, excl. engineer-report.md)
+**Files Reviewed:** 7 (delta 7a92f5c..4ce59f2, excl. engineer-report.md)
 
 ## Findings
 
-### Important
-Important — platform/worker/src/run.ts:295 (emptyFullListTables :329, EMPTY_NOUN :326; DESIGN.md:783-784; NOTES.md:93) — The guard covers monday and meta (jobs/records), but on those sources an unshared board or account already throws before the guard: monday "board <id> not found", meta a Graph permission error. So the guard only ever fires on a board or account that really is empty. Their tombstones also heal themselves, because applyTombstones un-deletes ids that come back and only media gets purge_after. So on those sources the guard protects nothing and makes the state permanently wrong. Scenario: a Monday client archives every item on the board, or a Meta client archives all campaigns (the default edges leave out archived ones). Every hourly run then errors, and the archived jobs/records stay live in jobs_v1, SB and MCP forever. The hub shows the generic "We'll try again" copy, health goes stale after 3 intervals, and bcns gets a stale alert 6 h later for a client who did nothing wrong. The §4.1 rationale ("an empty or unshared ... Monday board is far likelier") is false for Monday. — Fix: run the guard only for the `media` table (drive), the only table where a wrongful tombstone is lossy (30-day purge cascades into media_set_items). Move the runOne cases in empty-full-list.test.ts and worker.test.ts empty_full_list_fails_not_tombstones to a Drive fixture, drop monday/meta from EMPTY_NOUN, and correct DESIGN §4.1 and NOTES #7.
+No findings.
 
-### Minor
-Minor — platform/worker/src/run.ts:295 + connectors/meta.ts backfill resume — A Meta backfill on an empty account throws on its last page after that page's transaction has already saved cursor `{entity:'adimage'}`. The retry resumes at adimage, so campaign and ad are not in `finished`. The guard and their tombstones are skipped, the run goes ok and sends backfill_done, and later incremental runs error again. Health flaps error → ok → error. No data loss. — Fix: goes away with the Important fix (guard on drive only).
-
-## Earlier findings (01bb408 report): all fixed
-- I1 folderCheck: source-settings.ts:221-233 returns "pending" only while no finished run has started since the change, and "none" when there are finished runs but no backfill. Pinned in source-settings.test.mjs; mutating the filter back turns it red.
-- I2 empty/unshared Drive folder tombstones everything: fixed by the run.ts:295 guard, which throws before applyTombstones and before status ok, and leaves cursors as finishError does. Drive pull ignores the cursor, so a retry walks the whole folder. Pinned by the pure empty-full-list.test.ts (runs without DB, vitest include `test/**`) and the DB test worker.test.ts empty_full_list_fails_not_tombstones; removing the throw turns it red.
-- M1 refusal helper: migration p_hourly makes rate_limited null-safe (a null last_reset_at falls through to sync_running, so 22004 is gone). reset passes true, folder passes false, and the revoke signature `(uuid, data.source, boolean)` matches. New DB test checks the ISO detail is more than 59 min ahead.
-- M2 double-click: justReset (:354) is used by resyncSource (:372) with an injected `now`. 59:00 / 58:59 / garbage / sync_running / BCNS4 / null are pinned; bypassing it turns the test red.
-
-## Verified clean (no finding)
-- run.ts NUL byte: one pre-existing NUL at :22 (the `seen` key separator); the count is 1 before and after, and no new control bytes.
-- worker.test.ts edits are fixture-only (stale_no_false_alarm fabricates its ok run; lease_lost and worker_isolation stubs return one entity); no assertion weakened.
-- Half-committed pages on a guard throw match normal error semantics; Monday/Drive retries walk everything.
-- A new empty Monday board that never succeeded shows 'error' with no email. Acceptable on its own and subsumed by the Important fix.
-- DB tests (source-settings.test.ts, worker.test.ts) run for the first time in CI. Their fixtures use the existing mkClient/schedule helpers and the engineer ran them green on a local stack. Not re-run here per instructions.
-- Counts: platform non-DB 17 files / 173 pass (floor 172 holds); connect source-settings 15/15 and wired in package.json. The full connect run in an extract fails only 2 files that import packages/ (missing from the extract), so those failures come from the environment.
-- DESIGN §4.6, §5.3, §5.5 and NOTES #8 match the code apart from the Important above. Merge triggers deploy-worker.yml (platform/worker/** touched), and the engineer flagged it. Not a finding.
+## Verification (no finding)
+- Prior Important fixed: run.ts:336 `emptyFullListTables` now filters to `media`. Only drive.ts:53 declares a `media` fullList (monday `jobs`, meta `records`), so Monday and Meta go back to the base tombstone path. The thrown text is now fixed to the "folder" wording, and EMPTY_NOUN is gone. Pinned by empty-full-list.test.ts "never guards Monday jobs or Meta records".
+- Prior Minor (Meta backfill flap) gone: Meta never reaches the throw now. Drive has no analogue. pull() ignores the cursor, so a retried backfill walks the whole folder again and throws the same way each time, with no error -> ok -> error flip.
+- No regression vs feat/hub-first-run: `git diff -a feat/hub-first-run...HEAD` on run.ts is only the guard plus the SourceError import. On worker.test.ts it is only the new empty_full_list_fails_not_tombstones test. stale_no_false_alarm, lease_lost_write_ignored and the worker_isolation meta stub match base exactly.
+- DB test empty_full_list_fails_not_tombstones, traced against the committed code:
+  - mkClient(drive) seeds config {folder_id:'f1'} (passes the drive configSchema) and a google_oauth_refresh token with expires_at null, so it never refreshes.
+  - The stub answers `/drive/v3/files` with {files} and no nextPageToken. walkFolder yields one page with last=true, so entity 'file' finishes. No thumbnailLink, so there is no Storage call. kind 'file' passes the media check.
+  - Run 2 (empty) throws before applyTombstones, so deleted_at and purge_after stay null.
+  - Run 3: applyTombstones sets deleted_at and purge_after on d2 (run.ts:353).
+  - The fixture pattern matches drive-tombstone.test.ts, which already runs DB-backed. Not executed here (no local stack, per instructions).
+- The pure runOne Drive twin passes: the fetch stub returns {files} for every URL, and the regex `update data\.media set deleted_at = now\(\)` matches run.ts's template.
+- friendlyError: run.ts:296 is the only producer of "found nothing to sync" (git grep at 4ce59f2). It always says "folder", so collapsing to EMPTY_FOLDER_WARNING is exact. The guard never shipped, so no old board or ad account messages exist in connector_runs. folderCheck (source-settings.ts:227) still matches the string.
+- Docs: DESIGN §4.1 (:780-789), §5 step 3 (:1071), §5.5 stale row and test table rows :1303-1304 match the code. Monday "board not found" is at monday.ts:45. NOTES #7/#8 are accurate. No other doc still describes a Monday or Meta guard.
+- Counts:
+  - platform non-DB: 17 files / 174 pass (floor 173), run on a `git archive 4ce59f2` extract, so QA's concurrent mutations could not affect it.
+  - connect: 341/341 pass in the worktree (floor 341; git status was clean at run time). Removing the monday assertion did not change the test count.
 
 ## STANDARDS.md Updates
 none (findings-only run, no repo edits per instructions)
