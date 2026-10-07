@@ -258,7 +258,7 @@ Shopify policy rulings (Nate, 2026-09-30; the doc has no Shopify policy section,
 Follow-ups from the Shopify billing work (verified in this run, 2026-09-30):
 - Nothing ends hub access when a Shopify paid period ends: the Partner API end time is only logged. Needs a stored `paid_until`, a worker or cron re-check and a migration. Accepted as a gap for now by Nate.
 - After a paid period ends, the plan page behaviour is untested.
-- The worker revoked-to-`auth_failed` guard: no such branch exists; it was written fresh on `fix/worker-revoked-guard` (PR #98, merged).
+- The worker revoked-to-`auth_failed` guard: no such branch existed; it was written fresh on `fix/worker-revoked-guard` (PR #98, merged).
 - Stale comment at `apps/connect/lib/env.ts:38-45` (the `shopifyAppHandle` doc block).
 
 #### 10b. Connect visual tuning (chunk 9, promoted from "not scoped")
