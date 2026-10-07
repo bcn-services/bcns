@@ -35,6 +35,15 @@ async function reap(t: Tick): Promise<number> {
   return r.rowCount ?? 0
 }
 
+/**
+ * Billing grace expiry (item 1). Stripe sends nothing when a lapsed client's 30 days run out, so
+ * the tick does it: active + paid before + grace_until passed -> paused. Never churns.
+ */
+async function pauseLapsed(_t: Tick): Promise<number> {
+  const r = await sql<{ n: number }>(`select data.pause_lapsed_clients() as n`)
+  return r.rows[0]?.n ?? 0
+}
+
 /** Once per day: month+2's partition already existing means today's call would be a no-op. */
 async function ensurePartitions(_t: Tick): Promise<number> {
   const have = await sql(
@@ -77,6 +86,8 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
     await step('refreshTokens', () => refreshTokens(t))
     await step('probeAuthFailed', () => probeAuthFailed(t))
     await step('revokeDisconnected', () => revokeDisconnected(t))
+    // Before claimAndRun, so a client whose grace ran out is not synced one more time.
+    await step('pauseLapsed', () => pauseLapsed(t))
   }
 
   await step('claimAndRun', () => claimAndRun(t))

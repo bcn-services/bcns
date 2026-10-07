@@ -119,12 +119,13 @@ describe('pending owner (hook + RLS)', () => {
     expect((await sql(`select 1 from data.source_tokens where client_id = $1`, [pendingId])).rowCount).toBe(0)
   })
 
-  it('paused, churned and no-membership are still 403 at the hook', async () => {
+  // paused signs in tenant-less since 20261007000100 (pay to resume); stripe-billing.test.ts covers it.
+  it('churned and no-membership are still 403 at the hook', async () => {
     const other = await newUser()
     expect((await signupClient(other.id, 'ZZ Status Probe')).error).toBeNull()
     const otherClient = clients[clients.length - 1]
     try {
-      for (const status of ['paused', 'churned']) {
+      for (const status of ['churned']) {
         await sql(`update data.clients set status = $2 where id = $1`, [otherClient, status])
         const r = await passwordGrant(other.email)
         expect(r.status, status).toBe(403)
