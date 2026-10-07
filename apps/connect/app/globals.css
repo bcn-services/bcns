@@ -328,3 +328,22 @@ pre.code { margin: 0; overflow-x: auto; padding: 14px; border-radius: 10px; bord
 .back { margin-top: 20px; text-align: center; font-size: 14px; }
 .back a { color: hsl(var(--muted-foreground)); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: hsl(var(--input)); }
 .back a:hover { color: hsl(var(--primary-ink)); }
+
+/* first-run checklist (Sources) and the /access walkthrough: same card language as .sc / .panel */
+.fr-list { margin: 16px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.fr-list li { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--background)); }
+.fr-list li.fr-done { background: transparent; }
+.fr-mark { width: 22px; height: 22px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: inset 0 0 0 1.5px hsl(var(--input)); font-size: 13px; line-height: 1; }
+.fr-done .fr-mark { background: hsl(var(--primary-ink)); color: hsl(var(--primary-foreground)); box-shadow: none; }
+.fr-text { flex: 1; min-width: 0; }
+.fr-l { font-size: 15px; font-weight: 500; }
+.fr-done .fr-l { color: hsl(var(--muted-foreground)); text-decoration: line-through; text-decoration-color: hsl(var(--input)); }
+.fr-h { margin-top: 2px; font-size: 14px; color: hsl(var(--muted-foreground)); }
+@media (max-width: 520px) { .fr-list li { flex-wrap: wrap; } }
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; color: hsl(var(--muted-foreground)); }
+.tag { margin-left: 8px; padding: 2px 8px; border-radius: 999px; border: 1px solid hsl(var(--warn)); border: 1px solid color-mix(in srgb, hsl(var(--warn)) 60%, transparent); font-size: 12px; font-weight: 500; color: hsl(var(--warn)); vertical-align: middle; }
+.copyurl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.copyurl pre.code { flex: 1; min-width: 0; user-select: all; }
+.copyurl .tiny { flex-basis: 100%; font-size: 13px; color: hsl(var(--destructive)); }
+.copyurl .tiny:empty { display: none; }
+.qs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; color: hsl(var(--foreground)); }

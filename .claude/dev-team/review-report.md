@@ -1,27 +1,25 @@
+REVIEW: 0C/0I/5M
+**Branch:** feat/hub-first-run
 # Review Report
 **Date:** 2026-10-06
 **Files Reviewed:** 13
 
-REVIEW: 0C/0I/4M
-**Branch:** feat/mcp-directory
-
 ## Findings
 
 ### Minor
-Minor — platform/scripts/seed-demo-tenant.ts:7,260 — Nate re-seeds weeks later (for example before the ChatGPT submission): `daily_metrics` keys include `day`, so the earlier run's rows for days now outside the 60-day window stay. Those days then show sessions and ad spend with zero orders, and the header's "re-running yields the same row counts" holds only for the same base date — fix: in the same transaction, delete this tenant's `daily_metrics` rows older than the plan's first day, or pin `--base-date` in the Nate-only command.
-Minor — platform/scripts/seed-demo-tenant.ts:309-321 — `createUser` succeeds, then the membership insert throws (for example DATABASE_URL and SUPABASE_URL point at different projects, which violates the `memberships.user_id` foreign key). The new password was never printed, and a re-run prints "unchanged" — fix: print the password right after `createUser`/`updateUserById`, or say in the error to re-run with `--reset-password`.
-Minor — apps/web/CONTENT.md:1452-1453 — the cross-check rows for `pageMeta.connectSetup.*` point to the "Page Meta — connect, deluxe, aiConsulting" section, which never mentions `connectSetup` (no length or usage entry), so the docs drift — fix: add `pageMeta.connectSetup` to that section's heading and text.
-Minor — apps/web/components/services/connect-setup.tsx:45-50 — the visible Eyebrow and the sr-only `<h2 id="setup-what">` carry the same text, so screen readers read "What this does" twice — fix: put `aria-hidden` on the Eyebrow, or style the h2 as the eyebrow.
+Minor — platform/test/tenant.test.ts:23 (with helpers.ts:148) — `ai_last_used_at` is `expect: 'none'` and returns a timestamp string once acme has any `data.mcp_tool_calls` row; the loop pushes it into `acmeCreated` and the cleanup `$2::uuid[]` throws 22P02. It is safe today only because `ai_` sorts before `log_mcp_call` and the cleanup deletes the rows. A local re-run after a mid-loop failure (cleanup skipped), or a future acme seed row, turns the test red with a misleading uuid error — fix: push only uuid-shaped strings (`/^[0-9a-f-]{36}$/`), or skip the push for this fn.
+Minor — apps/connect/app/access/page.tsx:19-23 — `health.error` is ignored, so a failed read of connector_health_v1 shows an owner whose sources are connected "Connect a source on the Sources page…" — fix: when `health.error` is set, show "Couldn't load your sources right now" instead of the empty-state line.
+Minor — apps/connect/lib/first-run.ts:59,68 — visibility depends on live state only, so the checklist comes back after all four steps are done when one reverses. Example: an established owner removes their only teammate, or disconnects their only source, and the hub shows "Get started 3 of 4" again. Fix: accept and say so in the PR body, or hide for good once all four have been done (needs a stored marker, so it is out of scope here).
+Minor — apps/connect/lib/first-run.ts:64 — the "Get your first data in" hint says "This happens on its own within the hour" even when the only connected source's first run failed (status error, last_success_at null), so the owner is told to wait for something that won't happen — fix: when a connected card has tone error, change the hint to "A source needs attention, see its card."
+Minor — apps/connect/app/access/copy-url.tsx:21-26 — a successful copy is never announced to screen readers: the role=status span is only filled on failure, and a change to the button label is not announced. "Copied" also never resets — fix: put "Copied" in the status span (keep the destructive colour for failure only), and go back to idle after about 2 s.
 
-## Probes run (clean)
-- Seed schema: every column the script writes exists on data.money/customers/products/jobs/messages/records/daily_metrics. Each `on conflict` target matches a real unique key or primary key (`(client_id,source,external_id)` unique, daily_metrics primary key on 6 columns, ai_settings primary key `client_id`, memberships primary key `user_id`, clients `slug` unique). Omitted NOT NULL columns all have defaults. Every metric name is in the `metric_defs` seed. Every source is in the `data.source` enum. Mixed-key money rows (refund/payout) only drop nullable columns.
-- Reviewer visibility: clients.status defaults to 'active', and `active_client_id()`/the JWT hook need only active status plus a membership. Item 1's grace/pause path needs `grace_until`, which the demo never gets. The MCP OAuth page signs in with a password (no mailbox needed). Redirect allow-list has claude.ai, claude.com and chatgpt.com.
-- Prod safety: dry run opens no connection (mutation 2 confirmed by the orchestrator). The refusal runs inside the transaction before any table write, and its rollback is tested. The membership upsert runs only after the slug passed the demo-marker check, and keys on `reviewer+<slug>@bcn-services.com`, so it cannot move a real user. Nothing enumerates all clients in the worker or hub. Real row shapes match the connectors (refunds negative, `meeting_note`, `campaign`).
-- MCP: `annotations.title` matches MCP ToolAnnotations (`title?: string`, already in AgentToolAnnotations). No consumer depends on the identity of the shared `TOOL_ANNOTATIONS` object. The list-time throw is caught before deploy by the CI apps test job.
-- Web: no imports from apps/*, platform or packages/{data-client,tenant}. $200/month with no setup fee appears in body and meta. Legal lines 942-1019 are untouched. Sitemap and teaser are wired. Links use the focus-visible ring. The hub's sharing toggle that the copy mentions exists (apps/connect/app/access).
-- Secrets: password is generated with randomBytes, logged once and never written. No credential literals.
+## Verified clean (no finding)
+- Migration matches `get_ai_settings` exactly: security definer, `search_path = ''`, `data.tenant_or_raise()`, revoke from public/anon/service_role, grant to authenticated. Prediction for the CI catalog/tenant tests: `function_privileges`, `function_search_path_pinned`, `no_claim_zero_rows` (BCNS0) and `rpc_every_write_scoped` (RPC_ARGS entry present) all pass.
+- The data-client RPC_NAMES and database.types (`Args: never`) entries agree. After a data-client build, `tsc --noEmit` passes for apps/sb and apps/_template. apps/mcp passes no rpcs to the AI, so this function is not reachable by the AI.
+- The `memberships_v1` view is security_invoker over the `tenant` select policy, so an owner sees every membership row in their tenant. Members skip both extra reads.
+- Prod (aggregate SELECT): no user is a non-smoke member of more than one tenant, so the team step cannot tick on its own. Smoke rows are excluded.
+- Every starter question can be answered from synced fields. QuickBooks vendor and account come from `records_v1.attributes`, which MCP keeps. For Shopify: refund and payout kinds, and `products_v1.inventory_quantity`. For Meta: `insight_ad_day` clicks. For Monday: owner, priority, due_on.
+- Connect tests run 326/0 and first-run.test.mjs is in the test list. QA's mutations went RED. Off-limits files (layout.tsx, pending/*, data-views.ts, connectors) are untouched. No new code reads source_tokens. The copy has no jargon.
 
 ## STANDARDS.md Updates
-- Operator Scripts: importable `main(argv, deps)` with throwing `die()`; dry-run by default behind an `--apply` guard and a notes-marker refusal; passwords printed once.
-- MCP Server: every tool needs a `TOOL_TITLES` entry (`mcpTools()` throws), and annotations are built per tool.
-- Client-facing Copy: the jargon ban on the Connect setup page is test-enforced.
+none (caller instructed: edit nothing). Proposed: "A new api RPC needs entries in packages/data-client RPC_NAMES + database.types.ts and platform/test/helpers.ts RPC_ARGS; a non-uuid string return under expect 'none' must not reach tenant.test's acmeCreated cleanup."

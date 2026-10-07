@@ -12,7 +12,7 @@ export const AI_SETTINGS_FAILED =
 /** Minimal shape of the `api` schema client: just `.rpc`. */
 export interface AiSettingsApi {
   rpc(
-    fn: "get_ai_settings" | "set_ai_settings",
+    fn: "get_ai_settings" | "set_ai_settings" | "ai_last_used_at",
     args?: { p_share_customer_contact: boolean }
   ): PromiseLike<{ data: unknown; error: { message?: string } | null }>;
 }
@@ -53,5 +53,20 @@ export async function readShareContact(
     return { share, known: true };
   } catch {
     return { share: false, known: false };
+  }
+}
+
+/**
+ * When anyone in this workspace last asked an AI about its data, or null (never, or unreadable).
+ * A failure (e.g. the database function is not deployed yet) must neither crash the page nor
+ * tick the checklist step, so it reads as null.
+ */
+export async function readAiLastUsed(api: AiSettingsApi): Promise<string | null> {
+  try {
+    const { data, error } = await api.rpc("ai_last_used_at");
+    if (error) return null;
+    return typeof data === "string" && data ? data : null;
+  } catch {
+    return null;
   }
 }

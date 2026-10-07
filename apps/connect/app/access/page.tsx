@@ -1,5 +1,8 @@
 import { AI_SETTINGS_FAILED, readShareContact } from "@/lib/ai-settings";
 import { requireOwner } from "@/lib/session";
+import { starterQuestions } from "@/lib/first-run";
+import type { HealthRow } from "@/lib/sources";
+import { CopyUrl } from "./copy-url";
 import { setShareCustomerContact } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +16,11 @@ export default async function AccessPage({
   searchParams: { ok?: string; error?: string };
 }) {
   const { api } = await requireOwner("/");
-  const { share, known } = await readShareContact(api);
+  const [{ share, known }, health] = await Promise.all([
+    readShareContact(api),
+    api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
+  ]);
+  const groups = starterQuestions((health.data as HealthRow[] | null) ?? []);
 
   return (
     <>
@@ -36,26 +43,41 @@ export default async function AccessPage({
       ) : null}
 
       <section className="panel" aria-labelledby="connect-h">
-        <h2 id="connect-h">Connect an AI assistant</h2>
-        <p className="sub">Each team member signs in with their own bcns Connect email and password.</p>
+        <h2 id="connect-h">Ask Claude or ChatGPT about your business</h2>
+        <p className="sub">
+          Add your workspace once, then ask questions in plain English. Each team member signs in
+          with their own bcns Connect email and password.
+        </p>
         <div className="body">
           <div className="conn">
-            <p className="h">Claude.ai</p>
-            <p>
-              Open Settings, then Connectors, then Add custom connector. Paste this address and sign
-              in with your bcns Connect email and password.
-            </p>
-            <pre className="code">{MCP_URL}</pre>
+            <p className="h">Your workspace address</p>
+            <p>You will paste this into Claude or ChatGPT below.</p>
+            <CopyUrl url={MCP_URL} />
           </div>
           <div className="conn">
-            <p className="h">ChatGPT (best effort)</p>
-            <p>
-              Open Settings, then Connectors (you may need to turn on developer mode), and add the
-              same address. ChatGPT changes these screens often, so the names may differ.
-            </p>
+            <p className="h">In Claude</p>
+            <ol className="steps">
+              <li>Open claude.ai and go to Settings, then Connectors.</li>
+              <li>Choose Add custom connector.</li>
+              <li>Name it bcns and paste the address above.</li>
+              <li>Choose Add, then sign in with your bcns Connect email and password.</li>
+              <li>Start a new chat and ask a question. Try one from the list below.</li>
+            </ol>
           </div>
           <div className="conn">
-            <p className="h">Claude Code</p>
+            <p className="h">
+              In ChatGPT <span className="tag">Not yet hand-verified</span>
+            </p>
+            <ol className="steps">
+              <li>Open ChatGPT and go to Settings, then Connectors. You may need to turn on developer mode first.</li>
+              <li>Choose to create a new connector and paste the address above.</li>
+              <li>Sign in with your bcns Connect email and password when asked.</li>
+              <li>Start a new chat, turn the connector on for it, and ask a question.</li>
+            </ol>
+            <p>We have not walked through these screens ourselves yet, and ChatGPT changes them often, so the names may differ.</p>
+          </div>
+          <div className="conn">
+            <p className="h">In Claude Code</p>
             <p>Run this in your terminal. Then start Claude Code, type /mcp, choose bcns and sign in.</p>
             <pre className="code">{`claude mcp add --transport http bcns ${MCP_URL}`}</pre>
           </div>
@@ -65,6 +87,31 @@ export default async function AccessPage({
             text come from other people, so point the assistant only at tools you trust.
           </p>
         </div>
+      </section>
+
+      <section className="panel" aria-labelledby="ask-h">
+        <h2 id="ask-h">Questions to try</h2>
+        {groups.length === 0 ? (
+          <p className="sub">
+            Connect a source on the Sources page and you will see questions here that your data can answer.
+          </p>
+        ) : (
+          <>
+            <p className="sub">Plain questions your connected sources can answer. Copy one into your chat.</p>
+            <div className="body">
+              {groups.map((g) => (
+                <div key={g.source} className="conn" data-source={g.source}>
+                  <p className="h">{g.title}</p>
+                  <ul className="qs">
+                    {g.questions.map((q) => (
+                      <li key={q}>{q}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="panel" aria-labelledby="share-h">

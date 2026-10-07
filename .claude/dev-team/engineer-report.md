@@ -1,26 +1,15 @@
-BUILT — feat/mcp-directory — b10e653 — self-check: pnpm --filter @bcn-services/platform test pass
-GATES mcp: 272 -> 273 pass (tsc clean); new tests/titles.test.mjs
-GATES platform: 15 files/146 tests -> 16 files/158 tests, all pass (20 DB files skipped locally, no stack); typecheck clean
-GATES web: 98 -> 106 total; pass 87 -> 94, skip 11 -> 12, fail 0 (with a .next build: 106/106 pass); typecheck + lint clean
-MUTATION 1: removed one TOOL_TITLES entry in apps/mcp/src/policy.ts -> mcp suite red (titles.test.mjs + mcpTools() throws "has no human title"); restored via cp, shasum identical
-MUTATION 2: `if (!values.apply)` -> `if (false)` in seed-demo-tenant.ts -> red: "the --apply guard > dry run (no flag) issues zero queries, opens no connection and prints the plan" (1 failed/11 passed); restored via cp, shasum 3c52b090... identical, clean git status
-MCP: McpTool.annotations now `{ title, ...TOOL_ANNOTATIONS }`; mcpTools() throws if title missing or equals tool name (no silent fallback); readOnlyHint true / destructiveHint false asserted; policy/query tests updated for title
-WEB route: /services/connect/setup (apps/web/app/services/connect/setup/page.tsx); placed under /services/connect because it is the product page's how-to, teaser added after ConnectFaq; sitemap entry added
-WEB content: copy in lib/content.ts connectSetup + pageMeta, mirrored in CONTENT.md (30 new rows, total 152); ChatGPT plan language hedged; "$200/month, no setup fee"; privacy link /privacy; no jargon (test-enforced)
-SUPPORT contact: info address from siteConfig.email (same one used in site footer/legal), "a person will help you set it up"; no new inbox invented
-WEB tests: __tests__/connect-setup.test.mjs (fields, URL/support/privacy, jargon ban, wiring, CONTENT.md mirror + total re-derivation, built-HTML check skips without build)
-SEED file: platform/scripts/seed-demo-tenant.ts; test platform/test/seed-demo-tenant.test.ts (12 tests, does not import ./helpers so it runs without the stack)
-SEED tables covered: clients, money (orders/refunds/payouts, 291), customers (36), products (8), daily_metrics (1086), jobs (12), messages (6), records (9), ai_settings (customer contact sharing on), reviewer membership + auth user
-SEED tables skipped: media/media_sets (needs storage objects), connector_* / source_tokens (no secrets, no live connectors for a demo), egress_ledger, raw_*
-SEED safety: dry-run by default (no DB connection opened); refuses slug whose data.clients.notes is not the demo marker; all emails @example.com, no phones, URLs only https://example.com; idempotent upserts on natural keys; password printed once, never stored
-SEED verified: ran main --apply twice against a throwaway local Postgres 17 (all repo migrations applied, stub auth schema, NOT supabase start, NOT a real DB): counts identical both runs (money 291 customers 36 products 8 daily_metrics 1086 jobs 12 messages 6 records 9 ai_settings 1 memberships 1, 1 auth user); non-demo slug refused with zero rows written; scratch cluster deleted
-SEED not verified: real Supabase auth.admin.createUser path (faked in tests/scratch); MCP views against seeded data under a real JWT
-DEP none added
-FLAG seed dry-run base date derives from today (UTC); pass --base-date to pin
-FLAG apply path makes two connections (data write, then membership); data write is one transaction, membership step is separate
-NATE-ONLY 1: dry run (safe): cd platform && pnpm tsx scripts/seed-demo-tenant.ts
-NATE-ONLY 2: write to prod: cd platform && DATABASE_URL=<prod session pooler> SUPABASE_URL=<prod url> SUPABASE_SERVICE_ROLE_KEY=<from keychain> pnpm tsx scripts/seed-demo-tenant.ts --apply   (save the printed reviewer password; --reset-password issues a new one)
-NATE-ONLY 3: submit to Claude directory: free route = the directory review/submission form with the connector URL https://mcp.bcn-services.com/mcp, setup page https://bcn-services.com/services/connect/setup, privacy /privacy, reviewer login from step 2; admin-portal route may need a paid Team/Enterprise org
-NATE-ONLY 4: submit to ChatGPT directory with the same URLs and reviewer login; check the current plan requirements for custom connectors first
-NATE-ONLY 5: ! GITHUB_TOKEN= gh pr ready <n> -R bcn-services/bcns ; ! GITHUB_TOKEN= gh pr edit <n> -R bcn-services/bcns --body-file <file> ; ! GITHUB_TOKEN= gh pr merge <n> --squash -R bcn-services/bcns
-COMMITS 262a49d feat(mcp) title; 581b53f feat(web) setup page; b10e653 feat seed script; (not pushed)
+BUILT — feat/hub-first-run — 2971ac0 — self-check: pnpm --filter @bcn-services/connect test pass (326/326)
+# Engineer Report (item 3)
+signal-step4: api.ai_last_used_at() (new migration 20261007000300_ai_last_used.sql; max(data.mcp_tool_calls.at) for caller tenant, null if none); hub reads via readAiLastUsed in lib/ai-settings.ts: error/throw/non-string -> null -> step not ticked, page does not crash
+registries-updated: packages/data-client/src/index.ts RPC_NAMES; packages/data-client/src/database.types.ts Functions; platform/test/helpers.ts RPC_ARGS (catalog rpc_every_write_scoped needs an entry). grep get_ai_settings showed no other api-RPC list (apps/mcp refs are consumers, docs/architecture spec untouched)
+platform-test-new: platform/test/mcp-audit.test.ts describe 'api.ai_last_used_at' (null when none; newest across members; tenant A never sees B; no-claim BCNS0/anon refused). DB-backed files are excluded by vitest.config locally (no stack) -> not run here; CI runs them
+member-visibility: checklist HIDDEN from members (steps 3 and 4 are owner actions; /access is owner-only). Tested: role member/null -> visible=false. Members skip the two extra reads.
+state-rules: source=composeSources some connected; sync=HUB_SOURCES row with parseable last_success_at; team=non-smoke member user_id != viewer; ai=parseable timestamp. All done -> hidden.
+gates: connect test 314->326 pass / 0 fail (+12, first-run.test.mjs appended to package.json list); connect typecheck clean; lint clean; build ok (/access, / compile); platform test 15 files / 146 / 0 fail (unchanged, DB cases not run locally); platform typecheck clean; packages build ok; mcp test 272/272 0 fail, mcp typecheck clean
+mutation-1: syncDone forced to true -> RED (2 fail: 'a brand-new owner: nothing done, checklist visible, steps in order', 'first sync: needs a non-null last_success_at, not just a row'); restored via cp, shasum identical
+mutation-2: starterQuestions filter(c => c.connected) -> filter(() => true) -> RED (2 fail: 'starter questions: none when nothing is connected', 'starter questions: only connected sources, in hub order, 3 to 5 each'); restored via cp, shasum identical, suite back to 326/0
+card-markup: left inline and untouched in page.tsx (grid now has id="sources"); checklist is a separate <section> above it
+copy-notes: Shopify starter questions deliberately omit "best sellers": money_v1 line_items live in attributes, which apps/mcp excludes; questions are limited to orders/refunds/payouts/stock/visits. ChatGPT block carries a visible "Not yet hand-verified" tag. Claude steps are unverified by me against the live claude.ai UI.
+followups: sr-only relies on Tailwind utility being generated; not render-tested (no hub render tests, no dev server run). Nate must run db push for the migration; until then step 4 shows not-done.
+files: apps/connect/lib/first-run.ts (new), apps/connect/lib/ai-settings.ts (readAiLastUsed + fn union), apps/connect/app/page.tsx, apps/connect/app/access/page.tsx, apps/connect/app/access/copy-url.tsx (new), apps/connect/app/globals.css, apps/connect/tests/first-run.test.mjs (new), apps/connect/package.json, platform/supabase/migrations/20261007000300_ai_last_used.sql (new), platform/test/helpers.ts, platform/test/mcp-audit.test.ts, packages/data-client/src/{index,database.types}.ts
+untouched: layout.tsx, pending/*, lib/data-views.ts, worker connectors

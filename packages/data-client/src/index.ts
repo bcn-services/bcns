@@ -117,6 +117,7 @@ const RPC_NAMES = [
   'remove_member',
   'log_mcp_call',
   'get_ai_settings',
+  'ai_last_used_at',
   'set_ai_settings',
 ] as const satisfies readonly RpcName[]
 
