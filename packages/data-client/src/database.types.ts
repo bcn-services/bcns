@@ -102,7 +102,7 @@ export type Database = {
             | "drive"
             | "quickbooks"
             | null
-          status: "active" | "paused" | "churned" | null
+          status: "pending" | "active" | "paused" | "churned" | null
           timezone: string | null
           updated_at: string | null
         }
@@ -112,7 +112,7 @@ export type Database = {
           name?: string | null
           slug?: string | null
           source?: never
-          status?: "active" | "paused" | "churned" | null
+          status?: "pending" | "active" | "paused" | "churned" | null
           timezone?: string | null
           updated_at?: string | null
         }
@@ -122,7 +122,7 @@ export type Database = {
           name?: string | null
           slug?: string | null
           source?: never
-          status?: "active" | "paused" | "churned" | null
+          status?: "pending" | "active" | "paused" | "churned" | null
           timezone?: string | null
           updated_at?: string | null
         }
@@ -1287,6 +1287,7 @@ export type Database = {
       }
     }
     Functions: {
+      billing_self: { Args: never; Returns: Json }
       bulk_tag: {
         Args: { add?: string[]; media_ids: string[]; remove?: string[] }
         Returns: number

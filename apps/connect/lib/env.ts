@@ -72,6 +72,16 @@ export interface HubConfig {
    * is the real switch: without it the function 404s whatever this says.
    */
   signupEnabled: boolean;
+  /**
+   * Stripe self-serve billing ($200/mo). All server-only. The secret key creates Checkout and
+   * billing-portal sessions; the webhook signing secret (whsec_...) verifies Stripe's calls to
+   * /api/webhooks/stripe, which forwards them to the `stripe-webhook` Edge Function. Any unset =
+   * the Pay button is absent and the webhook answers 503 (Stripe retries).
+   */
+  stripeSecretKey?: string;
+  stripeWebhookSecret?: string;
+  stripePriceId?: string;
+  stripeWebhookFunctionUrl?: string;
 
   // sb-bridge: remove after SB migrates to bcns Connect
   /** The one store (full *.myshopify.com) that installs the bcns-data app instead. */
@@ -107,6 +117,10 @@ export function getConfig(): HubConfig {
     shopifyAppGid: readEnv("SHOPIFY_APP_GID"),
     shopRedactFunctionUrl: readEnv("SHOP_REDACT_FUNCTION_URL"),
     signupEnabled: ["1", "true"].includes(readEnv("SIGNUP_ENABLED")?.toLowerCase() ?? ""),
+    stripeSecretKey: readEnv("STRIPE_SECRET_KEY"),
+    stripeWebhookSecret: readEnv("STRIPE_WEBHOOK_SECRET"),
+    stripePriceId: readEnv("STRIPE_PRICE_ID"),
+    stripeWebhookFunctionUrl: readEnv("STRIPE_WEBHOOK_FUNCTION_URL"),
 
     // sb-bridge: remove after SB migrates to bcns Connect
     shopifyAltShop: readEnv("SHOPIFY_ALT_SHOP"), // sb-bridge: remove after SB migrates to bcns Connect

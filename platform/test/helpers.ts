@@ -107,7 +107,7 @@ export const PNG_1x1 = Buffer.from(
  * every api RPC is JWT-tenant-scoped, which doesn't apply here; N1's own
  * rpc-record-shop-redact.test.ts covers this RPC's real access-control surface instead.
  */
-export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled', 'signup_create_client'])
+export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled', 'signup_create_client', 'stripe_billing_state', 'stripe_apply_billing'])
 
 /**
  * One argument builder per api RPC, every id pointing at seeded `beta` rows. Used by the
@@ -147,6 +147,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   get_ai_settings: { args: {}, expect: 'none' },
   set_ai_settings: { args: { p_share_customer_contact: false }, expect: 'none' },
   log_mcp_call: { args: { p_tool: 'rpc-scoped-test', p_view: null, p_row_count: 0, p_ok: true, p_error_code: null }, expect: 'none' },
+  // A read of the caller's own billing row by auth.uid(); no argument to aim elsewhere.
+  billing_self: { args: {}, expect: 'none' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */

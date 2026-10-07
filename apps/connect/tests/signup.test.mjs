@@ -22,6 +22,7 @@ globalThis.React = react;
 globalThis.AsyncLocalStorage ??= require("node:async_hooks").AsyncLocalStorage;
 const { NextRequest } = await import("next/server");
 const { requestAsyncStorage } = require("next/dist/client/components/request-async-storage.external.js");
+const { actionAsyncStorage } = require("next/dist/client/components/action-async-storage.external.js");
 
 const { signupTarget, notifySignupConfirmed, signupNotice, SIGNUP_SENT_PATH } = await import("../lib/signup.ts");
 const { BCNS_EMAIL } = await import("../lib/request-connection.ts");
@@ -34,7 +35,7 @@ const USER_ID = "11111111-1111-1111-1111-111111111111";
 const USER = { id: USER_ID, email: "owner@acme.example", aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", email_confirmed_at: new Date().toISOString() };
 const FORM = { name: "Acme Bakery", email: "owner@acme.example" };
 
-const ENV_KEYS = ["SIGNUP_ENABLED", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "OAUTH_APPROVED_SOURCES", "HUB_BASE_URL"];
+const ENV_KEYS = ["SIGNUP_ENABLED", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "OAUTH_APPROVED_SOURCES", "HUB_BASE_URL", "STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_FUNCTION_URL"];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 const savedFetch = globalThis.fetch;
 afterEach(() => {
@@ -80,7 +81,8 @@ test("switch off: /signup is a 404, its action is a 404, and /login has no Creat
 
 test("switch on vs off: the login page (plain and Shopify finish) differs ONLY by the gated link", async () => {
   const { default: LoginPage } = await import("../app/login/page.tsx");
-  const LINK = /<a href="\/signup"[^>]*>Create account<\/a>/;
+  // During a Shopify App Store install the link carries the hand-off marker to /signup.
+  const LINK = /<a href="\/signup(\?from=shopify)?"[^>]*>Create account<\/a>/;
   for (const searchParams of [{}, { next: FINISH_PATH }, { ok: "reset-sent" }, { forgot: "1" }]) {
     delete process.env.SIGNUP_ENABLED;
     const off = renderToStaticMarkup(createElement(LoginPage, { searchParams }));
@@ -88,7 +90,7 @@ test("switch on vs off: the login page (plain and Shopify finish) differs ONLY b
     const on = renderToStaticMarkup(createElement(LoginPage, { searchParams }));
     if (searchParams.forgot) assert.equal(on, off, "the reset form never shows the link");
     else {
-      assert.match(on, LINK, JSON.stringify(searchParams));
+      assert.equal(on.match(LINK)?.[1], searchParams.next ? "?from=shopify" : undefined, JSON.stringify(searchParams));
       assert.equal(on.replace(LINK, ""), off, JSON.stringify(searchParams));
     }
   }
@@ -183,4 +185,81 @@ test("finish: a signed-in PENDING session is refused like signed-out (to /login,
   // Contrast: a real owner session passes currentMembership() and reaches the next gate.
   const owner = await finish({ client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc", client_role: "owner" });
   assert.notEqual(owner.headers.get("location"), `${HUB}/login?next=${encodeURIComponent(FINISH_PATH)}`);
+});
+
+/* ------------------------------- Shopify App Store installs never see Pay */
+
+const STRIPE_ENV = {
+  NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+  HUB_BASE_URL: HUB,
+  STRIPE_SECRET_KEY: "sk_test_fixture",
+  STRIPE_PRICE_ID: "price_Fixture200",
+  STRIPE_WEBHOOK_SECRET: "whsec_test_fixture_only",
+  STRIPE_WEBHOOK_FUNCTION_URL: `${SUPABASE_URL}/functions/v1/stripe-webhook`,
+};
+const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+/** Run a server action: next/headers' cookies() is writable there; the cookies it sets land in the returned jar. */
+async function inAction(request, fn) {
+  const { NextResponse } = await import("next/server");
+  const jar = NextResponse.next().cookies;
+  await actionAsyncStorage
+    .run({ isAction: true }, () => requestAsyncStorage.run({ headers: request.headers, cookies: request.cookies, mutableCookies: jar, draftMode: {} }, fn))
+    .catch((error) => {
+      if (!String(error?.digest).startsWith("NEXT_REDIRECT")) throw error;
+    });
+  return jar;
+}
+
+test("Shopify hand-off marker: /signup carries it, and signing in or up during the install sets the hub-wide cookie", async () => {
+  Object.assign(process.env, STRIPE_ENV, { SIGNUP_ENABLED: "1" });
+  const { SHOPIFY_INSTALL_COOKIE } = await import("../lib/stripe-billing.ts");
+  const { default: SignupPage } = await import("../app/signup/page.tsx");
+  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { from: "shopify" } })), /<input type="hidden" name="from" value="shopify"\/>/);
+  assert.doesNotMatch(renderToStaticMarkup(SignupPage({ searchParams: { from: "elsewhere" } })), /name="from"/);
+
+  globalThis.fetch = async () => jsonResponse({ error: "invalid_grant" }, 400); // the signup function / a wrong password
+  const { signUp } = await import("../app/signup/actions.ts");
+  const { signIn } = await import("../app/login/actions.ts");
+  const post = (path) => new NextRequest(`${HUB}${path}`, { method: "POST", headers: { host: "connect.bcn-services.com" } });
+  const form = (fields) => {
+    const data = new FormData();
+    for (const [k, v] of Object.entries({ name: FORM.name, email: FORM.email, password: "pw", ...fields })) data.set(k, v);
+    return data;
+  };
+
+  const marked = (await inAction(post("/signup"), () => signUp(form({ from: "shopify" })))).get(SHOPIFY_INSTALL_COOKIE);
+  assert.equal(marked?.value, "1");
+  assert.equal(marked?.path, "/", "where /pending can read it (the install's own cookie is scoped to /api/oauth/shopify)");
+  assert.equal(marked?.httpOnly, true);
+  assert.equal((await inAction(post("/signup"), () => signUp(form({})))).get(SHOPIFY_INSTALL_COOKIE), undefined);
+  assert.equal((await inAction(post("/login"), () => signIn(form({ next: FINISH_PATH })))).get(SHOPIFY_INSTALL_COOKIE)?.value, "1");
+  assert.equal((await inAction(post("/login"), () => signIn(form({ next: "/elsewhere" })))).get(SHOPIFY_INSTALL_COOKIE), undefined);
+});
+
+test("/pending: a new owner gets Pay plus the don't-pay-here-for-Shopify line; with the Shopify marker, the review screen and no Pay", async () => {
+  Object.assign(process.env, STRIPE_ENV);
+  const { SHOPIFY_INSTALL_COOKIE } = await import("../lib/stripe-billing.ts");
+  globalThis.fetch = async (input) => {
+    const url = String(input?.url ?? input);
+    if (url.includes("/auth/v1/user")) return jsonResponse(USER);
+    if (url.includes("/rpc/billing_self")) {
+      return jsonResponse({ client_id: "c0000000-0000-4000-8000-0000000000c1", role: "owner", status: "pending", paid_at: null, grace_until: null, shopify_billed: false, stripe_customer_id: null });
+    }
+    return jsonResponse([]);
+  };
+  const { default: PendingPage } = await import("../app/pending/page.tsx");
+  const render = async (marker) => {
+    const cookie = [sessionCookie({ client_status: "pending" }), marker].filter(Boolean).join("; ");
+    const request = new NextRequest(`${HUB}/pending`, { headers: { host: "connect.bcn-services.com", cookie } });
+    return renderToStaticMarkup(await inRequest(request, () => PendingPage({ searchParams: {} })));
+  };
+
+  const pay = await render();
+  assert.match(pay, /Pay \$200\/mo/);
+  assert.match(pay, /Shopify App Store\? Shopify bills you for it, so don&#x27;t pay here\./);
+  const shopify = await render(`${SHOPIFY_INSTALL_COOKIE}=1`);
+  assert.doesNotMatch(shopify, /Pay \$200|startCheckout/);
+  assert.match(shopify, /bcns reviews every new workspace before it opens/);
 });

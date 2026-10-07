@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import Link from "next/link";
 import { currentMembership, loadClient } from "@/lib/session";
 import type { ClientRow } from "@/lib/sources";
+import { loadBilling } from "@/lib/stripe-billing";
+import { BillingBanner } from "./billing-banner";
 import { signOut } from "./login/actions";
 import { HubNav } from "./nav";
 import "./globals.css";
@@ -64,13 +66,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const membership = await currentMembership();
   // Signed out (the login pages) draw their own full-page frame and wordmark.
   const client = membership ? await loadClient() : null;
+  const billing = membership ? await loadBilling() : null;
   return (
     <html lang="en">
       <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
         {membership ? (
           <>
             <Header membership={membership} client={client} />
-            <main className="app">{children}</main>
+            <main className="app">
+              <BillingBanner billing={billing} />
+              {children}
+            </main>
             <footer className="hfoot">
               bcns Connect &middot; <a href="https://bcn-services.com">Back to bcn-services.com</a>
             </footer>

@@ -1,0 +1,48 @@
+{
+  "id": "evt_TestSubDeleted",
+  "object": "event",
+  "api_version": "2025-03-31.basil",
+  "created": 1794406400,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "customer.subscription.deleted",
+  "data": {
+    "object": {
+      "id": "sub_TestFixture0001",
+      "object": "subscription",
+      "customer": "cus_TestFixture0001",
+      "status": "canceled",
+      "livemode": false,
+      "metadata": {
+        "client_id": "c0000000-0000-4000-8000-0000000000c1"
+      },
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_TestFixture0001",
+            "object": "subscription_item",
+            "price": {
+              "id": "price_TestFixture0001",
+              "object": "price",
+              "unit_amount": 20000,
+              "currency": "usd",
+              "recurring": {
+                "interval": "month",
+                "interval_count": 1
+              }
+            },
+            "quantity": 1
+          }
+        ]
+      },
+      "cancel_at_period_end": false,
+      "canceled_at": 1794406400,
+      "ended_at": 1794406400
+    }
+  }
+}
