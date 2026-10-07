@@ -51,6 +51,7 @@ interface and the component.
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
 | Pricing | `/pricing` | `pricing`, `faq`, `contactSection`, `pageMeta.pricing` |
 | About | `/about` | `about`, `contactSection`, `pageMeta.about` |
+| Connect setup | `/services/connect/setup` | `connectSetup`, `pageMeta.connectSetup` |
 | Privacy | `/privacy` | `legal.privacy` |
 | Terms | `/terms` | `legal.terms` |
 
@@ -1234,6 +1235,24 @@ description; `replayLabel` is the "Play again" button. `stepEmphasis` and
 six entries from `faq.items` by question text. `stageLabel` and `diagramLabel` are
 accessibility strings.
 
+## Connect Setup (`siteContent.connectSetup`) — /services/connect/setup
+
+The public, signed-out page that tells a client how to use bcns Connect from
+Claude or ChatGPT (what it does, how to add it in each, support contact, privacy
+link). Linked from `/services/connect` and listed in the sitemap. Plain language only:
+the one technical string is `connectorUrl`, the address Claude and ChatGPT ask for.
+`eyebrow`, `title`, `emphasis`, `description` head the page. `whatTitle` and
+`whatPoints` (three `{ title, description }`) say what it does. `needTitle` and
+`needBody` state the prerequisite and the price ($200/month, no setup fee). `addressTitle`,
+`addressHelp` and `connectorUrl` show the address to paste. `claude` and `chatgpt` are each
+`{ title, intro, steps[n], note }`; the ChatGPT `note` is deliberately hedged ("depends on
+your plan", "still rolling out"). `supportTitle` and `supportBody` carry the support
+contact (`siteConfig.email`, interpolated, never a literal). `privacyTitle`, `privacyBody`,
+`privacyLinkLabel` and `privacyHref` link to `/privacy`. `teaserTitle` and `teaserLabel`
+are the pointer shown on `/services/connect`. Page meta is `pageMeta.connectSetup`.
+Banned in these fields except inside `connectorUrl`: MCP, OAuth, server, API, token,
+endpoint (`connect-setup.test.mjs` gates it).
+
 ## Deluxe Demo (`siteContent.deluxeDemo`) — /services/deluxe
 
 Extras for the Deluxe page. Head copy is `useCases.blockEyebrow/blockTitle/
@@ -1390,6 +1409,34 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `legal.terms.effectiveDate` | Legal — effectiveDate |
 | `legal.terms.sections[n].heading` | Legal — sections heading |
 | `legal.terms.sections[n].body[m]` | Legal — sections body |
+| `connectSetup.eyebrow` | Connect Setup — eyebrow |
+| `connectSetup.title` | Connect Setup — title |
+| `connectSetup.emphasis` | Connect Setup — emphasis |
+| `connectSetup.description` | Connect Setup — description |
+| `connectSetup.whatTitle` | Connect Setup — whatTitle |
+| `connectSetup.whatPoints[0..2].title` | Connect Setup — title |
+| `connectSetup.whatPoints[0..2].description` | Connect Setup — description |
+| `connectSetup.needTitle` | Connect Setup — needTitle |
+| `connectSetup.needBody` | Connect Setup — needBody |
+| `connectSetup.addressTitle` | Connect Setup — addressTitle |
+| `connectSetup.addressHelp` | Connect Setup — addressHelp |
+| `connectSetup.connectorUrl` | Connect Setup — connectorUrl |
+| `connectSetup.claude.title` | Connect Setup — title |
+| `connectSetup.claude.intro` | Connect Setup — intro |
+| `connectSetup.claude.steps[n]` | Connect Setup — steps[n] |
+| `connectSetup.claude.note` | Connect Setup — note |
+| `connectSetup.chatgpt.title` | Connect Setup — title |
+| `connectSetup.chatgpt.intro` | Connect Setup — intro |
+| `connectSetup.chatgpt.steps[n]` | Connect Setup — steps[n] |
+| `connectSetup.chatgpt.note` | Connect Setup — note |
+| `connectSetup.supportTitle` | Connect Setup — supportTitle |
+| `connectSetup.supportBody` | Connect Setup — supportBody |
+| `connectSetup.privacyTitle` | Connect Setup — privacyTitle |
+| `connectSetup.privacyBody` | Connect Setup — privacyBody |
+| `connectSetup.privacyLinkLabel` | Connect Setup — privacyLinkLabel |
+| `connectSetup.privacyHref` | Connect Setup — privacyHref |
+| `connectSetup.teaserTitle` | Connect Setup — teaserTitle |
+| `connectSetup.teaserLabel` | Connect Setup — teaserLabel |
 | `navCards.items[0..3].title` | Nav Cards — items title |
 | `navCards.items[0..3].description` | Nav Cards — items description |
 | `navCards.items[0..3].href` | Nav Cards — items href |
@@ -1403,8 +1450,10 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.pricing.description` | Page Meta — pricing description |
 | `pageMeta.about.title` | Page Meta — about title |
 | `pageMeta.about.description` | Page Meta — about description |
+| `pageMeta.connectSetup.title` | Page Meta — connect, deluxe, aiConsulting |
+| `pageMeta.connectSetup.description` | Page Meta — connect, deluxe, aiConsulting |
 
-Total registry fields: 122 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`, `legal.*.sections[n].list[m]`) and container fields (`screenshots`) included. The chunk5-legal-pages pass added 13 rows for the new `legal.privacy`/`legal.terms` sections (§ Legal above). This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 152 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`, `legal.*.sections[n].list[m]`) and container fields (`screenshots`) included. The mcp-directory pass added 30 rows for `connectSetup` and `pageMeta.connectSetup` (§ Connect Setup above). The chunk5-legal-pages pass added 13 rows for the new `legal.privacy`/`legal.terms` sections (§ Legal above). This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
 The FAQ entries appended in the bcns Connect pass live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 

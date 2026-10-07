@@ -12,6 +12,7 @@ const pages: Page[] = [
   ["", "2026-10-06", "monthly", 1],
   ["/services", "2026-10-06", "monthly", 0.8],
   ["/services/connect", "2026-10-06", "monthly", 0.8],
+  ["/services/connect/setup", "2026-10-06", "monthly", 0.7],
   ["/services/deluxe", "2026-10-06", "monthly", 0.8],
   ["/services/ai-consulting", "2026-10-06", "monthly", 0.8],
   ["/work", "2026-10-06", "monthly", 0.8],
