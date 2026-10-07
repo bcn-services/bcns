@@ -56,7 +56,7 @@ export interface SourceCard {
   lastError: string | null;
 }
 
-const TITLES: Record<HubSource, string> = {
+export const TITLES: Record<HubSource, string> = {
   shopify: "Shopify",
   meta: "Meta Ads",
   monday: "Monday.com",
