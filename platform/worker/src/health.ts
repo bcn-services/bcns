@@ -136,10 +136,9 @@ async function raiseClientBreaks(t: Tick): Promise<number> {
      from data.connector_health h join data.clients c on c.id = h.client_id and c.status = 'active'
      where h.status in ('auth_failed', 'stale')`)
   if (!h.rows.length) return 0
-  // sent_at only counts when someone was actually emailed: the 'no owner to email' row is marked sent but reached nobody.
+  // Unsent rows have sent_at null, so no reminder is counted until the first email has gone out.
   const first = await sql<{ dedupe_key: string; sent_at: Date | null }>(
-    `select dedupe_key, case when last_error is distinct from 'no owner to email' then sent_at end as sent_at
-     from data.notifications where dedupe_key = any($1::text[])`,
+    `select dedupe_key, sent_at from data.notifications where dedupe_key = any($1::text[])`,
     [h.rows.map(r => breakKey('client_break', r))])
   const createdAt = new Map(first.rows.map(r => [r.dedupe_key, r.sent_at]))
   const notices = clientBreakNotices(
@@ -186,15 +185,16 @@ export function breakEmail(kind: BreakNotice['kind'], source: string, status: st
   }
 }
 
-/** One Resend batch call, one message per recipient so owners never see each other's address; Idempotency-Key makes a retry safe. */
+/** One Resend batch call, one message per recipient so owners never see each other's address; Idempotency-Key makes a retry safe. Replies go to the bcns alert inbox, not the bot sender. */
 export async function sendClientEmail(t: Tick, to: string[], subject: string, text: string, idempotencyKey: string): Promise<void> {
   const key = envStr('RESEND_API_KEY')
-  const from = envStr('BCNS_ALERT_FROM') || envStr('BCNS_ALERT_EMAIL')
+  const replyTo = envStr('BCNS_ALERT_EMAIL')
+  const from = envStr('BCNS_ALERT_FROM') || replyTo
   if (!key || !from) throw new Error('RESEND_API_KEY and BCNS_ALERT_FROM or BCNS_ALERT_EMAIL are required to email clients')
   const r = await t.fetch('https://api.resend.com/emails/batch', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}`, 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify(to.map(addr => ({ from, to: [addr], subject, text }))),
+    body: JSON.stringify(to.map(addr => ({ from, to: [addr], subject, text, ...(replyTo ? { reply_to: replyTo } : {}) }))),
   })
   if (!r.ok) throw new Error(`resend HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`)
 }

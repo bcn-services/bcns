@@ -32,3 +32,10 @@
 - M5 worker.test.ts: gamma (paused) health set auth_failed, asserts no client_break row; gamma health restored in finally; DB test backdates sent_at too (CI only, not run locally).
 - Mutations (shasum 28de312948c21773d1a93cc57024ead17efbe777 restored): health.ts:125 threshold >= 0 -> RED 'reminder: absent with no sent initial...'; sent gate dropped (initial_sent_at ?? status_since) -> RED same test.
 - Skipped M2, M4 per instruction (follow-ups).
+
+## Fix pass 2 (delta review: 0C/1I/2M)
+- IMPORTANT applied: `sendClientEmail` (health.ts) adds `reply_to: BCNS_ALERT_EMAIL` to each batch message when set (omitted when unset), so the stale copy's "reply to this email" reaches bcns's human alert inbox, not the bot sender. Pinned by 2 new pure tests in `platform/test/break-emails.test.ts` (stub Tick fetch: one message per owner, reply_to, Idempotency-Key, `/emails/batch`; no reply_to key when env unset; env restored in afterEach) and a `reply_to` assertion in the DB-backed `client_break_emails` case.
+- MINOR applied: dropped the `case when last_error is distinct from 'no owner to email'` in `raiseClientBreaks`; plain `sent_at`. An owner added mid-breakage now still gets the reminder. DB sub-case added in `client_break_emails` (initial row set to 'no owner to email', reminder deleted, tick -> reminder raised, 3rd batch sent). CI-only: local Supabase stack is down, so that case is unrun here; typechecks.
+- MINOR applied: `platform/DESIGN.md` 5.6 reworded: reminder is 3 days after the first email was sent (unsent counts nothing; a 'no owner' row's sent_at still starts the clock), and replies go to the bcns alert inbox.
+- Gates: `pnpm --filter @bcn-services/platform test` 160 passed (floor 158, +2), 0 fail; platform `typecheck` clean.
+- Mutations (cp backup, shasum identical after each, git status shows only the 4 intended files): reply_to spread removed -> RED "one batch message per owner, replies to the bcns alert inbox" (toMatchObject); key from clock -> RED 3 key tests; owner filter removed -> RED ownerRecipients; reminder threshold 0 -> RED "reminder: absent ... at 3d-1min" test.

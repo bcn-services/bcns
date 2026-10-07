@@ -232,11 +232,12 @@ describe('worker', () => {
       expect((await sql(`select 1 from data.notifications where client_id = $1 and kind like 'client_break%'`, [CLIENTS.gamma])).rowCount).toBe(0)
       expect(first[0].sent_at).not.toBeNull()
       expect(batches().length).toBe(1)
-      const msgs = JSON.parse(batches()[0].body) as { to: string[]; subject: string; text: string }[]
+      const msgs = JSON.parse(batches()[0].body) as { to: string[]; subject: string; text: string; reply_to?: string }[]
       expect(msgs.map(m => m.to)).toEqual([['acme-owner@example.com']])
       expect(batches()[0].body).not.toMatch(/acme-member|acme-smoke/)
       expect(batches()[0].headers['Idempotency-Key']).toBe(first[0].dedupe_key)
       expect(msgs[0].text).toContain('https://connect.bcn-services.com/')
+      expect(msgs[0]).toMatchObject({ reply_to: 'alerts@example.test' })
 
       // bcns's own alert still goes out, to bcns only.
       const bcns = await rowsOf('auth_failed')
@@ -254,6 +255,13 @@ describe('worker', () => {
       await alerts(mkTick(cap))
       expect((await rowsOf('client_break_reminder')).length).toBe(1)
       expect(batches().length).toBe(2)
+
+      // An owner added after a 'no owner to email' initial row still gets the reminder.
+      await sql(`delete from data.notifications where client_id = $1 and kind = 'client_break_reminder'`, [CLIENTS.acme])
+      await sql(`update data.notifications set last_error = 'no owner to email' where client_id = $1 and kind = 'client_break'`, [CLIENTS.acme])
+      await alerts(mkTick(cap))
+      expect((await rowsOf('client_break_reminder')).length).toBe(1)
+      expect(batches().length).toBe(3)
     } finally {
       for (const [id, o] of [[CLIENTS.acme, orig], [CLIENTS.gamma, gamma]] as const)
         await sql(`update data.connector_health set status = $3, status_since = $4, last_error = $5, computed_at = $6 where client_id = $1 and source = $2`,

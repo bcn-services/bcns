@@ -1,6 +1,7 @@
 // Client break emails: pure decision layer (no DB, runs locally). DB-backed cases live in worker.test.ts.
-import { describe, expect, it } from 'vitest'
-import { breakEmail, clientBreakNotices, ownerRecipients, type BreakRow } from '../worker/src/health.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import { breakEmail, clientBreakNotices, ownerRecipients, sendClientEmail, type BreakRow } from '../worker/src/health.js'
+import type { Tick } from '../worker/src/db.js'
 
 const T0 = new Date('2026-10-01T12:00:00.000Z')
 const H = 3600_000, D = 24 * H, MIN = 60_000
@@ -83,5 +84,38 @@ describe('breakEmail', () => {
     expect(breakEmail('client_break', 'drive', 'stale', T0).text).toContain("If it doesn't, reply to this email")
     expect(breakEmail('client_break', 'drive', 'auth_failed', T0).text).not.toContain('reply to this email')
     expect(breakEmail('client_break_reminder', 'drive', 'auth_failed', T0).text).toContain('still not connected')
+  })
+})
+
+describe('sendClientEmail', () => {
+  const ENV = ['RESEND_API_KEY', 'BCNS_ALERT_FROM', 'BCNS_ALERT_EMAIL']
+  const saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]))
+  afterEach(() => { for (const k of ENV) saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]) })
+  const send = async (to: string[]) => {
+    const calls: { url: string; headers: Record<string, string>; body: string }[] = []
+    const fetch = (async (url: any, init?: any) => {
+      calls.push({ url: String(url), headers: init?.headers ?? {}, body: String(init?.body ?? '') })
+      return new Response('{}', { status: 200 })
+    }) as typeof globalThis.fetch
+    await sendClientEmail({ fetch } as Tick, to, 'Subj', 'Body', 'k1')
+    return { call: calls[0], msgs: JSON.parse(calls[0].body) as Record<string, unknown>[] }
+  }
+
+  it('one batch message per owner, replies to the bcns alert inbox, Idempotency-Key set', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
+    const { call, msgs } = await send(['a@example.com', 'b@example.com'])
+    expect(call.url).toBe('https://api.resend.com/emails/batch')
+    expect(call.headers['Idempotency-Key']).toBe('k1')
+    expect(msgs.map(m => m.to)).toEqual([['a@example.com'], ['b@example.com']])
+    for (const m of msgs) expect(m).toMatchObject({ from: 'bot@example.test', reply_to: 'alerts@example.test', subject: 'Subj', text: 'Body' })
+  })
+
+  it('no BCNS_ALERT_EMAIL: no reply_to key at all', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    delete process.env.BCNS_ALERT_EMAIL
+    expect('reply_to' in (await send(['a@example.com'])).msgs[0]).toBe(false)
   })
 })
