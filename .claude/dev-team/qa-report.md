@@ -1,41 +1,36 @@
+VERDICT: PASS
 ## VERDICT: PASS
-Branch: feat/hub-first-run (head 950f130, no test additions needed, nothing committed by QA)
-Gate mode: tests+behavioral (signed-in render NOT possible, see Not Verifiable)
+**Branch:** feat/qbo-data-view (QA test commit on top of bc10fa6)
+**Gate mode:** tests
 
 ## Criteria Checked
-- Checklist (source -> first sync -> invite team -> connect AI), real state, self-ticking, hides when all done, owner-only: first-run.test.mjs 12 tests + 6 mutations all RED on the intended test -- PASS
-- /access Claude steps + ChatGPT labelled "Not yet hand-verified" + copy button + 3-5 questions per connected source: source read of app/access/page.tsx, CopyUrl, test "3 to 5 each" -- PASS (no visual check)
-- Tests wired, count above 314: package.json list ends in tests/first-run.test.mjs; connect test 326 pass / 0 fail (+12); probe-inject (throwing test appended) -> 327 tests / 326 pass / 1 fail, restored byte-identical -- PASS
-- Design match: pure logic lib/first-run.ts; api.ai_last_used_at() migration 20261007000300 (max mcp_tool_calls.at for tenant_or_raise, authenticated-only grant); readAiLastUsed returns null on error/throw/non-string; sync ticks only on parseable last_success_at for a HUB_SOURCES row; team = non-smoke, not viewer; hidden when allDone; owner-only -- PASS
-- Untouched: git diff da54d22 --stat shows no layout.tsx, app/pending/*, lib/data-views.ts, platform/worker/src/connectors/* -- PASS
+- QuickBooks tab on /data for connected client — "qbo view: a connected QuickBooks card gets a tab with views; every hub source has a view" — PASS
+- Expenses view, real columns date/vendor/amount(money)/account/type/payment type/memo — "config shape, real columns in order, no blob" + "only qbo_expense rows come back" (row shape) + live PostgREST select — PASS
+- Search covers vendor and memo — "search covers vendor and memo" + live PostgREST (q=globex/packing/initech/refund) — PASS
+- Date filter — "from/to filter runs on occurred_at" + live PostgREST with UTC tz (2 rows, to-inclusive) — PASS
+- CSV export like other views — "CSV export works like the other views" + live export through handleExport — PASS
+- 30-day count/stat strip — "joins the 30-day count and stat strip" + live fetchCounts30 = 3 — PASS
+- Money value x100 any currency, credits negative — "amount is value x 100 for every currency" (USD/JPY/negative) + added EUR — PASS
+- Tests in apps/connect/tests + in package.json list — probe throwing test: 322->323 total, fail 0->1; restored, cmp identical — PASS
+- No migration — git diff --name-status da54d22: only 6 files in apps/connect, no sql — PASS
 
-## Gates
-- connect test 326/326/0; typecheck clean; lint clean; build ok (/ and /access compile, /access 486 B)
-- platform test 15 files / 146 / 0 fail (DB-backed skipped locally; new mcp-audit ai_last_used_at cases NOT run here, CI runs them)
-- mcp test 272/272/0, tsc clean (data-client changed)
+## Evidence per ask
+- Suite: 322/322 pass, 0 fail/skip/cancel (floor 322); now 323 with my added test, 0 fail.
+- PostgREST syntax is REAL: ran PostgREST v16.4 (downloaded release binary to /tmp/pgrst, Postgres 17 local, no supabase start; torn down) with an api.records_v1 view over data.records and drove the app's real fetchPage/fetchCounts30/handleExport via postgrest-js 2.116.0. `alias:attributes->>key` select and `attributes->>key.ilike."%x%"` inside or= both worked; rows came back with named fields, search hit vendor and memo, order on occurred_at ok, no error.
+- Hostile search live: terms `"returned"`, `(chairs)`, `50%`, `a,b`, `x)`, `%`, `_`, `\` all returned err=null with correct counts (50% matched only the literal-percent memo; `%`/`_` not treated as wildcards).
+- Edge cases live + unit: null vendor/memo/payment_type render empty (cell and CSV, no "null"); Bill with null payment_type empty; -5000 => -$50.00 / CSV -50.00; JPY 150000 => ¥1,500 / 1500; EUR 2550 => €25.50 / 25.50; vendor `=cmd|calc` CSV => `'=cmd|calc`; memo with comma/quotes CSV-quoted.
+- data.test.mjs diff: only STAT_IDS 14->15 (3 asserts) and adding "quickbooks" to the all-sources catalog (14->15); no assertion weakened or removed. Existing money columns use minorDigits undefined => same `?? currencyDigits` path; full suite green.
+- typecheck exit 0; `next build` succeeds (/data, /data/export present).
+- Guardrails: no platform/worker change, no package.json deps change (only test list line), no lockfile change, no migration; fixtures use fake names (Globex, Initech, Umbrella KK).
 
-## Mutations (each: cp backup, one condition rewritten, RED, restored, shasum identical, git status clean)
-- M1 (required) sync step drops the last_success_at check -> RED: "first sync: needs a non-null last_success_at, not just a row" (expected false, actual true)
-- M2 (required) starterQuestions drops .filter(connected) -> RED: "starter questions: none when nothing is connected" + "only connected sources, in hub order, 3 to 5 each"
-- Extra, all RED on the matching test, all guarded: smoke member counted (#82 invite team); viewer counted (#79, #82); `&& !allDone` removed (#84 all four done hides); owner-only check removed (#85 members never see); ai step ticks without timestamp (#79, #83, #84); source step ignores connected (#79, #80)
-- Probe-inject confirms first-run.test.mjs runs (tests 326 -> 327, fail 0 -> 1)
+## Failures
+none
 
-## Starter questions vs data (cross-checked apps/mcp/src/policy.ts + worker connectors)
-- shopify: orders/refund/payout in money_v1, stock in products_v1.inventory_quantity; no best-sellers (line items excluded) -- OK
-- meta: spend/clicks per campaign/ad in daily_metrics -- OK; monday: jobs_v1 status/owner/priority/due_on/is_done -- OK
-- meet: messages_v1 meeting_note title/body -- OK; drive: media_v1 kind image/video, filename, created_at -- OK
-- quickbooks: records_v1 qbo_expense, vendor/account in attributes (attributes kept on records_v1) -- OK
-- Jargon: no "MCP/OAuth/sync cursor" in new client-facing copy. Only "mcp" strings are the address URL and the pre-existing Claude Code terminal block ("claude mcp add", "/mcp"), untouched by this item.
-- ChatGPT block: visible `.tag` "Not yet hand-verified" plus a sentence saying it is unverified. Copy button: URL is a plain <pre> (user-select: all), button failure shows "Couldn't copy..." text; clipboard error is try/caught.
-
-## Behavioral (dev server on 3123, killed, port confirmed free)
-- GET / -> 307 /login?error=unconfigured; GET /access -> 307 /login?error=unconfigured; GET /login -> 200. Redirect only (no env configured); this is NOT a visual check.
-- Structural: pages pass firstRun()/starterQuestions() output straight into JSX; copy-url.tsx starts with "use client" and compiled in `next build`; css classes .fr-list/.steps/.tag/.copyurl/.qs exist in globals.css.
+## Tests Added
+- `apps/connect/tests/qbo-data-view.test.mjs` — engineer's 8 tests plus one QA edge-case test (null cells, EUR, negative, CSV formula guard, exact escaped or= string for `a,b)"%`).
 
 ## Not Verifiable
-- Signed-in render of / and /access, the copy click, tick states against live data (no Supabase stack, no env). Interpretation tested: lib outputs + test suite + build compile.
-- Claude/ChatGPT click-through steps match the live claude.ai/ChatGPT UIs: not hand-checked by anyone (ChatGPT labelled as such).
-- api.ai_last_used_at() against a real DB: platform DB tests skipped locally; migration not pushed (Nate runs db push; until then step 4 reads not-done by design).
+none. Live data absent in prod; verified against a local PostgREST with fixture rows instead of the mocked fake alone.
 
 ## Notes (non-blocking)
-- `sr-only` relies on Tailwind class generation; build passed but unrendered.
+- INFO — timestamptz date filters depend on DB session TZ (pre-existing for all views; Supabase is UTC; my first local run in Los_Angeles TZ shifted the "from" boundary).

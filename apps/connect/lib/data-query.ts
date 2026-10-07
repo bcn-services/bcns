@@ -9,7 +9,7 @@
  */
 
 import type { ApiSchema } from "./session";
-import { selectKeys, type ViewConfig } from "./data-views";
+import { filterColumn, selectKeys, type ViewConfig } from "./data-views";
 import { addDays, parseIsoDate, cleanSearch, searchFilter } from "./data-format";
 
 export const PAGE_SIZE = 50;
@@ -83,7 +83,7 @@ export function applyFilters<Q extends QueryLike>(query: Q, cfg: ViewConfig, p: 
   if (cfg.liveOnly) q = q.is("deleted_at", null);
   if (p.from) q = q.gte(cfg.dateColumn, p.from);
   if (p.to) q = cfg.dateKind === "date" ? q.lte(cfg.dateColumn, p.to) : q.lt(cfg.dateColumn, addDays(p.to, 1));
-  const search = searchFilter(p.q, cfg.searchColumns);
+  const search = searchFilter(p.q, cfg.searchColumns.map((c) => filterColumn(cfg, c)));
   if (search) q = q.or(search);
   // Newest first; nulls last so an empty date never floats to the top. Tie-break keeps pages stable.
   return q.order(cfg.dateColumn, { ascending: false, nullsFirst: false }).order(cfg.tieBreak, { ascending: true });
