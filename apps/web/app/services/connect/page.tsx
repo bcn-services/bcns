@@ -7,6 +7,7 @@ import { ConnectHead } from "@/components/services/connect-head";
 import { ConnectStage } from "@/components/services/connect-stage";
 import { ConnectTools } from "@/components/services/connect-tools";
 import { ConnectFaq } from "@/components/services/connect-faq";
+import { ConnectSetupTeaser } from "@/components/services/connect-setup";
 import { SiteFooter } from "@/components/site-footer";
 import { siteConfig } from "@/lib/site";
 import { siteContent } from "@/lib/content";
@@ -27,6 +28,7 @@ export default function ConnectPage() {
         <ConnectStage connect={connect} connectDemo={connectDemo} tools={tools} />
         <ConnectTools />
         <ConnectFaq />
+        <ConnectSetupTeaser />
         <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" highlights={[]} secondary={siteConfig.signIn} />
       </main>
       <SiteFooter />

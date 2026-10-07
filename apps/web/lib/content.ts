@@ -235,6 +235,7 @@ export interface PageMetaRegistry {
   pricing: PageMeta;
   about: PageMeta;
   connect: PageMeta;
+  connectSetup: PageMeta;
   deluxe: PageMeta;
   aiConsulting: PageMeta;
 }
@@ -356,6 +357,42 @@ export interface ConnectDemoContent {
   faqEmphasis: string;
   /** `faq.items[].question` values to show on the Connect page, in order. */
   faqQuestions: [string, string, string, string, string, string];
+}
+
+export interface ConnectSetupStepList {
+  title: string;
+  /** One line under the title. */
+  intro: string;
+  steps: string[];
+  /** Plan caveat shown under the steps. */
+  note: string;
+}
+
+/** The public "use bcns Connect with Claude or ChatGPT" page, /services/connect/setup. */
+export interface ConnectSetupContent {
+  eyebrow: string;
+  title: string;
+  emphasis: string;
+  description: string;
+  whatTitle: string;
+  whatPoints: [ContactHighlightItem, ContactHighlightItem, ContactHighlightItem];
+  needTitle: string;
+  needBody: string;
+  addressTitle: string;
+  addressHelp: string;
+  /** The one technical string on the page: the address Claude and ChatGPT ask for. */
+  connectorUrl: string;
+  claude: ConnectSetupStepList;
+  chatgpt: ConnectSetupStepList;
+  supportTitle: string;
+  supportBody: string;
+  privacyTitle: string;
+  privacyBody: string;
+  privacyLinkLabel: string;
+  privacyHref: string;
+  /** Teaser on /services/connect that links here. */
+  teaserTitle: string;
+  teaserLabel: string;
 }
 
 export interface DeluxeTile {
@@ -497,6 +534,7 @@ export interface SiteContent {
   story: StoryContent;
   servicesOverview: ServicesOverviewContent;
   connectDemo: ConnectDemoContent;
+  connectSetup: ConnectSetupContent;
   deluxeDemo: DeluxeDemoContent;
   aiDay: AiDayContent;
   pricingPage: PricingPageContent;
@@ -1302,6 +1340,11 @@ export const siteContent: SiteContent = {
       description:
         "bcns Connect plugs into the tools your small business already uses and keeps everything organized in one place. $200/month, no setup fee.",
     },
+    connectSetup: {
+      title: "Use bcns Connect with Claude or ChatGPT",
+      description:
+        "Add bcns Connect to Claude or ChatGPT and ask about your orders, money and customers. Read only. $200/month, no setup fee.",
+    },
     deluxe: {
       title: "Deluxe Builds",
       description:
@@ -1477,6 +1520,70 @@ export const siteContent: SiteContent = {
       "Is my data private?",
       "What happens if I want to cancel?",
     ],
+  },
+
+  connectSetup: {
+    eyebrow: "Use it with Claude or ChatGPT",
+    title: "Ask Claude or ChatGPT about your business",
+    emphasis: "your business",
+    description:
+      "Connect Claude or ChatGPT to your bcns Connect data, then ask plain questions like which customers ordered most this month. They can only read your data. They never change it.",
+    whatTitle: "What this does",
+    whatPoints: [
+      {
+        title: "Answers from your real numbers",
+        description:
+          "Ask about your orders, money, customers, messages and files. The answer comes from your own organized data, not a guess.",
+      },
+      {
+        title: "Read only",
+        description: "Claude and ChatGPT can look, but they can never edit, send or delete anything in your tools.",
+      },
+      {
+        title: "You stay in control",
+        description:
+          "Customer email addresses stay hidden unless you switch on sharing in your bcns account. You can remove the connection whenever you like.",
+      },
+    ],
+    needTitle: "Before you start",
+    needBody:
+      "You need a bcns Connect account with at least one of your tools connected. Connect is $200/month, no setup fee.",
+    addressTitle: "Your connector address",
+    addressHelp: "Claude and ChatGPT both ask for this address when you add bcns. Copy it exactly.",
+    connectorUrl: "https://mcp.bcn-services.com/mcp",
+    claude: {
+      title: "Add it in Claude",
+      intro: "If your Claude plan supports custom connectors, it takes about a minute.",
+      steps: [
+        "Open Claude and go to Settings, then Connectors.",
+        "Choose Add custom connector.",
+        "Name it bcns and paste the connector address from above.",
+        "Sign in with your bcns Connect account when asked, then approve.",
+        "Start a new chat and ask something about your business.",
+      ],
+      note: "On a team plan, the account owner may need to add it first.",
+    },
+    chatgpt: {
+      title: "Add it in ChatGPT",
+      intro: "If your ChatGPT plan supports it, the steps are almost the same.",
+      steps: [
+        "Open ChatGPT and go to Settings, then Connectors. If you see Developer mode under Advanced settings, turn it on.",
+        "Choose Create and name it bcns.",
+        "Paste the connector address from above.",
+        "Sign in with your bcns Connect account when asked, then approve.",
+        "In a new chat, pick bcns from the tools menu and ask your question.",
+      ],
+      note: "Adding your own connector depends on your ChatGPT plan, and these options are still rolling out. If you don't see them yet, email us and we'll help.",
+    },
+    supportTitle: "Need a hand?",
+    supportBody: `Email ${siteConfig.email} and a person will help you set it up.`,
+    privacyTitle: "Your data and privacy",
+    privacyBody:
+      "Claude and ChatGPT only see what you've connected to bcns, and they can't change any of it. Read how we handle your data in our privacy policy.",
+    privacyLinkLabel: "Read the privacy policy",
+    privacyHref: "/privacy",
+    teaserTitle: "Already a bcns Connect client? Ask Claude or ChatGPT about your business.",
+    teaserLabel: "See how to set it up",
   },
 
   deluxeDemo: {
