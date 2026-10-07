@@ -166,3 +166,22 @@ test("qbo view: a connected QuickBooks card gets a tab with views; every hub sou
   assert.ok(viewsFor(page.card.source).length >= 1);
   for (const s of HUB_SOURCES) assert.ok(DATA_VIEWS.some((v) => v.source === s), `${s} has no data view`);
 });
+
+test("qbo view edge cases: null cells empty, EUR, formula-guarded vendor in CSV, hostile search stays one quoted pattern", async () => {
+  const rows = [
+    exp("e1", "2026-09-21T00:00:00Z", { vendor: null, amount_cents: 2550, currency: "EUR", memo: null, payment_type: null, txn_type: "Bill" }),
+    exp("e2", "2026-09-22T00:00:00Z", { vendor: "=HYPERLINK(\"x\")", amount_cents: -100, memo: "a,b" }),
+  ];
+  const { rows: got } = await fetchPage(fakeApi(rows), cfg, P());
+  const by = Object.fromEntries(got.map((r) => [r.id, r]));
+  for (const i of [1, 5, 6]) assert.equal(formatCell(cfg.columns[i], by.e1), "", cfg.columns[i].label); // vendor, payment type, memo: never "null"
+  assert.ok(![...cfg.columns.keys()].some((i) => csvCell(cfg.columns[i], by.e1).includes("null")));
+  assert.equal(formatCell(cfg.columns[2], by.e1), "€25.50");
+  assert.equal(csvCell(cfg.columns[2], by.e1), "25.50");
+  assert.equal(csvCell(cfg.columns[2], by.e2), "-1.00"); // negative money is not formula-guarded
+  assert.equal(csvCell(cfg.columns[1], by.e2), `"'=HYPERLINK(""x"")"`);
+  assert.equal(csvCell(cfg.columns[6], by.e2), '"a,b"');
+  const api = fakeApi(rows);
+  await fetchPage(api, cfg, P({ q: 'a,b)"%' }));
+  assert.equal(api.calls.find((c) => c[0] === "or")[1], 'attributes->>vendor.ilike."%a,b)\\"\\\\%%",attributes->>memo.ilike."%a,b)\\"\\\\%%"');
+});
