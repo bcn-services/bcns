@@ -300,3 +300,53 @@ test("billing banner: grace only; owners get the link, members the text", () => 
   assert.equal(renderToStaticMarkup(createElement(BillingBanner, { billing: null })), "");
   assert.equal(formatDay(1_792_000_000), "October 14, 2026");
 });
+
+/* ------------------------------- QA scenario: the review's double-subscription finding (I1) */
+
+test("scenario: pay, the webhook lags, Pay again => one subscription; inside Stripe's search lag the webhook flags the second instead of overwriting", async () => {
+  const { decideBilling } = await import("@bcn-services/app-core");
+  const stripeSubs = []; // Stripe's side: every subscription a completed Checkout made
+  let indexed = true; // false = the search index has not caught up yet
+  let checkoutsOpened = 0;
+  const completeCheckout = (id) => stripeSubs.push({ id, status: "active", customer: "cus_QaOne1", metadata: { client_id: CLIENT } });
+  const reply = (url) => {
+    const u = String(url);
+    if (u.startsWith(`${API}/subscriptions`)) return json({ object: "search_result", has_more: false, data: indexed ? stripeSubs : [] });
+    if (u === `${API}/checkout/sessions`) {
+      checkoutsOpened++;
+      return json({ url: CHECKOUT_URL });
+    }
+    return json({ url: PORTAL_URL });
+  };
+  const { fetchImpl } = recorder(reply);
+  const pendingOwner = billing(); // the database still says pending, no customer: the webhook has not landed
+
+  assert.equal(await checkoutTarget(pendingOwner, null, CONFIG, fetchImpl), CHECKOUT_URL);
+  completeCheckout("sub_QaFirst");
+  assert.equal(checkoutsOpened, 1);
+
+  // The owner opens /pending again and clicks Pay: Stripe already has their subscription.
+  assert.equal(await checkoutTarget(pendingOwner, null, CONFIG, fetchImpl), "/pending?paid=1&waiting=1");
+  assert.equal(checkoutsOpened, 1, "no second Checkout, no second subscription");
+
+  // Residual window: the first payment is not searchable yet, so a second Checkout opens and is paid.
+  indexed = false;
+  assert.equal(await checkoutTarget(pendingOwner, null, CONFIG, fetchImpl), CHECKOUT_URL);
+  completeCheckout("sub_QaSecond");
+  assert.equal(checkoutsOpened, 2);
+
+  // Both payments reach the webhook: the first applied wins, the second is flagged, the stored one is not replaced.
+  const paid = (subscriptionId, at) => ({ kind: "paid", at, clientRef: CLIENT, customerId: "cus_QaOne1", subscriptionId });
+  let state = { status: "pending", paidAt: null, graceUntil: null, subscriptionId: null, shopifyBilled: false, lastEventAt: null };
+  assert.deepEqual(decideBilling(state, paid("sub_QaFirst", 100)), { action: "activate" });
+  state = { ...state, status: "active", paidAt: 100, subscriptionId: "sub_QaFirst", lastEventAt: 100 };
+  assert.deepEqual(decideBilling(state, paid("sub_QaSecond", 101)), { action: "flag_duplicate" });
+  assert.deepEqual(decideBilling(state, paid("sub_QaFirst", 102)), { action: "record_payment" }, "the stored subscription renewing is normal");
+
+  // In grace the stored subscription is unpaid: Pay opens the portal for it, never a new Checkout.
+  indexed = true;
+  stripeSubs.length = 0;
+  stripeSubs.push({ id: "sub_QaFirst", status: "unpaid", customer: "cus_QaOne1", metadata: { client_id: CLIENT } });
+  assert.equal(await checkoutTarget(billing(GRACE), null, CONFIG, fetchImpl), PORTAL_URL);
+  assert.equal(checkoutsOpened, 2);
+});
