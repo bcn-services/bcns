@@ -1,5 +1,4 @@
-// §4.5 Google Meet notes — PROVISIONAL. Drive listing + OAuth refresh are documented API
-// behaviour; the note format (title suffix, participant block) is unverified until a sample lands.
+// §4.5 Google Meet notes: Drive folder walk + export of each Gemini notes doc; parseNotes cleans the text.
 import { z } from 'zod'
 import {
   type CanonicalWrites, type Connector, type MessageRow, type Page, type RawRow, type RunContext,
@@ -35,13 +34,85 @@ async function* pull(ctx: RunContext, since: Date | null): AsyncGenerator<Page> 
   }
 }
 
-/**
- * PROVISIONAL (§4.5, Needs Nate N3): the trailing "Notes by Gemini" suffix and the attendee
- * header block are unverified. Participants stay empty until a real sample exists.
- */
-export function parseNotes(name: string, text: string): { title: string; participants: string[] } {
-  void text
-  return { title: name.replace(/\s*[–-]\s*Notes by Gemini\s*$/i, '').trim(), participants: [] }
+export type MeetFormat = 'gemini-quick-notes' | 'gemini-legacy' | 'unknown'
+export type ParsedNotes = {
+  title: string
+  participants: string[]
+  body: string
+  occurredAt: string | null
+  format: MeetFormat
+  hasTranscript: boolean
+}
+
+// Verbatim Gemini lines, matched by prefix on the trimmed line so small trailing variations still strip.
+const BOILERPLATE = [
+  'Please rate the new Quick notes tab',
+  'Want to see more? View the full notes',
+  'Tip: You can always access your full notes',
+  "You should review Gemini's notes to make sure",
+  'How is the quality of these specific notes?',
+  'Meeting records Transcript',
+  'This editable transcript was computer generated',
+]
+const isBoilerplate = (l: string) => BOILERPLATE.some(b => l.startsWith(b))
+const BARE_DATE = /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/
+const MEETING = /^Meeting ([A-Z][a-z]{2}) (\d{1,2}), (\d{4}) at (\d{1,2}):(\d{2}) (\S+)$/
+const MEETING_ANY = /^Meeting [A-Z][a-z]{2} \d{1,2}, \d{4} at \d{1,2}:\d{2} \S+( - Transcript)?$/
+const HEADING = /^(Summary|Details|Next steps|Action items|Notes|Transcript)$/i
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+// ponytail: US abbreviations + UTC/GMT/GMT±h only — non-US abbreviations (BST, CET, IST…) give null and
+// normalize falls back to createdTime; upgrade to Intl/IANA lookup if a client's notes need it.
+const TZ_HOURS: Record<string, number> = { EDT: -4, EST: -5, CDT: -5, CST: -6, MDT: -6, MST: -7, PDT: -7, PST: -8, UTC: 0, GMT: 0 }
+
+function tzMinutes(tz: string): number | null {
+  if (tz in TZ_HOURS) return TZ_HOURS[tz] * 60
+  const m = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(tz)
+  return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0)) : null
+}
+
+function meetingTime(m: RegExpExecArray): string | null {
+  const mon = MONTHS.indexOf(m[1])
+  const off = tzMinutes(m[6])
+  if (mon < 0 || off === null || Number(m[2]) > 31 || Number(m[4]) > 23 || Number(m[5]) > 59) return null
+  return new Date(Date.UTC(Number(m[3]), mon, Number(m[2]), Number(m[4]), Number(m[5]) - off)).toISOString()
+}
+
+/** Splits a Gemini notes export into title / participants / occurredAt / cleaned body. Pure, line-based. */
+export function parseNotes(name: string, text: string): ParsedNotes {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n').map(l => l.trim() === '' ? '' : l)
+  const trimmed = lines.map(l => l.trim())
+  const hasQuick = trimmed.some(l => /^✍️? Quick notes$/.test(l) || l === '📝 Full notes')
+  const hasTranscript = hasQuick && trimmed.includes('📖 Transcript')
+  const format: MeetFormat = hasQuick ? 'gemini-quick-notes'
+    : /\s*[–-]\s*Notes by Gemini\s*$/i.test(name) || trimmed.some(l => l === 'Attendees' || l === 'Summary') ? 'gemini-legacy'
+    : 'unknown'
+
+  // An unknown (non-Gemini) doc keeps the pre-parser behaviour: name as title, no time, no participants.
+  const mi = format === 'unknown' ? -1 : trimmed.findIndex(l => MEETING.test(l))
+  const meeting = mi >= 0 ? MEETING.exec(trimmed[mi]) : null
+  const topic = mi >= 0 ? trimmed.slice(mi + 1).find(l => l && !BARE_DATE.test(l) && !isBoilerplate(l)) : undefined
+  const title = topic ?? name.replace(/\s*[–-]\s*Notes by Gemini\s*$/i, '').trim()
+
+  const ai = format === 'unknown' ? -1 : trimmed.findIndex(l => /^(Attendees|Invited)$/i.test(l))
+  let participants: string[] = []
+  if (ai >= 0) {
+    const rest = trimmed.slice(ai + 1)
+    const block = rest.slice(Math.max(0, rest.findIndex(l => l !== '')))
+    const end = block.findIndex(l => l === '' || HEADING.test(l))
+    participants = block.slice(0, end < 0 ? undefined : end).join(',').split(',').map(s => s.trim()).filter(Boolean)
+  }
+
+  let body = text
+  if (hasQuick) {
+    const kept: string[] = []
+    lines.forEach((l, i) => {
+      const t = trimmed[i]
+      if (isBoilerplate(t) || BARE_DATE.test(t) || MEETING_ANY.test(t) || /^✍️? Quick notes$/.test(t) || t === '📝 Full notes') return
+      kept.push(t === '📖 Transcript' ? '---\nTranscript\n---' : l)
+    })
+    body = kept.join('\n').replace(/\n{4,}/g, '\n\n\n').trim()
+  }
+  return { title, participants, body, occurredAt: meeting ? meetingTime(meeting) : null, format, hasTranscript }
 }
 
 export const meet: Connector = {
@@ -67,12 +138,15 @@ export const meet: Connector = {
     for (const r of rows) {
       if (r.entity !== 'doc') continue
       const p = r.payload
-      const { title, participants } = parseNotes(String(p.name ?? ''), String(p.text ?? ''))
+      const parsed = parseNotes(String(p.name ?? ''), String(p.text ?? ''))
       messages.push({
-        externalId: String(p.id), kind: 'meeting_note', title, body: p.text ?? null,
-        occurred_at: new Date(p.createdTime ?? p.modifiedTime ?? Date.now()).toISOString(),
-        participants, url: p.webViewLink ?? null,
-        attributes: { modified_time: p.modifiedTime ?? null, owners: p.owners ?? null },
+        externalId: String(p.id), kind: 'meeting_note', title: parsed.title, body: p.text == null ? null : parsed.body,
+        occurred_at: parsed.occurredAt ?? new Date(p.createdTime ?? p.modifiedTime ?? Date.now()).toISOString(),
+        participants: parsed.participants, url: p.webViewLink ?? null,
+        attributes: {
+          modified_time: p.modifiedTime ?? null, owners: p.owners ?? null,
+          format: parsed.format, has_transcript: parsed.hasTranscript,
+        },
         source_updated_at: p.modifiedTime ?? null,
       })
     }

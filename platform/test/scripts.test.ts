@@ -8,6 +8,7 @@ import { localKeys, sql, pool, SUPABASE_URL, PNG_1x1 } from './helpers.js'
 import { main as onboard } from '../scripts/onboard.js'
 import { main as addSource } from '../scripts/add-source.js'
 import { ScriptError } from '../scripts/_lib.js'
+import { main as renormalize } from '../scripts/renormalize.js'
 import { main as setQuota } from '../scripts/set-quota.js'
 import { main as importMedia } from '../scripts/import-media.js'
 import { main as addMember, upsertMembership } from '../scripts/add-member.js'
@@ -87,6 +88,22 @@ describe('scripts', () => {
     expect(sched.rows[0].config).toEqual({ board_id: '123', board_url: 'https://m.example', columns: { status: 'status', due: 'date4' } })
     const tok = await sql<any>(`select kind, secret from data.source_tokens t join data.clients c on c.id = t.client_id where c.slug = $1`, [SLUG2])
     expect(tok.rows[0]).toEqual({ kind: 'monday_personal', secret: 'tok' })
+  })
+
+  it('renormalize is a dry run until --apply sets renormalize_requested_at', async () => {
+    const requested = async () => (await sql<any>(
+      `select s.renormalize_requested_at from data.connector_schedule s join data.clients c on c.id = s.client_id where c.slug = $1 and s.source = 'monday'`, [SLUG2],
+    )).rows[0].renormalize_requested_at
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await renormalize(['--client', SLUG2, '--source', 'monday'])
+      expect(await requested()).toBeNull()
+      expect(log.mock.calls.map(c => c.join(' ')).join('\n')).toMatch(new RegExp(`${SLUG2}\\tmonday\\t0 raw_latest.*pass --apply`, 's'))
+      await renormalize(['--client', SLUG2, '--source', 'monday', '--apply'])
+      expect(await requested()).not.toBeNull()
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('set-quota updates egress_quota_bytes', async () => {

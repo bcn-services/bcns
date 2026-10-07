@@ -232,7 +232,4 @@ describe('connectors', () => {
     const kinds = await sql(`select 1 from data.money where kind not in ('order','refund','payout')`)
     expect(kinds.rowCount).toBe(0)
   })
-
-  // §4.5 is provisional: the note title suffix and attendee block are unverified (Needs Nate N3).
-  it.todo('parseNotes')
 })
