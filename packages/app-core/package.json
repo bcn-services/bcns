@@ -19,7 +19,7 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx tests/pricing.test.mjs && tsx tests/subscription.test.mjs && tsx tests/anthropic.test.mjs && tsx tests/health.test.mjs && tsx tests/webhooks.test.mjs && tsx tests/qa-app-core.test.mjs && tsx tests/fix-app-core.test.mjs",
+    "test": "tsx tests/pricing.test.mjs && tsx tests/subscription.test.mjs && tsx tests/anthropic.test.mjs && tsx tests/health.test.mjs && tsx tests/webhooks.test.mjs && tsx tests/qa-app-core.test.mjs && tsx tests/fix-app-core.test.mjs && tsx tests/stripe.test.mjs",
     "clean": "rm -rf .turbo node_modules"
   },
   "dependencies": {

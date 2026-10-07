@@ -1,0 +1,30 @@
+{
+  "id": "evt_TestCheckoutCompleted",
+  "object": "event",
+  "api_version": "2025-03-31.basil",
+  "created": 1790000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_Fixture0001",
+      "object": "checkout.session",
+      "mode": "subscription",
+      "status": "complete",
+      "payment_status": "paid",
+      "client_reference_id": "c0000000-0000-4000-8000-0000000000c1",
+      "customer": "cus_TestFixture0001",
+      "subscription": "sub_TestFixture0001",
+      "amount_total": 20000,
+      "currency": "usd",
+      "livemode": false,
+      "success_url": "https://connect.example.test/pending?paid=1",
+      "cancel_url": "https://connect.example.test/pending"
+    }
+  }
+}

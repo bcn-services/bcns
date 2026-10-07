@@ -144,3 +144,11 @@ test("requireMembership: a pending sign-up is no-membership, flagged pending, ne
   );
   assert.deepEqual(result, { ok: false, reason: "no-membership", pending: true });
 });
+
+test("requireMembership: a paused client is flagged pending (pay to resume); churned or unknown status is plain no-membership", async () => {
+  const as = (client_status) =>
+    requireMembership(stubClient({ user: { id: USER_ID }, token: accessToken({ sub: USER_ID, client_status }) }));
+  assert.deepEqual(await as("paused"), { ok: false, reason: "no-membership", pending: true });
+  assert.deepEqual(await as("churned"), { ok: false, reason: "no-membership" });
+  assert.deepEqual(await as("active"), { ok: false, reason: "no-membership" });
+});

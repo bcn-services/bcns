@@ -105,7 +105,8 @@ export async function requireMembership(
     // A self-service sign-up awaiting activation: the hook issues the session with
     // client_status "pending" and NO client_id/client_role (20261001000200), so it is still
     // no-membership everywhere. The flag only lets the hub show /pending instead of signing out.
-    return claims.client_status === "pending"
+    // A `paused` client gets the same tenant-less token (20261007000100) so its owner can pay to resume.
+    return claims.client_status === "pending" || claims.client_status === "paused"
       ? { ok: false, reason: "no-membership", pending: true }
       : { ok: false, reason: "no-membership" };
   }
