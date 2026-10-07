@@ -19,6 +19,9 @@ export const siteConfig = {
   description:
     "bcns connects the tools small businesses already use into one organized place, then builds anything on top of it: AI agents, apps, dashboards. Your data is always yours.",
   email: "nseluga@bcn-services.com",
+  /** JSON-LD only (Organization.legalName / description); not rendered. */
+  legalName: "BCNS LLC",
+  serviceArea: "We work remotely with small businesses across the US.",
   nav: [
     { label: "Services", href: "/services" },
     { label: "Work", href: "/work" },

@@ -208,13 +208,17 @@ assert(
   "sitemap privacy uses siteConfig.url template",
   sitemapSource.includes("`${siteConfig.url}/privacy`") ||
     sitemapSource.includes("siteConfig.url + \"/privacy\"") ||
-    sitemapSource.includes('siteConfig.url}/privacy')
+    sitemapSource.includes('siteConfig.url}/privacy') ||
+    // data-driven list: ["/privacy", ...] joined as `${siteConfig.url}${path}`
+    (sitemapSource.includes('["/privacy"') && sitemapSource.includes('`${siteConfig.url}${path}`'))
 );
 assert(
   "sitemap terms uses siteConfig.url template",
   sitemapSource.includes("`${siteConfig.url}/terms`") ||
     sitemapSource.includes("siteConfig.url + \"/terms\"") ||
-    sitemapSource.includes('siteConfig.url}/terms')
+    sitemapSource.includes('siteConfig.url}/terms') ||
+    // data-driven list: ["/terms", ...] joined as `${siteConfig.url}${path}`
+    (sitemapSource.includes('["/terms"') && sitemapSource.includes('`${siteConfig.url}${path}`'))
 );
 
 // ---------------------------------------------------------------------------
