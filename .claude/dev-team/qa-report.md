@@ -1,37 +1,37 @@
 VERDICT: PASS
 
+# QA Report
+**Task:** Item 1 re-verify after fix round #1 - Stripe self-serve Checkout + payment gate (caution: true)
+**Branch:** feat/stripe-gate @ fe916e2 (fix b6c38f7; engineer HEAD 5e239a1 + 1 test commit)
+**Date:** 2026-10-06
+**Gate mode:** tests+behavioral
+
 ## VERDICT: PASS
-**Branch:** feat/stripe-gate @ 9c31013 (no test additions needed, nothing committed; .claude/dev-team is gitignored)
-**Gate mode:** tests+behavioral | **Date:** 2026-10-06
 
-## Gate counts (re-run by QA; floors in parens)
-- connect 325 pass/0 fail/0 skip (314); app-core exit 0, 76 tests (61); platform 16 files/161 (15/146; DB files skipped locally, no stack); tenant 43 (42); web 98: 87 pass/11 skip/0 fail (same); mcp tsc clean + 272.
-- Wiring probes (appended throwing test, count + fail moved, restored from cp, shasum equal): app-core stripe.test.mjs -> "# fail 1" exit nonzero; connect stripe-billing -> 326 tests/1 fail; platform edge-stripe-webhook -> 162 tests/1 fail. All three new files run.
+## Gates (floor / run, all green, exit 0)
+connect 325 / 334 (333 claimed + my 1 added; wired in literal file list, count moved) - app-core 76 / 77 - platform 16 files/161 / 16 files/162 (DB tests skip, no stack) - tenant 43 / 43 - web 98 tests/87 pass / 98/87 - mcp 272 / 272. tsc clean. Done-when fixtures: webhook -> pending->active, grace month then paused, never-paid stays pending: covered (app-core, Deno edge, connect).
 
-## Mutations (each restored, shasum/cmp identical, git status clean)
-- M1 signature compare: app-core RED "stripe verifier: signature compare rejects a wrong secret..." (+ "plugs into processWebhook"); Deno RED "signature compare rejects a wrong secret, a tampered body and a wrong digest".
-- M2 timestamp tolerance: app-core RED "rejects a validly signed timestamp outside the tolerance..."; Deno RED same-named test.
-- M3 churned reactivation (guard line deleted): app-core RED "decideBilling: a churned client is never reactivated"; Deno copy RED 2 tests (parity + churned).
-- M4 Shopify exemption: decideBilling guard removed -> app-core RED "a Shopify-billed tenant is never activated or put in grace"; billingView exemption removed -> RED "billingView: who sees Pay"; Deno copy RED parity test + "a Shopify-billed tenant is never activated" (and billingView variant, 1 red).
-- Drift (item 3): platform/test/edge-stripe-webhook.test.ts "_shared/app-core/subscription.ts is byte-identical to packages/app-core/src/subscription.ts" already exists, wired, goes RED on any edit to the copy. Nothing added.
+## Mutations (cp backup, restore, shasum -c all OK, git status clean)
+- M1-M4 (sig compare, timestamp tolerance, churned reactivation, Shopify exemption): all still RED on intended tests, Node + Deno copies.
+- New guards each RED when removed: checkoutTarget live-sub check (fail-closed), flag_duplicate (Deno copy sha1-identical to Node), pendingScreen Shopify marker, stripeReady needing all 4 env values.
 
-## Behavioral (hub next start :3121, fake env, listener :3123, no .env read)
-- Signed fixture: 200, forwarded once, byte-exact (hex equal to fixture file) with Stripe-Signature header intact; 299s-old signature also 200.
-- Wrong v1: 401, stale (-1h) 401, future (+1h) 401, missing header 401: none forwarded (listener log had exactly 2 entries, both the valid ones).
-- GET /api/webhooks/stripe 405 (no /login redirect); GET /pending 307 -> /login; POST /pending 303 -> /login; /api/stripe/webhook 307 -> /login (confirms why route is /api/webhooks/stripe). Checkout/portal are server actions on /pending, gated by middleware plus signedIn() in actions.ts.
-- Teardown: both servers killed by PID, lsof shows 3121/3123 free; worktree clean.
+## Review findings
+- I1 (double subscription) CLOSED: added scenario test - pay, webhook lags, Pay again => waiting screen, one checkout; grace => portal; inside search lag the webhook flags the 2nd sub, never overwrites. RED without live-sub block and without flag_duplicate.
+- I2 (Shopify install shown Pay) CLOSED live: no marker => Pay + "don't pay here if Shopify" line; marker => review screen, no Pay.
+- Diff 98b1255..5e239a1 touches no forbidden file (shopify.app.toml, SHOPIFY_ALT_*, connectors/*, Shopify flow).
 
-## done-when coverage
-- pending->active on paid checkout: app-core "decideBilling: a payment activates pending..." + edge "checkout.session.completed on a pending client activates it" + DB test.
-- paid-before + lapse -> grace +30d, access kept: "a lapse after paying starts 30 days of grace once" (GRACE_SECONDS=30d, active stays active) + edge test.
-- grace expiry -> paused: ONLY platform/test/stripe-billing.test.ts via data.pause_lapsed_clients() (needs local stack; skipped here, runs in platform-ci via supabase start). No pure predicate.
-- never-paid stays pending/untouched; churned never reactivated; Shopify exempt (never Pay, activate, grace); stale event; pay again resumes: all in app-core + Deno handler tests.
-- Event-id dedupe: edge "a replay is 200" (RPC mocked) + DB test only.
-- Pending owner server-side (billing_self from auth.uid(), no client id param); checkout mode=subscription, price=STRIPE_PRICE_ID, client_reference_id from billing row: tested in connect "checkoutTarget".
-- Legal copy: content.ts + CONTENT.md describe live Checkout/grace/Shopify; a4-legal-pages green; no stale "until Checkout is live" text anywhere; no MCP/OAuth jargon in new hub copy. No forbidden file (Shopify toml, connectors/*) in diff.
+## Behavioral (next start :3121, invented env, fake listener :3123, both killed by PID, ports free)
+- Webhook: 200 valid + 299s-old; 401 wrong v1, stale, future, missing header, tampered body; 405 GET; 2 forwards, signature + length intact.
+- /signup?from=shopify and /login?next=/api/oauth/shopify/finish render; hidden from=shopify input present; plain /login links to /signup; 0 console errors.
+- Marker bcns_shopify_install=1: path=/, httpOnly, SameSite=Lax, ~30d, secure only on https; set by real signUp (from=shopify) and signIn (next=finish) submits; never by GET (/signup, /login, /pending?from=shopify).
 
 ## Findings
-- LOW — platform/test/stripe-billing.test.ts — grace-expiry pause, event-id dedupe and the SQL guards (churned/Shopify, advisory lock) are verified only by the DB suite, which could not run locally (no stack, per guardrail); SQL-side mutations not run. Rely on platform-ci being green before merge; consider a pure expiry predicate if a local check is wanted.
-- LOW — .github/workflows/platform-ci.yml:58 — turbo job excludes apps/web, so a4-legal-pages (the legal-copy test) does not run in CI; QA ran it locally, green (pre-existing).
-- INFO — fixtures hand-authored, not live captures (engineer flag); verifier/handler tests cannot catch a basil-shape drift in a live event.
-- No Critical/Important.
+- MINOR - apps/connect/app/signup/actions.ts, apps/connect/app/login/actions.ts - marker is never cleared: a plain /signup owner in a browser that did the Shopify hand-off sees no Pay for 30 days (reproduced: plain signup left marker set, /pending showed review); signIn also sets it on a failed password - clear it in signUp without from and in signOut.
+- LOW - platform/test/stripe-billing.test.ts - SQL flag_duplicate/record_payment guards and grace-expiry pause verified only by the DB suite in CI (no local stack).
+- INFO - search-lag double-Checkout window remains (documented); flag_duplicate + alert email is the backstop. A pending owner with an incomplete live sub waits up to ~23h. Deno billingView protected only by byte parity. checkoutTarget ignores the marker (deferred). Fixtures hand-authored.
+
+## Tests Added
+- `apps/connect/tests/stripe-billing.test.mjs` - pay-lag scenario test (commit fe916e2). No new infra.
+
+## Not Verifiable
+none (SQL guards: see LOW).
