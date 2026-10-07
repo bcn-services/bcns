@@ -88,6 +88,6 @@ Defaults taken where DESIGN.md left something open; each one line, no new decisi
 2. `BCNS_OAUTH_CLIENT_ID`: the bcns Google OAuth client id, so onboarding's G1 check can refuse it.
 3. `deploy-worker.yml`: WIF provider + service-account secrets, `GCP_PROJECT`/`GCP_REGION`/`TASK_COUNT` vars, Artifact Registry repo `bcns`, and a pre-created Cloud Run job `bcns-data-worker` (the workflow runs `jobs update`, not `create`). Never run here.
 4. `onboard` / `rotate-smoke`: which password manager and which dashboard repo receive the smoke credentials; today they print once.
-5. ~~Meet §4.5 N3: one real "Notes by Gemini" doc to finish `parseNotes` participants/title.~~ Resolved 2026-10-06: real sample shape verified, `parseNotes` implemented (PR #TBD).
+5. ~~Meet §4.5 N3: one real "Notes by Gemini" doc to finish `parseNotes` participants/title.~~ Resolved 2026-10-06: real sample shape verified, `parseNotes` implemented (PR #120).
 6. Hosted project: `RESEND_API_KEY`, `BCNS_ALERT_EMAIL`, and enabling the custom access token hook on the hosted project (config.toml only wires it locally).
 7. A complete full-list run that returns zero items tombstones every row of that table for the client (§4.1 as written; `tombstone_only_on_done` covers the budget-stop case only). Confirm Monday/Meta never answer an empty-but-successful list during degradation, or say whether an empty complete list should be a no-op.
