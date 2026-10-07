@@ -913,12 +913,7 @@ Tombstones: `item` is a `fullList` entity (§4.1), so after a run that paged the
 seen in that run and clears `deleted_at` on any that reappear. A budget-stopped or failed run never
 tombstones. The board is pulled every hour; with raw dedupe (D5) an unchanged item writes no raw row.
 
-### 4.5 Google Meet notes — **PROVISIONAL**
-
-`fixtures/meet-sample.*` is absent, so the document format, title pattern, and participant extraction
-below are unverified. The build implements the Drive listing and token refresh (which are
-documented API behaviour) and leaves `parseNotes()` behind a fixture-driven test that is marked
-`todo` until a sample lands. **Needs Nate N3.**
+### 4.5 Google Meet notes
 
 | | |
 |---|---|
@@ -928,7 +923,7 @@ documented API behaviour) and leaves `parseNotes()` behind a fixture-driven test
 | defaults | `interval = '1 hour'`, `backfillDepth = 'unbounded'` (as far as the folder goes), `rateLimit = { concurrency: 2, minDelayMs: 200 }`. |
 | Pull `drive_file` | Walks the folder tree (`connectors/google.ts` `walkFolder`), one call per folder page: `GET drive/v3/files?q='<id>' in parents and trashed=false and (mimeType='application/vnd.google-apps.folder' or (mimeType='application/vnd.google-apps.document' and modifiedTime > '<since>'))&fields=nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,webViewLink,owners)&pageSize=100` — the `modifiedTime` clause only once a cursor exists, at every level; subfolders are always listed. Breadth-first, each folder and file once (cycles, multi-parent); shortcuts skipped (`google_walk_shortcut_skip`); trashed subfolders never listed. Caps: 8 levels below the root, 500 folders — a trip logs `google_walk_cap` and fails the run (`error`), pages already written stay. Cursor `{ modified_time }` = max across the whole tree, written on the tree's last page only. `external_id = file.id`, `source_updated_at = modifiedTime`. |
 | Pull `doc` | `GET drive/v3/files/<id>/export?mimeType=text/plain` for each new/changed file. `external_id = file.id`. |
-| Normalize → `messages` | `kind='meeting_note'`, `external_id = file.id`, `title = name` with a trailing "– Notes by Gemini" (pattern **provisional**) stripped, `body = exported text`, `occurred_at = createdTime`, `participants = []` (**provisional**: Gemini notes list attendees in a header block; parse once a sample exists), `url = webViewLink`, `attributes = { modified_time, owners }`. |
+| Normalize → `messages` | `kind='meeting_note'`, `external_id = file.id`, `url = webViewLink`, `source_updated_at = modifiedTime`. `parseNotes(name, text)` (pure, CRLF→LF first) detects `attributes.format`: `gemini-quick-notes` (a `✍️ Quick notes` or `📝 Full notes` line), else `gemini-legacy` (name ends "Notes by Gemini" or an `Attendees`/`Summary` line), else `unknown`. **title** = first line after the `Meeting <Mon> <d>, <yyyy> at <hh:mm> <TZ>` line that is not a bare date or Google boilerplate (the topic sentence); otherwise `name` with a trailing "– Notes by Gemini" stripped. **body** (quick-notes only) = the export minus Google boilerplate lines (matched by prefix), the `✍️ Quick notes` / `📝 Full notes` headers, bare date lines and `Meeting … <TZ>` / `Meeting … - Transcript` lines, blank runs collapsed to two, the `📖 Transcript` header replaced by a `---` / `Transcript` / `---` divider; Quick notes, then Full notes (Summary, Next steps, Details), then the transcript, all LF. `legacy` and `unknown` keep the exported text unchanged. **occurred_at** = the meeting line's time (TZ via a small US-abbreviation / `UTC` / `GMT±h[:mm]` offset map); no line or an unknown TZ falls back to `createdTime`. **participants** = the comma-separated line(s) under an `Attendees` / `Invited` heading, up to the next blank line or section heading, else `[]` (never `owners`). An `unknown` doc skips title/time/participants parsing entirely: title = name, `occurred_at = createdTime`, `participants = []`. `attributes = { modified_time, owners, format, has_transcript }`. |
 
 Fallback when a client opts out: the owner drops the doc into the Content Library; nothing to design.
 
@@ -1160,7 +1155,7 @@ same batch.
 ### 5.8 Re-normalize (R7, R10)
 
 Triggered by `connector_schedule.renormalize_requested_at is not null` (timezone change) or by
-`scripts/renormalize.ts --client <slug> [--source <s>] [--since <date>]`. Takes
+`scripts/renormalize.ts --client <slug> [--source <s>] [--apply]` (dry-run by default: lists the matching schedule rows with their `raw_latest` counts and writes nothing; `--apply` sets `renormalize_requested_at`; `--since <date>` is not implemented). Takes
 `worker_leases('renormalize:<client_id>')` (TTL 9 min) and a `connector_runs` row with
 `mode = 'renormalize'`; it does **not** touch the schedule lease, so incremental runs continue.
 Work is driven by `raw_latest` (one row per key, un-partitioned): keyset-paginate
