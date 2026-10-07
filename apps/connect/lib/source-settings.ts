@@ -174,6 +174,12 @@ export function friendlyError(raw: string | null | undefined): string | null {
   const text = typeof raw === "string" ? raw.trim() : "";
   if (!text) return null;
   const t = text.toLowerCase();
+  // The worker's empty-listing guard (§4.1): nothing listed, so nothing was removed.
+  if (/found nothing to sync/.test(t)) {
+    return /\bfolder\b/.test(t)
+      ? EMPTY_FOLDER_WARNING
+      : "We didn't find anything to bring in. Check that it is shared with the account you connected.";
+  }
   if (/invalid_grant|token (has been )?(expired|revoked)|unauthori[sz]ed|\b401\b/.test(t)) {
     return "The connection was signed out. Reconnect it from the Sources page.";
   }
@@ -186,7 +192,7 @@ export function friendlyError(raw: string | null | undefined): string | null {
   if (/timeout|timed out|\b50[0-4]\b|econnreset|fetch failed/.test(t)) {
     return "The service didn't answer in time. We'll try again on the next sync.";
   }
-  return "The last sync hit a problem. bcns has been notified; email us if it keeps happening.";
+  return "The last sync hit a problem. We'll try again on the next sync. Email us if it keeps happening.";
 }
 
 export interface RunRow {
@@ -207,19 +213,23 @@ export const EMPTY_FOLDER_WARNING =
 
 /**
  * How the folder set at `folderChangedAt` turned out, from the full syncs started after it.
- * A worker run of an empty or unreadable Drive folder succeeds with 0 rows, so "empty" is
- * the only sign the owner gets. Any full sync that found files wins.
+ * An empty or unshared Drive folder fails the worker run with "found nothing to sync"
+ * (a 0-row ok run counts the same). Any full sync that found files wins. "pending" only
+ * until some sync finishes after the change; once one has and none was a full sync (it
+ * fell out of the recent-runs window), there is nothing left to judge: "none".
  */
 export function folderCheck(runs: readonly RunRow[], folderChangedAt: string | null | undefined): FolderCheck {
   const since = folderChangedAt ? new Date(folderChangedAt).getTime() : NaN;
   if (Number.isNaN(since)) return "none";
   const after = runs.filter(
-    (r) => r.mode === "backfill" && r.finished_at && r.status !== "running" && new Date(r.started_at).getTime() >= since
+    (r) => r.finished_at && r.status !== "running" && new Date(r.started_at).getTime() >= since
   );
-  const ok = after.filter((r) => r.status === "ok");
+  if (after.length === 0) return "pending";
+  const full = after.filter((r) => r.mode === "backfill");
+  const ok = full.filter((r) => r.status === "ok");
   if (ok.some((r) => (r.rows_fetched ?? 0) > 0)) return "found";
-  if (ok.length > 0) return "empty";
-  return after.length > 0 ? "failed" : "pending";
+  if (ok.length > 0 || full.some((r) => /found nothing to sync/i.test(r.error ?? ""))) return "empty";
+  return full.length > 0 ? "failed" : "none";
 }
 
 const MODE_LABELS: Record<string, string> = { backfill: "Full sync", incremental: "Update", renormalize: "Recalculate" };
@@ -334,6 +344,17 @@ export interface SourceSettingsApi {
 export interface MutationDeps {
   requireOwner: (denyTo: string) => Promise<{ api: SourceSettingsApi }>;
   revalidate: (path: string) => void;
+  now?: () => Date;
+}
+
+/**
+ * A `rate_limited` refusal whose next-allowed time is (almost) a full hour away means the
+ * reset landed a moment ago: a double-click, or a retried submit. Treat it as done.
+ */
+export function justReset(error: RpcError | null | undefined, now: Date): boolean {
+  if (error?.code !== "BCNS9" || error.message !== "rate_limited") return false;
+  const until = Date.parse(error.details ?? "");
+  return !Number.isNaN(until) && until - now.getTime() >= 59 * 60_000;
 }
 
 function back(source: HubSource, flag: string): string {
@@ -348,7 +369,7 @@ export async function resyncSource(form: FormData, deps: MutationDeps): Promise<
   if (!RESYNC_SOURCES.includes(source)) return back(source, "error=failed");
   try {
     const { error } = await api.rpc("reset_source_cursors", { p_source: source });
-    if (error) return back(source, `error=${errorFlag(error)}`);
+    if (error && !justReset(error, deps.now?.() ?? new Date())) return back(source, `error=${errorFlag(error)}`);
   } catch {
     return back(source, "error=failed");
   }

@@ -14,6 +14,7 @@ import {
   folderCheck,
   friendlyError,
   isHubSource,
+  justReset,
   parseDriveFolder,
   resetState,
   resyncSource,
@@ -119,7 +120,18 @@ test("friendlyError points at the fix, never at the jargon", () => {
   assert.match(friendlyError("drive: folder walk stopped at 5000 folders"), /too many subfolders/);
   assert.match(friendlyError("403 User Rate Limit Exceeded"), /slow down/);
   assert.match(friendlyError("fetch failed: ETIMEDOUT timeout"), /next sync/);
-  assert.match(friendlyError("TypeError: x is undefined"), /bcns has been notified/);
+  assert.equal(friendlyError("TypeError: x is undefined"), "The last sync hit a problem. We'll try again on the next sync. Email us if it keeps happening.");
+  assert.doesNotMatch(friendlyError("TypeError: x is undefined"), /notified/);
+});
+
+test("friendlyError: the worker's empty-listing failure reads as the empty-folder warning", () => {
+  const drive = "found nothing to sync: the folder is empty or not shared with the connected account, so nothing was removed";
+  const monday = "found nothing to sync: the board is empty or not shared with the connected account, so nothing was removed";
+  assert.equal(friendlyError(drive), EMPTY_FOLDER_WARNING);
+  assert.equal(
+    friendlyError(monday),
+    "We didn't find anything to bring in. Check that it is shared with the account you connected."
+  );
 });
 
 const run = (over) => ({
@@ -133,8 +145,13 @@ test("folderCheck: pending, found, empty, failed — only full syncs after the c
   assert.equal(folderCheck([], changed), "pending");
   assert.equal(folderCheck([run({ status: "running", finished_at: null })], changed), "pending");
   assert.equal(folderCheck([run({ started_at: "2026-10-06T11:00:00Z", rows_fetched: 9 })], changed), "pending");
-  assert.equal(folderCheck([run({ mode: "incremental", rows_fetched: 9 })], changed), "pending");
+  // Syncs finished after the change but none was a full sync (it dropped out of the 20-run window): nothing to judge.
+  assert.equal(folderCheck([run({ mode: "incremental", rows_fetched: 9 })], changed), "none");
+  assert.equal(folderCheck([run({ mode: "incremental", status: "error", error: "500" })], changed), "none");
   assert.equal(folderCheck([run({ rows_fetched: 0 })], changed), "empty");
+  const nothing = "found nothing to sync: the folder is empty or not shared with the connected account, so nothing was removed";
+  assert.equal(folderCheck([run({ status: "error", rows_fetched: 0, error: nothing })], changed), "empty");
+  assert.equal(folderCheck([run({ status: "error", error: nothing }), run({ rows_fetched: 3 })], changed), "found");
   assert.equal(folderCheck([run({ rows_fetched: 0 }), run({ rows_fetched: 3 })], changed), "found");
   assert.equal(folderCheck([run({ status: "error", error: "404" })], changed), "failed");
   assert.match(EMPTY_FOLDER_WARNING, /didn't find any files in that folder/);
@@ -242,6 +259,14 @@ test("resyncSource calls reset_source_cursors once and redirects with the outcom
   assert.equal(await resyncSource(form({ source: "meet" }), limited.deps), "/sources/meet?error=rate-limited");
   assert.deepEqual(limited.revalidated, []);
 
+  // Double-click: the second submit is refused with an hour still to wait, so the reset just landed.
+  const now = () => new Date("2026-10-06T12:00:30Z");
+  const twice = fakeDeps({ error: { code: "BCNS9", message: "rate_limited", details: "2026-10-06T13:00:00Z" } });
+  assert.equal(await resyncSource(form({ source: "meet" }), { ...twice.deps, now }), "/sources/meet?ok=resync");
+  assert.deepEqual(twice.revalidated, ["/sources/meet"]);
+  const later = fakeDeps({ error: { code: "BCNS9", message: "rate_limited", details: "2026-10-06T12:30:00Z" } });
+  assert.equal(await resyncSource(form({ source: "meet" }), { ...later.deps, now }), "/sources/meet?error=rate-limited");
+
   const down = fakeDeps({ throws: true });
   assert.equal(await resyncSource(form({ source: "meet" }), down.deps), "/sources/meet?error=failed");
 
@@ -254,6 +279,20 @@ test("resyncSource calls reset_source_cursors once and redirects with the outcom
   assert.deepEqual(bogus.calls, []);
 
   await assert.rejects(resyncSource(form({ source: "meet" }), fakeDeps({ role: "member" }).deps), /forbidden/);
+});
+
+test("justReset: only a rate_limited refusal with ~an hour left counts as the reset just landing", () => {
+  const now = new Date("2026-10-06T12:00:00Z");
+  const err = (details, over = {}) => ({ code: "BCNS9", message: "rate_limited", details, ...over });
+  assert.equal(justReset(err("2026-10-06T13:00:00Z"), now), true);
+  assert.equal(justReset(err("2026-10-06T12:59:00Z"), now), true);
+  assert.equal(justReset(err("2026-10-06T12:58:59Z"), now), false);
+  assert.equal(justReset(err("2026-10-06T12:10:00Z"), now), false);
+  assert.equal(justReset(err(null), now), false);
+  assert.equal(justReset(err("garbage"), now), false);
+  assert.equal(justReset(err("2026-10-06T13:00:00Z", { message: "sync_running" }), now), false);
+  assert.equal(justReset(err("2026-10-06T13:00:00Z", { code: "BCNS4" }), now), false);
+  assert.equal(justReset(null, now), false);
 });
 
 test("changeFolder sends the parsed id and canonical link, and refuses bad input before the database", async () => {

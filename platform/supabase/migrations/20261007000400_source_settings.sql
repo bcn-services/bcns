@@ -91,8 +91,10 @@ revoke all on function api.connector_runs_v1(data.source) from public, anon, ser
 grant execute on function api.connector_runs_v1(data.source) to authenticated;
 
 -- Why a reset or folder change did not happen. Called only after the guarded update matched
--- no row, so exactly one reason holds; raises, never returns normally.
-create function data.source_reset_refused(p_client_id uuid, p_source data.source)
+-- no row; raises, never returns normally. rate_limited only for the hourly-limited reset
+-- (p_hourly) and only while the last reset really is under an hour old; anything else that
+-- blocked the update was a sync holding the lease (it may have just released it).
+create function data.source_reset_refused(p_client_id uuid, p_source data.source, p_hourly boolean)
 returns void language plpgsql set search_path = '' as $$
 declare s record;
 begin
@@ -104,11 +106,14 @@ begin
   if s.lease_until > now() then
     raise exception using errcode = 'BCNS9', message = 'sync_running';
   end if;
-  raise exception using errcode = 'BCNS9', message = 'rate_limited',
-    detail = to_char((s.last_reset_at + interval '1 hour') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  if p_hourly and s.last_reset_at > now() - interval '1 hour' then
+    raise exception using errcode = 'BCNS9', message = 'rate_limited',
+      detail = to_char((s.last_reset_at + interval '1 hour') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  end if;
+  raise exception using errcode = 'BCNS9', message = 'sync_running';
 end $$;
 
-revoke all on function data.source_reset_refused(uuid, data.source) from public, anon, authenticated, service_role;
+revoke all on function data.source_reset_refused(uuid, data.source, boolean) from public, anon, authenticated, service_role;
 
 -- Re-sync: exactly what `add-source --reset-cursors` runs (backfill_cursor = '{}' puts the
 -- worker in backfill mode from backfill_from), owner only, one per source per hour.
@@ -131,7 +136,7 @@ begin
     and (s.last_reset_at is null or s.last_reset_at <= now() - interval '1 hour')
     and (s.lease_until is null or s.lease_until <= now());
   if not found then
-    perform data.source_reset_refused(tenant, p_source);
+    perform data.source_reset_refused(tenant, p_source, true);
   end if;
 end $$;
 
@@ -171,7 +176,7 @@ begin
   where s.client_id = tenant and s.source = p_source and s.enabled
     and (s.lease_until is null or s.lease_until <= now());
   if not found then
-    perform data.source_reset_refused(tenant, p_source);
+    perform data.source_reset_refused(tenant, p_source, false);
   end if;
 end $$;
 

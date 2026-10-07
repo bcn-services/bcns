@@ -172,3 +172,20 @@ describe('api.set_source_folder', () => {
     expect(error?.code).toBe('BCNS2')
   })
 })
+
+describe('data.source_reset_refused', () => {
+  it('says rate_limited only for the hourly reset inside the hour; anything else is sync_running', async () => {
+    const client = await mkClient()
+    await schedule(client, 'drive', { folder_id: FOLDER }, { resetNow: true })
+    const refused = (hourly: boolean) => sql(`select data.source_reset_refused($1, 'drive', $2)`, [client, hourly])
+      .then(() => null, (e: { code?: string; message?: string; detail?: string }) => ({ code: e.code, message: e.message, detail: e.detail }))
+    const limited = await refused(true)
+    expect(limited).toMatchObject({ code: 'BCNS9', message: 'rate_limited' })
+    // The hub's justReset parses this: next allowed time, ISO UTC to the second, about an hour out.
+    expect(limited?.detail).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
+    expect(Date.parse(limited!.detail!) - Date.now()).toBeGreaterThan(59 * 60_000)
+    expect(await refused(false)).toMatchObject({ code: 'BCNS9', message: 'sync_running' })
+    await sql(`update data.connector_schedule set last_reset_at = now() - interval '2 hours' where client_id = $1`, [client])
+    expect(await refused(true)).toMatchObject({ code: 'BCNS9', message: 'sync_running' })
+  })
+})

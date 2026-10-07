@@ -124,9 +124,21 @@ describe('20261007000400_source_settings.sql', () => {
 
   it('the refusal helper is unreachable from the api roles', () => {
     expect(sql).toContain(
-      'revoke all on function data.source_reset_refused(uuid, data.source) from public, anon, authenticated, service_role;'
+      'revoke all on function data.source_reset_refused(uuid, data.source, boolean) from public, anon, authenticated, service_role;'
     )
     expect(sql).not.toMatch(/grant [^;]* on function data\.source_reset_refused/)
+  })
+
+  it('rate_limited only for the hourly reset with a reset under an hour old; sync_running otherwise', () => {
+    const b = body('data.source_reset_refused')
+    expect(b).toContain(
+      "if p_hourly and s.last_reset_at > now() - interval '1 hour' then raise exception using errcode = 'bcns9', message = 'rate_limited',"
+    )
+    expect(b.match(/message = 'rate_limited'/g)).toHaveLength(1)
+    // The fallback after every guard is sync_running, never rate_limited.
+    expect(b.trimEnd()).toMatch(/end if; raise exception using errcode = 'bcns9', message = 'sync_running';$/)
+    expect(body('api.reset_source_cursors')).toContain('perform data.source_reset_refused(tenant, p_source, true);')
+    expect(body('api.set_source_folder')).toContain('perform data.source_reset_refused(tenant, p_source, false);')
   })
 
   it('the hub reads the same TARGET_KEYS', () => {
