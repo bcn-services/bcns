@@ -227,7 +227,7 @@ Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SE
 corepack pnpm tsx scripts/add-source.ts --slug sb --source meet
 ```
 Prompts, in order:
-1. `meet folder_id:` → Drive folder id of the Gemini notes
+1. `meet folder_id:` → Drive folder id of the Gemini notes (the owner can repoint it later from the hub, `/sources/meet` → Change folder; §7)
 2. `meet oauth_client_id:`
 3. `meet notes_url:` → `https://drive.google.com/drive/folders/<id>`
 4. `meet access token (blank to mint from refresh):` → leave blank, let it mint from the refresh token
@@ -276,7 +276,7 @@ Confirm the hosted env is exported (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SE
 corepack pnpm tsx scripts/add-source.ts --slug sb --source drive
 ```
 Prompts, in order:
-1. `drive folder_id:` → content library folder id
+1. `drive folder_id:` → content library folder id (the owner can repoint it later from the hub, `/sources/drive` → Change folder; §7)
 2. `drive oauth_client_id:`
 3. `drive access token (blank to mint from refresh):` → leave blank
 4. `drive refresh token:` → the second, separate refresh token from 6.1
@@ -309,6 +309,12 @@ where client_id = (select id from data.clients where slug = 'sb') and source = '
   board/store/account/folder than the saved schedule, whose cursors belong to the old one. If the
   change is intended, re-run with `--reset-cursors` — it re-backfills the new target from
   `backfill_from` and pulls on the next tick.
+- **After connection day, the owner does this from the hub.** `connect.bcn-services.com/sources/<source>`
+  shows status, what it pulls from, and the last 20 syncs. "Sync everything again" runs the same
+  cursor reset as `--reset-cursors` (owner only, once per source per hour, not while a sync is
+  running; not offered for Shopify). For `meet`/`drive`, "Change folder" takes a Drive folder link,
+  saves `folder_id` + `notes_url` and resets the cursors in one step. `add-source --reset-cursors`
+  stays the operator path (it also rotates the credential).
 - **`source_tokens.status = 'auth_failed'`**: the worker sets this when a live pull's auth call
   fails (distinct from the onboarding checklist, which fails before any write). Check:
   ```sql

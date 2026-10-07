@@ -179,6 +179,45 @@ describe('worker', () => {
     expect(by.monday).toBe('stale')   // full-list source: 0 rows after 10 positive runs
   })
 
+  it('empty_full_list_fails_not_tombstones', async () => {
+    // §4.1: a complete Drive walk with no files is an empty or unshared folder; it must not tombstone (and purge) every media row.
+    const c = await mkClient([{ source: 'drive' }])
+    const file = (id: string) => ({ id, name: `File ${id}`, mimeType: 'application/pdf', size: '1024', modifiedTime: '2026-09-01T00:00:00.000Z', webViewLink: `https://drive.example.test/file/${id}/view` })
+    const folder = (files: object[]) => stub(url => url.includes('/drive/v3/files') ? { files } : {})
+    const run = async (fetch: typeof globalThis.fetch) => {
+      const t = mkTick(fetch)
+      await sql(`update data.connector_schedule set lease_owner = $2, lease_until = now() + interval '8 minutes' where client_id = $1`, [c, t.owner])
+      await runOne(t, (await sql<ScheduleRow>(`select * from data.connector_schedule where client_id = $1`, [c])).rows[0])
+    }
+    const media = async () => (await sql<{ external_id: string; deleted_at: Date | null; purge_after: Date | null }>(
+      `select external_id, deleted_at, purge_after from data.media where client_id = $1 and source = 'drive' order by external_id`, [c])).rows
+
+    await run(folder([file('d1'), file('d2')]))
+    expect((await media()).filter(m => !m.deleted_at).map(m => m.external_id)).toEqual(['d1', 'd2'])
+
+    await run(folder([]))
+    const r = (await sql<{ status: string; error: string }>(
+      `select status, error from data.connector_runs where client_id = $1 order by started_at desc limit 1`, [c])).rows[0]
+    expect(r.status).toBe('error')
+    expect(r.error).toMatch(/^found nothing to sync: the folder is empty or not shared/)
+    expect(await media()).toMatchObject([{ external_id: 'd1', deleted_at: null, purge_after: null }, { external_id: 'd2', deleted_at: null, purge_after: null }])
+    const s = (await sql<{ last_error: string; consecutive_failures: number; lease_owner: string | null }>(
+      `select last_error, consecutive_failures, lease_owner from data.connector_schedule where client_id = $1`, [c])).rows[0]
+    expect(s).toMatchObject({ consecutive_failures: 1, lease_owner: null })
+    expect(s.last_error).toMatch(/found nothing to sync/)
+
+    // The next walk retries normally: a file back -> ok, failures reset, the missing file tombstoned with its purge scheduled.
+    await run(folder([file('d1')]))
+    const after = (await sql<{ consecutive_failures: number; last_error: string | null }>(
+      `select consecutive_failures, last_error from data.connector_schedule where client_id = $1`, [c])).rows[0]
+    expect(after).toEqual({ consecutive_failures: 0, last_error: null })
+    const [d1, d2] = await media()
+    expect(d1).toMatchObject({ external_id: 'd1', deleted_at: null, purge_after: null })
+    expect(d2.external_id).toBe('d2')
+    expect(d2.deleted_at).not.toBeNull()
+    expect(d2.purge_after).not.toBeNull()
+  })
+
   it('alert_retry', async () => {
     const c = await mkClient([{ source: 'monday' }])
     await sql(`update data.source_tokens set status = 'auth_failed' where client_id = $1`, [c])

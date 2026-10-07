@@ -714,6 +714,10 @@ Errors use custom SQLSTATEs so the dashboard can branch on `error.code`:
 | `BCNS3` | `validation` | bad argument (detail names the field) |
 | `BCNS4` | `not_found` | id not in tenant |
 | `BCNS5` | `too_large` | file > 100 MB or attributes > 256 KB |
+| `BCNS6` | `shop_in_use` | that Shopify store is already connected to another client |
+| `BCNS7` | `shop_mismatch` | reconnect points at a different Shopify store than the saved one |
+| `BCNS8` | `signup_capped` | too many pending self-serve sign-ups in the last hour (10) |
+| `BCNS9` | `rate_limited` / `sync_running` | source re-sync or folder change refused: `rate_limited` (detail = next allowed time, ISO UTC; one re-sync per source per hour) or `sync_running` (a worker holds the lease) |
 
 PostgREST returns these as HTTP 400 with `{code, message, details, hint}`.
 
@@ -733,6 +737,10 @@ PostgREST returns these as HTTP 400 with `{code, message, details, hint}`.
 | `api.download_url` | `(media_id uuid) returns jsonb` | Reads media where `id = media_id and client_id = tenant and deleted_at is null and storage_path is not null` → else `BCNS4`. Computes client-local month; locks the ledger row (`insert … on conflict do update set bytes = egress_ledger.bytes returning bytes` — a no-op upsert that takes the row lock); **if `used >= quota` → `BCNS1`** with detail `{used, quota}` (nothing charged, whole statement rolls back). Else `update egress_ledger set bytes = bytes + media.bytes` (this download may push the total past the quota; the next call is denied — D24), then `insert into download_tickets (client_id, storage_path, expires_at = now() + interval '5 minutes') on conflict do update set expires_at = excluded.expires_at`. Returns `{"path": storage_path, "bytes": bytes, "expires_in": 300, "egress": {"used": …, "quota": …}}`. Thumbnails never go through this RPC (R21). |
 | `api.report_dashboard_version` | `(app_version text, api_version text) returns void` | Upsert `dashboard_versions`. Any role. (D17) |
 | `api.remove_member` | `(target_user_id uuid) returns void` | Requires `data.active_client_role() = 'owner'` → else `BCNS2`. Refuses to remove self or an `is_smoke` row (`BCNS3`). `delete from memberships where user_id = target_user_id and client_id = tenant` → 0 rows ⇒ `BCNS4` (an owner cannot touch another tenant's users). R4 takes effect on the target's next request. Smoke rows are removed/rotated only by `scripts/rotate-smoke` (service role, §5.10). |
+| `api.source_settings_v1` | `() returns table(source, enabled, sync_interval, last_run_at, last_success_at, next_run_at, last_reset_at, next_reset_allowed_at, folder_changed_at, sync_running, target jsonb)` | Any role. Security-definer function, not a view (`connector_schedule` is internal). `target` is built from an allow-list of `config` keys (`folder_id, notes_url, board_url, board_id, admin_url, shop, realm_id`), never `config` itself. |
+| `api.connector_runs_v1` | `(p_source data.source) returns table(source, mode, status, started_at, finished_at, rows_fetched, rows_upserted, error)` | Any role. Last 20 runs of that source, newest first; no `lease_owner`. |
+| `api.reset_source_cursors` | `(p_source data.source) returns void` | Owner only (`BCNS2`); Shopify refused (`BCNS3` detail `source`). Same cursor reset as `add-source --reset-cursors` (`backfill_cursor = incremental_cursor = '{}'`, `next_run_at = now()`) in one guarded UPDATE: enabled row, `last_reset_at` older than 1 h, no live lease — else `BCNS4` / `BCNS9`. |
+| `api.set_source_folder` | `(p_source data.source, p_folder_id text, p_folder_url text default null) returns void` | Owner only. `meet`/`drive` only; id `^[A-Za-z0-9_-]{10,128}$`, url `https://drive.google.com/…` ≤ 500 chars (`BCNS3` detail `folder_id`/`folder_url`). Writes `config.folder_id` + `notes_url` and resets the cursors in the same UPDATE; not held to the 1-hour limit; refused while leased (`BCNS9`). |
 
 No RPC takes `client_id` as an argument (R16). Every RPC that writes checks `W`; `download_url` and
 `report_dashboard_version` accept any role. `data.register_media(client uuid, path, title, tags,
@@ -769,7 +777,16 @@ interface CanonicalWrites { money?: MoneyRow[]; products?: …; jobs?: …; mess
 accumulates every `externalId` it saw during the run; when the run ends with `done: true` (not a
 budget stop, not an error) it sets `deleted_at = now()` on tenant rows of `table` for that `source`
 whose `external_id` is not in the set, and clears `deleted_at` on any that reappeared. A partial run
-never tombstones. `normalize` cannot produce a DB-generated id; cross-entity references use source
+never tombstones. **Empty-listing guard, `media` (Drive) only:** a complete run whose `media` set is
+**empty** (every `fullList` entity of that table done, zero ids) tombstones nothing and fails the run
+instead (`SourceError` "found nothing to sync: the folder is empty or not shared with the connected
+account, so nothing was removed"; class `error`, cursors kept, next run retries). Drive lists an
+unshared or wrong folder as an empty one, and a `media` tombstone is lossy (30-day purge of the row,
+its thumbnail and its `media_set_items`). Monday and Meta are not guarded: an unshared board or ad
+account already throws upstream (board not found, Graph permission error), and their tombstones heal
+when the ids come back, so a guard would only fail a really-emptied board or all-archived account on
+every run. Cost (Drive): a folder really emptied is never tombstoned; health shows `error` (and
+`stale` once 3 intervals pass since an earlier success) until something is in it again. `normalize` cannot produce a DB-generated id; cross-entity references use source
 keys (`image_hash`, `campaign_id`), and views join on those.
 `RunContext` gives the connector its token, `config`, `clients.timezone`, an HTTP client with the
 source's rate limiter, and a logger. It has no scheduler, no DB handle, no Storage handle except
@@ -942,7 +959,7 @@ dashboard — the next complete run un-deletes anything still in the folder.
 | config | `{ folder_id: "<Drive folder of the content library>", oauth_client_id: "…" }` — `folder_id` is the id segment of the folder URL (`[A-Za-z0-9_-]+`; the schema rejects a pasted URL). |
 | defaults | `interval = '1 hour'`, `backfillDepth = '0'`, `rateLimit = { concurrency: 2, minDelayMs: 200 }`, `fullList = [{ entity: 'file', table: 'media' }]`. |
 | Pull `file` | Every run walks the whole folder tree — no `modifiedTime` filter, because a changed-only page would tombstone every unchanged file: per folder page `GET drive/v3/files?q='<id>' in parents and trashed=false&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))&pageSize=100`; subfolders are queued and shortcuts skipped client-side, same walk and caps as §4.5 Pull `drive_file`. Only the tree's last page is `done`, so a budget stop (walk restarts from the root next run) or a cap trip never tombstones. For rows that have no thumbnail yet (`knownMedia` = a row whose bytes or thumbnail landed) the connector fetches `thumbnailLink` (`=s512`) and writes it to `<client_id>/thumb/<file_id>.jpg`; a missing or failed thumbnail is logged (`drive_thumb_skip`) and the row still lands. |
-| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule and, like a dashboard delete, purged (row and thumbnail) 30 days later unless they return first. |
+| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule and, like a dashboard delete, purged (row and thumbnail) 30 days later unless they return first. A walk that finds no files at all fails the run instead (§4.1 empty-listing guard). |
 
 ### 4.7 QuickBooks Online
 
@@ -1052,7 +1069,7 @@ Per claimed row:
 2. Load token + config; build `RunContext`.
 3. Iterate `backfill(from, cursor)` or `incremental(since)`. Per page, in one transaction:
    insert raw (`on conflict do nothing`), `normalize`, upsert canonical, apply tombstone if
-   present (a `media` tombstone also sets `purge_after = now() + 30 days`, cleared if the id returns), `update connector_schedule set backfill_cursor|incremental_cursor = page.cursor`,
+   present (on `done`; a complete Drive walk with zero files throws instead, §4.1) (a `media` tombstone also sets `purge_after = now() + 30 days`, cleared if the id returns), `update connector_schedule set backfill_cursor|incremental_cursor = page.cursor`,
    bump `connector_runs.pages/rows_*`. Stop when `page.done` or `RUN_BUDGET_MS` elapsed.
 4. Finish: `status='ok'`, `finished_at`. Schedule: if backfill finished → `backfill_cursor = null`,
    `next_run_at = now()` (first incremental follows immediately), notification
@@ -1106,7 +1123,7 @@ upsert `connector_health` **only where the result is distinct** from the stored 
 | `auth_failed` | `source_tokens.status = 'auth_failed'` or last finished run `status = 'auth_failed'` |
 | `never_ran` | no run with `finished_at` |
 | `error` | last finished run `status = 'error'` and `consecutive_failures >= 1` and not stale |
-| `stale` | `last_success_at < now() − 3 * interval` (missed ≥ 3 runs), **or** — only for sources whose connector declares a `fullList` entity (Monday, Meta, Drive) — the last finished `ok` run fetched 0 rows for that entity while the previous 10 `ok` runs each fetched > 0. Never applied to `updated_at`-filtered incrementals (Shopify, Meet): an idle store legitimately returns 0 rows at night. |
+| `stale` | `last_success_at < now() − 3 * interval` (missed ≥ 3 runs), **or** — only for sources whose connector declares a `fullList` entity (Monday, Meta, Drive) — the last finished `ok` run fetched 0 rows for that entity while the previous 10 `ok` runs each fetched > 0 (a complete Drive walk with zero files fails the run under §4.1 instead, so for Drive this rule never sees that run). Never applied to `updated_at`-filtered incrementals (Shopify, Meet): an idle store legitimately returns 0 rows at night. |
 | `ok` | otherwise |
 
 ```sql
@@ -1218,6 +1235,7 @@ marker, an ambiguous shop→client match, or a shopify token not confirmed dead 
 | `rotate-smoke --slug` | Sets a new random password on the smoke user, updates the password manager entry and the dashboard repo's CI secret via `gh secret set`. Run at onboarding and on any suspected leak; `--remove` deletes the membership + auth user (the only path that can, §3.3). |
 | `renormalize` | §5.8 |
 | `set-quota --slug --gb <n>` | `clients.egress_quota_bytes`. |
+| `add-source --slug --source <s> [--reset-cursors]` | Attaches or rotates one source's credential (connection-day.md). `--reset-cursors` re-backfills a changed target. Stays the operator path; an owner can now do the same reset and the meet/drive folder change from the hub page `/sources/<source>` (`api.reset_source_cursors`, `api.set_source_folder`). |
 
 ## 6. SB panel map — quote § 2 → views
 
@@ -1296,6 +1314,7 @@ have a fixture that is not the one under test.
 | `raw_dedupe` | inserting the same fixture page twice yields one `raw` row per key and one `raw_latest` row; changing one payload byte yields a second `raw` row and an updated `raw_latest.payload_hash`. (D5) |
 | `tombstone_only_on_done` | Monday fixture with 25 items, then a run whose page reports `done: false` with 20 items → 0 `jobs` tombstoned; then `done: true` with 20 → exactly 5 `deleted_at` set; re-run with 25 → all cleared. (§4.1) |
 | `stale_no_false_alarm` | Shopify row with 10 consecutive `ok` runs then one `ok, rows_fetched = 0` → health stays `ok`; Monday `item` full-list run with 0 rows after 10 positive → `stale`. (§5.5) |
+| `empty_full_list_fails_not_tombstones` | Drive client with 2 live `media` rows; a complete walk of an empty folder → run `error` "found nothing to sync: the folder…", 0 media tombstoned, `purge_after` null, schedule `consecutive_failures 1`, lease cleared; next walk with 1 file → `ok`, failures reset, the missing file tombstoned with `purge_after` set. Pure twin: `test/empty-full-list.test.ts` (also pins that Monday `jobs` and Meta `records` are never guarded). (§4.1) |
 | `alert_retry` | with Resend stubbed to fail: `notifications` row has `sent_at null, attempts 1`; unstub, next tick sends it and sets `sent_at`; a second identical alert inserts nothing. (R33) |
 | `normalize_idempotent` | run each connector's `normalize` twice over the fixture pages (`fixtures/*-sample.json`); the second upsert changes 0 rows (`xmax` check / `updated_at` unchanged). (R7, R8) |
 | `money_metric_disjoint` | no `daily_metrics.metric` is in `('revenue','orders','refunds','payouts')`; no `money.kind` outside `('order','refund','payout')`. (R11) |
@@ -1357,7 +1376,7 @@ Recorded by `scripts/onboard`; a failed item stops the script.
 | M3 | Meta | `timezone_name == clients.timezone` (warn, not fail; see N2). |
 | D1 | Monday | Personal token; board id; column autodetect found `Status` (others optional). |
 | G1 | Meet | OAuth client lives in the **client's** Workspace project, user type **Internal**; consented by the owner or a role account; refresh token pasted. A bcns-org client id fails. |
-| G2 | Meet | Drive folder id of the Gemini notes; at least one doc readable through the token. |
+| G2 | Meet | Drive folder id of the Gemini notes; at least one doc readable through the token. The owner can repoint it later from the hub (`/sources/meet` → Change folder); the hub cannot check readability, the next worker run does. |
 | U1 | all | Smoke user created and `is_smoke = true`. |
 | U2 | all | `clients.timezone` confirmed with the owner ("which timezone does your Shopify admin show?") **and** equal to S5's `store_timezone` and M3's `timezone_name`; if the three disagree, record which one the owner chose in `clients.notes` before continuing. |
 | Q1 | QuickBooks | OAuth self-serve only (no manual token prompt): hub Connect completed, `config.realm_id` set from the callback's `realmId`, not typed by hand. |

@@ -49,6 +49,7 @@ export async function signupTarget(form: SignupForm, deps: SignupDeps): Promise<
     });
     if (response.ok) return SIGNUP_SENT_PATH;
     if (response.status === 400) return `${SIGNUP_PATH}?error=invalid`;
+    console.error(`signup: edge function answered ${response.status}`);
   } catch {
     // unreachable or timed out: same answer as a 5xx
   }

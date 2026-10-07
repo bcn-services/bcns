@@ -347,3 +347,23 @@ pre.code { margin: 0; overflow-x: auto; padding: 14px; border-radius: 10px; bord
 .copyurl .tiny { flex-basis: 100%; font-size: 13px; color: hsl(var(--destructive)); }
 .copyurl .tiny:empty { display: none; }
 .qs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; color: hsl(var(--foreground)); }
+
+/* /sources/[source] (item 8) */
+.sc-t a { color: inherit; text-decoration: none; }
+.sc-t a:hover, .sc-t a:focus-visible { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: hsl(var(--input)); }
+.crumb { margin-bottom: 6px; font-size: 14px; }
+.crumb a { color: hsl(var(--muted-foreground)); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: hsl(var(--input)); }
+.crumb a:hover { color: hsl(var(--primary-ink)); }
+.ss-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 14.5px; }
+.ss-row { display: contents; }
+.ss-dl dt { color: hsl(var(--muted-foreground)); }
+.ss-dl dd { min-width: 0; overflow-wrap: anywhere; }
+.ss-dl a, .sc .meta a { text-decoration: underline; text-underline-offset: 4px; }
+.panel .sub + .sub { margin-top: 6px; }
+.panel .note { margin-top: 14px; }
+.ss-act { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.ss-act .field { flex: 1 1 18rem; }
+.ss-act .tiny { font-size: 13px; color: hsl(var(--muted-foreground)); }
+.ss-runs { margin-top: 16px; }
+.ss-why { margin-top: 6px; font-size: 13.5px; color: hsl(var(--muted-foreground)); max-width: 28rem; }
+.ss-runs code.m { display: block; margin-top: 6px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; max-width: 28rem; }

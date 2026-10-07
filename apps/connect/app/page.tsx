@@ -180,7 +180,7 @@ export default async function SourcesPage({
             <div className="sc-h">
               <h2 className="sc-t">
                 <span className="dot" aria-hidden="true" />
-                {card.title}
+                {card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}
               </h2>
               <span className={cn("st", TONE[card.tone])}>{card.label}</span>
             </div>
