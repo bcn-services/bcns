@@ -13,8 +13,9 @@ import {
   type RunRow,
   type SettingsRow,
 } from "@/lib/source-settings";
-import type { HealthRow } from "@/lib/sources";
 import { changeFolderAction, resyncAction } from "./actions";
+import { DisconnectControl } from "@/app/disconnect";
+import { canDisconnect, composeSources, googleSiblingConnected, type HealthRow } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +35,12 @@ export default async function SourceSettingsPage({
   const tz = client?.timezone ?? undefined;
   const at = (iso: string | null) => (iso && !Number.isNaN(new Date(iso).getTime()) ? formatDateTime(iso, tz) : "never");
 
-  const [settings, runs, health] = await Promise.all([
+  const [settings, runs, health, disconnecting] = await Promise.all([
     api.rpc("source_settings_v1"),
     api.rpc("connector_runs_v1", { p_source: source }),
+    // Every source: the Status badge; meet/drive also need the other Google source for the Disconnect text.
     api.from("connector_health_v1").select("source,status,last_success_at,last_error"),
+    api.rpc("disconnecting_sources_v1"),
   ]);
   const page = sourcePage({
     source,
@@ -46,8 +49,10 @@ export default async function SourceSettingsPage({
     role: membership.role,
     now: new Date(),
     health: health.error ? null : (health.data as HealthRow[] | null),
+    disconnecting: disconnecting.error ? null : (disconnecting.data as string[] | null),
   });
   const ok = searchParams.ok ? OK_MESSAGES[searchParams.ok] : undefined;
+  const disc = { source, status: page.connected ? "ok" : "none" } as const;
 
   return (
     <>
@@ -119,6 +124,8 @@ export default async function SourceSettingsPage({
               </div>
             ))}
           </dl>
+        ) : page.disconnecting ? (
+          <p className="meta">{page.disconnecting}</p>
         ) : (
           <p className="meta">
             This source isn&apos;t connected. <Link href="/#sources">Connect it from the Sources page.</Link>
@@ -184,44 +191,60 @@ export default async function SourceSettingsPage({
         </section>
       ) : null}
 
-      <section className="panel" aria-labelledby="runs-h">
-        <h2 id="runs-h">Recent syncs</h2>
-        {page.runs.length === 0 ? (
-          <p className="sub">No syncs yet.</p>
-        ) : (
-          <div className="tablewrap ss-runs">
-            <table>
-              <thead>
-                <tr>
-                  <th>Started</th>
-                  <th>Kind</th>
-                  <th>Result</th>
-                  <th className="r">Items</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.runs.map((run, i) => (
-                  <tr key={`${run.startedAt}-${i}`}>
-                    <td>{at(run.startedAt)}</td>
-                    <td>{run.kind}</td>
-                    <td>
-                      <span className={cn("st", TONE[run.tone])}>{run.status}</span>
-                      {run.problem ? <p className="ss-why">{run.problem}</p> : null}
-                      {run.raw ? (
-                        <details>
-                          <summary>Details</summary>
-                          <code className="m">{run.raw}</code>
-                        </details>
-                      ) : null}
-                    </td>
-                    <td className="r">{run.rows}</td>
+      {/* Same gate and control as the Sources card; "connected" here is an enabled schedule. */}
+      {canDisconnect(disc, membership.role) ? (
+        <section className="panel" aria-labelledby="disconnect-h">
+          <h2 id="disconnect-h">Disconnect</h2>
+          <p className="sub">Stop syncing this source and delete what bcns stored from it.</p>
+          <DisconnectControl
+            source={disc.source}
+            siblingConnected={
+              health.error ? null : googleSiblingConnected(source, composeSources(health.data as HealthRow[] | null))
+            }
+          />
+        </section>
+      ) : null}
+
+      {page.disconnecting ? null : (
+        <section className="panel" aria-labelledby="runs-h">
+          <h2 id="runs-h">Recent syncs</h2>
+          {page.runs.length === 0 ? (
+            <p className="sub">No syncs yet.</p>
+          ) : (
+            <div className="tablewrap ss-runs">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Started</th>
+                    <th>Kind</th>
+                    <th>Result</th>
+                    <th className="r">Items</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {page.runs.map((run, i) => (
+                    <tr key={`${run.startedAt}-${i}`}>
+                      <td>{at(run.startedAt)}</td>
+                      <td>{run.kind}</td>
+                      <td>
+                        <span className={cn("st", TONE[run.tone])}>{run.status}</span>
+                        {run.problem ? <p className="ss-why">{run.problem}</p> : null}
+                        {run.raw ? (
+                          <details>
+                            <summary>Details</summary>
+                            <code className="m">{run.raw}</code>
+                          </details>
+                        ) : null}
+                      </td>
+                      <td className="r">{run.rows}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
     </>
   );
 }

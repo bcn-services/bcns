@@ -1221,6 +1221,25 @@ transaction, or escalates to `needs_operator` (a `data.notifications` row, deliv
 existing `alerts()` → `sendPending()` path, §5.6) on: the sb-bridge shop, the sb-bridge config
 marker, an ambiguous shop→client match, or a shopify token not confirmed dead (still `active`, or created/refreshed/expiring within 24 h of the request — a reconnect after uninstall).
 
+### 5.9b Owner disconnect (`worker/src/disconnect.ts`)
+
+The hub's `POST /api/sources/<source>/disconnect` calls `api.disconnect_source` (owner only;
+allow-list `quickbooks`, `meet`, `drive`, `monday`, `meta`; Shopify is BCNS3, its uninstall flow
+owns it), which marks the token `revoked` / `owner_disconnect`, disables the schedule and deletes
+the health row. `revokeDisconnected` runs in housekeeping after `probeAuthFailed`: per
+(client, source), with the token row locked (for meet/drive, both Google rows in one
+statement, so overlapping runs cannot deadlock) and no schedule lease held, it revokes upstream
+(`revokeUpstream`: Intuit's revoke; Google's `oauth2.googleapis.com/revoke` for meet/drive;
+Meta `DELETE /me/permissions`; Monday has no revoke endpoint, so the hub tells the owner to
+uninstall the app or regenerate a pasted personal API token in Monday), then deletes that source's raw,
+canonical, token, schedule and health rows and, after commit, its stored media files.
+meet and drive hold separate token rows on the same Google app and Google's revoke removes the
+whole grant, so meet/drive skip it while the other Google source's token is `active` or
+`auth_failed` (when its hub card reads connected), and revoke otherwise — no row, or a row
+revoked for any reason, including by an operator. A 4xx other than "already invalid" keeps the row; a 5xx,
+network error or missing Intuit credentials skips that provider for the rest of the tick. A row
+stuck 24 h raises one `<source>_revoke_stuck` notification per client per day.
+
 ### 5.10 Scripts (bcns-run, `scripts/`, service key from the local env)
 
 | script | does |

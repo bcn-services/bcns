@@ -8,7 +8,7 @@
  * database re-checks owner, tenant, the one-hour limit and the folder id. Everything here is
  * the friendly layer on top.
  */
-import { HUB_SOURCES, TITLES, composeSources, type HealthRow, type HubSource, type Tone } from "./sources";
+import { HUB_SOURCES, TITLES, composeSources, disconnectingNote, type HealthRow, type HubSource, type Tone } from "./sources";
 import { normalizeShop } from "./shopify-oauth";
 
 /** The only config keys the page ever reads, matching TARGET_KEYS in the migration. */
@@ -268,6 +268,8 @@ export interface SourcePage {
   status: { label: string; tone: Tone };
   /** The health row's last error: plain words plus the raw text for "Details". */
   lastError: { problem: string; raw: string } | null;
+  /** The pending-delete note after an owner Disconnect, else null. Then nothing else is offered. */
+  disconnecting: string | null;
   isOwner: boolean;
   lastRunAt: string | null;
   lastSuccessAt: string | null;
@@ -292,23 +294,27 @@ export function sourcePage(input: {
   now: Date;
   /** connector_health_v1 rows; null or absent when the read failed. */
   health?: readonly HealthRow[] | null;
+  /** api.disconnecting_sources_v1; null or absent when the read failed. */
+  disconnecting?: readonly string[] | null;
 }): SourcePage {
   const { source, now } = input;
-  const row = (input.settings ?? []).find((s) => s.source === source && s.enabled) ?? null;
+  const disconnecting = input.disconnecting?.includes(source) ? disconnectingNote(source) : null;
+  const row = disconnecting ? null : ((input.settings ?? []).find((s) => s.source === source && s.enabled) ?? null);
   const isOwner = input.role === "owner";
   const connected = row !== null;
   const syncRunning = row?.sync_running === true;
-  const runs = (input.runs ?? []).slice(0, 20);
+  const runs = disconnecting ? [] : (input.runs ?? []).slice(0, 20);
   const target = row ? targetFor(source, row.target) : [];
-  const healthRow = (input.health ?? []).find((h) => h.source === source) ?? null;
+  const healthRow = disconnecting ? null : ((input.health ?? []).find((h) => h.source === source) ?? null);
   const card = composeSources(healthRow ? [healthRow] : []).find((c) => c.source === source);
   const lastErrorRaw = healthRow?.last_error?.trim() ? healthRow.last_error.trim() : null;
   return {
     source,
     title: TITLES[source],
     connected,
-    status:
-      connected && syncRunning
+    status: disconnecting
+      ? { label: "Disconnecting", tone: "idle" }
+      : connected && syncRunning
         ? { label: "Syncing now", tone: "warn" }
         : card && card.status !== "none"
           ? { label: card.label, tone: card.tone }
@@ -316,6 +322,7 @@ export function sourcePage(input: {
             ? { label: "Connected", tone: "ok" }
             : { label: "Not connected", tone: "idle" },
     lastError: lastErrorRaw ? { problem: friendlyError(lastErrorRaw) ?? lastErrorRaw, raw: lastErrorRaw } : null,
+    disconnecting,
     isOwner,
     lastRunAt: row?.last_run_at ?? null,
     lastSuccessAt: row?.last_success_at ?? null,

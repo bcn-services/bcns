@@ -1,12 +1,13 @@
-// Owner-initiated QuickBooks disconnect: api.disconnect_source (migration 20261002000100) marks
-// the token revoked; worker disconnect.ts revokes it at Intuit and deletes the client's
-// QuickBooks rows. Every fixture client is synthetic, so the shared acme/beta/gamma seed is untouched.
+// Owner-initiated disconnect: api.disconnect_source (migrations 20261002000100, 20261007000500)
+// marks the token revoked; worker disconnect.ts revokes it upstream and deletes the client's rows
+// for that source. QuickBooks first; meet, drive, monday and meta at the end. The per-source HTTP
+// shapes are pinned DB-free in disconnect-upstream.test.ts. Every fixture client is synthetic, so the shared acme/beta/gamma seed is untouched.
 // Needs the local stack (supabase start in platform/) with migrations applied.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { clientWithToken, mintJwt, pool, serviceClient, sql } from './helpers.js'
 import { closePool, type Tick } from '../worker/src/db.js'
-import { INTUIT_REVOKE_URL, revokeDisconnected } from '../worker/src/disconnect.js'
+import { GOOGLE_REVOKE_URL, INTUIT_REVOKE_URL, META_PERMISSIONS_URL, revokeDisconnected } from '../worker/src/disconnect.js'
 import { probeAuthFailed } from '../worker/src/tokens.js'
 
 const made: string[] = []
@@ -33,11 +34,16 @@ async function mkUser(client: string, role: 'owner' | 'member'): Promise<string>
  * A 'revoked' token defaults to status_detail 'owner_disconnect' (what api.disconnect_source writes);
  * `age` backdates the token's updated_at (an insert, so the touch trigger does not run).
  */
-async function seed(client: string, source: 'quickbooks' | 'shopify', status = 'active',
+type Seeded = 'quickbooks' | 'shopify' | 'meet' | 'drive' | 'monday' | 'meta'
+const KIND: Record<Seeded, string> = {
+  quickbooks: 'quickbooks_oauth_refresh', shopify: 'shopify_admin', meet: 'google_oauth_refresh',
+  drive: 'google_oauth_refresh', monday: 'monday_personal', meta: 'meta_system_user',
+}
+async function seed(client: string, source: Seeded, status = 'active',
   opts: { detail?: string | null; age?: string } = {}) {
   const detail = opts.detail !== undefined ? opts.detail : status === 'revoked' ? 'owner_disconnect' : null
-  const kind = source === 'quickbooks' ? 'quickbooks_oauth_refresh' : 'shopify_admin'
-  const config = source === 'quickbooks' ? { realm_id: '123' } : { shop: `qd-${client.slice(0, 8)}.myshopify.com` }
+  const kind = KIND[source]
+  const config = source === 'shopify' ? { shop: `qd-${client.slice(0, 8)}.myshopify.com` } : { realm_id: '123' }
   await sql(`insert into data.source_tokens (client_id, source, kind, secret, refresh_secret, status, status_detail, updated_at)
              values ($1, $2, $3, 'access-secret', 'refresh-secret', $4, $5, now() - $6::interval)`,
     [client, source, kind, status, detail, opts.age ?? '0'])
@@ -113,7 +119,7 @@ describe('api.disconnect_source', () => {
     expect(await counts(client, 'quickbooks')).toEqual(ALL)
   })
 
-  it('a non-quickbooks source raises BCNS3 and leaves that source alone', async () => {
+  it('shopify raises BCNS3 and leaves that source alone', async () => {
     const client = await mkClient()
     await seed(client, 'shopify')
     const { error } = await clientWithToken(await mkUser(client, 'owner')).rpc('disconnect_source', { p_source: 'shopify' })
@@ -130,6 +136,32 @@ describe('api.disconnect_source', () => {
     expect(error).toBeNull()
     expect((await tokenOf(other)).status).toBe('active')
     expect(await counts(other, 'quickbooks')).toEqual(ALL)
+  })
+})
+
+describe('api.disconnecting_sources_v1', () => {
+  it('lists the caller\'s owner-disconnected sources, source names only, to owner and member, until the token row is deleted', async () => {
+    const mine = await mkClient(), other = await mkClient()
+    await seed(mine, 'quickbooks')
+    await seed(mine, 'meta', 'revoked', { detail: null }) // revoked by an operator: not a pending delete
+    await seed(other, 'quickbooks', 'revoked')
+    const owner = clientWithToken(await mkUser(mine, 'owner'))
+    const member = clientWithToken(await mkUser(mine, 'member'))
+    expect((await owner.rpc('disconnecting_sources_v1')).data).toEqual([])
+    expect((await owner.rpc('disconnect_source', { p_source: 'quickbooks' })).error).toBeNull()
+    for (const c of [owner, member]) {
+      const { data, error } = await c.rpc('disconnecting_sources_v1')
+      expect(error).toBeNull()
+      expect(data).toEqual(['quickbooks'])
+    }
+    // The worker deletes the token row last: then it is just Not connected.
+    await sql(`delete from data.source_tokens where client_id = $1 and source = 'quickbooks'`, [mine])
+    expect((await member.rpc('disconnecting_sources_v1')).data).toEqual([])
+  })
+
+  it('data.disconnecting_sources is not callable by authenticated', async () => {
+    const r = await sql<{ ok: boolean }>(`select has_function_privilege('authenticated', 'data.disconnecting_sources(uuid)', 'execute') ok`)
+    expect(r.rows[0].ok).toBe(false)
   })
 })
 
@@ -288,5 +320,132 @@ describe('probeAuthFailed vs an owner disconnect', () => {
     expect(probed).toBe(true)
     expect(await tokenOf(client)).toEqual({ status: 'revoked', status_detail: 'owner_disconnect' })
     await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
+  })
+})
+
+describe('meet, drive, monday, meta', () => {
+  // Earlier tests may leave revoked rows behind; clear them so call counts below are this test's own.
+  beforeAll(() => revokeDisconnected(mkTick(() => json(200, { success: true }))))
+  const ok = () => json(200, { success: true })
+
+  it.each(['meet', 'drive', 'monday', 'meta'] as const)('api.disconnect_source: owner disconnects %s; a member is refused', async source => {
+    const client = await mkClient()
+    await seed(client, source)
+    const { error: denied } = await clientWithToken(await mkUser(client, 'member')).rpc('disconnect_source', { p_source: source })
+    expect(denied?.code).toBe('BCNS2')
+    expect((await tokenOf(client, source)).status).toBe('active')
+    const { data, error } = await clientWithToken(await mkUser(client, 'owner')).rpc('disconnect_source', { p_source: source })
+    expect(error).toBeNull()
+    expect(data).toBe(1)
+    expect(await tokenOf(client, source)).toEqual({ status: 'revoked', status_detail: 'owner_disconnect' })
+    expect(await counts(client, source)).toEqual({ ...ALL, health: 0 })
+    await revokeDisconnected(mkTick(ok))
+    expect(await counts(client, source)).toEqual(NONE)
+  })
+
+  it('monday: no upstream call, rows deleted, other sources kept', async () => {
+    const client = await mkClient()
+    await seed(client, 'monday', 'revoked')
+    await seed(client, 'shopify')
+    const calls: Call[] = [], logs: unknown[][] = []
+    await revokeDisconnected(mkTick(ok, calls, logs))
+    expect(calls).toHaveLength(0)
+    expect(await counts(client, 'monday')).toEqual(NONE)
+    expect(await counts(client, 'shopify')).toEqual(ALL)
+    expect(logs).toContainEqual(['monday_disconnected', { client, source: 'monday', outcome: 'none' }])
+  })
+
+  it('meta: DELETE /me/permissions with the user token, then rows deleted', async () => {
+    const client = await mkClient()
+    await seed(client, 'meta', 'revoked')
+    const calls: Call[] = [], logs: unknown[][] = []
+    await revokeDisconnected(mkTick(ok, calls, logs))
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url.startsWith(`${META_PERMISSIONS_URL}?access_token=`)).toBe(true)
+    expect(calls[0].init.method).toBe('DELETE')
+    expect(await counts(client, 'meta')).toEqual(NONE)
+    expect(JSON.stringify(logs)).not.toMatch(/refresh-secret|access-secret/)
+  })
+
+  it('drive with meet still connected: no Google revoke (it would cut off meet), drive deleted, meet kept', async () => {
+    const client = await mkClient()
+    await seed(client, 'drive', 'revoked')
+    await seed(client, 'meet')
+    const calls: Call[] = [], logs: unknown[][] = []
+    await revokeDisconnected(mkTick(ok, calls, logs))
+    expect(calls).toHaveLength(0)
+    expect(await counts(client, 'drive')).toEqual(NONE)
+    expect(await counts(client, 'meet')).toEqual(ALL)
+    expect((await tokenOf(client, 'meet')).status).toBe('active')
+    expect(logs).toContainEqual(['drive_disconnected', { client, source: 'drive', outcome: 'kept_for_sibling' }])
+  })
+
+  it('meet and drive both disconnected: Google revoke runs, both deleted', async () => {
+    const client = await mkClient()
+    await seed(client, 'meet', 'revoked')
+    await seed(client, 'drive', 'revoked')
+    const calls: Call[] = []
+    await revokeDisconnected(mkTick(ok, calls))
+    expect(calls.length).toBeGreaterThanOrEqual(1)
+    expect(calls.every(c => c.url === GOOGLE_REVOKE_URL && String(c.init.body) === 'token=refresh-secret')).toBe(true)
+    expect(await counts(client, 'meet')).toEqual(NONE)
+    expect(await counts(client, 'drive')).toEqual(NONE)
+  })
+
+  it('drive with meet revoked by an operator: Google revoke runs (that row keeps no grant), meet row left alone', async () => {
+    const client = await mkClient()
+    await seed(client, 'drive', 'revoked')
+    await seed(client, 'meet', 'revoked', { detail: 'operator' })
+    const calls: Call[] = [], logs: unknown[][] = []
+    await revokeDisconnected(mkTick(ok, calls, logs))
+    expect(calls.map(c => c.url)).toEqual([GOOGLE_REVOKE_URL])
+    expect(await counts(client, 'drive')).toEqual(NONE)
+    expect(await tokenOf(client, 'meet')).toEqual({ status: 'revoked', status_detail: 'operator' })
+    expect(logs).toContainEqual(['drive_disconnected', { client, source: 'drive', outcome: 'revoked' }])
+  })
+
+  it('meet row held by another transaction (a reconnect): no decision, no Google call, drive kept for next tick', async () => {
+    const client = await mkClient()
+    await seed(client, 'drive', 'revoked')
+    await seed(client, 'meet')
+    const held = await pool.connect()
+    const calls: Call[] = []
+    try {
+      await held.query('begin')
+      await held.query(`select 1 from data.source_tokens where client_id = $1 and source = 'meet' for update`, [client])
+      await revokeDisconnected(mkTick(ok, calls))
+      expect(calls).toHaveLength(0)
+      expect(await counts(client, 'drive')).toEqual(ALL)
+    } finally {
+      await held.query('rollback')
+      held.release()
+    }
+    await revokeDisconnected(mkTick(ok, calls))
+    expect(calls).toHaveLength(0) // meet is active: kept_for_sibling
+    expect(await counts(client, 'drive')).toEqual(NONE)
+  })
+
+  it('stuck over 24h: a drive_revoke_stuck notification, row kept', async () => {
+    const client = await mkClient()
+    await seed(client, 'drive', 'revoked', { age: '25 hours' })
+    await revokeDisconnected(mkTick(() => json(403, { error: 'forbidden' })))
+    const notes = await sql(`select kind, dedupe_key from data.notifications where client_id = $1`, [client])
+    expect(notes.rows).toEqual([{ kind: 'drive_revoke_stuck', dedupe_key: expect.stringMatching(new RegExp(`^drive_revoke_stuck:${client}:\\d{4}-\\d{2}-\\d{2}$`)) }])
+    expect(await counts(client, 'drive')).toEqual(ALL)
+    await revokeDisconnected(mkTick(ok))
+  })
+
+  it('Google down does not hold up a Meta disconnect in the same tick', async () => {
+    const g = await mkClient(), m = await mkClient()
+    await seed(g, 'drive', 'revoked')
+    await seed(m, 'meta', 'revoked')
+    // Per URL: Google answers 503, Meta answers ok.
+    const t = mkTick(ok)
+    t.fetch = (async (url: string) => String(url) === GOOGLE_REVOKE_URL ? json(503, {}) : ok()) as typeof fetch
+    await revokeDisconnected(t)
+    expect(await counts(g, 'drive')).toEqual(ALL)
+    expect(await counts(m, 'meta')).toEqual(NONE)
+    await revokeDisconnected(mkTick(ok))
+    expect(await counts(g, 'drive')).toEqual(NONE)
   })
 })

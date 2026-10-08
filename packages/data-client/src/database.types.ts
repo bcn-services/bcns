@@ -1333,6 +1333,20 @@ export type Database = {
       delete_media: { Args: { media_ids: string[] }; Returns: number }
       delete_media_set: { Args: { set_id: string }; Returns: undefined }
       delete_record: { Args: { record_id: string }; Returns: undefined }
+      disconnecting_sources_v1: {
+        Args: never
+        Returns: (
+          | "shopify"
+          | "meta"
+          | "monday"
+          | "meet"
+          | "upload"
+          | "dashboard"
+          | "platform"
+          | "drive"
+          | "quickbooks"
+        )[]
+      }
       download_url: { Args: { media_id: string }; Returns: Json }
       get_ai_settings: { Args: never; Returns: Json }
       log_mcp_call: {
