@@ -67,7 +67,6 @@ Save under `docs/architecture/baselines/2026-09-15/`. Done when committed. This 
 - Old repos: README pointer "moved to bcn-services/bcns/<path>"; `bcns-data` and `bcns-app-template` archived after the merge PR is green; `bcns-client-sb` frozen, not archived, until chunk 7 is live.
 - `/new-client-repo` skill in `~/os` → `/new-client-app` (stamps `apps/<slug>`).
 Verification: `diff -r` old repo vs new folder shows only the enumerated config files; test counts equal baseline; RLS suite green; `supabase db diff` empty (no migration in this PR); web preview deploy HTML equals baseline per route modulo build ids; worker image builds from the new path and a dry tick runs; isolation test green.
-Constraint: private-repo Actions minutes are exhausted until 2026-10-01. Run the suites locally and paste results, or Nate raises the Actions spending limit above $0.
 
 ### 2. Domain and infra
 - Squarespace DNS: A records `connect`, `mcp`, `sb` → droplet 146.190.138.141 (wildcard `*` if Squarespace allows it; verify). Nothing else on the zone moves; Workspace MX/SPF/DKIM/DMARC untouched. Vercel apex/www records untouched.
@@ -211,7 +210,7 @@ What exists today (read from `origin/main`):
   client or an owner.
 - `data.memberships.user_id` is the primary key, so one user belongs to one client.
 - A stranger at `connect.bcn-services.com` reaches only `/login` (sign-in and forgot-password;
-  no sign-up route; the page offers only a mailto to bcns). A valid password with no membership
+  "Create account" appears only when the hub's `SIGNUP_ENABLED` flag is on, and then goes to the public `signup` Edge Function; otherwise the page offers only a mailto to bcns). A valid password with no membership
   bounces to "Ask bcns for an invite".
 - Local `platform/supabase/config.toml` has email `enable_signup = true`; that is the local stack,
   not hosted. Hosted, observed 2026-09-29 in the Supabase dashboard (project
@@ -313,7 +312,6 @@ Rulings made by recommendation (Nate may overrule):
 
 ## Calendar constraints
 
-- Private-repo Actions minutes: exhausted until 2026-10-01 (or raise the spending limit).
 - Shopify: depends on the distribution choice made after the Declan call (`chunk5-windows.md`
   W6a). Custom distribution is one store with no review, so it adds no clock. Public (unlisted)
   adds app review, days to weeks, which would be the longest clock we control. That's why W5a

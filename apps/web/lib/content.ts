@@ -994,9 +994,10 @@ export const siteContent: SiteContent = {
   // collect" is checked against platform/worker/src/connectors/quickbooks.ts:
   // `select *` over Purchase and Bill (full record stored as raw), 24-month
   // backfill, read-only use of a read/write Intuit scope. It deliberately
-  // does NOT yet say the owner can disconnect to revoke at Intuit and delete
-  // the stored data: that ships with the hub disconnect PR, and the sentence
-  // goes into the same entry when it does.
+  // The owner-disconnect sentence (hub Sources page, #129) is in "Requesting
+  // deletion", checked against apps/connect/lib/sources.ts DISCONNECTABLE and
+  // platform/worker/src/disconnect.ts (revoke upstream, then delete the
+  // token, schedule, health row and data for that source).
   //
   legal: {
     privacy: {
@@ -1004,7 +1005,7 @@ export const siteContent: SiteContent = {
       title: "Privacy Policy",
       description:
         "How bcns collects, uses, and protects the information that runs through bcns Connect, the hub, and the MCP server.",
-      effectiveDate: "Last updated October 6, 2026.",
+      effectiveDate: "Last updated October 8, 2026.",
       sections: [
         {
           heading: "Who we are",
@@ -1084,6 +1085,7 @@ export const siteContent: SiteContent = {
           heading: "Requesting deletion",
           body: [
             `To delete your account or your data, email ${siteConfig.email}.`,
+            "You can also disconnect QuickBooks Online, Meta Ads, monday.com, Google Drive or meeting notes yourself in the hub; we then delete the token and data we stored for that source and revoke our access with Intuit, Meta or Google (Google once Drive and meeting notes are both disconnected; monday.com has nothing to revoke).",
             "If you're a customer of one of our clients and want your Shopify order data removed, Shopify sends us that request directly. We handle a shop's full data removal (\"shop/redact\") by hand, inside Shopify's 48-hour window, and a customer-level removal request by hand as well.",
             `If you interacted with a Meta ad and want your data removed, email ${siteConfig.email} and we'll confirm by email once it's done.`,
             "These requests are handled by a person, not automatically; we'll confirm with you once each one is complete.",
