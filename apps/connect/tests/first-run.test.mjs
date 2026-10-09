@@ -85,16 +85,18 @@ test("a completed checklist stays hidden after the owner disconnects the only so
   assert.equal(firstRun(finished).visible, false);
   // Disconnect deletes the source's health row (platform/worker disconnect.ts): no cards, no sync time.
   const after = firstRun({ ...finished, health: [] });
-  assert.equal(after.allDone, true);
-  assert.equal(after.visible, false);
+  assert.deepEqual(done(after), { source: false, sync: false, team: true, ai: true }); // ticks stay truthful
+  assert.equal(after.visible, false); // ai + team done: it was finished once
 });
 
-test("monotonic: a sync time proves a source was connected; an AI question proves both", () => {
+test("a sync time proves a source was connected; an AI question proves neither", () => {
   // token revoked since: the card is not connected, but the data arrived once
   assert.equal(done(firstRun(input({ health: [row("shopify", "auth_failed", T)] }))).source, true);
+  // mcp_tool_calls logs failed calls too and survives shop/redact: an AI timestamp says nothing about a source
   const asked = done(firstRun(input({ aiLastUsedAt: T })));
-  assert.equal(asked.source, true);
-  assert.equal(asked.sync, true);
+  assert.equal(asked.ai, true);
+  assert.equal(asked.source, false);
+  assert.equal(asked.sync, false);
   // nothing asked, nothing connected: still not ticked
   assert.equal(done(firstRun(input())).source, false);
 });

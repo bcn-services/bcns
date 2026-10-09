@@ -543,12 +543,12 @@ test("stats catalog: only connected sources, one count per view, ids are source/
   for (const s of all) assert.ok(STAT_IDS.includes(s.id), s.id);
 });
 
-test("stats defaults: orders+revenue for Shopify, spend for Meta, jobs for Monday, expenses for QuickBooks, nothing for Meet or Drive", () => {
+test("stats defaults: orders+revenue for Shopify, spend for Meta, jobs for Monday, nothing for QuickBooks, Meet or Drive", () => {
   assert.deepEqual(defaultPins(["shopify"]), ["shopify/orders", "shopify/revenue"]);
   assert.deepEqual(defaultPins(["meta"]), ["meta/spend"]);
   assert.deepEqual(defaultPins(["shopify", "meta"]), ["shopify/orders", "shopify/revenue", "meta/spend"]);
   assert.deepEqual(defaultPins(["monday"]), ["monday/jobs"]);
-  assert.deepEqual(defaultPins(["quickbooks"]), ["quickbooks/expenses"]);
+  assert.deepEqual(defaultPins(["quickbooks"]), []); // a bare expense count would read as dollars next to Revenue / Ad spend
   assert.deepEqual(defaultPins(["meet", "drive"]), []);
   for (const id of defaultPins(["shopify", "meta", "monday", "quickbooks"])) assert.ok(STAT_IDS.includes(id), id);
 });
