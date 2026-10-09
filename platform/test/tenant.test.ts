@@ -15,21 +15,24 @@ describe('tenant isolation', () => {
     const { client } = await signIn(USERS.acmeOwner)
     await sql(`delete from data.media_sets where client_id = $1 and name = 'rpc-scoped-test'`, [CLIENTS.acme])
     const acmeCreated: string[] = []
-    for (const name of rpcs) {
-      const spec = argsFor[name]
-      expect(spec, `no RPC_ARGS entry for ${name}`).toBeDefined()
-      const { data, error } = await client.rpc(name, spec.args)
-      if (spec.expect.startsWith('BCNS')) expect(rpcCode(error), name).toBe(spec.expect)
-      else if (spec.expect === 'ignored') { expect(error, name).toBeNull(); expect(data, name).toBe(0) }
-      else { expect(error, name).toBeNull(); if (typeof data === 'string') acmeCreated.push(data) }
+    try {
+      for (const name of rpcs) {
+        const spec = argsFor[name]
+        expect(spec, `no RPC_ARGS entry for ${name}`).toBeDefined()
+        const { data, error } = await client.rpc(name, spec.args)
+        if (spec.expect.startsWith('BCNS')) expect(rpcCode(error), name).toBe(spec.expect)
+        else if (spec.expect === 'ignored') { expect(error, name).toBeNull(); expect(data, name).toBe(0) }
+        else { expect(error, name).toBeNull(); if (typeof data === 'string') acmeCreated.push(data) }
+      }
+      expect(await betaSnapshot()).toEqual(before)
+    } finally {
+      // clean acme-side rows created by the 'none' RPCs
+      await sql(`delete from data.records where client_id = $1 and external_id = 'rec-0' and source = 'dashboard' and id = any($2::uuid[])`, [CLIENTS.acme, acmeCreated])
+      await sql(`delete from data.media_sets where client_id = $1 and name = 'rpc-scoped-test'`, [CLIENTS.acme])
+      await sql(`delete from data.dashboard_versions where client_id = $1`, [CLIENTS.acme])
+      await sql(`delete from data.ai_settings where client_id = $1`, [CLIENTS.acme])
+      await sql(`delete from data.mcp_tool_calls where client_id = $1 and tool = 'rpc-scoped-test'`, [CLIENTS.acme])
     }
-    expect(await betaSnapshot()).toEqual(before)
-    // clean acme-side rows created by the 'none' RPCs
-    await sql(`delete from data.records where client_id = $1 and external_id = 'rec-0' and source = 'dashboard' and id = any($2::uuid[])`, [CLIENTS.acme, acmeCreated])
-    await sql(`delete from data.media_sets where client_id = $1 and name = 'rpc-scoped-test'`, [CLIENTS.acme])
-    await sql(`delete from data.dashboard_versions where client_id = $1`, [CLIENTS.acme])
-    await sql(`delete from data.ai_settings where client_id = $1`, [CLIENTS.acme])
-    await sql(`delete from data.mcp_tool_calls where client_id = $1 and tool = 'rpc-scoped-test'`, [CLIENTS.acme])
   })
 
   it('forbidden_read_views', async () => {
