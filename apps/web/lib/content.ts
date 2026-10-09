@@ -1088,7 +1088,7 @@ export const siteContent: SiteContent = {
             "If you're a customer of one of our clients and want your Shopify order data removed, Shopify sends us that request directly. We handle a shop's full data removal (\"shop/redact\") by hand, inside Shopify's 48-hour window, and a customer-level removal request by hand as well.",
             `If you interacted with a Meta ad and want your data removed, email ${siteConfig.email} and we'll confirm by email once it's done.`,
             "These requests are handled by a person, not automatically; we'll confirm with you once each one is complete.",
-            "Your account owner can also disconnect QuickBooks Online, Meta Ads, monday.com, Google Drive or meeting notes in the hub. We then delete the token and data we stored for that source and cancel our access with Intuit or Meta, and with Google once Drive and meeting notes are both disconnected. If they were connected with different Google accounts, also remove bcns from the first account's Google settings.",
+            "Your account owner can also disconnect QuickBooks Online, Meta Ads, monday.com, Google Drive or meeting notes in the hub. We then delete the token and data we stored for that source and cancel our access with Intuit or Meta, and with Google once Drive and meeting notes are both disconnected. If they were connected with different Google accounts, also remove bcns in both accounts' Google settings.",
             "monday.com gives us no way to cancel access, so remove bcns in monday.com as well.",
           ],
         },
