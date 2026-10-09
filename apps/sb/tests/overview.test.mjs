@@ -121,8 +121,9 @@ test("formatMoney: USD uses 2 fraction digits (cents)", () => {
   assert.equal(formatMoney(150000, "USD"), "$1,500.00");
 });
 
-test("formatMoney: JPY has 0 fraction digits — minor units ARE full units", () => {
-  assert.equal(formatMoney(1500, "JPY"), "¥1,500");
+test("formatMoney: JPY is stored x100 like every currency, shown with 0 fraction digits", () => {
+  assert.equal(formatMoney(1999, "JPY"), "¥20");
+  assert.equal(formatMoney(150000, "JPY"), "¥1,500");
 });
 
 test("formatMoney: null -> em dash", () => {
@@ -231,6 +232,7 @@ test("rangeQuery: the querystring every header link carries", () => {
 
 test("formatters: whole money, counts, compact, roas", () => {
   assert.equal(formatMoneyWhole(14254000), "$142,540");
+  assert.equal(formatMoneyWhole(150000, "JPY"), "¥1,500");
   assert.equal(formatMoneyWhole(null), "—");
   assert.equal(formatCount(1248.4), "1,248");
   assert.equal(formatCount(null), "—");

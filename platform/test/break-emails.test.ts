@@ -1,7 +1,20 @@
 // Client break emails: pure decision layer (no DB, runs locally). DB-backed cases live in worker.test.ts.
-import { afterEach, describe, expect, it } from 'vitest'
-import { breakEmail, clientBreakNotices, ownerRecipients, sendClientEmail, type BreakRow } from '../worker/src/health.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { breakEmail, clientBreakNotices, ownerRecipients, sendClientEmail, sendPending, type BreakRow } from '../worker/src/health.js'
 import type { Tick } from '../worker/src/db.js'
+
+const dbCalls: { text: string; params: unknown[] }[] = []
+let pendingRows: unknown[] = []
+// sendPending's reads/writes go through db.sql; envStr stays real.
+vi.mock('../worker/src/db.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../worker/src/db.js')>()),
+  sql: vi.fn(async (text: string, params: unknown[] = []) => {
+    dbCalls.push({ text, params })
+    if (text.includes('from data.notifications') && text.includes('select id, kind')) return { rows: pendingRows, rowCount: pendingRows.length }
+    if (text.includes('from data.memberships')) return { rows: [{ email: 'o@example.com', role: 'owner', is_smoke: false }], rowCount: 1 }
+    return { rows: [], rowCount: 1 }
+  }),
+}))
 
 const T0 = new Date('2026-10-01T12:00:00.000Z')
 const H = 3600_000, D = 24 * H, MIN = 60_000
@@ -92,14 +105,14 @@ describe('sendClientEmail', () => {
   const ENV = ['RESEND_API_KEY', 'BCNS_ALERT_FROM', 'BCNS_ALERT_EMAIL', 'BCNS_CLIENT_REPLY_TO']
   const saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]))
   afterEach(() => { for (const k of ENV) saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]) })
-  const send = async (to: string[]) => {
+  const send = async (to: string[], status = 200, resBody = '{}') => {
     const calls: { url: string; headers: Record<string, string>; body: string }[] = []
     const fetch = (async (url: any, init?: any) => {
       calls.push({ url: String(url), headers: init?.headers ?? {}, body: String(init?.body ?? '') })
-      return new Response('{}', { status: 200 })
+      return new Response(resBody, { status })
     }) as typeof globalThis.fetch
-    await sendClientEmail({ fetch } as Tick, to, 'Subj', 'Body', 'k1')
-    return { call: calls[0], msgs: JSON.parse(calls[0].body) as Record<string, unknown>[] }
+    const result = await sendClientEmail({ fetch } as Tick, to, 'Subj', 'Body', 'k1')
+    return { result, call: calls[0], msgs: JSON.parse(calls[0].body) as Record<string, unknown>[] }
   }
 
   it('one batch message per owner, reply_to from BCNS_CLIENT_REPLY_TO only, Idempotency-Key set', async () => {
@@ -120,5 +133,54 @@ describe('sendClientEmail', () => {
     process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
     delete process.env.BCNS_CLIENT_REPLY_TO
     expect('reply_to' in (await send(['a@example.com'])).msgs[0]).toBe(false)
+  })
+
+  it('409 invalid_idempotent_request (key reused, original went out) resolves as already_sent, no throw', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    expect((await send(['a@example.com'], 409, '{"name":"invalid_idempotent_request","message":"x"}')).result).toBe('already_sent')
+  })
+
+  it('409 concurrent_idempotent_requests (original still in flight) throws so the row is retried', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    await expect(send(['a@example.com'], 409, '{"name":"concurrent_idempotent_requests","message":"x"}')).rejects.toThrow(/409/)
+  })
+
+  it('500 still rejects with the status in the message', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    await expect(send(['a@example.com'], 500)).rejects.toThrow(/500/)
+  })
+})
+
+describe('sendPending (client_break row)', () => {
+  const ENV = ['RESEND_API_KEY', 'BCNS_ALERT_FROM', 'BCNS_ALERT_EMAIL']
+  const saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]))
+  beforeEach(() => {
+    dbCalls.length = 0
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
+    pendingRows = [{ id: 'n1', kind: 'client_break', dedupe_key: 'k1', client_id: 'c1',
+      payload: { source: 'drive', status: 'auth_failed', status_since: T0.toISOString() } }]
+  })
+  afterEach(() => { for (const k of ENV) saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]) })
+  const run = async (status: number, body: string) => {
+    const fetch = (async () => new Response(body, { status })) as typeof globalThis.fetch
+    const sent = await sendPending({ fetch } as Tick)
+    return { sent, update: dbCalls.find(c => c.text.includes('update data.notifications set sent_at = now(), last_error = $2')) }
+  }
+
+  it('409 invalid_idempotent_request: marked sent with the 409 note', async () => {
+    const { sent, update } = await run(409, '{"name":"invalid_idempotent_request"}')
+    expect(sent).toBe(1)
+    expect(update?.params).toEqual(['n1', 'resend 409: idempotency key already used'])
+  })
+
+  it('200: marked sent with last_error cleared', async () => {
+    const { sent, update } = await run(200, '{}')
+    expect(sent).toBe(1)
+    expect(update?.params).toEqual(['n1', null])
   })
 })

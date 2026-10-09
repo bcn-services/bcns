@@ -1,28 +1,17 @@
-REVIEW: 0C/0I/0M
+REVIEW: 0C/1I/2M
 # Review Report
-**Date:** 2026-10-06
-**Files Reviewed:** 7 (delta 7a92f5c..4ce59f2, excl. engineer-report.md)
+**Date:** 2026-10-08
+**Files Reviewed:** 7
 
 ## Findings
 
-No findings.
+### Important
+Important — apps/connect/lib/first-run.ts:62-63 — `syncDone = aiDone || ...` / `sourceDone = syncDone || ...` ticks "Connect a source" and "Get your first data in" for any owner whose workspace has one MCP tool call, but apps/mcp/src/mcp.ts:213-217 logs a row for every call, failed and unknown-tool calls included, so it proves nothing about a source. Prod example: bcns-oauth-test has 11 mcp_tool_calls and zero connector_health rows, so its owner now sees source ✓ and sync ✓ with no connected card. Any owner who sets up /access before connecting a source sees the same. Also, mcp_tool_calls is not in scope.ts DATA_TABLES, so it survives shop/redact. If a reset tenant has fewer than 4 steps done, its owner now sees "Get your first data in ✓" right after reconnecting, before the first sync. The code comment "the question was asked about synced data" is false. — Fix: keep the step ticks truthful (`syncDone` = a hub health row with last_success_at only; `sourceDone = syncDone || any connected card`) and move the monotonic rule into visibility: `visible: input.role === "owner" && !allDone && !(aiDone && teamDone)`. The disconnect test still passes. Flip `asked.source` / `asked.sync` in the "monotonic" test to false.
 
-## Verification (no finding)
-- Prior Important fixed: run.ts:336 `emptyFullListTables` now filters to `media`. Only drive.ts:53 declares a `media` fullList (monday `jobs`, meta `records`), so Monday and Meta go back to the base tombstone path. The thrown text is now fixed to the "folder" wording, and EMPTY_NOUN is gone. Pinned by empty-full-list.test.ts "never guards Monday jobs or Meta records".
-- Prior Minor (Meta backfill flap) gone: Meta never reaches the throw now. Drive has no analogue. pull() ignores the cursor, so a retried backfill walks the whole folder again and throws the same way each time, with no error -> ok -> error flip.
-- No regression vs feat/hub-first-run: `git diff -a feat/hub-first-run...HEAD` on run.ts is only the guard plus the SourceError import. On worker.test.ts it is only the new empty_full_list_fails_not_tombstones test. stale_no_false_alarm, lease_lost_write_ignored and the worker_isolation meta stub match base exactly.
-- DB test empty_full_list_fails_not_tombstones, traced against the committed code:
-  - mkClient(drive) seeds config {folder_id:'f1'} (passes the drive configSchema) and a google_oauth_refresh token with expires_at null, so it never refreshes.
-  - The stub answers `/drive/v3/files` with {files} and no nextPageToken. walkFolder yields one page with last=true, so entity 'file' finishes. No thumbnailLink, so there is no Storage call. kind 'file' passes the media check.
-  - Run 2 (empty) throws before applyTombstones, so deleted_at and purge_after stay null.
-  - Run 3: applyTombstones sets deleted_at and purge_after on d2 (run.ts:353).
-  - The fixture pattern matches drive-tombstone.test.ts, which already runs DB-backed. Not executed here (no local stack, per instructions).
-- The pure runOne Drive twin passes: the fetch stub returns {files} for every URL, and the regex `update data\.media set deleted_at = now\(\)` matches run.ts's template.
-- friendlyError: run.ts:296 is the only producer of "found nothing to sync" (git grep at 4ce59f2). It always says "folder", so collapsing to EMPTY_FOLDER_WARNING is exact. The guard never shipped, so no old board or ad account messages exist in connector_runs. folderCheck (source-settings.ts:227) still matches the string.
-- Docs: DESIGN §4.1 (:780-789), §5 step 3 (:1071), §5.5 stale row and test table rows :1303-1304 match the code. Monday "board not found" is at monday.ts:45. NOTES #7/#8 are accurate. No other doc still describes a Monday or Meta guard.
-- Counts:
-  - platform non-DB: 17 files / 174 pass (floor 173), run on a `git archive 4ce59f2` extract, so QA's concurrent mutations could not affect it.
-  - connect: 341/341 pass in the worktree (floor 341; git status was clean at run time). Removing the monday assertion did not change the test count.
+### Minor
+Minor — apps/connect/lib/data-stats.ts:56 — `quickbooks/expenses` becomes a default pin. It renders as "Expenses, 30 days" with a bare count ("42") next to the money stats "Revenue, 30 days $…" and "Ad spend, 30 days $…", so a QuickBooks owner reads it as $42 of expenses. There are no QuickBooks tenants in prod yet. — Fix: drop `quickbooks/expenses` from defaults, extend the comment ("QuickBooks: only a row count, which reads as a money total"), and update the two data.test.mjs assertions.
+Minor — apps/connect/app/access/copy-url.tsx:21 — The accessible name "Copy the workspace address" does not contain the visible label "Copy address" (WCAG 2.5.3 Label in Name), so a voice-control user who says "click Copy address" can miss the button. No double announcement: the role="status" span is empty except on failure. — Fix: `aria-label={state === "copied" ? "Copied workspace address" : "Copy address of this workspace"}`.
 
 ## STANDARDS.md Updates
-none (findings-only run, no repo edits per instructions)
+- Connect Hub: "Money is always stored x100" (formatters divide by 10**(minorDigits ?? 2); the currency only sets the output digits).
+- Connect Hub: "Which rows survive a disconnect" (connector_health is deleted on disconnect and redact; mcp_tool_calls survives and is logged for every call, so it is no evidence of a source or synced data).

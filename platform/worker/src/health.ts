@@ -309,7 +309,7 @@ export function breakEmail(kind: BreakNotice['kind'], source: string, status: st
 }
 
 /** One Resend batch call, one message per recipient so owners never see each other's address; Idempotency-Key makes a retry safe. reply_to is only the optional human-read BCNS_CLIENT_REPLY_TO, never the alerts inbox (a bot parses that one). */
-export async function sendClientEmail(t: Tick, to: string[], subject: string, text: string, idempotencyKey: string): Promise<void> {
+export async function sendClientEmail(t: Tick, to: string[], subject: string, text: string, idempotencyKey: string): Promise<'sent' | 'already_sent'> {
   const key = envStr('RESEND_API_KEY')
   const replyTo = envStr('BCNS_CLIENT_REPLY_TO')
   const from = envStr('BCNS_ALERT_FROM') || envStr('BCNS_ALERT_EMAIL')
@@ -319,7 +319,15 @@ export async function sendClientEmail(t: Tick, to: string[], subject: string, te
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}`, 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(to.map(addr => ({ from, to: [addr], subject, text, ...(replyTo ? { reply_to: replyTo } : {}) }))),
   })
-  if (!r.ok) throw new Error(`resend HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  if (!r.ok) {
+    const body = await r.text()
+    // 409 invalid_idempotent_request: key reused with a different payload, so the original email went out. 409 concurrent_idempotent_requests (original still in flight, may yet fail) and any other status throw, so the row is retried next tick.
+    let name = body
+    try { name = String(JSON.parse(body).name ?? body) } catch { /* not JSON: substring check on the text */ }
+    if (r.status === 409 && name.includes('invalid_idempotent_request')) return 'already_sent'
+    throw new Error(`resend HTTP ${r.status}: ${body.slice(0, 200)}`)
+  }
+  return 'sent'
 }
 
 /** §5.6 step 9 — the pooled allowance is a platform-level number, so the row has no client. */
@@ -346,6 +354,7 @@ export async function sendPending(t: Tick): Promise<number> {
   let sent = 0
   for (const n of rows.rows) {
     let error: string | null = null
+    let note: string | null = null
     try {
       if (n.kind === 'client_break' || n.kind === 'client_break_reminder' || n.kind === 'weekly_digest') {
         const owners = n.client_id ? await ownerEmails(n.client_id) : []
@@ -356,7 +365,7 @@ export async function sendPending(t: Tick): Promise<number> {
         const m = n.kind === 'weekly_digest'
           ? digestEmail(n.payload as unknown as DigestPayload)
           : breakEmail(n.kind, (n.payload as { source: string }).source, (n.payload as { status: string }).status, new Date((n.payload as { status_since: string }).status_since))
-        await sendClientEmail(t, owners, m.subject, m.text, n.dedupe_key)
+        if (await sendClientEmail(t, owners, m.subject, m.text, n.dedupe_key) === 'already_sent') note = 'resend 409: idempotency key already used'
       } else {
         if (!key || !to) throw new Error('RESEND_API_KEY and BCNS_ALERT_EMAIL are required to send alerts')
         const r = await t.fetch('https://api.resend.com/emails', {
@@ -376,7 +385,7 @@ export async function sendPending(t: Tick): Promise<number> {
     if (error) {
       await sql(`update data.notifications set attempts = attempts + 1, last_error = $2 where id = $1`, [n.id, error.slice(0, 500)])
     } else {
-      await sql(`update data.notifications set sent_at = now() where id = $1`, [n.id])
+      await sql(`update data.notifications set sent_at = now(), last_error = $2 where id = $1`, [n.id, note])
       sent++
     }
   }

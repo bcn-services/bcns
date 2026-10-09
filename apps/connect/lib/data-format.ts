@@ -36,19 +36,23 @@ function finite(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** `1999` + USD -> "19.99"; JPY 1999 -> "1999". null when the amount is missing or not a number. */
+/**
+ * Every connector stores money as round(amount * 100), whatever the currency, so the divisor is
+ * 10 ** (minorDigits ?? 2) and the currency only sets the OUTPUT digits: `1999` + USD -> "19.99";
+ * JPY 1999 -> "20"; KWD 1999 -> "19.990". null when the amount is missing or not a number.
+ */
 export function moneyMajorString(minor: unknown, currency: unknown, minorDigits?: number): string | null {
   const n = finite(minor);
   if (n === null) return null;
   const digits = currencyDigits(currency);
-  return (n / 10 ** (minorDigits ?? digits)).toFixed(digits);
+  return (n / 10 ** (minorDigits ?? 2)).toFixed(digits);
 }
 
-/** "$19.99", "€19.99", "¥1,999". Empty string when the amount is missing or not a number. */
+/** "$19.99", "€19.99", "¥20" (JPY 1999 is 19.99 yen, rounded to the currency's digits). Empty string when the amount is missing or not a number. */
 export function formatMoney(minor: unknown, currency: unknown, minorDigits?: number): string {
   const n = finite(minor);
   if (n === null) return "";
-  const major = n / 10 ** (minorDigits ?? currencyDigits(currency));
+  const major = n / 10 ** (minorDigits ?? 2);
   if (typeof currency === "string" && currency) {
     const f = currencyFormat(currency);
     return f ? f.format(major) : `${major.toFixed(2)} ${currency}`;

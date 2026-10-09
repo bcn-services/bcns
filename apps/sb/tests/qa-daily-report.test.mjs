@@ -55,8 +55,8 @@ test("non-USD currency (0-decimal JPY) formats correctly through the daily lines
   const r = computeDailyReport(DAY, [{ day: DAY, revenue_minor: 12345, orders: 3, currency: "JPY" }], [], []);
   assert.equal(r.currency, "JPY");
   const lines = dailyReportLines(r);
-  // JPY has 0 minor units per Intl, so 12345 "minor" is treated as 12345 yen.
-  assert.equal(lines[0].value, "¥12,345");
+  // Connectors store Math.round(amount * 100) for every currency, so 12345 is 123.45 -> "¥123".
+  assert.equal(lines[0].value, "¥123");
 });
 
 test("a malformed currency code from a row degrades every money line to '—' instead of throwing", () => {
