@@ -209,9 +209,11 @@ What exists today (read from `origin/main`):
   people to their own client, landing on `/auth/confirm` then `/set-password`. It cannot create a
   client or an owner.
 - `data.memberships.user_id` is the primary key, so one user belongs to one client.
-- A stranger at `connect.bcn-services.com` reaches only `/login` (sign-in and forgot-password;
-  "Create account" appears only when the hub's `SIGNUP_ENABLED` flag is on, and then goes to the public `signup` Edge Function; otherwise the page offers only a mailto to bcns). A valid password with no membership
-  bounces to "Ask bcns for an invite".
+- A stranger at `connect.bcn-services.com` reaches only `/login` (sign-in and forgot-password),
+  plus `/signup` when the hub's `SIGNUP_ENABLED` flag is on (its server action calls the public
+  `signup` Edge Function; with the flag off, `/signup` is a 404, there is no "Create account" link,
+  and only the Shopify-install finish variant of the page shows a mailto to bcns). A valid password
+  with no membership bounces to "Ask bcns for an invite".
 - Local `platform/supabase/config.toml` has email `enable_signup = true`; that is the local stack,
   not hosted. Hosted, observed 2026-09-29 in the Supabase dashboard (project
   `cnsxbglhredokjbvudfd`): "Allow new users to sign up" is OFF and "Confirm email" is ON. Self-service
