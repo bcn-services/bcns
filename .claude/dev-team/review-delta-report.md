@@ -1,8 +1,26 @@
-REVIEW: 0C/1I/2M
-Scope: git diff 05de3ba..HEAD (2eb8025): platform/worker/src/health.ts, platform/test/break-emails.test.ts, platform/test/worker.test.ts.
+REVIEW: 0C/0I/1M
+# Review Delta Report (fix round 1, 77e9bd7..56045f2)
+**Date:** 2026-10-08
+**Files Reviewed:** 3 (apps/web/lib/content.ts, apps/web/CONTENT.md, docs/architecture/platform-v1.md)
 
-IMPORTANT — platform/worker/src/health.ts:179 (+ sendClientEmail :195-197) — the stale copy tells the client "reply to this email and we'll sort it out", but the send sets no reply_to, so the reply goes to the `from` address. That is BCNS_ALERT_FROM, default `bot@bcn-services.com` (platform/scripts/gcp-setup.sh:40, platform/docs/deploy-worker.md:27). bot@ is the sender for the bcns-internal pipeline, and an agent parses replies to it as founder commands. No person is known to read it. A client whose source is stale for a reason reconnecting can't fix (for example the zero_now stale rule at health.ts:30-37) follows the instruction, and the reply may never reach anyone — fix: add `reply_to: <human-monitored inbox>` (e.g. BCNS_ALERT_EMAIL or connect@, the way apps/connect/lib/request-connection.ts:45 does) to each batch message, or drop the reply sentence.
-MINOR — platform/worker/src/health.ts:141-142 — the new `last_error is distinct from 'no owner to email'` exclusion has no observable benefit: a reminder for a client with no owner is already swallowed by sendPending (:229-231). Its only effect is when an owner is added mid-breakage (for example an onboarding invite accepted on day 2): that owner then gets no initial email and no reminder for the breakage, which misses the done-when "every owner-role member … gets one … email". Nothing tests it either: no DB test has a 'no owner to email' initial row, so replacing the CASE with plain `sent_at` stays green — fix: drop the CASE (sent_at null already covers "unsent"), or, when owners now exist, reset a 'no owner' initial row to unsent. Add a DB case either way.
-MINOR — platform/DESIGN.md:1137 — still says the reminder fires "3 days after that row was created". After M3 it counts from the initial row's sent_at and skips a 'no owner to email' row, so the doc misstates the rule the fix pass changed — fix: reword to "3 days after the first email was sent (not counted when no owner was emailed)".
+## Prior findings
+- I1 monday "nothing to revoke": closed. content.ts:1092 matches disconnect.ts:45-46 ('none') and the hub copy at lib/sources.ts:274-277.
+- I2 owner-only: closed. "Your account owner" matches RPC BCNS2 (20261007000500:19-21), route ownerSession, and canDisconnect.
+- I3 person-handled line: closed. Both disconnect strings now come after content.ts:1090, so "These requests" covers only the email and Shopify/Meta requests above it.
+- M1 Google different account: closed. "if they use the same Google account" matches googleRevokeNeeded per client (disconnect.ts:96-101,135-147). Data deletion is still unconditional (disconnect.ts:149-157), and the copy does not say otherwise.
+- M2 dangling "It deliberately": closed (content.ts:996).
+- M3 platform-v1 /signup: closed. Each clause checks out: /signup is a 404 with the flag off (signup/page.tsx:16), the server action calls the Edge Function (signup/actions.ts:15-22), "Create account" is flag-gated (login/page.tsx:105-109), and the only mailto in login/page.tsx is in the finishingShopify branch (:50, :63-71). The engineer's departure from my suggested wording is correct.
 
-Checked, no finding: `is distinct from` correctly keeps the reminder for a row that failed once then sent (last_error keeps the Resend error, sent_at is set). An exhausted initial row (sent_at null) gets no reminder and is surfaced by notifications_stuck. The gamma test is sound: gamma is paused (seed.sql:19), has a seeded never_ran shopify health row (seed.sql:56) and no owner. Without the active-client filter a client_break row would still be inserted (marked 'no owner'), so the rowCount=0 assertion turns red. finally restores both health rows and deletes both clients' notifications; afterAll resets SEEDED health and deletes every notification, so nothing leaks into later files (fileParallelism false). gamma's bcns auth_failed alert goes to /emails, not /emails/batch, so batches().length=1/2 holds. The reminder phase backdates created_at and sent_at together, so it exercises the new sent_at path.
+## Findings
+
+### Minor
+Minor — docs/architecture/platform-v1.md:212-216 — the bullet grew from a one-clause fix into a four-clause parenthetical, which goes against the lane rule that a deletion beats a rewrite. The trailing clause "there is no "Create account" link, and only the Shopify-install finish variant of the page shows a mailto to bcns" is true but repeats the flag-gating already stated. — Fix (optional): delete that trailing clause, so it reads "...calls the public `signup` Edge Function; with the flag off, `/signup` is a 404)."
+
+## Other checks
+- content.ts:1091-1092: every clause checks out against disconnect.ts and lib/sources.ts. The only thing this round changed in that copy is the wording ("cancel" for "revoke"), and the new monday line is the hub's own advice.
+- CONTENT.md:1090 mirrors content.ts: owner-only, placed last, Intuit/Meta/Google, the same-account caveat, and monday removed by the owner. No field was added.
+- The working tree is clean against 56045f2. Only the 3 allowed files changed under apps/docs.
+- I did not re-run the gates; I accepted the orchestrator's re-run (106/94/0/12, docs 21/21).
+
+## STANDARDS.md Updates
+none (scoped re-review)
