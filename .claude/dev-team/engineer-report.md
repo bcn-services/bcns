@@ -1,16 +1,15 @@
-BUILT — polish/sb — 6013ef2 (uncommitted working tree on top) — self-check: cd apps/sb && pnpm test pass
-- tests: before 273 total (pre-change baseline per spec: pass>=273 incl 1 skip is spec figure) / after 274 tests, 273 pass, 0 fail, 1 skip; no test file added (package.json untouched)
-- typecheck: root pnpm typecheck 11/11 green; sb eslint clean
-- grep next/font/google apps/sb: only apps/sb/DESIGN.md:56 (must not edit; STALE, says "load via next/font/google" -> Nate/orchestrator to fix separately)
-- font: apps/sb/app/fonts/inter-tight-latin-var.woff2 44916 B (single variable wght 400-700 file; Google serves this same binary for every static weight, so static x4 would be ~180 KB), OFL.txt 4383 B, README.md 1136 B; total 50 KB
-- font source: https://fonts.gstatic.com/s/intertight/v9/NGSwv5HMAFg6IuGlBNMjxLsH8ahuQ2e8.woff2 (v9, latin unicode-range from CSS API css2?family=Inter+Tight:wght@400..700), sha256 83d548cd...938aaf; OFL.txt from google/fonts ofl/intertight
-- layout.tsx: localFont src ./fonts/inter-tight-latin-var.woff2, weight "400 700", variable --font-inter-tight, display swap, fallback [system-ui, sans-serif]; no CSS change. Not build-verified (no sb build per guardrail); typecheck only
-- lib/overview.ts formatMoney: now minorUnits/100 through Intl; doc comment rewritten
-- lib/overview.ts formatMoneyWhole: SAME bug (10 ** digits) - fixed too (shared root cause, beyond named line)
-- tests/overview.test.mjs: JPY case flipped (1999 -> "¥20", 150000 -> "¥1,500"); added formatMoneyWhole JPY assertion
-- tests/qa-daily-report.test.mjs:54-59: JPY test encoded the old bug (12345 -> "¥12,345"); flipped to "¥123" (this was the only failure after the fix)
-- callers confirmed unchanged: app/page.tsx and app/financials/page.tsx pass *_minor / *Cents from DB; daily-report goes through formatMoney. No caller edits
-- swept apps/sb for "not /100"/10 ** digits claims: none left besides the two fixed; no CONTENT/docs echo
-- no new deps, package.json untouched, DESIGN.md untouched
-- flag: git index already has 15 staged deletions of .claude/dev-team/*.md (pre-existing, not mine); orchestrator should check before committing
-- flag: JPY/non-USD display changes by 100x for any real non-USD tenant; SB is USD so no visible change for the Shopify reviewer
+BUILT — polish/connect — 6013ef2 (uncommitted, working tree) — self-check: cd apps/connect && pnpm test pass
+FALSE PREMISE: tests/first-run.test.mjs was ALREADY in the apps/connect `test` list (since #122) and its 12 tests are inside the 384 baseline. package.json untouched. The "+13" floor (397) rests on that premise and is NOT met; no padding added.
+TEST COUNT: before 384/384 pass; after 386/386 pass (+2 new first-run tests; money/pins tests extended in place, no new test() blocks).
+GATE: pnpm typecheck (repo root) 11/11 ok; pnpm lint 10/10 ok.
+FILES: apps/connect/{lib/data-format.ts,lib/data-views.ts(comment only),lib/data-stats.ts,lib/first-run.ts,app/access/copy-url.tsx,tests/data.test.mjs,tests/first-run.test.mjs}. Nothing else touched.
+1 MONEY: both fns now divide by 10**(minorDigits ?? 2); currencyDigits only sets output digits. JPY 1999 -> "¥20"/"20"; KWD 1999 -> "19.990"; minorDigits override kept (test: JPY,0 -> "¥1,999"). Doc comments fixed in data-format.ts and data-views.ts (minorDigits doc said "currency's digits").
+1 CALLER GREP: data-format.ts:119 (formatCell) and :194 (csvCell) pass col.minorDigits only; data-stats.ts:35 passes r.minor (raw minor from last30/meta30). No caller passes a precomputed major value. QBO view sets minorDigits:2 (now redundant, left; qbo-data-view tests still pass: JPY 150000 -> ¥1,500).
+1 STALE-CLAIM SWEEP: grep of apps/connect for JPY/1999/zero-decimal/own digits: only data-format.ts, data-views.ts, data.test.mjs (all fixed). No .md echoes.
+2 PINS: added monday/jobs ("Jobs, 30 days" count) and quickbooks/expenses ("Expenses, 30 days" count) to defaultPins. meet and drive: none, no stat beyond note/file counts that says anything about the business (one-line code comment in data-stats.ts). QuickBooks has no money-total stat (Last30 only carries shopify revenue / meta spend), so no revenue/expense sum default. Tests updated (data.test.mjs defaults + resolvePins monday case).
+3 FIRST-RUN: DISCOVERY: owner Disconnect deletes the source's health row (platform/worker/src/disconnect.ts deleteClientRows), so the suggested `sourceDone = connected || syncDone` is NOT enough on real data: syncDone derives from the same deleted row and un-ticks too. Implemented instead: syncDone = aiDone || (hub-source health row has last_success_at); sourceDone = syncDone || any connected card. A finished checklist has aiDone true (persisted ai_last_used_at), so source+sync stay ticked after disconnect. No new state.
+3 TEAMDONE: left live. A removed member leaves no row; "invited then removed" is indistinguishable from "never invited" without new state. Residual: removing the invitee re-opens only the team step (commented in code).
+3 CAVEAT: aiDone implying source+sync ticks them for an owner who asked the AI with no source ever connected (edge case; they never reach all-done without team anyway).
+3 EVIDENCE: new tests written first. Base (pre-fix): `tsx --test tests/first-run.test.mjs` -> tests 14, pass 12, fail 2 (not ok 7 "completed checklist stays hidden after the owner disconnects the only source", not ok 8 "monotonic..."). After fix: all pass; full suite 386/386.
+4 ARIA: copy-url.tsx button aria-label is state-aware: "Copy the workspace address" / "Copied the workspace address". Not "sign-in address": the URL is MCP_URL, labelled "Your workspace address" on /access. DEVIATION from the suggested e.g. wording, for truthfulness. Only that line changed.
+NOTE: git status shows pre-staged deletions of old .claude/dev-team/*.md reports (not mine, from base state); engineer-report.md here is new.

@@ -44,7 +44,7 @@ export interface FirstRun {
   steps: Step[];
   doneCount: number;
   allDone: boolean;
-  /** Owners only, and only until every step is done. Members never see it: two of the
+  /** Owners only, and only until every step is done (ai + team done also hides it, see firstRun). Members never see it: two of the
    *  four steps (invite, connect AI) are owner actions they cannot take. */
   visible: boolean;
 }
@@ -53,11 +53,15 @@ const hasTime = (v: string | null | undefined): boolean => typeof v === "string"
 
 export function firstRun(input: FirstRunInput): FirstRun {
   const health = input.health ?? [];
-  const sourceDone = composeSources(health).some((c) => c.connected);
-  // Health rows for sources the hub does not show (e.g. 'platform') never count.
-  const syncDone = health.some((r) => (HUB_SOURCES as readonly string[]).includes(r.source) && hasTime(r.last_success_at));
-  const teamDone = (input.members ?? []).some((m) => !m.is_smoke && m.user_id !== input.viewerUserId);
   const aiDone = hasTime(input.aiLastUsedAt);
+  // Health rows for sources the hub does not show (e.g. 'platform') never count. A sync time proves a source
+  // was connected (the token may be revoked since), so it ticks both steps. An AI question proves neither:
+  // ai_last_used_at comes from mcp_tool_calls, which logs failed calls too and survives shop/redact.
+  const syncDone = health.some((r) => (HUB_SOURCES as readonly string[]).includes(r.source) && hasTime(r.last_success_at));
+  const sourceDone = syncDone || composeSources(health).some((c) => c.connected);
+  // teamDone stays live: a removed member leaves no row, so "invited then removed" cannot be told from
+  // "never invited" without new state. Removing the invitee re-opens only this step.
+  const teamDone = (input.members ?? []).some((m) => !m.is_smoke && m.user_id !== input.viewerUserId);
 
   const steps: Step[] = [
     { id: "source", label: "Connect a source", hint: "Pick the tool that holds your business data.", done: sourceDone, href: "#sources", cta: "Choose a source" },
@@ -67,7 +71,10 @@ export function firstRun(input: FirstRunInput): FirstRun {
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const allDone = doneCount === steps.length;
-  return { steps, doneCount, allDone, visible: input.role === "owner" && !allDone };
+  // No stored state: disconnecting the only source deletes its health row and un-ticks "source" and "sync",
+  // but a finished checklist always had ai + team ticked. So it hides only when ai + team are done and no
+  // source is connected (finished, then disconnected). A connected-but-unsynced source keeps it visible.
+  return { steps, doneCount, allDone, visible: input.role === "owner" && !allDone && !(aiDone && teamDone && !sourceDone) };
 }
 
 /**

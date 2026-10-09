@@ -318,18 +318,20 @@ test("dashboardUrl is app_url or null, never a /data fallback", () => {
 
 /* ---------------------------------------------------------------- e: money */
 
-test("money: minor to major with the currency's own decimals; missing input is safe", () => {
+test("money: minor is always /100, the currency sets the displayed decimals; missing input is safe", () => {
   assert.equal(formatMoney(1999, "USD"), "$19.99");
   assert.equal(formatMoney(1999, "EUR"), "€19.99");
-  assert.equal(formatMoney(1999, "JPY"), "¥1,999"); // zero-decimal: no /100
+  assert.equal(formatMoney(1999, "JPY"), "¥20"); // stored x100 for every currency; Intl rounds to JPY's 0 digits
   assert.equal(formatMoney(-500, "USD"), "-$5.00");
   assert.equal(formatMoney("1999", "USD"), "$19.99");
   assert.equal(formatMoney(1999, null), "19.99");
   assert.equal(formatMoney(1999, "ZZZ9"), "19.99 ZZZ9"); // invalid code does not throw
   for (const bad of [null, undefined, NaN, "", "abc", Infinity]) assert.equal(formatMoney(bad, "USD"), "");
   assert.equal(moneyMajorString(1999, "USD"), "19.99");
-  assert.equal(moneyMajorString(1999, "JPY"), "1999");
-  assert.equal(moneyMajorString(1999, "KWD"), "1.999");
+  assert.equal(moneyMajorString(1999, "JPY"), "20");
+  assert.equal(moneyMajorString(1999, "KWD"), "19.990");
+  assert.equal(formatMoney(1999, "KWD").replace(/\s/g, " "), "KWD 19.990"); // Intl puts a no-break space after the code
+  assert.equal(formatMoney(1999, "JPY", 0), "¥1,999"); // explicit minorDigits override still wins;
   assert.equal(moneyMajorString(undefined, "USD"), null);
 });
 
@@ -541,11 +543,14 @@ test("stats catalog: only connected sources, one count per view, ids are source/
   for (const s of all) assert.ok(STAT_IDS.includes(s.id), s.id);
 });
 
-test("stats defaults: orders+revenue for Shopify, spend for Meta, nothing for Monday-only", () => {
+test("stats defaults: orders+revenue for Shopify, spend for Meta, jobs for Monday, nothing for QuickBooks, Meet or Drive", () => {
   assert.deepEqual(defaultPins(["shopify"]), ["shopify/orders", "shopify/revenue"]);
   assert.deepEqual(defaultPins(["meta"]), ["meta/spend"]);
   assert.deepEqual(defaultPins(["shopify", "meta"]), ["shopify/orders", "shopify/revenue", "meta/spend"]);
-  assert.deepEqual(defaultPins(["monday"]), []);
+  assert.deepEqual(defaultPins(["monday"]), ["monday/jobs"]);
+  assert.deepEqual(defaultPins(["quickbooks"]), []); // a bare expense count would read as dollars next to Revenue / Ad spend
+  assert.deepEqual(defaultPins(["meet", "drive"]), []);
+  for (const id of defaultPins(["shopify", "meta", "monday", "quickbooks"])) assert.ok(STAT_IDS.includes(id), id);
 });
 
 test("stats pins: round trip, none is empty, undefined is no choice, junk and repeats are dropped", () => {
@@ -567,7 +572,8 @@ test("stats pins: resolved against today's catalog, unconnected sources drop out
   assert.deepEqual(resolvePins(["shopify/orders", "meta/spend", "monday/jobs"], cat, ["shopify"]), ["shopify/orders"]);
   assert.deepEqual(resolvePins(null, cat, ["shopify"]), ["shopify/orders", "shopify/revenue"]);
   assert.deepEqual(resolvePins([], cat, ["shopify"]), []); // saved empty stays empty
-  assert.deepEqual(resolvePins(null, buildCatalog(["monday"], inputs()), ["monday"]), []);
+  assert.deepEqual(resolvePins(null, buildCatalog(["monday"], inputs()), ["monday"]), ["monday/jobs"]);
+  assert.deepEqual(resolvePins(null, buildCatalog(["meet"], inputs()), ["meet"]), []);
 });
 
 test("stats returnTo: only /data and its query string, everything else is /data", () => {

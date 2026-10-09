@@ -18,7 +18,7 @@ export function CopyUrl({ url }: { url: string }) {
   return (
     <div className="copyurl">
       <pre className="code">{url}</pre>
-      <button type="button" className="btn btn-out btn-sm" onClick={copy}>
+      <button type="button" className="btn btn-out btn-sm" onClick={copy} aria-label={state === "copied" ? "Copied workspace address" : "Copy address of this workspace"}>
         {state === "copied" ? "Copied" : "Copy address"}
       </button>
       <span role="status" className="tiny">
