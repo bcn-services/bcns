@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const interTight = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+// Self-hosted: see fonts/README.md (no build-time Google fetch).
+const interTight = localFont({
+  src: "./fonts/inter-tight-latin-var.woff2",
+  weight: "400 700",
   variable: "--font-inter-tight",
   display: "swap",
   fallback: ["system-ui", "sans-serif"],
