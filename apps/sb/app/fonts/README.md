@@ -25,3 +25,6 @@ woff2 is served), `@font-face` whose `unicode-range` begins `U+0000-00FF`
 
 SIL Open Font License 1.1, Copyright 2022 The Inter Project Authors. Text in
 `OFL.txt` (from `google/fonts` `ofl/intertight/OFL.txt`).
+
+Latin subset only: characters outside it (latin-ext letters such as ł ő ș, ₹)
+render in the `system-ui` fallback. Vendor the latin-ext file if a tenant needs them.
