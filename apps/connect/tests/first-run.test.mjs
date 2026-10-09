@@ -89,6 +89,17 @@ test("a completed checklist stays hidden after the owner disconnects the only so
   assert.equal(after.visible, false); // ai + team done: it was finished once
 });
 
+test("a connected source whose first sync has not run keeps the checklist visible", () => {
+  // connecting writes a never_ran health row at once; ai + team done must not hide it (shop/redact keeps both)
+  const r = firstRun(input({
+    health: [row("shopify", "never_ran")],
+    members: [{ user_id: ME }, { user_id: "u2", is_smoke: false }],
+    aiLastUsedAt: T,
+  }));
+  assert.deepEqual(done(r), { source: true, sync: false, team: true, ai: true });
+  assert.equal(r.visible, true);
+});
+
 test("a sync time proves a source was connected; an AI question proves neither", () => {
   // token revoked since: the card is not connected, but the data arrived once
   assert.equal(done(firstRun(input({ health: [row("shopify", "auth_failed", T)] }))).source, true);

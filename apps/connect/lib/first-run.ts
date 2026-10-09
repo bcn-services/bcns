@@ -72,8 +72,9 @@ export function firstRun(input: FirstRunInput): FirstRun {
   const doneCount = steps.filter((s) => s.done).length;
   const allDone = doneCount === steps.length;
   // No stored state: disconnecting the only source deletes its health row and un-ticks "source" and "sync",
-  // but a finished checklist always had ai + team ticked, so ai + team done keeps it hidden.
-  return { steps, doneCount, allDone, visible: input.role === "owner" && !allDone && !(aiDone && teamDone) };
+  // but a finished checklist always had ai + team ticked. So it hides only when ai + team are done and no
+  // source is connected (finished, then disconnected). A connected-but-unsynced source keeps it visible.
+  return { steps, doneCount, allDone, visible: input.role === "owner" && !allDone && !(aiDone && teamDone && !sourceDone) };
 }
 
 /**
