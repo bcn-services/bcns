@@ -319,8 +319,14 @@ export async function sendClientEmail(t: Tick, to: string[], subject: string, te
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}`, 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(to.map(addr => ({ from, to: [addr], subject, text, ...(replyTo ? { reply_to: replyTo } : {}) }))),
   })
-  if (r.status === 409) return 'already_sent' // Idempotency-Key already used: a prior attempt's email went out
-  if (!r.ok) throw new Error(`resend HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  if (!r.ok) {
+    const body = await r.text()
+    // 409 invalid_idempotent_request: key reused with a different payload, so the original email went out. 409 concurrent_idempotent_requests (original still in flight, may yet fail) and any other status throw, so the row is retried next tick.
+    let name = body
+    try { name = String(JSON.parse(body).name ?? body) } catch { /* not JSON: substring check on the text */ }
+    if (r.status === 409 && name.includes('invalid_idempotent_request')) return 'already_sent'
+    throw new Error(`resend HTTP ${r.status}: ${body.slice(0, 200)}`)
+  }
   return 'sent'
 }
 
