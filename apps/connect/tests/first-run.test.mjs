@@ -76,6 +76,29 @@ test("all four done hides the checklist; three of four keeps it", () => {
   assert.equal(almost.visible, true);
 });
 
+test("a completed checklist stays hidden after the owner disconnects the only source", () => {
+  const finished = input({
+    health: [row("shopify", "ok", T)],
+    members: [{ user_id: ME }, { user_id: "u2" }],
+    aiLastUsedAt: T,
+  });
+  assert.equal(firstRun(finished).visible, false);
+  // Disconnect deletes the source's health row (platform/worker disconnect.ts): no cards, no sync time.
+  const after = firstRun({ ...finished, health: [] });
+  assert.equal(after.allDone, true);
+  assert.equal(after.visible, false);
+});
+
+test("monotonic: a sync time proves a source was connected; an AI question proves both", () => {
+  // token revoked since: the card is not connected, but the data arrived once
+  assert.equal(done(firstRun(input({ health: [row("shopify", "auth_failed", T)] }))).source, true);
+  const asked = done(firstRun(input({ aiLastUsedAt: T })));
+  assert.equal(asked.source, true);
+  assert.equal(asked.sync, true);
+  // nothing asked, nothing connected: still not ticked
+  assert.equal(done(firstRun(input())).source, false);
+});
+
 test("members never see the checklist, even with nothing done", () => {
   assert.equal(firstRun(input({ role: "member" })).visible, false);
   assert.equal(firstRun(input({ role: null })).visible, false);

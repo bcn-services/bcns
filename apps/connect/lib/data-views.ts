@@ -25,8 +25,8 @@ export interface Column {
   /** For `money`: the column holding this row's ISO currency code. */
   currencyKey?: string;
   /**
-   * For `money`: decimal places of the stored integer, when it is not the currency's own
-   * (QuickBooks stores value x 100 for every currency, JPY included). Default: the currency's digits.
+   * For `money`: decimal places of the stored integer. Default 2: every connector stores
+   * value x 100 for every currency, JPY included; the currency only sets the displayed digits.
    */
   minorDigits?: number;
 }

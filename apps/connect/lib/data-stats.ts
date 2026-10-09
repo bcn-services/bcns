@@ -51,7 +51,9 @@ export function buildCatalog(connectedSources: readonly string[], inputs: StatIn
 }
 
 export function defaultPins(connectedSources: readonly string[]): string[] {
-  return ["shopify/orders", "shopify/revenue", "meta/spend"].filter((id) => connectedSources.includes(id.split("/")[0]!));
+  // meet, drive: no stat worth a default (note and file counts say nothing about the business).
+  // monday/jobs and quickbooks/expenses are 30-day row counts; QuickBooks has no money total stat.
+  return ["shopify/orders", "shopify/revenue", "meta/spend", "monday/jobs", "quickbooks/expenses"].filter((id) => connectedSources.includes(id.split("/")[0]!));
 }
 
 /** Known ids only, strings only, no repeats, at most MAX_PINS. */
