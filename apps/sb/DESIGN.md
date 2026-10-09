@@ -53,7 +53,7 @@ digest.
 | up / down | `#16a34a` / `#dc2626` |
 | status badges | In Progress `#a16207` on `#fef3c7`; Done `#15803d` on `#dcfce7`; To Do `#3f3f46` on `#f1f1f3` |
 | brand tiles | Shopify `#5a9e45` on `#e8f6ea`; Meta `#1877f2` on `#e8f0fd`; Meet `#4285f4`/`#34a853` on `#eaf2fd`; Monday dots `#f2545b #ffcb00 #00c875` on `#fff3ea` |
-| font | `Inter Tight` 400/500/600/700 (load via `next/font/google`, fallback `system-ui, sans-serif`), antialiased |
+| font | `Inter Tight` 400/500/600/700 (self-hosted via `next/font/local`, see `app/fonts/README.md`; fallback `system-ui, sans-serif`), antialiased |
 | radii | panel/card 11px; controls/buttons 9px; icon tile, badges, inner 8px; small 6–7px |
 | shadows | none (borders only) |
 | page padding | `22px 26px 34px`; header margin-bottom 18px; grid gaps 14px (metric row) / 16px (panels) |
