@@ -117,6 +117,8 @@ export function parseNotes(name: string, text: string): ParsedNotes {
 
 export const meet: Connector = {
   source: 'meet',
+  // No fullList on purpose: Meet walks a Drive folder of Gemini notes docs with an incremental modifiedTime > cursor filter,
+  // so zero rows on a tick is healthy and the §5.5 zero-row rule (fullListSources in connectors/index.ts) must not fire for it.
   defaults: {
     interval: '1 hour',
     backfillDepth: 'unbounded',

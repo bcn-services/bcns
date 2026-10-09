@@ -92,14 +92,14 @@ describe('sendClientEmail', () => {
   const ENV = ['RESEND_API_KEY', 'BCNS_ALERT_FROM', 'BCNS_ALERT_EMAIL', 'BCNS_CLIENT_REPLY_TO']
   const saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]))
   afterEach(() => { for (const k of ENV) saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]) })
-  const send = async (to: string[]) => {
+  const send = async (to: string[], status = 200) => {
     const calls: { url: string; headers: Record<string, string>; body: string }[] = []
     const fetch = (async (url: any, init?: any) => {
       calls.push({ url: String(url), headers: init?.headers ?? {}, body: String(init?.body ?? '') })
-      return new Response('{}', { status: 200 })
+      return new Response('{}', { status })
     }) as typeof globalThis.fetch
-    await sendClientEmail({ fetch } as Tick, to, 'Subj', 'Body', 'k1')
-    return { call: calls[0], msgs: JSON.parse(calls[0].body) as Record<string, unknown>[] }
+    const result = await sendClientEmail({ fetch } as Tick, to, 'Subj', 'Body', 'k1')
+    return { result, call: calls[0], msgs: JSON.parse(calls[0].body) as Record<string, unknown>[] }
   }
 
   it('one batch message per owner, reply_to from BCNS_CLIENT_REPLY_TO only, Idempotency-Key set', async () => {
@@ -120,5 +120,17 @@ describe('sendClientEmail', () => {
     process.env.BCNS_ALERT_EMAIL = 'alerts@example.test'
     delete process.env.BCNS_CLIENT_REPLY_TO
     expect('reply_to' in (await send(['a@example.com'])).msgs[0]).toBe(false)
+  })
+
+  it('409 (Idempotency-Key already used) resolves as already_sent, no throw', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    expect((await send(['a@example.com'], 409)).result).toBe('already_sent')
+  })
+
+  it('500 still rejects with the status in the message', async () => {
+    process.env.RESEND_API_KEY = 'rk'
+    process.env.BCNS_ALERT_FROM = 'bot@example.test'
+    await expect(send(['a@example.com'], 500)).rejects.toThrow(/500/)
   })
 })
