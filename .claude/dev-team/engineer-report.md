@@ -1,29 +1,16 @@
-# Engineer Report
-**Task:** Item C, stale docs + legal copy (items 7, 10)
-**Branch:** polish/docs
-**Date:** 2026-10-08
-
-## Design Decisions
-- platform-v1.md: two "Actions minutes exhausted until 2026-10-01" lines deleted outright; sign-up line corrected to one true clause (flag-gated, `apps/connect/app/login/page.tsx:105-109`, `apps/connect/lib/env.ts:69-74,119`, `platform/supabase/functions/signup`).
-- platform/DESIGN.md dropped: `pending` exists only as clients status (`20261001000100`, `20261007000100`) and `data.privacy_requests` (`20260924000300:22`, `platform/worker/src/privacy.ts`); no connector_health / notifications `pending`. Not touched.
-- Privacy sentence placed in "Requesting deletion" (applies to 4 sources, not only QuickBooks); `legal.privacy.effectiveDate` bumped to October 8, 2026 (copy changed).
-
-## Files Changed
-- `docs/architecture/platform-v1.md` - 2 deletions (:70, :316), :214 sign-up claim corrected.
-- `apps/web/lib/content.ts` - maintainer comment (~:996) now says the sentence is shipped; one sentence added to legal.privacy "Requesting deletion"; privacy effectiveDate bump.
-- `apps/web/CONTENT.md` - :1090 and :1092 no longer say "when the hub disconnect ships"; no field added, so the field count is untouched (CONTENT.md does not mirror body text).
-
-## Disconnect behaviour sources (read)
-- `apps/connect/lib/sources.ts:225` DISCONNECTABLE = quickbooks, meet, drive, monday, meta (never Shopify).
-- `apps/connect/app/api/sources/[source]/disconnect/route.ts:1-8,27-33` owner-only; rpc `disconnect_source` marks token revoked; worker revokes upstream then deletes.
-- `platform/worker/src/disconnect.ts:36-90` revoke: Intuit, Google, Meta; monday returns 'none'. `:93-104,142` Google skipped while the sibling Google source (meet/drive) is live. `:156-157` deletes raw data, token, schedule, health, media.
-
-## Sentence added
-"You can also disconnect QuickBooks Online, Meta Ads, monday.com, Google Drive or meeting notes yourself in the hub; we then delete the token and data we stored for that source and revoke our access with Intuit, Meta or Google (Google once Drive and meeting notes are both disconnected; monday.com has nothing to revoke)."
-
-## Deferred / Out of Scope
-- DESIGN.md pending item (dropped, see above).
-
-## Flags for Reviewer
-- Sentence says "delete" without a time; worker deletes on its next housekeeping tick, and a stuck upstream revoke retries (`disconnect.ts:162`). Backups still roll off per the existing 7-day line.
-- Sentence is long; shorten by dropping the Google parenthetical if the nuance is not wanted.
+BUILT — polish/sb — 6013ef2 (uncommitted working tree on top) — self-check: cd apps/sb && pnpm test pass
+- tests: before 273 total (pre-change baseline per spec: pass>=273 incl 1 skip is spec figure) / after 274 tests, 273 pass, 0 fail, 1 skip; no test file added (package.json untouched)
+- typecheck: root pnpm typecheck 11/11 green; sb eslint clean
+- grep next/font/google apps/sb: only apps/sb/DESIGN.md:56 (must not edit; STALE, says "load via next/font/google" -> Nate/orchestrator to fix separately)
+- font: apps/sb/app/fonts/inter-tight-latin-var.woff2 44916 B (single variable wght 400-700 file; Google serves this same binary for every static weight, so static x4 would be ~180 KB), OFL.txt 4383 B, README.md 1136 B; total 50 KB
+- font source: https://fonts.gstatic.com/s/intertight/v9/NGSwv5HMAFg6IuGlBNMjxLsH8ahuQ2e8.woff2 (v9, latin unicode-range from CSS API css2?family=Inter+Tight:wght@400..700), sha256 83d548cd...938aaf; OFL.txt from google/fonts ofl/intertight
+- layout.tsx: localFont src ./fonts/inter-tight-latin-var.woff2, weight "400 700", variable --font-inter-tight, display swap, fallback [system-ui, sans-serif]; no CSS change. Not build-verified (no sb build per guardrail); typecheck only
+- lib/overview.ts formatMoney: now minorUnits/100 through Intl; doc comment rewritten
+- lib/overview.ts formatMoneyWhole: SAME bug (10 ** digits) - fixed too (shared root cause, beyond named line)
+- tests/overview.test.mjs: JPY case flipped (1999 -> "¥20", 150000 -> "¥1,500"); added formatMoneyWhole JPY assertion
+- tests/qa-daily-report.test.mjs:54-59: JPY test encoded the old bug (12345 -> "¥12,345"); flipped to "¥123" (this was the only failure after the fix)
+- callers confirmed unchanged: app/page.tsx and app/financials/page.tsx pass *_minor / *Cents from DB; daily-report goes through formatMoney. No caller edits
+- swept apps/sb for "not /100"/10 ** digits claims: none left besides the two fixed; no CONTENT/docs echo
+- no new deps, package.json untouched, DESIGN.md untouched
+- flag: git index already has 15 staged deletions of .claude/dev-team/*.md (pre-existing, not mine); orchestrator should check before committing
+- flag: JPY/non-USD display changes by 100x for any real non-USD tenant; SB is USD so no visible change for the Shopify reviewer

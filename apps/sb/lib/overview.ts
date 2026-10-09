@@ -217,14 +217,13 @@ export function computeOverviewMetrics(currentRows: DailySummaryLike[], previous
   };
 }
 
-/** Money, minor units -> localized string. Fraction digits come from Intl for
- *  the given currency (e.g. JPY -> 0), not hardcoded /100. */
+/** Money, minor units -> localized string. Every connector stores
+ *  `Math.round(amount * 100)` whatever the currency, so this always divides by
+ *  100; Intl only picks the display digits (JPY 1999 -> "¥20"). */
 export function formatMoney(minorUnits: number | null, currency = "USD"): string {
   if (minorUnits === null) return "—";
   try {
-    const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency });
-    const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
-    return fmt.format(minorUnits / 10 ** digits);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(minorUnits / 100);
   } catch {
     return "—"; // malformed currency code from a row must not crash the page
   }
@@ -455,8 +454,7 @@ export function rangeQuery(range: { from: string; to: string }): string {
 export function formatMoneyWhole(minorUnits: number | null, currency = "USD"): string {
   if (minorUnits === null) return "—";
   try {
-    const digits = new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
-    return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(minorUnits / 10 ** digits);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(minorUnits / 100);
   } catch {
     return "—";
   }
