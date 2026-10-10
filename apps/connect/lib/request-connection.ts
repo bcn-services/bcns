@@ -62,8 +62,9 @@ function describe(request: ConnectionRequest): string {
 
 export function mailtoLink(request: ConnectionRequest): string {
   const email = buildEmail(request);
-  const query = new URLSearchParams({ subject: email.subject, body: email.text });
-  return `mailto:${BCNS_EMAIL}?${query.toString()}`;
+  // encodeURIComponent, not URLSearchParams: that writes a space as "+", which a mail app shows literally in a mailto:.
+  const query = `subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.text)}`;
+  return `mailto:${BCNS_EMAIL}?${query}`;
 }
 
 export interface RequestDeps {

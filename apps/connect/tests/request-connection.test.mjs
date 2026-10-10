@@ -78,6 +78,16 @@ test("a network failure is not an error the member sees", async () => {
   assert.ok(outcome.mailto.length > 0);
 });
 
+test("the mailto encodes spaces as %20, never +", () => {
+  const email = buildEmail(REQUEST);
+  const link = mailtoLink(REQUEST);
+  assert.ok(!link.includes("+"), "a + shows literally in the mail app");
+  assert.ok(link.includes("%20"));
+  const [subject, body] = link.split("?")[1].split("&").map((p) => decodeURIComponent(p.split("=")[1]));
+  assert.equal(subject, email.subject);
+  assert.equal(body, email.text);
+});
+
 test("an anonymous requester is allowed and carries no reply_to", () => {
   const email = buildEmail({ ...REQUEST, requesterEmail: null });
   assert.equal(email.reply_to, undefined);
