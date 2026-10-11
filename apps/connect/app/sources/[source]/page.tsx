@@ -61,7 +61,7 @@ export default async function SourceSettingsPage({
           <Link href="/#sources">Sources</Link> / {page.title}
         </p>
         <h1 id="source-h" className="page-title">
-          {page.title}, <b>{page.status.label.toLowerCase()}</b>
+          {page.title}, <b className={`t-${page.status.tone}`}>{page.status.label.toLowerCase()}</b>
         </h1>
         <p className="lead">What this source is connected to, and how its recent syncs went.</p>
       </section>

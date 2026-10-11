@@ -30,7 +30,7 @@ export default async function AccessPage({
           <b>Access</b> | {client?.name ?? "Your workspace"}
         </p>
         <h1 id="access-h" className="page-title">
-          Your <b>access</b>
+          <b>Access</b>
         </h1>
         <p className="lead">Let an AI assistant look at your business data, and choose what it can see.</p>
       </section>
@@ -60,7 +60,7 @@ export default async function AccessPage({
           </div>
           <div className="conn">
             <p className="h">In Claude</p>
-            <ol className="steps">
+            <ol className="steps" role="list">
               <li>Open claude.ai and go to Settings, then Connectors.</li>
               <li>Choose Add custom connector.</li>
               <li>Name it bcns and paste the address above.</li>
@@ -72,7 +72,7 @@ export default async function AccessPage({
             <p className="h">
               In ChatGPT <span className="tag">Not yet hand-verified</span>
             </p>
-            <ol className="steps">
+            <ol className="steps" role="list">
               <li>Open ChatGPT and go to Settings, then Connectors. You may need to turn on developer mode first.</li>
               <li>Choose to create a new connector and paste the address above.</li>
               <li>Sign in with your bcns Connect email and password when asked.</li>
@@ -106,7 +106,7 @@ export default async function AccessPage({
               {groups.map((g) => (
                 <div key={g.source} className="conn" data-source={g.source}>
                   <p className="h">{g.title}</p>
-                  <ul className="qs">
+                  <ul className="qs" role="list">
                     {g.questions.map((q) => (
                       <li key={q}>{q}</li>
                     ))}
