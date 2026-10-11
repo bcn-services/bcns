@@ -17,8 +17,10 @@ import {
   googleSiblingConnected,
   shopifyControl,
   egressLine,
+  formatBytes,
   type EgressRow,
   type HealthRow,
+  type HubSource,
   type ShopifyControl,
   type Tone,
 } from "@/lib/sources";
@@ -31,6 +33,17 @@ const TONE: Record<Tone, string> = {
   warn: "st-warn",
   error: "st-error",
   idle: "st-idle",
+};
+
+/** Tile anatomy (decoration only): monogram badge and the kind of data each source holds. */
+const MONO: Record<HubSource, string> = { shopify: "Sh", meta: "Me", monday: "Mo", meet: "Mt", drive: "Dr", quickbooks: "QB" };
+const KIND: Record<HubSource, string> = {
+  shopify: "Commerce",
+  meta: "Advertising",
+  monday: "Projects",
+  meet: "Meetings",
+  drive: "Files",
+  quickbooks: "Accounting",
 };
 
 function when(iso: string | null, timeZone?: string | null): string {
@@ -63,7 +76,15 @@ export default async function SourcesPage({
     (health.data as HealthRow[] | null) ?? [],
     disconnecting.error ? null : (disconnecting.data as string[] | null),
   );
-  const usage = egressLine(egress.data as EgressRow | null);
+  const egressRow = egress.data as EgressRow | null;
+  const usage = egressLine(egressRow);
+  const quota = egressRow?.quota_bytes ?? 0;
+  const usedPct = quota > 0 ? Math.min(100, Math.round(((egressRow?.bytes_used ?? 0) / quota) * 100)) : 0;
+  const ringStyle: React.CSSProperties & Record<"--p", string> = { "--p": `${usedPct}%` };
+  const healthRows = (health.data as HealthRow[] | null) ?? [];
+  const connectedCount = cards.filter((c) => c.connected).length;
+  // Newest last success across sources; ISO strings sort chronologically.
+  const lastSync = cards.reduce<string | null>((max, c) => (c.lastSuccessAt && (!max || c.lastSuccessAt > max) ? c.lastSuccessAt : max), null);
   const checklist = firstRun({
     health: (health.data as HealthRow[] | null) ?? [],
     members: (members.data as MemberRow[] | null) ?? [],
@@ -84,20 +105,55 @@ export default async function SourcesPage({
 
   return (
     <>
-      <div>
-        <h1 className="page-title">
-          <b>Sources</b>
-        </h1>
-        <p className="lead">What bcns is pulling into your workspace, and how it is doing.</p>
-      </div>
-
-      <div className="ws">
-        <div>
-          <p className="n">{client?.name ?? "Your workspace"}</p>
-          <p className="u">{usage ?? "Usage is not available yet."}</p>
+      <section className="hero" aria-labelledby="hero-h">
+        <div className="hero-main">
+          <p className="eyebrow">
+            <b>Sources</b> | {client?.name ?? "Your workspace"}
+          </p>
+          <h1 id="hero-h" className="page-title">
+            Your sources, <b>{connectedCount} of {cards.length} connected</b>
+          </h1>
+          <p className="lead">What bcns is pulling into your workspace, and how it is doing.</p>
+          <dl className="hs">
+            <div>
+              <dt>Connected</dt>
+              <dd>
+                {connectedCount} <span>/ {cards.length}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Last sync</dt>
+              <dd className="hs-t">{when(lastSync, client?.timezone)}</dd>
+            </div>
+            <div>
+              <dt>By source</dt>
+              <dd className="ticks">
+                {cards.map((c) => (
+                  <i key={c.source} data-source={c.source} className={c.connected ? "on" : undefined} title={`${c.title}: ${c.connected ? "connected" : "not connected"}`} />
+                ))}
+                <span className="sr-only">{cards.filter((c) => c.connected).map((c) => c.title).join(", ") || "None connected"}</span>
+              </dd>
+            </div>
+          </dl>
+          <div className="hero-act">
+            <DashboardButton client={client} />
+            <a href="/data" className="btn btn-out btn-sm">
+              Browse your data
+            </a>
+          </div>
         </div>
-        <DashboardButton client={client} />
-      </div>
+        {egressRow ? (
+          <div className={cn("ring", egressRow.exceeded && "ring-x")} style={ringStyle} role="img" aria-label={usage ?? undefined}>
+            <div className="ring-in" aria-hidden="true">
+              <p className="v">{formatBytes(egressRow.bytes_used)}</p>
+              <p className="o">of {formatBytes(egressRow.quota_bytes)}</p>
+              <p className="l">{egressRow.exceeded ? "Quota exceeded" : "This month"}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="ring-none">Usage is not available yet.</p>
+        )}
+      </section>
 
       {searchParams.requested ? (
         <p role="status" className="note">
@@ -182,18 +238,35 @@ export default async function SourcesPage({
       ) : null}
 
       <div className="grid-src" id="sources">
-        {cards.map((card) => (
+        {cards.map((card) => {
+          const lastSuccess = card.disconnectingNote ?? (card.pending ? "First sync pending" : when(card.lastSuccessAt, client?.timezone));
+          const lastRun = healthRows.find((r) => r.source === card.source)?.last_run_at ?? null;
+          return (
           <article key={card.source} data-source={card.source} className="sc">
             <div className="sc-h">
-              <h2 className="sc-t">
-                <span className="dot" aria-hidden="true" />
-                {card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}
-              </h2>
+              <span className="sc-b" aria-hidden="true">
+                {MONO[card.source]}
+              </span>
+              <div className="sc-id">
+                <h2 className="sc-t">{card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}</h2>
+                <p className="sc-k">{KIND[card.source]}</p>
+              </div>
               <span className={cn("st", TONE[card.tone])}>{card.label}</span>
             </div>
-            <p className="meta">
-              {card.disconnectingNote ?? (card.pending ? "First sync pending" : `Last success: ${when(card.lastSuccessAt, client?.timezone)}`)}
-            </p>
+            {card.disconnecting ? (
+              <p className="meta">{lastSuccess}</p>
+            ) : (
+              <dl className="sc-m">
+                <div>
+                  <dt>Last success</dt>
+                  <dd>{lastSuccess}</dd>
+                </div>
+                <div>
+                  <dt>Last attempt</dt>
+                  <dd>{when(lastRun, client?.timezone)}</dd>
+                </div>
+              </dl>
+            )}
             {card.lastError ? (
               <p className="err" title={card.lastError}>
                 {card.lastError}
@@ -223,7 +296,7 @@ export default async function SourcesPage({
                     />
                   ) : (
                     <form action={connectPath(config, card.source)!} method="POST">
-                      <button type="submit" className="btn btn-out btn-sm">
+                      <button type="submit" className="btn btn-sm">
                         Connect
                       </button>
                     </form>
@@ -243,7 +316,8 @@ export default async function SourcesPage({
               </div>
             )}
           </article>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -256,7 +330,7 @@ function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: stri
     return (
       <form action={action} method="GET">
         <input type="hidden" name="shop" value={ctl.shop} />
-        <button type="submit" className="btn btn-out btn-sm">
+        <button type="submit" className="btn btn-sm">
           {ctl.label}
         </button>
       </form>

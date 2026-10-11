@@ -25,6 +25,14 @@ const spaceGrotesk = localFont({
   weight: "300 700",
 });
 
+// Eyebrows, labels, nav index and status words. The file covers the whole 100..800 axis.
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin-var.woff2",
+  variable: "--font-mono",
+  display: "swap",
+  weight: "100 800",
+});
+
 export const metadata: Metadata = {
   title: "bcns Connect",
   description: "Your sources, your team, and your data access — in one place.",
@@ -37,7 +45,7 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Signed in: wordmark, nav, workspace name and sign-out. */
+/** Signed in: wordmark, nav, workspace chip (monogram + name) and sign-out. */
 function Header({ membership, client }: { membership: NonNullable<Awaited<ReturnType<typeof currentMembership>>>; client: ClientRow | null }) {
   return (
     <header className="hh">
@@ -50,7 +58,12 @@ function Header({ membership, client }: { membership: NonNullable<Awaited<Return
         </Link>
         <HubNav client={client} role={membership.role} />
         <div className="who">
-          <span>{client?.name ?? "Your workspace"}</span>
+          <span className="wsc">
+            <span className="wsc-m" aria-hidden="true">
+              {(client?.name ?? "Your workspace").trim().charAt(0).toUpperCase()}
+            </span>
+            <span className="wsc-n">{client?.name ?? "Your workspace"}</span>
+          </span>
           <form action={signOut}>
             <button type="submit" className="btn btn-out btn-sm">
               Sign out
@@ -69,7 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const billing = membership ? await loadBilling() : null;
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
+      <body className={`${manrope.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
         {membership ? (
           <>
             <Header membership={membership} client={client} />
