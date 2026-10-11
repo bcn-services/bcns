@@ -1,4 +1,4 @@
-import { requireHub } from "@/lib/session";
+import { loadClient, requireHub } from "@/lib/session";
 import { inviteMember, removeMember } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -38,19 +38,23 @@ export default async function TeamPage({
     .select("user_id,role,is_smoke,created_at")
     .order("created_at", { ascending: true });
   const members = ((data as MemberRow[] | null) ?? []).filter((m) => !m.is_smoke || isOwner);
+  const client = await loadClient();
 
   return (
     <>
-      <div>
-        <h1 className="page-title">
-          <b>Team</b>
+      <section className="phead" aria-labelledby="team-h">
+        <p className="eyebrow">
+          <b>Team</b> | {client?.name ?? "Your workspace"}
+        </p>
+        <h1 id="team-h" className="page-title">
+          Your <b>team</b>
         </h1>
         <p className="lead">
           {isOwner
             ? "Everyone who can sign in to this workspace. Owners can invite and remove."
             : "Everyone who can sign in to this workspace. Ask an owner to make changes."}
         </p>
-      </div>
+      </section>
 
       {searchParams.ok && MESSAGES[searchParams.ok] ? (
         <p role="status" className="note">
