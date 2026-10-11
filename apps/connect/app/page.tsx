@@ -131,15 +131,12 @@ export default async function SourcesPage({
                 {cards.map((c) => (
                   <i key={c.source} data-source={c.source} className={c.connected ? "on" : undefined} title={`${c.title}: ${c.connected ? "connected" : "not connected"}`} />
                 ))}
-                <span className="sr-only">{cards.filter((c) => c.connected).map((c) => c.title).join(", ") || "None connected"}</span>
+                <span className="sr-only">{`${cards.filter((c) => c.connected).map((c) => c.title).join(", ") || "None"} connected`}</span>
               </dd>
             </div>
           </dl>
           <div className="hero-act">
             <DashboardButton client={client} />
-            <a href="/data" className="btn btn-out btn-sm">
-              Browse your data
-            </a>
           </div>
         </div>
         {egressRow ? (
