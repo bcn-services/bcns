@@ -38,7 +38,8 @@ function EmptyState({ title, message }: { title: string; message?: string }) {
 
 export default async function DataPage({ searchParams }: { searchParams: SearchParams }) {
   const { api: schema } = await requireHub();
-  const timezone = (await loadClient())?.timezone ?? undefined;
+  const client = await loadClient();
+  const timezone = client?.timezone ?? undefined;
   const api = toDataApi(schema);
 
   const now = new Date();
@@ -56,12 +57,15 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const connectedSources = connected.map((c) => c.source);
 
   const heading = (
-    <div>
-      <h1 className="page-title">
+    <section className="phead" aria-labelledby="data-h">
+      <p className="eyebrow">
+        <b>Your data</b> | {client?.name ?? "Your workspace"}
+      </p>
+      <h1 id="data-h" className="page-title">
         Your <b>data</b>
       </h1>
       <p className="lead">Search, filter and export what bcns has pulled into your workspace.</p>
-    </div>
+    </section>
   );
 
   if (!plan.card) {
@@ -127,6 +131,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
           <Link
             key={c.source}
             href={`/data?source=${c.source}`}
+            data-source={c.source}
             aria-current={c.source === card.source ? "page" : undefined}
           >
             {c.title}

@@ -55,16 +55,16 @@ export default async function SourceSettingsPage({
   const disc = { source, status: page.connected ? "ok" : "none" } as const;
 
   return (
-    <>
-      <div>
-        <p className="crumb">
-          <Link href="/#sources">Sources</Link>
+    <div className="pg" data-source={source}>
+      <section className="phead" aria-labelledby="source-h">
+        <p className="eyebrow crumb">
+          <Link href="/#sources">Sources</Link> / {page.title}
         </p>
-        <h1 className="page-title">
-          <b>{page.title}</b>
+        <h1 id="source-h" className="page-title">
+          {page.title}, <b>{page.status.label.toLowerCase()}</b>
         </h1>
         <p className="lead">What this source is connected to, and how its recent syncs went.</p>
-      </div>
+      </section>
 
       {ok ? (
         <p role="status" className="note">
@@ -193,7 +193,7 @@ export default async function SourceSettingsPage({
 
       {/* Same gate and control as the Sources card; "connected" here is an enabled schedule. */}
       {canDisconnect(disc, membership.role) ? (
-        <section className="panel" aria-labelledby="disconnect-h">
+        <section className="panel panel-disc" aria-labelledby="disconnect-h">
           <h2 id="disconnect-h">Disconnect</h2>
           <p className="sub">Stop syncing this source and delete what bcns stored from it.</p>
           <DisconnectControl
@@ -245,6 +245,6 @@ export default async function SourceSettingsPage({
           )}
         </section>
       )}
-    </>
+    </div>
   );
 }
