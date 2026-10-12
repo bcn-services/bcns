@@ -17,7 +17,7 @@ const manrope = localFont({
   weight: "300 600",
 });
 
-// The file covers 300..700; the hub's light page titles use 300, so the range starts there.
+// Titles and headings. The file covers 300..700.
 const spaceGrotesk = localFont({
   src: "./fonts/space-grotesk-latin-var.woff2",
   variable: "--font-display",
@@ -25,7 +25,7 @@ const spaceGrotesk = localFont({
   weight: "300 700",
 });
 
-// Eyebrows, labels, nav index and status words. The file covers the whole 100..800 axis.
+// Technical values only: URLs, commands, byte counts, ids. The file covers the whole 100..800 axis.
 const jetbrainsMono = localFont({
   src: "./fonts/jetbrains-mono-latin-var.woff2",
   variable: "--font-mono",
@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Signed in: wordmark, nav, workspace chip (monogram + name) and sign-out. */
+/** Signed in: the slim top bar. Wordmark, nav, workspace name and sign-out. */
 function Header({ membership, client }: { membership: NonNullable<Awaited<ReturnType<typeof currentMembership>>>; client: ClientRow | null }) {
   return (
     <header className="hh">
@@ -90,9 +90,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <BillingBanner billing={billing} />
               {children}
             </main>
-            <footer className="hfoot">
-              bcns Connect &middot; <a href="https://bcn-services.com">Back to bcn-services.com</a>
-            </footer>
           </>
         ) : (
           <main>{children}</main>

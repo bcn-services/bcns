@@ -8,8 +8,7 @@
  * /data is reached only from "Your data" here. The dashboard link and button
  * exist only when the client has an `app_url`, and open in the same tab.
  *
- * The 01.. index before each item is a CSS counter (globals.css `.hh nav`), so
- * the link text stays exactly the label; NavLink marks the current section.
+ * The link text is exactly the label; NavLink marks the current section.
  *
  * The jsxRuntime pragma above is for tests/nav.test.mjs: tsx reads the
  * tsconfig's `jsx: preserve` as classic React.createElement. Next already

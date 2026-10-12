@@ -1,5 +1,5 @@
 import { AI_SETTINGS_FAILED, readShareContact } from "@/lib/ai-settings";
-import { loadClient, requireOwner } from "@/lib/session";
+import { requireOwner } from "@/lib/session";
 import { starterQuestions } from "@/lib/first-run";
 import type { HealthRow } from "@/lib/sources";
 import { CopyUrl } from "./copy-url";
@@ -20,19 +20,14 @@ export default async function AccessPage({
     readShareContact(api),
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
   ]);
-  const client = await loadClient();
   const groups = starterQuestions((health.data as HealthRow[] | null) ?? []);
 
   return (
     <>
       <section className="phead" aria-labelledby="access-h">
-        <p className="eyebrow">
-          <b>Access</b> | {client?.name ?? "Your workspace"}
-        </p>
         <h1 id="access-h" className="page-title">
-          <b>Access</b>
+          Access
         </h1>
-        <p className="lead">Let an AI assistant look at your business data, and choose what it can see.</p>
       </section>
 
       {searchParams.ok === "saved" ? (

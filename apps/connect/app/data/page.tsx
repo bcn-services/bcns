@@ -58,13 +58,9 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
 
   const heading = (
     <section className="phead" aria-labelledby="data-h">
-      <p className="eyebrow">
-        <b>Your data</b> | {client?.name ?? "Your workspace"}
-      </p>
       <h1 id="data-h" className="page-title">
-        Your <b>data</b>
+        Your data
       </h1>
-      <p className="lead">Search, filter and export what bcns has pulled into your workspace.</p>
     </section>
   );
 
