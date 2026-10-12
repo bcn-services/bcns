@@ -400,11 +400,6 @@ pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; 
 .copyurl pre.code { flex: 1 1 240px; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .copyurl .tiny { flex-basis: 100%; font-size: 13px; color: hsl(var(--destructive)); }
 .copyurl .tiny:empty { display: none; }
-.qs { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13.5px; color: hsl(var(--foreground)); }
-.qs li { padding: 6px 12px; }
-.qs li + li { border-top: 1px solid var(--line); }
-.qg + .qg { margin-top: 16px; }
-.qg .grp { margin-bottom: 6px; }
 /* assistant setup: each button is a <details class="pop pop-btn"> whose popup holds the steps */
 .asst { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pop-btn > summary { width: auto; height: 30px; padding: 0 10px; border-radius: 6px; font: 500 13px/1 var(--font-sans), system-ui, sans-serif; color: hsl(var(--foreground)); transition: background-color 0.15s, border-color 0.15s; }

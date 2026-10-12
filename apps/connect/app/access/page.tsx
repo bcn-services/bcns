@@ -1,7 +1,5 @@
 import { AI_SETTINGS_FAILED, readShareContact } from "@/lib/ai-settings";
 import { requireOwner } from "@/lib/session";
-import { starterQuestions } from "@/lib/first-run";
-import type { HealthRow } from "@/lib/sources";
 import { CopyUrl } from "./copy-url";
 import { setShareCustomerContact } from "./actions";
 
@@ -16,11 +14,7 @@ export default async function AccessPage({
   searchParams: { ok?: string; error?: string };
 }) {
   const { api } = await requireOwner("/");
-  const [{ share, known }, health] = await Promise.all([
-    readShareContact(api),
-    api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
-  ]);
-  const groups = starterQuestions((health.data as HealthRow[] | null) ?? []);
+  const { share, known } = await readShareContact(api);
 
   return (
     <>
@@ -92,26 +86,6 @@ export default async function AccessPage({
               </div>
             </details>
           </div>
-        </div>
-      </section>
-
-      <section className="panel" aria-labelledby="ask-h">
-        <h2 id="ask-h">Try asking</h2>
-        <div className="body">
-          {groups.length === 0 ? (
-            <p className="sub">Connect a source to get questions here.</p>
-          ) : (
-            groups.map((g) => (
-              <div key={g.source} className="qg" data-source={g.source}>
-                <h3 className="grp">{g.title}</h3>
-                <ul className="qs" role="list">
-                  {g.questions.map((q) => (
-                    <li key={q}>{q}</li>
-                  ))}
-                </ul>
-              </div>
-            ))
-          )}
         </div>
       </section>
 
