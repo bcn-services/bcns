@@ -87,4 +87,24 @@ describe('refreshGoogleToken credentials', () => {
     await expect(refreshGoogleToken(ctx, 'drive')).rejects.toBeInstanceOf(SourceError)
     expect(bodies).toHaveLength(0)
   })
+
+  it('operator rows: request body is byte-identical to the pre-C2 body, with env unset or set to other values', async () => {
+    // pre-C2 (ccf07b1): client_id = config.oauth_client_id ?? '', client_secret = attributes.oauth_client_secret ?? ''
+    const oldBody = (id: string | undefined, secret: string) => new URLSearchParams({
+      grant_type: 'refresh_token', refresh_token: 'rt', client_id: id ?? '', client_secret: secret,
+    }).toString()
+    for (const env of [{ id: 'other-id', secret: 'other-secret' }, { id: undefined, secret: undefined }]) {
+      restore('GOOGLE_CLIENT_ID', env.id); restore('GOOGLE_CLIENT_SECRET', env.secret)
+      for (const id of ['sb-id', ENV_ID, undefined]) {
+        let raw = ''
+        const { ctx } = setup(id === undefined ? {} : { oauth_client_id: id }, { oauth_client_secret: 's e/c+ret' })
+        ctx.fetch = (async (_u: unknown, init?: { body?: string }) => {
+          raw = String(init?.body)
+          return new Response(JSON.stringify({ access_token: 'at', expires_in: 3600 }))
+        }) as unknown as typeof globalThis.fetch
+        await refreshGoogleToken(ctx, 'drive')
+        expect(raw).toBe(oldBody(id, 's e/c+ret'))
+      }
+    }
+  })
 })
