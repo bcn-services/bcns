@@ -181,8 +181,8 @@
 /* links */
 .lnk { font-size: 13.5px; color: hsl(var(--muted-foreground)); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: hsl(var(--input)); }
 .lnk:hover { color: hsl(var(--primary-ink)); text-decoration-color: currentColor; }
-.ul, .ss-dl a, .crumb a { color: hsl(var(--primary-ink)); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: hsl(var(--primary) / 0.4); }
-.ul:hover, .ss-dl a:hover, .crumb a:hover { text-decoration-color: currentColor; }
+.ul, .ss-dl a, .crumb a, .sc .meta a { color: hsl(var(--primary-ink)); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: hsl(var(--primary) / 0.4); }
+.ul:hover, .ss-dl a:hover, .crumb a:hover, .sc .meta a:hover { text-decoration-color: currentColor; }
 
 /* fields */
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; min-width: 0; }
@@ -479,6 +479,8 @@ pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; 
   .srct td[data-l]::before { content: attr(data-l) " "; color: hsl(var(--muted-foreground)); }
   .srct .sc-f { justify-content: flex-start; margin-top: 4px; }
   .srct .disc { margin-left: 0; }
+  .srct .disc[open] { flex-basis: 100%; text-align: left; }
+  .srct .disc form { position: static; width: auto; max-width: none; margin-top: 8px; box-shadow: none; }
   .srct-err { max-width: none; white-space: normal; overflow-wrap: anywhere; }
 }
 

@@ -138,7 +138,8 @@ export default async function SourcesPage({
     if (view === "rows") q.set("view", view);
     if (type) q.set("type", kindSlug(type));
     if (attention) q.set("status", "attention");
-    if (searchParams.shop) q.set("shop", searchParams.shop);
+    // An ?error= turns the operator form off (shopifyControl); dropping only the error would turn it back on.
+    if (searchParams.shop && !searchParams.error) q.set("shop", searchParams.shop);
     const qs = q.toString();
     return qs ? `/?${qs}` : "/";
   };
@@ -321,7 +322,7 @@ export default async function SourcesPage({
                           {isAttached(card) ? (
                             <p className="sc-s">
                               <span className={cn("st", TONE[card.tone])}>{card.label}</span>
-                              {card.disconnecting ? null : <span>{lastSuccess}</span>}
+                              {card.disconnecting ? null : <span>Last sync {lastSuccess}</span>}
                             </p>
                           ) : (
                             <p className="sc-k">{KIND[card.source]}</p>
