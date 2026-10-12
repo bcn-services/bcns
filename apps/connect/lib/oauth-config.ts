@@ -13,7 +13,7 @@ import type { HubConfig } from "./env";
 import type { HubSource } from "./sources";
 
 /** Sources with an OAuth flow built. */
-export const OAUTH_SOURCES = ["shopify", "meta", "monday", "quickbooks"] as const;
+export const OAUTH_SOURCES = ["shopify", "meta", "monday", "quickbooks", "meet", "drive"] as const;
 
 export type OAuthSource = (typeof OAUTH_SOURCES)[number];
 
@@ -27,6 +27,11 @@ function hasCredentials(config: HubConfig, source: OAuthSource): boolean {
   if (source === "meta") return Boolean(config.metaClientId && config.metaClientSecret);
   if (source === "monday") return Boolean(config.mondayClientId && config.mondayClientSecret);
   if (source === "quickbooks") return Boolean(config.quickbooksClientId && config.quickbooksClientSecret);
+  if (source === "meet" || source === "drive") {
+    return Boolean(
+      config.googleClientId && config.googleClientSecret && config.googlePickerApiKey && config.googleCloudProjectNumber
+    );
+  }
   return false;
 }
 
