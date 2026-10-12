@@ -390,24 +390,31 @@
 
 /* access */
 .panel .body { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
-.panel p.t { font-size: 13.5px; color: hsl(var(--muted-foreground)); max-width: 46rem; }
 code.m { font: 13px var(--font-mono), ui-monospace, monospace; color: hsl(var(--foreground)); }
-.conn { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
-.panel .body > .conn:first-child { padding-top: 0; border-top: 0; }
-.conn p { color: hsl(var(--muted-foreground)); font-size: 13.5px; }
-.conn p.h { color: hsl(var(--foreground)); font-weight: 500; }
 pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--well); font: 12.5px/1.6 var(--font-mono), ui-monospace, monospace; color: hsl(var(--foreground)); }
-.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: hsl(var(--muted-foreground)); }
-.steps li { counter-increment: step; display: flex; gap: 10px; align-items: baseline; }
-.steps li::before { content: counter(step) "."; content: counter(step) "." / ""; flex: none; width: 1.4em; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 6px; }
+.steps li { counter-increment: step; display: flex; gap: 8px; align-items: baseline; }
+.steps li::before { content: counter(step) "."; content: counter(step) "." / ""; flex: none; width: 1.2em; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
 .tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid hsl(var(--warn) / 0.6); font-size: 12px; font-weight: 500; color: hsl(var(--warn)); vertical-align: middle; }
 .copyurl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .copyurl pre.code { flex: 1; min-width: 0; user-select: all; }
 .copyurl .tiny { flex-basis: 100%; font-size: 13px; color: hsl(var(--destructive)); }
 .copyurl .tiny:empty { display: none; }
 .qs { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13.5px; color: hsl(var(--foreground)); }
-.qs li { padding: 8px 14px; }
+.qs li { padding: 6px 12px; }
 .qs li + li { border-top: 1px solid var(--line); }
+.qg + .qg { margin-top: 16px; }
+.qg .grp { margin-bottom: 6px; }
+/* assistant setup: each button is a <details class="pop pop-btn"> whose popup holds the steps */
+.asst { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pop-btn > summary { width: auto; height: 30px; padding: 0 10px; border-radius: 6px; font: 500 13px/1 var(--font-sans), system-ui, sans-serif; color: hsl(var(--foreground)); transition: background-color 0.15s, border-color 0.15s; }
+.pop-btn > summary:hover, .pop-btn[open] > summary { background: var(--well); border-color: hsl(var(--muted-foreground)); }
+.pop-b .pop-h { margin: 0 0 8px; font-weight: 500; }
+.pop-b .pop-n { margin: 8px 0 0; color: hsl(var(--muted-foreground)); }
+.pop-b pre.code { margin-top: 8px; }
+@media (min-width: 640px) { .pop-w .pop-b { max-width: min(400px, calc(100vw - 32px)); } }
+/* settings row: label and current state left, the action right */
+.srow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; }
 
 /* source page: resync and folder forms, run history */
 .ss-act { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
