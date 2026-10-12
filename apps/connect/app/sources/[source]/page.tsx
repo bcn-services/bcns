@@ -85,10 +85,7 @@ export default async function SourceSettingsPage({
       ) : null}
 
       <article className="sc" data-source={source}>
-        <div className="sc-h">
-          <h2 className="sc-t">Status</h2>
-          <span className={cn("st", TONE[page.status.tone])}>{page.status.label}</span>
-        </div>
+        <h2 className="sc-t">Status</h2>
         {page.lastError ? (
           <div>
             <p className="err">{page.lastError.problem}</p>
@@ -173,7 +170,6 @@ export default async function SourceSettingsPage({
               <div className="pop-b">
                 Paste the link to the Google Drive folder {source === "meet" ? "your meeting notes are saved in" : "to bring in"}.
                 The folder is checked on the next sync, within the hour.
-                {source === "drive" ? " Files that are not in the new folder are removed from your workspace." : null}
               </div>
             </details>
           </div>
@@ -191,7 +187,14 @@ export default async function SourceSettingsPage({
             <label className="field" htmlFor="folder">
               Folder link
               <input id="folder" name="folder" type="text" inputMode="url" required autoComplete="off"
-                placeholder="https://drive.google.com/drive/folders/…" />
+                placeholder="https://drive.google.com/drive/folders/…"
+                aria-describedby={source === "drive" ? "folder-hint" : undefined} />
+              {/* Data-loss warning: stays visible, not in the popup. */}
+              {source === "drive" ? (
+                <span id="folder-hint" className="hint">
+                  Files that are not in the new folder are removed from your workspace.
+                </span>
+              ) : null}
             </label>
             <button type="submit" className="btn btn-sm" disabled={page.syncRunning}>
               Save folder

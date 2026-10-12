@@ -60,6 +60,7 @@ export default async function TeamPage({
 
       <section className="panel" aria-labelledby="members-h">
         <h2 id="members-h">Members</h2>
+        {isOwner ? null : <p className="sub">Only owners can invite or remove people.</p>}
         <div className="mlist">
           {members.length === 0 ? <p className="sub">No members yet.</p> : null}
           {members.map((member) => (
