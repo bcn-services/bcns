@@ -15,7 +15,6 @@
  * compiles with the automatic runtime, so it changes nothing in the app.
  */
 
-import { Button } from "@bcn-services/ui";
 import { dashboardUrl, type ClientRow } from "@/lib/sources";
 import { NavLink } from "./nav-link";
 
@@ -50,8 +49,8 @@ export function DashboardButton({ client }: { client: ClientRow | null }) {
   const dashboard = dashboardUrl(client);
   if (!dashboard) return null;
   return (
-    <a href={dashboard} className="shrink-0">
-      <Button type="button" className="btn btn-sm">Open your dashboard</Button>
+    <a href={dashboard} className="btn btn-sm shrink-0">
+      Open your dashboard
     </a>
   );
 }

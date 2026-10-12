@@ -116,7 +116,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
       {view.notices.map((n) => (
         <p key={n.source} role="alert" className="note note-alert">
           {n.text}{" "}
-          <Link href="/">
+          <Link href="/" className={BTN_OUT_SM}>
             Go to Sources
           </Link>
         </p>
@@ -204,7 +204,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
               {params.page > 1 ? (
                 <>
                   {" "}
-                  <Link href={link(1)}>
+                  <Link href={link(1)} className={BTN_OUT_SM}>
                     Back to the first page
                   </Link>
                 </>

@@ -124,12 +124,18 @@ export default async function SourceSettingsPage({
           <p className="meta">{page.disconnecting}</p>
         ) : (
           <p className="meta">
-            This source isn&apos;t connected. <Link href="/#sources">Connect it from the Sources page.</Link>
+            This source isn&apos;t connected. Connect it from the Sources page.{" "}
+            <Link href="/#sources" className="btn btn-out btn-sm">
+              Go to Sources
+            </Link>
           </p>
         )}
         {page.shopSwitchByEmail && page.connected ? (
           <p className="meta">
-            To switch to a different Shopify store, <a href={`mailto:${BCNS_EMAIL}`}>email us</a>.
+            To switch to a different Shopify store, email us.{" "}
+            <a href={`mailto:${BCNS_EMAIL}`} className="btn btn-out btn-sm">
+              Email us
+            </a>
           </p>
         ) : null}
       </article>
