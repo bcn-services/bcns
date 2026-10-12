@@ -16,10 +16,11 @@ export const GOOGLE_AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const GOOGLE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
 /**
- * THE scope. Nothing else in the repo may hard-code it: the run may switch to
- * `.../auth/drive.readonly` after the folder-listing gate test, and this line is the only change.
+ * THE scope. Nothing else in the repo may hard-code it. `drive.readonly` (restricted), not
+ * `drive.file`: a Picker-picked folder under drive.file exposes no children (gate test,
+ * docs/architecture/chunk7-google-flow.md).
  */
-export const GOOGLE_SCOPES = ["https://www.googleapis.com/auth/drive.file"] as const;
+export const GOOGLE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"] as const;
 /** `data.token_kind`; mirrors `meet.tokenKind` / `drive.tokenKind`. */
 export const GOOGLE_TOKEN_KIND = "google_oauth_refresh";
 export const FOLDER_MIME = "application/vnd.google-apps.folder";

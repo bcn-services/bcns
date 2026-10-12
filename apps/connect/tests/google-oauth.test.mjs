@@ -28,7 +28,7 @@ const conn = await import("../lib/google-connect.ts");
 const { signState, verifyState, STATE_TTL_MS, PICK_TTL_MS } = await import("../lib/oauth-state.ts");
 const { oauthEnabled, connectPath, redirectUri } = await import("../lib/oauth-config.ts");
 
-const SCOPE = "https://www.googleapis.com/auth/drive.file";
+const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const FOLDER = "1AbCdEfGhIjKlMnOpQrStUvWxYz012345";
 const GOOD_TOKEN = { access_token: "ACCESS_TOKEN_VALUE", refresh_token: "REFRESH_TOKEN_VALUE", expires_in: 3599, scope: SCOPE };
 
