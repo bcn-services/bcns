@@ -8,6 +8,7 @@ import { getConfig } from "@/lib/env";
 import { connectPath } from "@/lib/oauth-config";
 import { reopenAppUrl } from "@/lib/shopify-oauth";
 import { formatDateTime } from "@/lib/data-format";
+import { relativeTime } from "./relative-time";
 import { readAiLastUsed } from "@/lib/ai-settings";
 import { firstRun, type MemberRow } from "@/lib/first-run";
 import {
@@ -71,9 +72,15 @@ type SearchParams = {
 };
 type ListState = { view: "cards" | "rows"; type: string | null; attention: boolean };
 
-function when(iso: string | null, timeZone?: string | null): string {
-  if (!iso) return "never";
-  return Number.isNaN(new Date(iso).getTime()) ? "never" : formatDateTime(iso, timeZone ?? undefined);
+/** Relative time, full timestamp on hover; `now` is taken once per request. */
+function when(iso: string | null, now: number, timeZone?: string | null): React.ReactNode {
+  const text = relativeTime(iso, now, timeZone);
+  if (text === "never" || !iso) return text;
+  return (
+    <time dateTime={iso} title={formatDateTime(iso, timeZone ?? undefined)}>
+      {text}
+    </time>
+  );
 }
 
 export default async function SourcesPage({
@@ -139,10 +146,11 @@ export default async function SourcesPage({
     (!type || KIND[c.source] === type) && (!attention || needsAttention(c));
   const attentionCount = cards.filter((c) => matches(c, list.type, true)).length;
   const ctx: Ctx = { cards, config, membership, searchParams };
+  const now = Date.now();
   const rowFor = (card: SourceCard) => ({
     card,
-    lastSuccess: card.disconnectingNote ?? (card.pending ? "First sync pending" : when(card.lastSuccessAt, client?.timezone)),
-    lastAttempt: when(healthRows.find((r) => r.source === card.source)?.last_run_at ?? null, client?.timezone),
+    lastSuccess: card.disconnectingNote ?? (card.pending ? "First sync pending" : when(card.lastSuccessAt, now, client?.timezone)),
+    lastAttempt: when(healthRows.find((r) => r.source === card.source)?.last_run_at ?? null, now, client?.timezone),
   });
   const shown = cards.filter((c) => matches(c));
   const attached = shown.filter(isAttached).map(rowFor);
@@ -171,7 +179,7 @@ export default async function SourcesPage({
           <span>
             {connectedCount} of {cards.length} connected
           </span>
-          <span>Last sync {when(lastSync, client?.timezone)}</span>
+          <span>Last sync {when(lastSync, now, client?.timezone)}</span>
           {egressRow ? (
             <span className={cn(egressRow.exceeded && "sum-x")}>
               <span className="m">
