@@ -41,16 +41,11 @@ export default async function TeamPage({
 
   return (
     <>
-      <div>
-        <h1 className="page-title">
-          <b>Team</b>
+      <section className="phead" aria-labelledby="team-h">
+        <h1 id="team-h" className="page-title">
+          Team
         </h1>
-        <p className="lead">
-          {isOwner
-            ? "Everyone who can sign in to this workspace. Owners can invite and remove."
-            : "Everyone who can sign in to this workspace. Ask an owner to make changes."}
-        </p>
-      </div>
+      </section>
 
       {searchParams.ok && MESSAGES[searchParams.ok] ? (
         <p role="status" className="note">
@@ -65,6 +60,7 @@ export default async function TeamPage({
 
       <section className="panel" aria-labelledby="members-h">
         <h2 id="members-h">Members</h2>
+        {isOwner ? null : <p className="sub">Only owners can invite or remove people.</p>}
         <div className="mlist">
           {members.length === 0 ? <p className="sub">No members yet.</p> : null}
           {members.map((member) => (

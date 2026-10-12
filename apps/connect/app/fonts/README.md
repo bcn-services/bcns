@@ -1,11 +1,12 @@
 # Self-hosted fonts
 
-Two families, loaded by `app/layout.tsx` via `next/font/local`:
+Three families, loaded by `app/layout.tsx` via `next/font/local`:
 
 | Role | Family | Weights | CSS var | Tailwind |
 |---|---|---|---|---|
 | Body | Manrope | 300–600 | `--font-sans` | `font-sans` |
-| Headings, eyebrows, labels, numerals | Space Grotesk | 300–700 | `--font-display` | `font-display` |
+| Headings, numerals | Space Grotesk | 300–700 | `--font-display` | `font-display` |
+| Eyebrows, labels, nav index, status words | JetBrains Mono | 400–600 | `--font-mono` | — (plain CSS `var(--font-mono)`) |
 
 ## Never use `next/font/google`
 
@@ -24,7 +25,7 @@ Self-hosting removes the network from both dev and CI.
 
 ## Why one file per family
 
-Both are variable fonts, so a single binary covers the whole weight axis — the
+All three are variable fonts, so a single binary covers the whole weight axis — the
 `weight` values in `layout.tsx` are axis ranges, not face lists.
 
 Only the latin subset is shipped. `subsets: ["latin"]` in `next/font/google`
@@ -43,6 +44,7 @@ begins `U+0000-00FF`.
 |---|---|---|---|
 | `manrope-latin-var.woff2` | `e310b55a7fd9677f5e3555e6c6c4d064fa1f1d24393f0ddbe217cea12a8c432f` | 24576 | `family=Manrope:wght@200..800` |
 | `space-grotesk-latin-var.woff2` | `a0d054c4af557de20afd6ca59f47ab353bcaec49c63ff04b6c9d39d0f8910557` | 22320 | `family=Space+Grotesk:wght@300..700` |
+| `jetbrains-mono-latin-var.woff2` | `1e06740a02a443fb7f3eeda8fcaa685a0f6c620e3f01e6666e847295469ce3ad` | 40480 | `family=JetBrains+Mono:wght@100..800` |
 
 To refresh one, request the CSS and pull the latin URL out of it:
 
@@ -56,8 +58,9 @@ Without the browser user-agent Google returns TTF instead of woff2.
 
 ## Licenses
 
-Both are SIL Open Font License 1.1, which permits redistribution. The upstream
+All are SIL Open Font License 1.1, which permits redistribution. The upstream
 license text is kept alongside the binaries as required:
 
 - `LICENSE-Manrope.txt` — Copyright 2018 The Manrope Project Authors
 - `LICENSE-SpaceGrotesk.txt` — Copyright 2020 The Space Grotesk Project Authors
+- `LICENSE-JetBrainsMono.txt` — Copyright 2020 The JetBrains Mono Project Authors

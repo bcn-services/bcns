@@ -55,16 +55,18 @@ export default async function SourceSettingsPage({
   const disc = { source, status: page.connected ? "ok" : "none" } as const;
 
   return (
-    <>
-      <div>
+    <div className="pg" data-source={source}>
+      <section className="phead" aria-labelledby="source-h">
         <p className="crumb">
-          <Link href="/#sources">Sources</Link>
+          <Link href="/#sources">Sources</Link> / {page.title}
         </p>
-        <h1 className="page-title">
-          <b>{page.title}</b>
-        </h1>
-        <p className="lead">What this source is connected to, and how its recent syncs went.</p>
-      </div>
+        <div className="ph-t">
+          <h1 id="source-h" className="page-title">
+            {page.title}
+          </h1>
+          <span className={cn("st", TONE[page.status.tone])}>{page.status.label}</span>
+        </div>
+      </section>
 
       {ok ? (
         <p role="status" className="note">
@@ -83,13 +85,7 @@ export default async function SourceSettingsPage({
       ) : null}
 
       <article className="sc" data-source={source}>
-        <div className="sc-h">
-          <h2 className="sc-t">
-            <span className="dot" aria-hidden="true" />
-            Status
-          </h2>
-          <span className={cn("st", TONE[page.status.tone])}>{page.status.label}</span>
-        </div>
+        <h2 className="sc-t">Status</h2>
         {page.lastError ? (
           <div>
             <p className="err">{page.lastError.problem}</p>
@@ -128,23 +124,34 @@ export default async function SourceSettingsPage({
           <p className="meta">{page.disconnecting}</p>
         ) : (
           <p className="meta">
-            This source isn&apos;t connected. <Link href="/#sources">Connect it from the Sources page.</Link>
+            This source isn&apos;t connected. Connect it from the Sources page.{" "}
+            <Link href="/#sources" className="btn btn-out btn-sm">
+              Go to Sources
+            </Link>
           </p>
         )}
         {page.shopSwitchByEmail && page.connected ? (
           <p className="meta">
-            To switch to a different Shopify store, <a href={`mailto:${BCNS_EMAIL}`}>email us</a>.
+            To switch to a different Shopify store, email us.{" "}
+            <a href={`mailto:${BCNS_EMAIL}`} className="btn btn-out btn-sm">
+              Email us
+            </a>
           </p>
         ) : null}
       </article>
 
       {page.resync ? (
         <section className="panel" aria-labelledby="resync-h">
-          <h2 id="resync-h">Sync everything again</h2>
-          <p className="sub">
-            Pulls all of this source&apos;s history again, starting on the next sync, within the hour. Use it if something
-            looks missing. Once an hour at most.
-          </p>
+          <div className="hd">
+            <h2 id="resync-h">Sync everything again</h2>
+            <details className="pop">
+              <summary aria-label="About syncing everything again">?</summary>
+              <div className="pop-b">
+                Pulls all of this source&apos;s history again, starting on the next sync, within the hour. Use it if
+                something looks missing. Once an hour at most.
+              </div>
+            </details>
+          </div>
           <p className="sub">Last done: {at(page.resync.lastResetAt)}</p>
           <form action={resyncAction} className="ss-act">
             <input type="hidden" name="source" value={source} />
@@ -162,12 +169,16 @@ export default async function SourceSettingsPage({
 
       {page.folder ? (
         <section className="panel" aria-labelledby="folder-h">
-          <h2 id="folder-h">Change folder</h2>
-          <p className="sub">
-            Paste the link to the Google Drive folder {source === "meet" ? "your meeting notes are saved in" : "to bring in"}.
-            The folder is checked on the next sync, within the hour.
-            {source === "drive" ? " Files that are not in the new folder are removed from your workspace." : null}
-          </p>
+          <div className="hd">
+            <h2 id="folder-h">Change folder</h2>
+            <details className="pop">
+              <summary aria-label="About changing the folder">?</summary>
+              <div className="pop-b">
+                Paste the link to the Google Drive folder {source === "meet" ? "your meeting notes are saved in" : "to bring in"}.
+                The folder is checked on the next sync, within the hour.
+              </div>
+            </details>
+          </div>
           {page.folder.check === "pending" && !ok ? (
             <p role="status" className="note note-plain">
               New folder saved. It will be checked on the next sync, within the hour.
@@ -182,7 +193,14 @@ export default async function SourceSettingsPage({
             <label className="field" htmlFor="folder">
               Folder link
               <input id="folder" name="folder" type="text" inputMode="url" required autoComplete="off"
-                placeholder="https://drive.google.com/drive/folders/…" />
+                placeholder="https://drive.google.com/drive/folders/…"
+                aria-describedby={source === "drive" ? "folder-hint" : undefined} />
+              {/* Data-loss warning: stays visible, not in the popup. */}
+              {source === "drive" ? (
+                <span id="folder-hint" className="hint">
+                  Files that are not in the new folder are removed from your workspace.
+                </span>
+              ) : null}
             </label>
             <button type="submit" className="btn btn-sm" disabled={page.syncRunning}>
               Save folder
@@ -193,9 +211,14 @@ export default async function SourceSettingsPage({
 
       {/* Same gate and control as the Sources card; "connected" here is an enabled schedule. */}
       {canDisconnect(disc, membership.role) ? (
-        <section className="panel" aria-labelledby="disconnect-h">
-          <h2 id="disconnect-h">Disconnect</h2>
-          <p className="sub">Stop syncing this source and delete what bcns stored from it.</p>
+        <section className="panel panel-disc" aria-labelledby="disconnect-h">
+          <div className="hd">
+            <h2 id="disconnect-h">Disconnect</h2>
+            <details className="pop">
+              <summary aria-label="About disconnecting">?</summary>
+              <div className="pop-b">Stop syncing this source and delete what bcns stored from it.</div>
+            </details>
+          </div>
           <DisconnectControl
             source={disc.source}
             siblingConnected={
@@ -245,6 +268,6 @@ export default async function SourceSettingsPage({
           )}
         </section>
       )}
-    </>
+    </div>
   );
 }

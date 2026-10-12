@@ -51,7 +51,7 @@ function Cell({ col, row }: { col: ViewConfig["columns"][number]; row: Record<st
   if (col.type === "link") {
     const href = safeHref(row[col.key]);
     return href ? (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="ul">
+      <a href={href} target="_blank" rel="noopener noreferrer" className="btn btn-out btn-sm">
         Open<span className="sr-only"> {col.label} (new tab)</span>
       </a>
     ) : (

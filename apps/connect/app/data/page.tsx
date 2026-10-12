@@ -38,7 +38,8 @@ function EmptyState({ title, message }: { title: string; message?: string }) {
 
 export default async function DataPage({ searchParams }: { searchParams: SearchParams }) {
   const { api: schema } = await requireHub();
-  const timezone = (await loadClient())?.timezone ?? undefined;
+  const client = await loadClient();
+  const timezone = client?.timezone ?? undefined;
   const api = toDataApi(schema);
 
   const now = new Date();
@@ -56,12 +57,11 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
   const connectedSources = connected.map((c) => c.source);
 
   const heading = (
-    <div>
-      <h1 className="page-title">
-        Your <b>data</b>
+    <section className="phead" aria-labelledby="data-h">
+      <h1 id="data-h" className="page-title">
+        Your data
       </h1>
-      <p className="lead">Search, filter and export what bcns has pulled into your workspace.</p>
-    </div>
+    </section>
   );
 
   if (!plan.card) {
@@ -116,7 +116,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
       {view.notices.map((n) => (
         <p key={n.source} role="alert" className="note note-alert">
           {n.text}{" "}
-          <Link href="/">
+          <Link href="/" className={BTN_OUT_SM}>
             Go to Sources
           </Link>
         </p>
@@ -127,6 +127,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
           <Link
             key={c.source}
             href={`/data?source=${c.source}`}
+            data-source={c.source}
             aria-current={c.source === card.source ? "page" : undefined}
           >
             {c.title}
@@ -203,7 +204,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
               {params.page > 1 ? (
                 <>
                   {" "}
-                  <Link href={link(1)}>
+                  <Link href={link(1)} className={BTN_OUT_SM}>
                     Back to the first page
                   </Link>
                 </>

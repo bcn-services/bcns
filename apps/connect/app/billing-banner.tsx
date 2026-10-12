@@ -7,7 +7,7 @@ export function BillingBanner({ billing }: { billing: BillingSelf | null }) {
   return (
     <p role="status" className="note note-alert">
       Your last payment didn&apos;t go through. Your workspace stays open until {formatDay(billing.graceUntil)}.{" "}
-      {billing.role === "owner" ? <Link href="/pending">Keep it open</Link> : "Ask your workspace owner to update the payment."}
+      {billing.role === "owner" ? <Link href="/pending" className="btn btn-sm">Keep it open</Link> : "Ask your workspace owner to update the payment."}
     </p>
   );
 }
