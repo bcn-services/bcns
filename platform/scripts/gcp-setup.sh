@@ -18,6 +18,9 @@
 #   - Step 6b (QuickBooks) is opt-in and never required for the worker to run: it needs
 #     QUICKBOOKS_CLIENT_ID and QUICKBOOKS_ENV (sandbox|production) exported, and skips with a
 #     message otherwise. Running this script or deploy-worker before 6b is safe.
+#   - Step 6c (Google Meet/Drive, bcns-owned OAuth client) is opt-in the same way: it needs
+#     GOOGLE_CLIENT_ID exported (the client id from the bcns Google Cloud project's External
+#     OAuth client) and skips with a message otherwise. Safe to run the script before 6c.
 #
 # Never does:
 #   - Runs no gcloud command before you answer y. The `describe` existence checks also run
@@ -301,6 +304,47 @@ if ask; then
       --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor >/dev/null
     note 'if the update below fails with permission denied, the new grant is still propagating: wait a minute and re-run 6b.'
     "${update_qbo[@]}"
+  fi
+fi
+
+# ---------------------------------------------------------------- 6c. Google (opt-in)
+# Same shape as 6b, for the ONE bcns-owned Google OAuth client that hub-connected meet/drive rows
+# refresh with (rows with their own attributes.oauth_client_secret, e.g. SB, never read these).
+# Not in SECRET_ENV / step 6 for the same reason as 6b. The worker reads them only while
+# refreshing a Google token for a row that carries no client secret of its own.
+step '6c. Google (opt-in) — bcns OAuth client secret + job env'
+GOOGLE_SECRET=GOOGLE_CLIENT_SECRET
+google_env="GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-<export GOOGLE_CLIENT_ID>}"
+update_google=(gcloud run jobs update "$JOB" --project "$PROJECT" --region "$REGION"
+  --update-env-vars "$google_env" --update-secrets "${GOOGLE_SECRET}=${GOOGLE_SECRET}:latest")
+show gcloud secrets create "$GOOGLE_SECRET" --project "$PROJECT" --replication-policy automatic --data-file=-
+show gcloud secrets add-iam-policy-binding "$GOOGLE_SECRET" --project "$PROJECT" \
+  --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor
+show "${update_google[@]}"
+note 'needs GOOGLE_CLIENT_ID exported (<digits>-<chars>.apps.googleusercontent.com), and step 6 already done.'
+note 'the secret is created first, so the update never references a missing secret. The value is typed'
+note 'at a hidden prompt, never echoed; an existing secret is kept. --update-* merges, other vars stay.'
+if ask; then
+  if [[ ! "${GOOGLE_CLIENT_ID:-}" =~ ^[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$ ]]; then
+    echo '  skipped: export GOOGLE_CLIENT_ID (<digits>-<chars>.apps.googleusercontent.com), then re-run this step.' >&2
+  elif ! exists gcloud run jobs describe "$JOB" --project "$PROJECT" --region "$REGION"; then
+    echo "  skipped: ${JOB} does not exist yet — run step 6 first, then re-run this step." >&2
+  else
+    if exists gcloud secrets describe "$GOOGLE_SECRET" --project "$PROJECT"; then
+      note "$GOOGLE_SECRET already exists — keeping it."
+    else
+      printf '  value for %s (hidden): ' "$GOOGLE_SECRET"
+      read -rs value || { printf '\n'; echo "  no input for $GOOGLE_SECRET — aborting before a half-set secret." >&2; exit 1; }
+      printf '\n'
+      [[ -n "$value" ]] || { echo "  empty value for $GOOGLE_SECRET — aborting." >&2; exit 1; }
+      printf '%s' "$value" |
+        gcloud secrets create "$GOOGLE_SECRET" --project "$PROJECT" --replication-policy automatic --data-file=-
+      unset value
+    fi
+    gcloud secrets add-iam-policy-binding "$GOOGLE_SECRET" --project "$PROJECT" \
+      --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor >/dev/null
+    note 'if the update below fails with permission denied, the new grant is still propagating: wait a minute and re-run 6c.'
+    "${update_google[@]}"
   fi
 fi
 
