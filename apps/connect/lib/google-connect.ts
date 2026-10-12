@@ -202,7 +202,11 @@ export async function pickGET(request: NextRequest, source: GoogleSource, deps: 
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
-        "Referrer-Policy": "no-referrer",
+        // strict-origin, NOT no-referrer: under no-referrer the Picker callback's form.submit() (a non-CORS POST) carries
+        // `Origin: null`, and isCrossSite refuses that even with Sec-Fetch-Site: same-origin, so every real pick would fail.
+        // strict-origin keeps Origin on the same-origin POST and sends only the hub origin as Referer to Google, which an
+        // HTTP-referrer-restricted Picker API key needs.
+        "Referrer-Policy": "strict-origin",
         "Content-Security-Policy": pickCsp(nonce),
       },
     }

@@ -164,7 +164,21 @@ test("interval / backfill are pinned to literals and to the worker connectors (d
     assert.match(worker, /tokenKind:\s*'google_oauth_refresh'/, source);
     const args = g.connectArgs(source, "A", "R", "2026-11-20T00:00:00.000Z", FOLDER, "gid");
     assert.equal(args.p_interval, interval);
-    assert.equal(args.p_backfill_depth, backfillDepth);
+    assert.equal(args.p_backfill_depth, backfillDepth === "unbounded" ? "100 years" : backfillDepth);
+  }
+});
+
+test("connectArgs maps the worker's 'unbounded' to an interval literal api.connect_source can cast; drive stays '0'", () => {
+  // api.connect_source runs `current_date - p_backfill_depth::interval`; "unbounded" is not an interval.
+  const args = (source) => g.connectArgs(source, "A", "R", "2026-11-20T00:00:00.000Z", FOLDER, "gid");
+  assert.equal(args("meet").p_backfill_depth, "100 years");
+  assert.equal(args("drive").p_backfill_depth, "0");
+});
+
+test("every p_backfill_depth connectArgs can produce is interval-shaped, so 'unbounded' never reaches the RPC", () => {
+  for (const source of g.GOOGLE_SOURCES) {
+    const depth = g.connectArgs(source, "A", "R", "2026-11-20T00:00:00.000Z", FOLDER, "gid").p_backfill_depth;
+    assert.match(depth, /^\d+ (years?|months?|days?)$|^0$/, source);
   }
 });
 
@@ -397,6 +411,8 @@ for (const source of ["meet", "drive"]) {
     const b = await conn.pickGET(req(`${HUB}/api/oauth/${source}/pick`, { cookies }), source, deps(fakeSession().session));
     assert.equal(a.status, 200);
     assert.equal(a.headers.get("cache-control"), "no-store");
+    // Not no-referrer: that makes the Picker callback's form POST carry `Origin: null`, which isCrossSite refuses.
+    assert.equal(a.headers.get("referrer-policy"), "strict-origin");
     const csp = a.headers.get("content-security-policy");
     const nonce = csp.match(/script-src 'nonce-([^']+)'/)[1];
     const html = await a.text();
@@ -450,6 +466,17 @@ for (const source of ["meet", "drive"]) {
       assert.equal(loc(res), `${HUB}/?error=connect-failed`);
     }
     assert.equal(sessionReads, 0);
+  });
+
+  test(`${source} POST /pick: Origin "null" is refused as cross-site even with Sec-Fetch-Site same-origin (the page must keep Origin intact)`, async () => {
+    // What a form POST sends under Referrer-Policy: no-referrer. isCrossSite stays strict; pickGET's header is what keeps Origin.
+    const cookies = { [`${source}_pick`]: sealedFor(source) };
+    let sessionReads = 0;
+    const d = { session: async () => { sessionReads++; return fakeSession().session; }, fetchImpl: noNetwork };
+    const res = await conn.pickPOST(formReq(source, FOLDER, cookies, { origin: "null", "sec-fetch-site": "same-origin" }), source, d);
+    assert.equal(res.status, 303);
+    assert.equal(loc(res), `${HUB}/?error=connect-failed`);
+    assert.equal(sessionReads, 0, "refused at the cross-site check, before the session");
   });
 
   test(`${source} POST /pick: no/foreign/expired cookie, wrong tenant and anon are refused with no fetch and no write`, async () => {

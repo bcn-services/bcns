@@ -26,9 +26,6 @@ export const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 export const GOOGLE_SOURCES = ["meet", "drive"] as const;
 export type GoogleSource = (typeof GOOGLE_SOURCES)[number];
-export function isGoogleSource(source: string): source is GoogleSource {
-  return (GOOGLE_SOURCES as readonly string[]).includes(source);
-}
 
 /** Mirrors each worker connector's `defaults`; tests fail if they drift. */
 export const GOOGLE_DEFAULTS = {
@@ -144,7 +141,9 @@ export function connectArgs(
     p_expires_at: expiresAt,
     p_config: { folder_id: folderId, oauth_client_id: clientId },
     p_interval: GOOGLE_DEFAULTS[source].interval,
-    p_backfill_depth: GOOGLE_DEFAULTS[source].backfillDepth,
+    // api.connect_source runs `current_date - p_backfill_depth::interval` (20260924000200_quickbooks_connect_config.sql),
+    // which rejects the worker's "unbounded". 100 years reaches before 1970, as onboard.ts backfillFrom does.
+    p_backfill_depth: GOOGLE_DEFAULTS[source].backfillDepth === "unbounded" ? "100 years" : GOOGLE_DEFAULTS[source].backfillDepth,
   };
 }
 
