@@ -397,7 +397,7 @@ pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; 
 .steps li::before { content: counter(step) "."; content: counter(step) "." / ""; flex: none; width: 1.2em; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
 .tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid hsl(var(--warn) / 0.6); font-size: 12px; font-weight: 500; color: hsl(var(--warn)); vertical-align: middle; }
 .copyurl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.copyurl pre.code { flex: 1; min-width: 0; user-select: all; }
+.copyurl pre.code { flex: 1 1 240px; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .copyurl .tiny { flex-basis: 100%; font-size: 13px; color: hsl(var(--destructive)); }
 .copyurl .tiny:empty { display: none; }
 .qs { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13.5px; color: hsl(var(--foreground)); }
