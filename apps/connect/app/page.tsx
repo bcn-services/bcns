@@ -12,6 +12,7 @@ import { relativeTime } from "./relative-time";
 import { KIND, MONO, kindSlug } from "./source-look";
 import { readAiLastUsed } from "@/lib/ai-settings";
 import { firstRun, type MemberRow } from "@/lib/first-run";
+import { shopifyAppsUrl, type SettingsRow } from "@/lib/source-settings";
 import {
   canDisconnect,
   composeSources,
@@ -81,9 +82,11 @@ export default async function SourcesPage({
 
   const isOwner = membership.role === "owner";
   // The checklist is owner-only, so members skip its two extra reads.
-  const [health, disconnecting, egress, members, aiLastUsedAt] = await Promise.all([
+  const [health, disconnecting, settings, egress, members, aiLastUsedAt] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
     api.rpc("disconnecting_sources_v1"),
+    // Read-only; only the Shopify row's target is used, for the "Disconnect in Shopify" link.
+    isOwner ? api.rpc("source_settings_v1") : Promise.resolve({ data: null, error: null }),
     api.from("egress_status_v1").select("*").limit(1).maybeSingle(),
     isOwner ? api.from("memberships_v1").select("user_id,role,is_smoke") : Promise.resolve({ data: null }),
     isOwner ? readAiLastUsed(api) : Promise.resolve(null),
@@ -131,7 +134,9 @@ export default async function SourcesPage({
   const matches = (c: SourceCard, type = list.type, attention = list.attention) =>
     (!type || KIND[c.source] === type) && (!attention || needsAttention(c));
   const attentionCount = cards.filter((c) => matches(c, list.type, true)).length;
-  const ctx: Ctx = { cards, config, membership, searchParams };
+  // A failed read leaves the link out; the card then says where to uninstall in words.
+  const shopifyRow = settings.error ? null : ((settings.data as SettingsRow[] | null) ?? []).find((s) => s.source === "shopify" && s.enabled);
+  const ctx: Ctx = { cards, config, membership, searchParams, shopifyAdminUrl: shopifyRow ? shopifyAppsUrl(shopifyRow.target) : null };
   const now = Date.now();
   const rowFor = (card: SourceCard) => ({
     card,
@@ -389,10 +394,12 @@ type Ctx = {
   config: ReturnType<typeof getConfig>;
   membership: Awaited<ReturnType<typeof requireHub>>["membership"];
   searchParams: SearchParams;
+  /** The store's admin Apps settings (where the owner uninstalls bcns Connect), or null. */
+  shopifyAdminUrl: string | null;
 };
 
 /** A source's action row, shared by the cards and rows views: Connect, Request connection or Disconnect. */
-function CardActions({ card, cards, config, membership, searchParams }: Ctx & { card: SourceCard }) {
+function CardActions({ card, cards, config, membership, searchParams, shopifyAdminUrl }: Ctx & { card: SourceCard }) {
   return (
     <>
       {/* Disconnecting: no Connect, Request connection or Disconnect until the worker's delete is done. */}
@@ -435,6 +442,22 @@ function CardActions({ card, cards, config, membership, searchParams }: Ctx & { 
           )}
           {canDisconnect(card, membership.role) ? (
             <DisconnectControl source={card.source} siblingConnected={googleSiblingConnected(card.source, cards)} />
+          ) : null}
+          {/* Shopify is never disconnected from the hub: the owner uninstalls in Shopify, which fires the app-uninstalled webhook. */}
+          {card.source === "shopify" && card.status !== "none" && membership.role === "owner" ? (
+            shopifyAdminUrl ? (
+              <a
+                className="btn btn-out btn-sm"
+                href={shopifyAdminUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Disconnect in Shopify, opens your Shopify admin in a new tab"
+              >
+                Disconnect in Shopify
+              </a>
+            ) : (
+              <p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin (Settings, Apps).</p>
+            )
           ) : null}
         </div>
       )}
