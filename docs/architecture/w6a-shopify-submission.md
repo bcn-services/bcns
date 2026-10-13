@@ -290,8 +290,8 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 >    your store domain. The first sync runs within the hour, so Your data fills in after that.
 > 5. To test uninstall and the privacy webhooks, uninstall the app from the Shopify admin.
 >    Shopify sends `app/uninstalled`, and bcns revokes the stored token and stops syncing
->    within seconds. The Sources card then shows Not connected, with an "Install bcns Connect
->    from the Shopify App Store" link. About 48 hours later Shopify sends `shop/redact`, which
+>    within seconds. The Sources card then shows Not connected, with a blue "Connect" button
+>    that opens the Shopify App Store listing in a new tab. About 48 hours later Shopify sends `shop/redact`, which
 >    deletes the store's data from bcns.
 >
 > Shopify is the only source under review. The other cards on Sources (Meta Ads, Monday.com,
@@ -347,8 +347,8 @@ Don't include the Access page unless §2's AI-tools check passes.
 ## 8. Known review risks this PR does not change
 
 - The Sources page has no field for a store domain (rule 2.3.1). With no Shopify source
-  stored, the Shopify card links to the App Store listing ("Install bcns Connect from the
-  Shopify App Store"). With a stored source, it tells the merchant to open bcns Connect from
+  stored, the Shopify card shows a "Connect" button that opens the App Store listing in a new
+  tab. With a stored source, it tells the merchant to open bcns Connect from
   the Shopify admin to reconnect. A hidden `shop` input appears only when the page is opened
   with an explicit `?shop=` query, which only an operator does
   (`apps/connect/lib/sources.ts:165-185`, `apps/connect/app/page.tsx:158-186`).

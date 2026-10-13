@@ -169,12 +169,11 @@
 .btn-danger, .btn-danger:hover { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
 .btn-danger:hover { filter: brightness(0.94); }
 /*
- * Fixed markup that wears btn btn-out btn-sm from here: the Disconnect <summary> (tests pin its markup)
- * and Shopify's install link (App Store review copy, markup unchanged). Disclosure summaries get a smaller one.
+ * Fixed markup that wears btn btn-out btn-sm from here: the Disconnect <summary> (tests pin its markup).
+ * Disclosure summaries get a smaller one.
  */
-.disc > summary, .sc-f .tiny > a.ul, .tablewrap details > summary, .ss-why > summary { cursor: pointer; list-style: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 6px; background: transparent; font-size: 13px; font-weight: 500; line-height: 1; color: hsl(var(--foreground)); text-decoration: none; transition: background-color 0.15s, border-color 0.15s, color 0.15s; }
-.sc-f .tiny > a.ul:hover, .tablewrap details > summary:hover, .ss-why > summary:hover, .tablewrap details[open] > summary, .ss-why[open] > summary { background: var(--well); border-color: hsl(var(--muted-foreground)); color: hsl(var(--foreground)); }
-.sc-f .tiny > a.ul { height: auto; min-height: 30px; padding: 6px 10px; white-space: normal; text-align: center; line-height: 1.3; }
+.disc > summary, .tablewrap details > summary, .ss-why > summary { cursor: pointer; list-style: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 6px; background: transparent; font-size: 13px; font-weight: 500; line-height: 1; color: hsl(var(--foreground)); text-decoration: none; transition: background-color 0.15s, border-color 0.15s, color 0.15s; }
+.tablewrap details > summary:hover, .ss-why > summary:hover, .tablewrap details[open] > summary, .ss-why[open] > summary { background: var(--well); border-color: hsl(var(--muted-foreground)); color: hsl(var(--foreground)); }
 .tablewrap details > summary, .ss-why > summary { width: fit-content; height: 26px; padding: 0 8px; font-size: 12.5px; }
 .tablewrap details > summary::-webkit-details-marker, .ss-why > summary::-webkit-details-marker { display: none; }
 
@@ -311,7 +310,8 @@
 .ss-dl dd { margin: 4px 0 0; min-width: 0; font-size: 13.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .meta { font-size: 13.5px; color: hsl(var(--muted-foreground)); }
 .err { font-size: 13.5px; color: hsl(var(--destructive)); padding: 8px 12px; border-radius: 6px; background: hsl(var(--err-bg)); overflow-wrap: anywhere; }
-.sc-f { margin-top: auto; display: flex; align-items: center; gap: 14px; min-height: 32px; }
+.sc-f { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 32px; }
+.sc-f > a.tiny { white-space: nowrap; }
 .sc-f .flow { width: 72px; flex: 1 1 auto; min-width: 48px; }
 .sc-f .tiny { font-size: 13px; color: hsl(var(--muted-foreground)); }
 .sc-f form { display: flex; }
@@ -463,7 +463,6 @@ pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; 
 .srct-err { display: block; margin-top: 3px; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: hsl(var(--destructive)); }
 .srct .flow { display: none; }
 .srct .sc-f { margin: 0; min-height: 0; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.srct .sc-f:not(:has(form, details, p)) { display: none; }
 @media (max-width: 999px) {
   .srct, .srct tbody, .srct tr, .srct td { display: block; }
   .srct thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

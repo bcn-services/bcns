@@ -39,3 +39,23 @@ test("page.tsx: hidden shop input, Shopify branch under owner+connectPath gate, 
   assert.doesNotMatch(src, /(type|enter|paste)[^"\n]{0,20}(shop|store) (domain|name)/i);
   assert.doesNotMatch(src, /Enter your (shop|store)/i);
 });
+test("page.tsx: Shopify install is a Connect button to the App Store in a new tab; no handle stays plain text; every card links its guide", () => {
+  const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const view = src.slice(src.indexOf("function ShopifyControlView"));
+  const link = view.match(/<a[^>]*href=\{ctl\.url\}[^>]*>/)?.[0] ?? "";
+  assert.match(link, /className="btn btn-sm"/);
+  assert.match(link, /target="_blank"/);
+  assert.match(link, /rel="noopener noreferrer"/);
+  // url null: the fallback after ") : (" is the text paragraph, not a link.
+  const fallback = view.slice(view.indexOf(") : (", view.indexOf("href={ctl.url}")));
+  assert.doesNotMatch(fallback, /<a[\s>]/);
+  assert.match(fallback, /Install bcns Connect from the Shopify App Store/);
+  // The guide link sits inside the non-disconnecting .sc-f, before Disconnect (its popup is right-anchored).
+  const actions = src.slice(src.indexOf("function CardActions"), src.indexOf("function ShopifyControlView"));
+  const open = actions.indexOf('<div className="sc-f">');
+  const close = actions.indexOf("</div>", actions.indexOf("<DisconnectControl"));
+  const how = actions.indexOf("#how");
+  assert.ok(actions.indexOf("card.disconnecting ? null") < open, "sc-f is inside the disconnecting early-out");
+  assert.ok(open > 0 && open < how && how < actions.indexOf("<DisconnectControl") && how < close, "guide link: inside sc-f, before Disconnect");
+  assert.match(actions, /href=\{`\/sources\/\$\{card\.source\}#how`\}\s+aria-label=\{`How to connect \$\{card\.title\}`\}/);
+});

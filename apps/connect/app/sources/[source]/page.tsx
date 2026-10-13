@@ -15,6 +15,7 @@ import {
 } from "@/lib/source-settings";
 import { changeFolderAction, resyncAction } from "./actions";
 import { DisconnectControl } from "@/app/disconnect";
+import { SourceGuide } from "@/app/source-guide";
 import { canDisconnect, composeSources, googleSiblingConnected, type HealthRow } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
@@ -139,6 +140,8 @@ export default async function SourceSettingsPage({
           </p>
         ) : null}
       </article>
+
+      <SourceGuide source={source} />
 
       {page.resync ? (
         <section className="panel" aria-labelledby="resync-h">

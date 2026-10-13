@@ -438,6 +438,10 @@ function CardActions({ card, cards, config, membership, searchParams }: Ctx & { 
               </button>
             </form>
           )}
+          {/* Before Disconnect: its confirm popup is anchored to the row's right edge. */}
+          <a className="ul tiny" href={`/sources/${card.source}#how`} aria-label={`How to connect ${card.title}`}>
+            How to connect
+          </a>
           {canDisconnect(card, membership.role) ? (
             <DisconnectControl source={card.source} siblingConnected={googleSiblingConnected(card.source, cards)} />
           ) : null}
@@ -463,15 +467,18 @@ function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: stri
   if (ctl.kind === "reconnect-in-shopify") {
     return <p className="tiny">Open bcns Connect from your Shopify admin to reconnect.</p>;
   }
-  return (
-    <p className="tiny">
-      {ctl.url ? (
-        <a href={ctl.url} className="ul">
-          Install bcns Connect from the Shopify App Store
-        </a>
-      ) : (
-        "Install bcns Connect from the Shopify App Store"
-      )}
-    </p>
+  // No stored source: Connect is the App Store listing (rule 2.3.1), in a new tab. No handle configured: plain text.
+  return ctl.url ? (
+    <a
+      className="btn btn-sm"
+      href={ctl.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Connect, opens the Shopify App Store in a new tab"
+    >
+      Connect
+    </a>
+  ) : (
+    <p className="tiny">Install bcns Connect from the Shopify App Store</p>
   );
 }
