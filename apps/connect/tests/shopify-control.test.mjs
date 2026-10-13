@@ -43,19 +43,24 @@ test("page.tsx: Shopify install is a Connect button to the App Store in a new ta
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const view = src.slice(src.indexOf("function ShopifyControlView"));
   const link = view.match(/<a[^>]*href=\{ctl\.url\}[^>]*>/)?.[0] ?? "";
-  assert.match(link, /className="btn btn-sm"/);
+  assert.match(link, /className="btn btn-out btn-sm"/);
   assert.match(link, /target="_blank"/);
   assert.match(link, /rel="noopener noreferrer"/);
   // url null: the fallback after ") : (" is the text paragraph, not a link.
   const fallback = view.slice(view.indexOf(") : (", view.indexOf("href={ctl.url}")));
   assert.doesNotMatch(fallback, /<a[\s>]/);
   assert.match(fallback, /Install bcns Connect from the Shopify App Store/);
-  // The guide link sits inside the non-disconnecting .sc-f, before Disconnect (its popup is right-anchored).
-  const actions = src.slice(src.indexOf("function CardActions"), src.indexOf("function ShopifyControlView"));
-  const open = actions.indexOf('<div className="sc-f">');
-  const close = actions.indexOf("</div>", actions.indexOf("<DisconnectControl"));
-  const how = actions.indexOf("#how");
-  assert.ok(actions.indexOf("card.disconnecting ? null") < open, "sc-f is inside the disconnecting early-out");
-  assert.ok(open > 0 && open < how && how < actions.indexOf("<DisconnectControl") && how < close, "guide link: inside sc-f, before Disconnect");
-  assert.match(actions, /href=\{`\/sources\/\$\{card\.source\}#how`\}\s+aria-label=\{`How to connect \$\{card\.title\}`\}/);
+  // The per-card guide link is gone: guides live on /guide and the source page.
+  assert.doesNotMatch(src, /How to connect|#how/);
+});
+test("page.tsx: every card's title links to its source page, connected or not (whole-card stretched link)", () => {
+  const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /card\.connected \? <a href=\{`\/sources\//);
+  assert.equal((src.match(/<a href=\{`\/sources\/\$\{card\.source\}`\}>\{card\.title\}<\/a>/g) ?? []).length, 2, "cards view and rows view");
+  assert.match(src, /<a className="btn btn-out btn-sm" href="\/guide">\s*Connection guide/);
+  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(css, /\.grid-src \.sc-t a::after \{[^}]*position: absolute; inset: 0/);
+  assert.match(css, /\.grid-src \.sc \{ position: relative; \}/);
+  assert.match(css, /\.grid-src \.sc-f > :is\(form, details, a, button\)[^{]*\{ position: relative; z-index: 1; \}/);
+  assert.match(css, /\.grid-src \.sc-t a:focus-visible::after/);
 });

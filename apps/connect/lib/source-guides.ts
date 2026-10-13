@@ -4,7 +4,7 @@
  * the steps are what an owner actually sees. Second person, no jargon. Edit wording here only;
  * tests/source-guides.test.mjs keeps it to six steps and free of technical words.
  */
-import type { HubSource } from "./sources";
+import { HUB_SOURCES, type HubSource } from "./sources";
 
 export interface SourceGuide {
   intro: string;
@@ -80,6 +80,11 @@ export const GUIDES: Record<HubSource, SourceGuide> = {
     after: "One workspace connects one QuickBooks company.",
   },
 };
+
+/** `/guide?source=`: one HubSource shows just that guide; missing or unknown means all of them (null). */
+export function guideFilter(param: string | string[] | undefined): HubSource | null {
+  return HUB_SOURCES.find((s) => s === param) ?? null;
+}
 
 /** Shown under every guide: who sees Connect, and what to do when the card says something else. */
 export const GUIDE_FOOTER =

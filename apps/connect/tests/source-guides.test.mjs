@@ -27,10 +27,9 @@ test("Shopify guide never mentions a store domain (App Store rule 2.3.1)", () =>
 test("QuickBooks: the company is chosen on Intuit's screen, there is no hub picker step", () => {
   assert.equal(GUIDES.quickbooks.steps[2], "If Intuit asks which company to use, choose it, then approve.");
 });
-test("the #how link on the cards targets the guide's id", () => {
+test("the source page keeps its guide at #how", () => {
   const guide = readFileSync(new URL("../app/source-guide.tsx", import.meta.url), "utf8");
-  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const anchor = page.match(/\/sources\/\$\{card\.source\}#([a-z-]+)/)?.[1];
-  assert.equal(anchor, "how");
-  assert.ok(guide.includes(`id="${anchor}"`));
+  const page = readFileSync(new URL("../app/sources/[source]/page.tsx", import.meta.url), "utf8");
+  assert.match(guide, /anchor = "how"/);
+  assert.match(page, /<SourceGuide source=\{source\} \/>/);
 });

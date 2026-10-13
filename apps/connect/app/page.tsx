@@ -9,6 +9,7 @@ import { connectPath } from "@/lib/oauth-config";
 import { reopenAppUrl } from "@/lib/shopify-oauth";
 import { formatDateTime } from "@/lib/data-format";
 import { relativeTime } from "./relative-time";
+import { KIND, MONO, kindSlug } from "./source-look";
 import { readAiLastUsed } from "@/lib/ai-settings";
 import { firstRun, type MemberRow } from "@/lib/first-run";
 import {
@@ -21,7 +22,6 @@ import {
   formatBytes,
   type EgressRow,
   type HealthRow,
-  type HubSource,
   type ShopifyControl,
   type SourceCard,
   type Tone,
@@ -37,22 +37,7 @@ const TONE: Record<Tone, string> = {
   idle: "st-idle",
 };
 
-/** Badge monogram (decoration only). */
-const MONO: Record<HubSource, string> = { shopify: "Sh", meta: "Me", monday: "Mo", meet: "Mt", drive: "Dr", quickbooks: "QB" };
-/**
- * The kind of data each source holds. The type filter's chips are generated from this map, and
- * each kind's hue is the `--kind-<slug>` token in globals.css (badge and chip share it).
- */
-const KIND: Record<HubSource, string> = {
-  shopify: "Commerce",
-  meta: "Advertising",
-  monday: "Projects",
-  meet: "Meetings",
-  drive: "Files",
-  quickbooks: "Accounting",
-};
 const KINDS = Array.from(new Set(Object.values(KIND)));
-const kindSlug = (kind: string) => kind.toLowerCase();
 
 /** Attached: has a health row (Reconnect needed included) or is mid-disconnect. Not attached = available to connect. */
 const isAttached = (c: SourceCard) => c.status !== "none" || c.disconnecting;
@@ -174,7 +159,12 @@ export default async function SourcesPage({
           <h1 id="src-h" className="page-title">
             Sources
           </h1>
-          <DashboardButton client={client} />
+          <div className="ph-b">
+            <a className="btn btn-out btn-sm" href="/guide">
+              Connection guide
+            </a>
+            <DashboardButton client={client} />
+          </div>
         </div>
         <p className="sum">
           <span>
@@ -318,7 +308,10 @@ export default async function SourcesPage({
                           {MONO[card.source]}
                         </span>
                         <div className="sc-id">
-                          <h3 className="sc-t">{card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}</h3>
+                          {/* Always a link: its ::after covers the card (globals.css), so the whole card opens the source page. */}
+                          <h3 className="sc-t">
+                            <a href={`/sources/${card.source}`}>{card.title}</a>
+                          </h3>
                           {isAttached(card) ? (
                             <p className="sc-s">
                               <span className={cn("st", TONE[card.tone])}>{card.label}</span>
@@ -362,7 +355,9 @@ export default async function SourcesPage({
                       <span className="sc-b" data-kind={kindSlug(KIND[card.source])} aria-hidden="true">
                         {MONO[card.source]}
                       </span>
-                      <span className="sc-t">{card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}</span>
+                      <span className="sc-t">
+                        <a href={`/sources/${card.source}`}>{card.title}</a>
+                      </span>
                     </span>
                   </td>
                   <td data-l="Type">{KIND[card.source]}</td>
@@ -438,10 +433,6 @@ function CardActions({ card, cards, config, membership, searchParams }: Ctx & { 
               </button>
             </form>
           )}
-          {/* Before Disconnect: its confirm popup is anchored to the row's right edge. */}
-          <a className="ul tiny" href={`/sources/${card.source}#how`} aria-label={`How to connect ${card.title}`}>
-            How to connect
-          </a>
           {canDisconnect(card, membership.role) ? (
             <DisconnectControl source={card.source} siblingConnected={googleSiblingConnected(card.source, cards)} />
           ) : null}
@@ -470,7 +461,7 @@ function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: stri
   // No stored source: Connect is the App Store listing (rule 2.3.1), in a new tab. No handle configured: plain text.
   return ctl.url ? (
     <a
-      className="btn btn-sm"
+      className="btn btn-out btn-sm"
       href={ctl.url}
       target="_blank"
       rel="noopener noreferrer"

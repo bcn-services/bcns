@@ -278,6 +278,7 @@
 
 /* Sources head: title, one summary line, a thin usage bar (neutral; red only over quota) */
 .ph-r { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.ph-b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sum { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 13.5px; color: hsl(var(--muted-foreground)); }
 .sum > span + span::before { content: "·"; margin: 0 8px; }
 .sum .m { font: 12.5px var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }
@@ -307,11 +308,18 @@
 .sc-id .sc-t { line-height: 1.3; overflow-wrap: anywhere; }
 .sc-t a { color: inherit; text-decoration: none; }
 .sc-t a:hover, .sc-t a:focus-visible { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: hsl(var(--input)); }
+/* Cards view: the title link's ::after covers the whole card (stretched link), so any click opens the source page.
+   Controls sit above it. The ring is drawn on the card edge by that same ::after. */
+.grid-src .sc { position: relative; }
+.grid-src .sc:hover { border-color: hsl(var(--muted-foreground)); }
+.grid-src .sc-t a::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
+.grid-src .sc-t a:focus-visible { outline: none; text-decoration: underline; }
+.grid-src .sc-t a:focus-visible::after { outline: 2px solid hsl(var(--ring)); outline-offset: 0; }
+.grid-src .sc-f > :is(form, details, a, button), .grid-src .sc .err { position: relative; z-index: 1; }
 .ss-dl dd { margin: 4px 0 0; min-width: 0; font-size: 13.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .meta { font-size: 13.5px; color: hsl(var(--muted-foreground)); }
 .err { font-size: 13.5px; color: hsl(var(--destructive)); padding: 8px 12px; border-radius: 6px; background: hsl(var(--err-bg)); overflow-wrap: anywhere; }
 .sc-f { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 32px; }
-.sc-f > a.tiny { white-space: nowrap; }
 .sc-f .flow { width: 72px; flex: 1 1 auto; min-width: 48px; }
 .sc-f .tiny { font-size: 13px; color: hsl(var(--muted-foreground)); }
 .sc-f form { display: flex; }
@@ -395,6 +403,17 @@ pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; 
 .steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 6px; }
 .steps li { counter-increment: step; display: flex; gap: 8px; align-items: baseline; }
 .steps li::before { content: counter(step) "."; content: counter(step) "." / ""; flex: none; width: 1.2em; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
+/* connection guide panel (app/source-guide.tsx): badge + title, lead, numbered rows, callouts */
+.gd .hd { gap: 12px; }
+.gd .sc-b { width: 32px; height: 32px; font-size: 12px; }
+.gd-lead { font-size: 14px; line-height: 1.55; }
+.gd-steps { gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.gd-steps li { align-items: flex-start; gap: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.55; }
+.gd-steps li + li { border-top: 1px solid var(--line); }
+.gd-steps li::before { content: counter(step); content: counter(step) / ""; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; font-size: 12px; font-weight: 600; line-height: 1; background: hsl(var(--primary) / 0.12); color: hsl(var(--primary-ink)); }
+.gd-notes { display: flex; flex-direction: column; gap: 8px; }
+.gd-notes .note { margin-top: 0; }
+.gd-notes .note + .note { color: hsl(var(--muted-foreground)); }
 .tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid hsl(var(--warn) / 0.6); font-size: 12px; font-weight: 500; color: hsl(var(--warn)); vertical-align: middle; }
 .copyurl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .copyurl pre.code { flex: 1 1 240px; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
@@ -463,6 +482,7 @@ pre.code { margin: 0; overflow-x: auto; padding: 10px 12px; border-radius: 6px; 
 .srct-err { display: block; margin-top: 3px; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: hsl(var(--destructive)); }
 .srct .flow { display: none; }
 .srct .sc-f { margin: 0; min-height: 0; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.srct .sc-f:not(:has(form, details, p, a)) { display: none; }
 @media (max-width: 999px) {
   .srct, .srct tbody, .srct tr, .srct td { display: block; }
   .srct thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
