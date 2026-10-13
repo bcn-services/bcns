@@ -115,6 +115,20 @@ export function targetFor(source: HubSource, target: unknown): TargetLine[] {
   }
 }
 
+/**
+ * Where an owner uninstalls bcns Connect: the store's Shopify admin Apps settings. The hub never
+ * disconnects Shopify itself; uninstalling fires the app/uninstalled webhook (token revoked,
+ * schedule off), and Shopify's shop/redact about 48 hours later erases the data. Built only from a validated shop domain or an
+ * admin.shopify.com store handle, never from a stored URL as-is. Null when neither is usable.
+ */
+export function shopifyAppsUrl(target: unknown): string | null {
+  const t = target && typeof target === "object" && !Array.isArray(target) ? (target as Record<string, unknown>) : {};
+  const shop = normalizeShop(str(t.shop));
+  if (shop) return `https://${shop}/admin/settings/apps`;
+  const handle = str(t.admin_url)?.match(/^https:\/\/admin\.shopify\.com\/store\/([a-z0-9][a-z0-9-]*)(?:[/?#]|$)/i)?.[1];
+  return handle ? `https://admin.shopify.com/store/${handle}/settings/apps` : null;
+}
+
 export type ResetState =
   | { kind: "ready" }
   | { kind: "running" }
@@ -283,6 +297,8 @@ export interface SourcePage {
   folder: { current: string | null; check: FolderCheck } | null;
   /** Shopify: switching store is an email to bcns, never a form here. */
   shopSwitchByEmail: boolean;
+  /** Shopify only: the store's admin Apps settings, where an owner uninstalls bcns Connect. Else null. */
+  shopifyAppsUrl: string | null;
 }
 
 /** Everything the page renders, from the two reads. `settings` may hold every source of the client. */
@@ -351,6 +367,7 @@ export function sourcePage(input: {
         ? { current: target[0]?.text ?? null, check: folderCheck(runs, row?.folder_changed_at) }
         : null,
     shopSwitchByEmail: source === "shopify",
+    shopifyAppsUrl: source === "shopify" && row ? shopifyAppsUrl(row.target) : null,
   };
 }
 

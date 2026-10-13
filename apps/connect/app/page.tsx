@@ -9,8 +9,10 @@ import { connectPath } from "@/lib/oauth-config";
 import { reopenAppUrl } from "@/lib/shopify-oauth";
 import { formatDateTime } from "@/lib/data-format";
 import { relativeTime } from "./relative-time";
+import { KIND, MONO, kindSlug } from "./source-look";
 import { readAiLastUsed } from "@/lib/ai-settings";
 import { firstRun, type MemberRow } from "@/lib/first-run";
+import { shopifyAppsUrl, type SettingsRow } from "@/lib/source-settings";
 import {
   canDisconnect,
   composeSources,
@@ -21,7 +23,6 @@ import {
   formatBytes,
   type EgressRow,
   type HealthRow,
-  type HubSource,
   type ShopifyControl,
   type SourceCard,
   type Tone,
@@ -37,22 +38,7 @@ const TONE: Record<Tone, string> = {
   idle: "st-idle",
 };
 
-/** Badge monogram (decoration only). */
-const MONO: Record<HubSource, string> = { shopify: "Sh", meta: "Me", monday: "Mo", meet: "Mt", drive: "Dr", quickbooks: "QB" };
-/**
- * The kind of data each source holds. The type filter's chips are generated from this map, and
- * each kind's hue is the `--kind-<slug>` token in globals.css (badge and chip share it).
- */
-const KIND: Record<HubSource, string> = {
-  shopify: "Commerce",
-  meta: "Advertising",
-  monday: "Projects",
-  meet: "Meetings",
-  drive: "Files",
-  quickbooks: "Accounting",
-};
 const KINDS = Array.from(new Set(Object.values(KIND)));
-const kindSlug = (kind: string) => kind.toLowerCase();
 
 /** Attached: has a health row (Reconnect needed included) or is mid-disconnect. Not attached = available to connect. */
 const isAttached = (c: SourceCard) => c.status !== "none" || c.disconnecting;
@@ -96,9 +82,11 @@ export default async function SourcesPage({
 
   const isOwner = membership.role === "owner";
   // The checklist is owner-only, so members skip its two extra reads.
-  const [health, disconnecting, egress, members, aiLastUsedAt] = await Promise.all([
+  const [health, disconnecting, settings, egress, members, aiLastUsedAt] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
     api.rpc("disconnecting_sources_v1"),
+    // Read-only; only the Shopify row's target is used, for the "Disconnect in Shopify" link.
+    isOwner ? api.rpc("source_settings_v1") : Promise.resolve({ data: null, error: null }),
     api.from("egress_status_v1").select("*").limit(1).maybeSingle(),
     isOwner ? api.from("memberships_v1").select("user_id,role,is_smoke") : Promise.resolve({ data: null }),
     isOwner ? readAiLastUsed(api) : Promise.resolve(null),
@@ -146,7 +134,9 @@ export default async function SourcesPage({
   const matches = (c: SourceCard, type = list.type, attention = list.attention) =>
     (!type || KIND[c.source] === type) && (!attention || needsAttention(c));
   const attentionCount = cards.filter((c) => matches(c, list.type, true)).length;
-  const ctx: Ctx = { cards, config, membership, searchParams };
+  // A failed read leaves the link out; the card then says where to uninstall in words.
+  const shopifyRow = settings.error ? null : ((settings.data as SettingsRow[] | null) ?? []).find((s) => s.source === "shopify" && s.enabled);
+  const ctx: Ctx = { cards, config, membership, searchParams, shopifyAdminUrl: shopifyRow ? shopifyAppsUrl(shopifyRow.target) : null };
   const now = Date.now();
   const rowFor = (card: SourceCard) => ({
     card,
@@ -174,7 +164,12 @@ export default async function SourcesPage({
           <h1 id="src-h" className="page-title">
             Sources
           </h1>
-          <DashboardButton client={client} />
+          <div className="ph-b">
+            <a className="btn btn-sm" href="/guide">
+              Connection guide
+            </a>
+            <DashboardButton client={client} />
+          </div>
         </div>
         <p className="sum">
           <span>
@@ -318,7 +313,10 @@ export default async function SourcesPage({
                           {MONO[card.source]}
                         </span>
                         <div className="sc-id">
-                          <h3 className="sc-t">{card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}</h3>
+                          {/* Always a link: its ::after covers the card (globals.css), so the whole card opens the source page. */}
+                          <h3 className="sc-t">
+                            <a href={`/sources/${card.source}`}>{card.title}</a>
+                          </h3>
                           {isAttached(card) ? (
                             <p className="sc-s">
                               <span className={cn("st", TONE[card.tone])}>{card.label}</span>
@@ -362,7 +360,9 @@ export default async function SourcesPage({
                       <span className="sc-b" data-kind={kindSlug(KIND[card.source])} aria-hidden="true">
                         {MONO[card.source]}
                       </span>
-                      <span className="sc-t">{card.connected ? <a href={`/sources/${card.source}`}>{card.title}</a> : card.title}</span>
+                      <span className="sc-t">
+                        <a href={`/sources/${card.source}`}>{card.title}</a>
+                      </span>
                     </span>
                   </td>
                   <td data-l="Type">{KIND[card.source]}</td>
@@ -394,10 +394,12 @@ type Ctx = {
   config: ReturnType<typeof getConfig>;
   membership: Awaited<ReturnType<typeof requireHub>>["membership"];
   searchParams: SearchParams;
+  /** The store's admin Apps settings (where the owner uninstalls bcns Connect), or null. */
+  shopifyAdminUrl: string | null;
 };
 
 /** A source's action row, shared by the cards and rows views: Connect, Request connection or Disconnect. */
-function CardActions({ card, cards, config, membership, searchParams }: Ctx & { card: SourceCard }) {
+function CardActions({ card, cards, config, membership, searchParams, shopifyAdminUrl }: Ctx & { card: SourceCard }) {
   return (
     <>
       {/* Disconnecting: no Connect, Request connection or Disconnect until the worker's delete is done. */}
@@ -441,6 +443,22 @@ function CardActions({ card, cards, config, membership, searchParams }: Ctx & { 
           {canDisconnect(card, membership.role) ? (
             <DisconnectControl source={card.source} siblingConnected={googleSiblingConnected(card.source, cards)} />
           ) : null}
+          {/* Shopify is never disconnected from the hub: the owner uninstalls in Shopify, which fires the app-uninstalled webhook. */}
+          {card.source === "shopify" && card.status !== "none" && membership.role === "owner" ? (
+            shopifyAdminUrl ? (
+              <a
+                className="btn btn-out btn-sm"
+                href={shopifyAdminUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Disconnect in Shopify, opens your Shopify admin in a new tab"
+              >
+                Disconnect in Shopify
+              </a>
+            ) : (
+              <p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin (Settings, Apps).</p>
+            )
+          ) : null}
         </div>
       )}
     </>
@@ -463,15 +481,18 @@ function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: stri
   if (ctl.kind === "reconnect-in-shopify") {
     return <p className="tiny">Open bcns Connect from your Shopify admin to reconnect.</p>;
   }
-  return (
-    <p className="tiny">
-      {ctl.url ? (
-        <a href={ctl.url} className="ul">
-          Install bcns Connect from the Shopify App Store
-        </a>
-      ) : (
-        "Install bcns Connect from the Shopify App Store"
-      )}
-    </p>
+  // No stored source: Connect is the App Store listing (rule 2.3.1), in a new tab. No handle configured: plain text.
+  return ctl.url ? (
+    <a
+      className="btn btn-sm"
+      href={ctl.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Connect, opens the Shopify App Store in a new tab"
+    >
+      Connect
+    </a>
+  ) : (
+    <p className="tiny">Install bcns Connect from the Shopify App Store</p>
   );
 }
