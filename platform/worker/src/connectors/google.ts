@@ -1,5 +1,6 @@
 // §4.5/§4.6 shared Google plumbing for meet + drive: bearer fetch, OAuth refresh, recursive folder walk.
 import { type Json, type RunContext, type Source, SourceError } from './index.js'
+import { envStr } from '../db.js'
 
 export const DRIVE = 'https://www.googleapis.com/drive/v3'
 export const FOLDER = 'application/vnd.google-apps.folder'
@@ -18,15 +19,33 @@ export async function googleFetch(ctx: RunContext, source: Source, url: string):
   return r
 }
 
+/**
+ * Operator rows (attributes.oauth_client_secret set, e.g. SB) send exactly what they always did.
+ * Hub-connected rows carry only config.oauth_client_id: the bcns-owned client's secret comes from env
+ * GOOGLE_CLIENT_SECRET, and only when the row's client id is the env GOOGLE_CLIENT_ID, so bcns's secret
+ * never goes out with another client's id. The message names config keys, never a value.
+ */
+export function googleClientCreds(ctx: RunContext, source: Source): { client_id: string; client_secret: string } {
+  const own = ctx.token.attributes?.oauth_client_secret
+  if (typeof own === 'string' && own !== '') return { client_id: ctx.config.oauth_client_id ?? '', client_secret: own }
+  const envId = envStr('GOOGLE_CLIENT_ID'), envSecret = envStr('GOOGLE_CLIENT_SECRET')
+  const id = ctx.config.oauth_client_id || envId
+  if (!id || id !== envId || !envSecret) {
+    throw new SourceError(source, 'no Google OAuth client secret: row has no attributes.oauth_client_secret and GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET do not match this row')
+  }
+  return { client_id: id, client_secret: envSecret }
+}
+
 export async function refreshGoogleToken(ctx: RunContext, source: Source): Promise<{ secret: string; expiresAt: Date }> {
+  const { client_id, client_secret } = googleClientCreds(ctx, source)
   const r = await ctx.fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: ctx.token.refresh_secret ?? '',
-      client_id: ctx.config.oauth_client_id ?? '',
-      client_secret: ctx.token.attributes?.oauth_client_secret ?? '',
+      client_id,
+      client_secret,
     }).toString(),
   })
   const b: Json = await r.json().catch(() => ({}))
