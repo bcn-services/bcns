@@ -25,7 +25,7 @@ export function isHubSource(value: unknown): value is HubSource {
   return typeof value === "string" && (HUB_SOURCES as readonly string[]).includes(value);
 }
 
-const FOLDER_ID = /^[A-Za-z0-9_-]{10,128}$/;
+export const FOLDER_ID = /^[A-Za-z0-9_-]{10,128}$/;
 
 export function folderUrl(id: string): string {
   return `https://drive.google.com/drive/folders/${id}`;

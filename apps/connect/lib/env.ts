@@ -28,6 +28,15 @@ export interface HubConfig {
   quickbooksClientId?: string;
   quickbooksClientSecret?: string;
   /**
+   * ONE bcns-owned Google OAuth client serves both `meet` and `drive` (docs/architecture/chunk7-google-flow.md).
+   * The key and project number feed the Google Picker (folder pick); all four must be set for either source
+   * to go self-serve. The secret is server-only and also keys the signed state and sealed hand-off.
+   */
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googlePickerApiKey?: string;
+  googleCloudProjectNumber?: string;
+  /**
    * Sources whose OAuth app is approved and may show a "Connect" button.
    * Everything absent from this list keeps the chunk-4 "Request connection"
    * email, so a source stays exactly as it was until its review lands.
@@ -106,6 +115,10 @@ export function getConfig(): HubConfig {
     mondayClientSecret: readEnv("MONDAY_CLIENT_SECRET"),
     quickbooksClientId: readEnv("QUICKBOOKS_CLIENT_ID"),
     quickbooksClientSecret: readEnv("QUICKBOOKS_CLIENT_SECRET"),
+    googleClientId: readEnv("GOOGLE_CLIENT_ID"),
+    googleClientSecret: readEnv("GOOGLE_CLIENT_SECRET"),
+    googlePickerApiKey: readEnv("GOOGLE_PICKER_API_KEY"),
+    googleCloudProjectNumber: readEnv("GOOGLE_CLOUD_PROJECT_NUMBER"),
     approvedOAuthSources: (readEnv("OAUTH_APPROVED_SOURCES") ?? "")
       .split(",")
       .map((s) => s.trim().toLowerCase())
