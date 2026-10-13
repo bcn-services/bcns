@@ -17,12 +17,20 @@ const manrope = localFont({
   weight: "300 600",
 });
 
-// The file covers 300..700; the hub's light page titles use 300, so the range starts there.
+// Titles and headings. The file covers 300..700.
 const spaceGrotesk = localFont({
   src: "./fonts/space-grotesk-latin-var.woff2",
   variable: "--font-display",
   display: "swap",
   weight: "300 700",
+});
+
+// Technical values only: URLs, commands, byte counts, ids. The file covers the whole 100..800 axis.
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin-var.woff2",
+  variable: "--font-mono",
+  display: "swap",
+  weight: "100 800",
 });
 
 export const metadata: Metadata = {
@@ -37,7 +45,7 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Signed in: wordmark, nav, workspace name and sign-out. */
+/** Signed in: the slim top bar. Wordmark, nav, workspace name and sign-out. */
 function Header({ membership, client }: { membership: NonNullable<Awaited<ReturnType<typeof currentMembership>>>; client: ClientRow | null }) {
   return (
     <header className="hh">
@@ -50,7 +58,12 @@ function Header({ membership, client }: { membership: NonNullable<Awaited<Return
         </Link>
         <HubNav client={client} role={membership.role} />
         <div className="who">
-          <span>{client?.name ?? "Your workspace"}</span>
+          <span className="wsc">
+            <span className="wsc-m" aria-hidden="true">
+              {(client?.name ?? "Your workspace").trim().charAt(0).toUpperCase()}
+            </span>
+            <span className="wsc-n">{client?.name ?? "Your workspace"}</span>
+          </span>
           <form action={signOut}>
             <button type="submit" className="btn btn-out btn-sm">
               Sign out
@@ -69,7 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const billing = membership ? await loadBilling() : null;
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
+      <body className={`${manrope.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
         {membership ? (
           <>
             <Header membership={membership} client={client} />
@@ -77,9 +90,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <BillingBanner billing={billing} />
               {children}
             </main>
-            <footer className="hfoot">
-              bcns Connect &middot; <a href="https://bcn-services.com">Back to bcn-services.com</a>
-            </footer>
           </>
         ) : (
           <main>{children}</main>

@@ -32,7 +32,7 @@ everything runs nothing at all, which is a safe way to read what it would do.
    straight into Secret Manager;
    none is echoed or written to disk. Step 7 creates the Scheduler job as the `bcns-data-tick`
    service account, so the principal running the script needs `iam.serviceAccounts.actAs` on it —
-   project Owner already has it. Step 6b (QuickBooks) is opt-in — see below; skip it for now.
+   project Owner already has it. Steps 6b (QuickBooks) and 6c (Google) are opt-in — see below; skip them for now.
 3. **Set the four GitHub settings it prints** (step 8) — `GCP_WORKLOAD_IDENTITY_PROVIDER` and
    `GCP_SERVICE_ACCOUNT` as secrets, `GCP_REGION` and `GCP_PROJECT` as variables, all with
    `GITHUB_TOKEN= gh ...`.
@@ -86,6 +86,28 @@ connection made before the job has the client id refreshes with an empty id and 
 `auth_failed`. If 6b fails with permission denied right after the secret grant, wait a minute and re-run it.
 If a half-failed create left the secret with no version, 6b keeps it and the update fails on `:latest`:
 `gcloud secrets versions add QUICKBOOKS_CLIENT_SECRET --data-file=-` fixes it.
+
+## Google Meet/Drive (opt-in, step 6c)
+
+Same shape and reasons as 6b. Hub-connected `meet`/`drive` rows store the bcns-owned OAuth client's id in
+`config.oauth_client_id` and no `attributes.oauth_client_secret`; the worker refreshes them with env
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. The secret is sent only when the row's client id equals
+`GOOGLE_CLIENT_ID`. Operator rows that carry their own `attributes.oauth_client_secret` (SB) never read
+these and refresh exactly as before, so skipping 6c is always safe for them. A hub-connected row refreshed
+with these unset fails closed (no request is made).
+
+| Var | Kind | Where |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | plain env | exported before step 6c (public half) |
+| `GOOGLE_CLIENT_SECRET` | Secret Manager | typed at step 6c's hidden prompt; created once, existing secret kept, accessor bound to the runtime SA |
+
+```
+export GOOGLE_CLIENT_ID=<id>.apps.googleusercontent.com
+bash scripts/gcp-setup.sh      # n to every step except 6c
+```
+
+6c uses `--update-env-vars` / `--update-secrets` (merges), skips with a stderr message if the job is missing
+or the export is unset/invalid, and is safe to re-run. Run it before the first hub Google connection.
 
 ## Afterwards
 
