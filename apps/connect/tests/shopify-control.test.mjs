@@ -43,7 +43,7 @@ test("page.tsx: Shopify install is a Connect button to the App Store in a new ta
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const view = src.slice(src.indexOf("function ShopifyControlView"));
   const link = view.match(/<a[^>]*href=\{ctl\.url\}[^>]*>/)?.[0] ?? "";
-  assert.match(link, /className="btn btn-out btn-sm"/);
+  assert.match(link, /className="btn btn-sm"/);
   assert.match(link, /target="_blank"/);
   assert.match(link, /rel="noopener noreferrer"/);
   // url null: the fallback after ") : (" is the text paragraph, not a link.
@@ -57,7 +57,7 @@ test("page.tsx: every card's title links to its source page, connected or not (w
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(src, /card\.connected \? <a href=\{`\/sources\//);
   assert.equal((src.match(/<a href=\{`\/sources\/\$\{card\.source\}`\}>\{card\.title\}<\/a>/g) ?? []).length, 2, "cards view and rows view");
-  assert.match(src, /<a className="btn btn-out btn-sm" href="\/guide">\s*Connection guide/);
+  assert.match(src, /<a className="btn btn-sm" href="\/guide">\s*Connection guide/);
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /\.grid-src \.sc-t a::after \{[^}]*position: absolute; inset: 0/);
   assert.match(css, /\.grid-src \.sc \{ position: relative; \}/);

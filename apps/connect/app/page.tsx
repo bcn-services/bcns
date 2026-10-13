@@ -160,7 +160,7 @@ export default async function SourcesPage({
             Sources
           </h1>
           <div className="ph-b">
-            <a className="btn btn-out btn-sm" href="/guide">
+            <a className="btn btn-sm" href="/guide">
               Connection guide
             </a>
             <DashboardButton client={client} />
@@ -461,7 +461,7 @@ function ShopifyControlView({ ctl, action }: { ctl: ShopifyControl; action: stri
   // No stored source: Connect is the App Store listing (rule 2.3.1), in a new tab. No handle configured: plain text.
   return ctl.url ? (
     <a
-      className="btn btn-out btn-sm"
+      className="btn btn-sm"
       href={ctl.url}
       target="_blank"
       rel="noopener noreferrer"
