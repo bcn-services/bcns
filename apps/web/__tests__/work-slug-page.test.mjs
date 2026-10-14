@@ -164,7 +164,7 @@ test("every rendered narrative field is real copy (no placeholder regression)", 
 // --- PLAN item 8 wired `screenshots` into the page (next/image rendering). The prior
 // "page.tsx does not read screenshots" invariant is now obsolete by design — its own
 // failure message pointed here. Re-add the empty-array safety net it warned about:
-// both live registry items have non-empty screenshots arrays (see team-memory), so a
+// both live registry items have non-empty screenshots arrays, so a
 // built-HTML check can't exercise the empty case without mutating the registry.
 // Assert the source-level guard instead, consistent with this file's other
 // pageSrc.includes(...) checks for behavior the two live items can't exercise. ---
