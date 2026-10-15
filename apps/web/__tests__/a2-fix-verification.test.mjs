@@ -6,7 +6,7 @@
  *  3. about-founder.tsx uses registry fields for cardTitleBio, cardTitleCredentials, description
  *  4. AboutFounderContent has description?, cardTitleBio, cardTitleCredentials — all wired in registry
  *
- * Run with: npx tsx apps/web/__tests__/a2-fix-verification.test.mjs
+ * Run with: pnpm --filter @bcn-services/web test
  */
 
 import { siteContent } from "../lib/content.ts";

@@ -43,7 +43,6 @@ pnpm --filter @bcn-services/web export   # opt-in static export -> apps/web/out/
 - `apps/connect` and `apps/sb` tests import `packages/tenant/dist` and `packages/data-client/dist`; build both first (`pnpm --filter @bcn-services/tenant build`, same for data-client). Under turbo, `test` depends on `build`, so `pnpm test` does it for you.
 - App `test` scripts are hard-coded file lists (`tsx --test tests/a.test.mjs ...`) in `apps/{connect,sb,_template}/package.json`. A new test file does nothing until it is added to that list. `apps/mcp` runs `tsc && node --test tests/*.test.mjs`; `apps/web` runs `__tests__/*.mjs`.
 - `rm -rf apps/web/.next` before `apps/web` tests: `b3-copy-wiring` and `past-work-card-links` read `.next/server/app` and fail on a stale build.
-- `apps/web`: `__tests__/a2-fix-verification.test.mjs` was red on main when the `apps` CI job was written, so that job excludes `@bcn-services/web` from test (`platform-ci.yml`).
 
 ## What a merge to `main` deploys
 

@@ -53,6 +53,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # turbo's test/lint/typecheck depend on ^build, so workspace deps build first.
       - run: pnpm exec turbo run lint typecheck --filter='./apps/*'
-      # apps/web is excluded from test only: __tests__/a2-fix-verification.test.mjs is red on
-      # main (about-founder.tsx does not wire description). Drop the exclusion once it is fixed.
-      - run: pnpm exec turbo run test --filter='./apps/*' --filter='!@bcn-services/web'
+      - run: pnpm exec turbo run test --filter='./apps/*'
