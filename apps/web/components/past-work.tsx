@@ -15,6 +15,7 @@ import { caseStudyImage } from "@/lib/case-study-images";
 
 /** Tool dot per case, by slug; an unlisted slug falls back to the brand blue. */
 const CASE_DOT: Record<string, string> = {
+  sb: "bg-tool-shopify",
   delucas: "bg-tool-quickbooks",
   l2detailz: "bg-tool-calendar",
 };

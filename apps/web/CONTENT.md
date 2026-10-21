@@ -517,28 +517,23 @@ fixed tuple.
 Portfolio / proof section. `items` is an open-ended array — add more as
 projects are completed. The `link` field is optional.
 
-**Current state:** `pastWork.items` holds two case-study slots — `delucas`
-and `l2detailz` — real bcns clients. Every narrative field (`title`,
-`problem`, `approach`, `outcome`) on both ships as an `[INPUT: …]`
-placeholder. **Never replace these with drafted or invented copy** — a
-fabricated metric on a live marketing site is a false claim about a real
-business. Fill each field only with the real, confirmed detail for that
-client, then remove the `[INPUT: …]` wrapper.
+**Current state:** `pastWork.items` holds three case studies, in display order
+(array order is card order on `/work`): `sb` (SB Command Center, shot on the
+bcns-demo tenant, never SB's real figures), `l2detailz`, `delucas`. Narrative
+fields are filled from detail Nate confirmed. **Never replace them with drafted
+or invented copy** — a fabricated metric on a live marketing site is a false
+claim about a real business.
 
-**Screenshots:** both entries now carry real screenshot files, captured
-locally from each app's demo fixture (never from a deployed instance) and
-committed to `apps/web/public/case-studies/`. `delucas` has one shot
-(`delucas-dashboard.png`); `l2detailz` has two (`l2detailz-frontend.png`,
-`l2detailz-calendar.png`). Each `src` points at a file that exists —
-verified by `apps/web/__tests__/case-study-screenshots.test.mjs`, which
-walks the registry and asserts every `screenshots[].src` resolves to a real
-file. `alt` text is real, descriptive accessibility copy (not a client
-claim, so it's filled in directly). `caption` still ships as an
-`[INPUT: …]` placeholder — captions are public-facing prose about a named
-client and stay behind the same anti-fabrication rule as `title`/`problem`/
-`approach`/`outcome` until Nate confirms the wording.
+**Screenshots:** real PNGs in `apps/web/public/case-studies/`, 1512x801 each.
+The `/work` card shows `screenshots[0]` only; `/work/[slug]` shows all.
+`sb` has one (`sb-command-center.png`, demo data); `l2detailz` has two, calendar
+first (`l2detailz-calendar.png`, `l2detailz-frontend.png`); `delucas` has one
+(`delucas-dashboard.png`). Each `src` must also be registered in
+`lib/case-study-images.ts`. `case-study-screenshots.test.mjs` asserts every
+`src` resolves to a file and no PNG is orphaned. `alt` and `caption` are real
+copy.
 
-**Why `link` is omitted on both entries:** it's optional, and
+**Why `link` is omitted on all entries:** it's optional, and
 `past-work.tsx` renders `{link}` as the visible anchor text — a placeholder
 href would render as a broken, misleading link. Add the field only once a
 real project URL exists.
@@ -569,7 +564,7 @@ Each entry has:
 - **Field:** `pastWork.items[n].slug`
 - **Purpose:** Stable, URL-safe identifier for the case study (React list key; also the `/work/[slug]` detail-page route param)
 - **Tone:** N/A (identifier, not copy)
-- **Note:** Must be unique across `items` and match `^[a-z0-9-]+$`. Current values: `delucas`, `l2detailz`. Set once; do not change after a detail page or external link depends on it.
+- **Note:** Must be unique across `items` and match `^[a-z0-9-]+$`. Current values: `sb`, `l2detailz`, `delucas`. Set once; do not change after a detail page or external link depends on it.
 - **Length:** Short, lowercase, hyphenated
 
 #### items[n].title
@@ -643,7 +638,7 @@ Each entry has:
 - **Field:** `pastWork.items[n].link`
 - **Purpose:** URL to a live project, case study, or write-up
 - **Tone:** N/A (URL only)
-- **Note:** Omitted on both current entries — see "Why `link` is omitted" above.
+- **Note:** Omitted on every current entry — see "Why `link` is omitted" above.
 - **Length:** Valid URL; omit field entirely if no link exists
 
 ### holdingState — shown when items[] is empty

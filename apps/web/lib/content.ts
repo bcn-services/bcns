@@ -733,22 +733,21 @@ export const siteContent: SiteContent = {
     description: "What we've built, and what it changed for the businesses using it.",
     items: [
       {
-        slug: "delucas",
-        title: "DeLuca's revenue dashboard",
-        titleEmphasis: "dashboard",
-        tag: "Restaurant · Bookkeeping",
+        slug: "sb",
+        title: "SB Command Center",
+        titleEmphasis: "Command Center",
+        tag: "Shopify retailer · Operations dashboard",
         problem:
-          "He was not tracking revenue or costs. The only signal he had about the business was the amount that landed in his bank account.",
+          "Orders sat in Shopify, tasks in Monday, meeting notes in Meet, and files in Drive. Getting the day's picture meant opening all four.",
         approach:
-          "A dashboard that fills itself by parsing his email and pulling the rest through direct API access. Recurring items like rent are set once as rules.",
+          "A private dashboard on our shared platform that pulls each tool in on a schedule and shows it in one place. QuickBooks is next.",
         outcome:
-          "He can see monthly revenue, spending, and what he is paying for, without doing anything to keep it current.",
+          "He opens one page for orders, open tasks, meeting notes, and files, with each source's sync status beside it.",
         screenshots: [
           {
-            src: "/case-studies/delucas-dashboard.png",
-            alt: "DeLuca's dashboard showing monthly money in, spent, and profit totals above a 12-month profit bar chart and an expenses-by-category breakdown.",
-            caption:
-              "The monthly view: money in, money out, profit, and which categories the spending went to.",
+            src: "/case-studies/sb-command-center.png",
+            alt: "SB Command Center home page, shown with demo data: KPI tiles and a daily financial report above Shopify, Meta Ads, financials, Meet notes, Monday tasks, a content library and recent activity.",
+            caption: "The home view, shown here with demo data: every connected source on one page, from the week's numbers to meeting notes and files.",
           },
         ],
       },
@@ -765,16 +764,36 @@ export const siteContent: SiteContent = {
           "He manages scheduling, routes, and site promotions in one place, without the manual hours or the room for error.",
         screenshots: [
           {
+            src: "/case-studies/l2detailz-calendar.png",
+            alt: "L2 Detailz admin calendar in month view with scheduled detailing jobs listed across the days of the month.",
+            caption:
+              "The admin calendar: every booking with its time, package, and vehicle, in month view.",
+          },
+          {
             src: "/case-studies/l2detailz-frontend.png",
             alt: "L2 Detailz marketing site showing the Essential, Signature, and Prestige detailing package cards with pricing and included services.",
             caption:
               "The public site, with the three detailing packages and what each includes.",
           },
+        ],
+      },
+      {
+        slug: "delucas",
+        title: "DeLuca's revenue dashboard",
+        titleEmphasis: "dashboard",
+        tag: "Restaurant · Bookkeeping",
+        problem:
+          "He was not tracking revenue or costs. The only signal he had about the business was the amount that landed in his bank account.",
+        approach:
+          "A dashboard that fills itself by parsing his email and pulling the rest through direct API access. Recurring items like rent are set once as rules.",
+        outcome:
+          "He can see monthly revenue, spending, and what he is paying for, without doing anything to keep it current.",
+        screenshots: [
           {
-            src: "/case-studies/l2detailz-calendar.png",
-            alt: "L2 Detailz admin calendar in month view with scheduled detailing jobs listed across the days of the month.",
+            src: "/case-studies/delucas-dashboard.png",
+            alt: "DeLuca's dashboard showing monthly money in, spent, and profit totals above a 12-month profit bar chart and an expenses-by-category breakdown.",
             caption:
-              "The admin calendar: every booking with its time, package, and vehicle, in month view.",
+              "The monthly view: money in, money out, profit, and which categories the spending went to.",
           },
         ],
       },
