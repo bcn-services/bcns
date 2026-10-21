@@ -73,7 +73,7 @@ test("parseBillingSelf: the view follows the status, and a missing Shopify flag 
   assert.equal(parseBillingSelf(null), null);
 });
 
-test("checkoutTarget: a $200/mo subscription session for the signed-in owner's own client", async () => {
+test("checkoutTarget: a $50/mo subscription session for the signed-in owner's own client", async () => {
   const { calls, fetchImpl } = recorder();
   const target = await checkoutTarget(billing(), "owner@acme.example", CONFIG, fetchImpl);
   assert.equal(target, CHECKOUT_URL);

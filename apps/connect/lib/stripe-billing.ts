@@ -1,5 +1,5 @@
 /**
- * stripe-billing.ts — self-serve billing on the hub ($200/mo, no setup fee).
+ * stripe-billing.ts — self-serve billing on the hub ($50/mo, no setup fee).
  *
  * The hub only ever starts a payment and passes Stripe's webhook on: it creates
  * Checkout and billing-portal sessions with plain `fetch` to Stripe's REST API,
@@ -17,7 +17,7 @@ import { createServerSupabase } from "@bcn-services/tenant";
 import { billingView, canStartCheckout, stripeVerifier, type BillingView, type ClientStatus } from "@bcn-services/app-core";
 import type { HubConfig } from "./env";
 
-export const PRICE_LABEL = "$200/mo";
+export const PRICE_LABEL = "$50/mo";
 const STRIPE_API = "https://api.stripe.com/v1";
 const STRIPE_TIMEOUT_MS = 10_000;
 const FORWARD_TIMEOUT_MS = 5_000;

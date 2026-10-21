@@ -257,9 +257,9 @@ test("/pending: a new owner gets Pay plus the don't-pay-here-for-Shopify line; w
   };
 
   const pay = await render();
-  assert.match(pay, /Pay \$200\/mo/);
+  assert.match(pay, /Pay \$50\/mo/);
   assert.match(pay, /Shopify App Store\? Shopify bills you for it, so don&#x27;t pay here\./);
   const shopify = await render(`${SHOPIFY_INSTALL_COOKIE}=1`);
-  assert.doesNotMatch(shopify, /Pay \$200|startCheckout/);
+  assert.doesNotMatch(shopify, /Pay \$50|startCheckout/);
   assert.match(shopify, /bcns reviews every new workspace before it opens/);
 });

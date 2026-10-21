@@ -51,7 +51,7 @@ test("service JSON-LD prices come from pricing.tiers", () => {
     deluxe.offers.priceSpecification.map((p) => p.minPrice),
     [parsePrice(tier("deluxe").setup), parsePrice(tier("deluxe").monthly)],
   );
-  assert.equal(connect.offers.priceSpecification.price, 200);
+  assert.equal(connect.offers.priceSpecification.price, 50);
 });
 
 test("parsePrice throws on text with no dollar amount", () => {

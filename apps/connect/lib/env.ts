@@ -82,7 +82,7 @@ export interface HubConfig {
    */
   signupEnabled: boolean;
   /**
-   * Stripe self-serve billing ($200/mo). All server-only. The secret key creates Checkout and
+   * Stripe self-serve billing ($50/mo). All server-only. The secret key creates Checkout and
    * billing-portal sessions; the webhook signing secret (whsec_...) verifies Stripe's calls to
    * /api/webhooks/stripe, which forwards them to the `stripe-webhook` Edge Function. Any unset =
    * the Pay button is absent and the webhook answers 503 (Stripe retries).

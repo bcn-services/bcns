@@ -108,7 +108,7 @@ export function Tag({ children }: { children: ReactNode }) {
   );
 }
 
-/** "$5,000+ setup" -> ["$5,000+", "setup"]; the string itself is never altered. */
+/** "$2,000+ setup" -> ["$2,000+", "setup"]; the string itself is never altered. */
 function splitPrice(value: string): [string, string] {
   const at = value.indexOf(" ");
   return at === -1 ? [value, ""] : [value.slice(0, at), value.slice(at + 1)];
