@@ -1,5 +1,6 @@
 import type { StaticImageData } from "next/image";
 import delucasDashboard from "@/public/case-studies/delucas-dashboard.png";
+import sbCommandCenter from "@/public/case-studies/sb-command-center.png";
 import l2detailzCalendar from "@/public/case-studies/l2detailz-calendar.png";
 import l2detailzFrontend from "@/public/case-studies/l2detailz-frontend.png";
 
@@ -21,6 +22,7 @@ import l2detailzFrontend from "@/public/case-studies/l2detailz-frontend.png";
  * at build/prerender time (by design), so drift fails loud, not silent.
  */
 const CASE_STUDY_IMAGES: Record<string, StaticImageData> = {
+  "/case-studies/sb-command-center.png": sbCommandCenter,
   "/case-studies/delucas-dashboard.png": delucasDashboard,
   "/case-studies/l2detailz-frontend.png": l2detailzFrontend,
   "/case-studies/l2detailz-calendar.png": l2detailzCalendar,

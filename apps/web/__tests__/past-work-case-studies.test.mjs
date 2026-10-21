@@ -9,13 +9,13 @@ import { siteContent } from "../lib/content.ts";
 
 const { items } = siteContent.pastWork;
 
-test("pastWork.items has exactly 2 entries", () => {
-  assert.equal(items.length, 2);
+test("pastWork.items has exactly 3 entries", () => {
+  assert.equal(items.length, 3);
 });
 
-test("slugs are exactly delucas and l2detailz", () => {
+test("slugs are exactly sb, l2detailz and delucas, in that order", () => {
   const slugs = items.map((i) => i.slug);
-  assert.deepEqual(slugs.sort(), ["delucas", "l2detailz"]);
+  assert.deepEqual(slugs, ["sb", "l2detailz", "delucas"]);
 });
 
 test("every slug is unique", () => {

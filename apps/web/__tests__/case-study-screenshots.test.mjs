@@ -46,9 +46,9 @@ test("public/case-studies contains exactly the files the registry references (no
   );
 });
 
-test("public/case-studies contains exactly three PNGs", () => {
+test("public/case-studies contains exactly four PNGs", () => {
   const onDisk = readdirSync(caseStudiesDir);
-  assert.equal(onDisk.length, 3, `expected exactly 3 files, found: ${onDisk.join(", ")}`);
+  assert.equal(onDisk.length, 4, `expected exactly 4 files, found: ${onDisk.join(", ")}`);
   for (const f of onDisk) {
     assert.match(f, /\.png$/, `${f} is not a .png file`);
   }

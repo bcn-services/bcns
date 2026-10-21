@@ -193,8 +193,8 @@ assert(
 // items is ever emptied again — both branches in past-work.tsx stay live.
 // (Slug/placeholder detail on those entries: past-work-case-studies.test.mjs.)
 assert(
-  "pastWork.items is seeded with the 2 case-study entries",
-  siteContent.pastWork.items.length === 2,
+  "pastWork.items is seeded with the 3 case-study entries",
+  siteContent.pastWork.items.length === 3,
   `got ${siteContent.pastWork.items.length}`
 );
 assert(
