@@ -384,7 +384,7 @@ export type SubscriptionCheckResult =
 /**
  * The managed-pricing gate for a Shopify-initiated install on the PUBLIC app
  * (W6a follow-up). Hub-initiated connects are billed off-platform; an install
- * that starts from Shopify with no active $200/mo managed-pricing
+ * that starts from Shopify with no active $50/mo managed-pricing
  * subscription must land on Shopify's plan page instead of being bound to a
  * tenant. Queried with the merchant's own fresh access token — no Partner API
  * credential needed, matching how the worker already queries the Admin API

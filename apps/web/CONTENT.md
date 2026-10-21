@@ -835,7 +835,7 @@ on top of Connect; the copy should never present them as bigger versions of it.
 
 #### tiers[0].price
 - **Field:** `pricing.tiers[0].price`
-- **Purpose:** Headline monthly price shown on the card (Connect has no setup fee, so the monthly rate is the headline). Currently `$200 per month`.
+- **Purpose:** Headline monthly price shown on the card (Connect has no setup fee, so the monthly rate is the headline). Currently `$50 per month`.
 - **Note:** Must match `connect.rate` and `hero.proofPoints`.
 - **Length:** ≤20 chars
 
@@ -863,17 +863,17 @@ on top of Connect; the copy should never present them as bigger versions of it.
 
 #### tiers[1].price
 - **Field:** `pricing.tiers[1].price`
-- **Purpose:** Headline starting price. Currently `$5,000+ setup` (the `+` marks it as a starting price).
+- **Purpose:** Headline starting price. Currently `$2,000+ setup` (the `+` marks it as a starting price).
 - **Length:** ≤20 chars
 
 #### tiers[1].setup _(optional)_
 - **Field:** `pricing.tiers[1].setup`
-- **Purpose:** Starting setup fee; the card renders this over `price` when present. Currently `$5,000+ setup` (the `+` marks it as a starting price).
+- **Purpose:** Starting setup fee; the card renders this over `price` when present. Currently `$2,000+ setup` (the `+` marks it as a starting price).
 - **Length:** ≤30 chars
 
 #### tiers[1].monthly _(optional)_
 - **Field:** `pricing.tiers[1].monthly`
-- **Purpose:** Monthly add-on on top of Connect. Currently `+ from $300/mo on top of Connect`.
+- **Purpose:** Monthly add-on on top of Connect. Currently `+ from $150/mo on top of Connect`.
 - **Note:** Must match `useCases.blockDescription`. Real quotes vary per build; the site shows the starting figure.
 - **Length:** ≤30 chars
 
@@ -963,7 +963,7 @@ The eleven pre-seeded entries, in order, are:
 7. **Can I use my data with other tools?** — Yes; the data is the client's, and they can plug in the third-party AI tools and apps they like.
 8. **What does a Deluxe build add?** — Something custom on top of Connect, scoped and quoted as a fixed price before work starts.
 9. **Is my data private?** — Only the client's team sees it, and a full export is handed over any time, free.
-10. **How do I pay?** — By card through Stripe, $200 a month, workspace opens right away; a failed payment keeps the workspace open a month while the card is updated; Shopify App Store installs are billed by Shopify, never twice.
+10. **How do I pay?** — By card through Stripe, $50 a month, workspace opens right away; a failed payment keeps the workspace open a month while the card is updated; Shopify App Store installs are billed by Shopify, never twice.
 
 New entries are appended, never inserted, so existing indexes stay stable.
 
@@ -1012,7 +1012,7 @@ Each founder entry has:
 #### founders[n].photo _(optional)_
 - **Field:** `about.founders[n].photo`
 - **Purpose:** Path to the founder's headshot, served from `public/`
-- **Note:** Nate: `/founders/nate-seluga.jpg`. Brandon: field omitted — `about-founder.tsx` falls back to initials, so omit rather than setting a placeholder (a placeholder path renders a broken image). Adding a photo takes two steps: drop the file in `public/founders/`, then register it in `FOUNDER_PHOTOS` in `about-founder.tsx` — next/image needs a static import, so a path alone will not render.
+- **Note:** Nate: `/founders/nate-seluga.jpg`. Brandon: `/founders/brandon-chung.jpg`. Both are 512x512 JPEGs with EXIF stripped. A founder with no `photo` falls back to initials in `about-founder.tsx`, so omit the field rather than setting a placeholder (a placeholder path renders a broken image). To add one, drop the file in `public/founders/` and set the path.
 - **Asset spec:** square crop, shoulders-up, face filling the frame (it renders at 56px), plain background, 512×512 minimum. Shoot both founders in one session so lighting and framing match.
 - **Length:** Valid path under `public/`
 
@@ -1243,7 +1243,7 @@ link). Linked from `/services/connect` and listed in the sitemap. Plain language
 the one technical string is `connectorUrl`, the address Claude and ChatGPT ask for.
 `eyebrow`, `title`, `emphasis`, `description` head the page. `whatTitle` and
 `whatPoints` (three `{ title, description }`) say what it does. `needTitle` and
-`needBody` state the prerequisite and the price ($200/month, no setup fee). `addressTitle`,
+`needBody` state the prerequisite and the price ($50/month, no setup fee). `addressTitle`,
 `addressHelp` and `connectorUrl` show the address to paste. `claude` and `chatgpt` are each
 `{ title, intro, steps[n], note }`; the ChatGPT `note` is deliberately hedged ("depends on
 your plan", "still rolling out"). `supportTitle` and `supportBody` carry the support

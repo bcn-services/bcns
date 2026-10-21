@@ -40,7 +40,7 @@ for (const tier of buildTiers) {
 }
 
 // Spot-check the new pricing literals are present (bcns Connect + Deluxe + Consulting).
-for (const literal of ["$200", "$5,000", "$300", "$1,000"]) {
+for (const literal of ["$50", "$2,000", "$150", "$1,000"]) {
   test(`CONTENT.md contains pricing literal: ${literal}`, () => {
     assert.ok(contentMd.includes(literal), `CONTENT.md missing "${literal}"`);
   });

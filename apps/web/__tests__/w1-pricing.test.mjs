@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { siteContent } from "../lib/content.ts";
 
 // W1 — pricing reshape: bcns Connect + Deluxe + consulting
-// New structure: Connect ($200/mo), Deluxe ($5,000+$300/mo), Consulting ($1,000/day)
+// New structure: Connect ($50/mo), Deluxe ($2,000+$150/mo), Consulting ($1,000/day)
 
 const { tiers } = siteContent.pricing;
 const connect = tiers[0];
@@ -18,7 +18,7 @@ test("criterion 1: pricing has three cards; Connect and Deluxe carry their prici
 
   // Connect: monthly price and no-setup-fee message
   assert.ok(connect.price && connect.price.length > 0, "Connect missing price");
-  assert.match(connect.price, /\$200/, "Connect price should include $200");
+  assert.match(connect.price, /\$50/, "Connect price should include $50");
   assert.ok(!connect.setup, "Connect should not have setup");
   assert.ok(connect.seats && connect.seats.length > 0, "Connect should have seats (no-setup message)");
   assert.match(connect.seats, /[Nn]o setup fee/, "Connect seats field should state 'No setup fee'");
@@ -26,23 +26,23 @@ test("criterion 1: pricing has three cards; Connect and Deluxe carry their prici
   // Deluxe: setup, monthly, and per-tier recurring
   assert.ok(deluxe.setup && deluxe.setup.length > 0, "Deluxe missing setup");
   assert.ok(deluxe.monthly && deluxe.monthly.length > 0, "Deluxe missing monthly");
-  assert.match(deluxe.setup, /\$5,000/, "Deluxe setup should be $5,000");
-  assert.match(deluxe.monthly, /\$300/, "Deluxe monthly should be $300");
+  assert.match(deluxe.setup, /\$2,000/, "Deluxe setup should be $2,000");
+  assert.match(deluxe.monthly, /\$150/, "Deluxe monthly should be $150");
   // Deluxe doesn't have seats overage like old structure
   assert.ok(!deluxe.seats || deluxe.seats.length === 0, "Deluxe should not have seats overage");
 });
 
 test("criterion 2: exact strings appear across pricing registry", () => {
   const blob = JSON.stringify(siteContent.pricing) + JSON.stringify(siteContent.pageMeta?.pricing ?? {});
-  for (const s of ["$200", "$1,000", "$5,000", "$300"]) {
+  for (const s of ["$50", "$1,000", "$2,000", "$150"]) {
     assert.ok(blob.includes(s), `pricing content missing exact string ${s}`);
   }
 });
 
 test("criterion 2b: new tier prices match spec", () => {
-  assert.match(connect.price, /\$200/, "Connect price should be $200/month");
-  assert.match(deluxe.setup, /\$5,000/, "Deluxe setup should be $5,000");
-  assert.match(deluxe.monthly, /\$300/, "Deluxe monthly should be $300");
+  assert.match(connect.price, /\$50/, "Connect price should be $50/month");
+  assert.match(deluxe.setup, /\$2,000/, "Deluxe setup should be $2,000");
+  assert.match(deluxe.monthly, /\$150/, "Deluxe monthly should be $150");
   assert.match(consulting.price, /\$1,000/, "Consulting price should be $1,000/day");
 });
 
@@ -61,7 +61,7 @@ test("criterion 4: no old FAQ cost answer; FAQ reflects new pricing structure", 
   assert.equal(siteContent.faq.items[0].question, "Do you use AI?");
   // New FAQ items exist to explain the pricing
   const faqText = siteContent.faq.items.map(i => `${i.question} ${i.answer}`).join(" ").toLowerCase();
-  assert.ok(/monthly fee|connect.*\$200/.test(faqText), "FAQ should explain the monthly fee and/or Connect pricing");
+  assert.ok(/monthly fee|connect.*\$50/.test(faqText), "FAQ should explain the monthly fee and/or Connect pricing");
   assert.ok(!/\$1,000 setup|\$149|\$3,000|\$349|15 users|\$20\/user|1000.*setup/.test(faqText), "FAQ should not contain old pricing structure");
 });
 
@@ -92,9 +92,9 @@ test("criterion 1b: pricing.tsx component renders tier prices and optional field
   // If a production build exists, assert the rendered HTML carries Connect pricing
   const html = readBuiltPricingHtml();
   if (html) {
-    assert.ok(html.includes("$200"), "built /pricing HTML should include Connect $200/mo");
-    assert.ok(html.includes("$5,000"), "built /pricing HTML should include Deluxe $5,000 setup");
-    assert.ok(html.includes("$300"), "built /pricing HTML should include Deluxe $300/mo");
+    assert.ok(html.includes("$50"), "built /pricing HTML should include Connect $50/mo");
+    assert.ok(html.includes("$2,000"), "built /pricing HTML should include Deluxe $2,000 setup");
+    assert.ok(html.includes("$150"), "built /pricing HTML should include Deluxe $150/mo");
     assert.ok(html.includes("$1,000"), "built /pricing HTML should include Consulting $1,000/day");
   }
 });

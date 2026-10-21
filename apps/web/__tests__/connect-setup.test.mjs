@@ -45,9 +45,9 @@ test("no jargon anywhere in the page copy except inside the connector URL", () =
   }
 });
 
-test("copy is honest about ChatGPT plans and keeps the $200, no-setup-fee price", () => {
+test("copy is honest about ChatGPT plans and keeps the $50, no-setup-fee price", () => {
   assert.match(c.chatgpt.intro + c.chatgpt.note, /if your .*plan supports|depends on your .*plan/i);
-  assert.match(c.needBody, /\$200\/month, no setup fee/);
+  assert.match(c.needBody, /\$50\/month, no setup fee/);
   assert.ok(!/free|unlimited/i.test(fields.map((f) => f.value).join(" ")), "no overclaiming");
 });
 

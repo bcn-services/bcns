@@ -8,7 +8,7 @@ import { siteContent, type PricingTier } from "./content.ts";
 
 const ORG_ID = `${siteConfig.url}/#org`;
 
-/** "$5,000+ setup" → 5000. Throws so a reworded price fails the build, not the schema. */
+/** "$2,000+ setup" → 2000. Throws so a reworded price fails the build, not the schema. */
 export function parsePrice(text: string | undefined): number {
   const amount = text?.match(/\$([\d,]+)/)?.[1];
   if (!amount) throw new Error(`No $ amount in price text: ${text}`);

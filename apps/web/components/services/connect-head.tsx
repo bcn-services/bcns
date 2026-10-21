@@ -2,7 +2,7 @@ import { Eyebrow, GUTTER, emphasize } from "@/components/kit";
 import { Reveal } from "@/components/reveal";
 import { siteContent } from "@/lib/content";
 
-/** /services/connect page head: the standard head plus the rate pill ($200 / month, no setup fee). */
+/** /services/connect page head: the standard head plus the rate pill ($50 / month, no setup fee). */
 export function ConnectHead() {
   const { connect, connectDemo } = siteContent;
   return (

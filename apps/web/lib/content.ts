@@ -555,7 +555,7 @@ export const siteContent: SiteContent = {
     ctaSecondary: "See how it works",
     proofPoints: [
       "Keep the tools you already use",
-      "$200 a month, no setup fee",
+      "$50 a month, no setup fee",
       "Build on top whenever you're ready",
     ],
   },
@@ -617,7 +617,7 @@ export const siteContent: SiteContent = {
     eyebrow: "bcns Connect",
     title: "How bcns Connect works",
     description: "One connection for your whole business.",
-    rate: "$200 / month",
+    rate: "$50 / month",
     steps: [
       {
         step: "01",
@@ -648,7 +648,7 @@ export const siteContent: SiteContent = {
     blockEyebrow: "Deluxe builds",
     blockTitle: "Anything you need, custom built on top of Connect.",
     blockDescription:
-      "Starting at $5,000 setup and $300/month on top of Connect. If you have a pain point, we can build a tool to alleviate it.",
+      "Starting at $2,000 setup and $150/month on top of Connect. If you have a pain point, we can build a tool to alleviate it.",
     items: [
       {
         tag: "Agents",
@@ -816,7 +816,7 @@ export const siteContent: SiteContent = {
       {
         id: "connect",
         name: "bcns Connect",
-        price: "$200 per month",
+        price: "$50 per month",
         seats: "No setup fee.",
         description:
           "The foundation for everything else. Every tool your business runs on, connected and organized in one place.",
@@ -830,9 +830,9 @@ export const siteContent: SiteContent = {
       {
         id: "deluxe",
         name: "Deluxe build",
-        price: "$5,000+ setup",
-        setup: "$5,000+ setup",
-        monthly: "+ from $300/mo on top of Connect",
+        price: "$2,000+ setup",
+        setup: "$2,000+ setup",
+        monthly: "+ from $150/mo on top of Connect",
         description:
           "Anything custom built on top of your Connect data: an agent, an app, a dashboard.",
         features: [
@@ -915,7 +915,7 @@ export const siteContent: SiteContent = {
       {
         question: "How do I pay?",
         answer:
-          "By card, through Stripe. Sign up, pay $200 a month, and your workspace opens right away. If a payment ever fails, your workspace stays open for a month while you update your card. If you added bcns Connect from the Shopify App Store, Shopify bills you instead, so you're never charged twice.",
+          "By card, through Stripe. Sign up, pay $50 a month, and your workspace opens right away. If a payment ever fails, your workspace stays open for a month while you update your card. If you added bcns Connect from the Shopify App Store, Shopify bills you instead, so you're never charged twice.",
       },
     ],
   },
@@ -936,11 +936,11 @@ export const siteContent: SiteContent = {
         ],
       },
       {
-        // No `photo` yet. The component falls back to initials until one exists.
         name: "Brandon Chung",
         roleLine: "Business & clients",
         sameAs: ["https://www.linkedin.com/in/brandon-chung1/"],
-        bio: "Brandon studies economics at New York University and has worked in business evaluation and optimization, including time as an investor. That work comes down to one question asked repeatedly: what enables a business to make money, and what is quietly slowing down that process. He has spent time finding the businesses and projects that already work and identifying what would make them work better. On a bcns project he owns scoping and communication, meaning he is the one who advises you on solutions that are worth building.",
+        photo: "/founders/brandon-chung.jpg",
+        bio: "Brandon studies economics at New York University and has worked with businesses large and small, from global markets to local shops, as an investor and optimizer. He is passionate about helping clients get more out of what they produce, clear bottlenecks, and reclaim time for what they love doing most. At bcns he owns scoping and communication: he advises on which solutions are worth building and is your main contact for every question. Outside work he cooks, fishes, skis, rides mountain bikes and horses, and recently started training Muay Thai.",
         credentials: [
           "Economics, New York University",
         ],
@@ -1208,7 +1208,7 @@ export const siteContent: SiteContent = {
         {
           heading: "Fees and billing",
           body: [
-            "bcns Connect is $200 a month with no setup fee, paid by card through Stripe and renewed each month until you cancel. If you installed it from the Shopify App Store, Shopify bills you instead. Deluxe builds and AI consulting are billed per their Order Form.",
+            "bcns Connect is $50 a month with no setup fee, paid by card through Stripe and renewed each month until you cancel. If you installed it from the Shopify App Store, Shopify bills you instead. Deluxe builds and AI consulting are billed per their Order Form.",
             "You're responsible for any taxes on top of the listed price. If a payment fails, the Services stay on for one month so you can update your card; after that we pause them until the payment goes through, and your data is kept while they're paused.",
             "If we change our pricing, we'll give you reasonable advance notice before the new price takes effect.",
           ],
@@ -1316,7 +1316,7 @@ export const siteContent: SiteContent = {
     home: {
       title: "bcns: Get Your Small Business Ready for AI",
       description:
-        "bcns Connect brings your small business's tools into one organized place, ready for AI and custom software. $200/month, no setup fee.",
+        "bcns Connect brings your small business's tools into one organized place, ready for AI and custom software. $50/month, no setup fee.",
     },
     services: {
       title: "What We Offer",
@@ -1331,7 +1331,7 @@ export const siteContent: SiteContent = {
     pricing: {
       title: "Pricing",
       description:
-        "bcns Connect is $200/month, no setup fee. Deluxe builds from $5,000 setup plus $300/month. AI consulting at $1,000 a day. Fixed quotes.",
+        "bcns Connect is $50/month, no setup fee. Deluxe builds from $2,000 setup plus $150/month. AI consulting at $1,000 a day. Fixed quotes.",
     },
     about: {
       title: "About bcns | Two Founders, Custom Software",
@@ -1341,17 +1341,17 @@ export const siteContent: SiteContent = {
     connect: {
       title: "bcns Connect | Every Tool in One Place",
       description:
-        "bcns Connect plugs into the tools your small business already uses and keeps everything organized in one place. $200/month, no setup fee.",
+        "bcns Connect plugs into the tools your small business already uses and keeps everything organized in one place. $50/month, no setup fee.",
     },
     connectSetup: {
       title: "Use bcns Connect with Claude or ChatGPT",
       description:
-        "Add bcns Connect to Claude or ChatGPT and ask about your orders, money and customers. Read only. $200/month, no setup fee.",
+        "Add bcns Connect to Claude or ChatGPT and ask about your orders, money and customers. Read only. $50/month, no setup fee.",
     },
     deluxe: {
       title: "Deluxe Builds",
       description:
-        "Custom AI agents, apps and dashboards built on top of your bcns Connect data. From $5,000 setup plus $300/month, with a fixed quote before work starts.",
+        "Custom AI agents, apps and dashboards built on top of your bcns Connect data. From $2,000 setup plus $150/month, with a fixed quote before work starts.",
     },
     aiConsulting: {
       title: "AI Consulting",
@@ -1378,7 +1378,7 @@ export const siteContent: SiteContent = {
       label: "Get organized",
       name: "bcns Connect",
       line: "Every tool you use, connected in one organized place.",
-      price: "$200 a month",
+      price: "$50 a month",
       href: "/services/connect",
     },
     {
@@ -1386,7 +1386,7 @@ export const siteContent: SiteContent = {
       label: "Put it to work",
       name: "Deluxe builds",
       line: "An AI agent, an app or a dashboard, built on top of Connect around how you work.",
-      price: "From $5,000 setup",
+      price: "From $2,000 setup",
       href: "/services/deluxe",
     },
     {
@@ -1550,7 +1550,7 @@ export const siteContent: SiteContent = {
     ],
     needTitle: "Before you start",
     needBody:
-      "You need a bcns Connect account with at least one of your tools connected. Connect is $200/month, no setup fee.",
+      "You need a bcns Connect account with at least one of your tools connected. Connect is $50/month, no setup fee.",
     addressTitle: "Your connector address",
     addressHelp: "Claude and ChatGPT both ask for this address when you add bcns. Copy it exactly.",
     connectorUrl: "https://mcp.bcn-services.com/mcp",
