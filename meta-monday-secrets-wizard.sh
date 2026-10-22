@@ -301,8 +301,8 @@ if ! preflight_gh; then
   exit 1
 fi
 say "gh reaches ${GH_REPO}."
-ask DROPLET_SSH "Droplet ssh target [root@146.190.138.141]:"
-DROPLET_SSH="${DROPLET_SSH:-root@146.190.138.141}"
+ask DROPLET_SSH "Droplet ssh target [root@104.236.20.89]:"
+DROPLET_SSH="${DROPLET_SSH:-root@104.236.20.89}"
 ask SSH_KEY "Private key for it [~/.ssh/id_ed25519_bcns]:"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519_bcns}"
 SSH_KEY="${SSH_KEY/#\~/$HOME}"

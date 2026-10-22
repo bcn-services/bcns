@@ -408,8 +408,8 @@ stage "Droplet preflight — read the gate as it is now" 3
 say "oauthEnabled() needs BOTH the approval list AND the Shopify credentials"
 say "(lib/oauth-config.ts:37). Checking the credentials are really there."
 echo
-ask DROPLET_SSH "Droplet ssh target [root@146.190.138.141]:"
-DROPLET_SSH="${DROPLET_SSH:-root@146.190.138.141}"
+ask DROPLET_SSH "Droplet ssh target [root@104.236.20.89]:"
+DROPLET_SSH="${DROPLET_SSH:-root@104.236.20.89}"
 ask SSH_KEY "Private key for it [~/.ssh/id_ed25519_bcns]:"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519_bcns}"
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
@@ -421,8 +421,8 @@ WHO="$(dssh 'id -un' 2>/dev/null | tr -d '[:space:]' || true)"
 if [[ -z "$WHO" ]]; then
   warn "ssh ${DROPLET_SSH} with ${SSH_KEY} failed."
   note "The two routes that work (baselines/2026-09-15/pv1-gates/chunk2-droplet.txt):"
-  note "  root@146.190.138.141     -> ~/.ssh/id_ed25519_bcns"
-  note "  connect@146.190.138.141  -> ~/.ssh/id_ed25519_bcns_deploy"
+  note "  root@104.236.20.89     -> ~/.ssh/id_ed25519_bcns"
+  note "  connect@104.236.20.89  -> ~/.ssh/id_ed25519_bcns_deploy"
   exit 1
 fi
 say "ssh ok, logged in as: ${WHO}"
