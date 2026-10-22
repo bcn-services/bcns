@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DISCONNECTABLE, shopifyControl } from "../lib/sources.ts";
+import { DISCONNECTABLE, canDisconnect, composeSources, shopifyControl } from "../lib/sources.ts";
 
 const SHOP = "fa8a00-11.myshopify.com";
 test("valid ?shop= and no error: hidden-input form; Reconnect when a row exists", () => {
@@ -65,39 +65,36 @@ test("page.tsx: every card's title links to its source page, connected or not (w
   assert.match(css, /\.grid-src \.sc-t a:focus-visible::after/);
 });
 
-const DISC_LINK = /<a\s[^>]*href=\{shopifyAdminUrl\}[^>]*>\s*Disconnect in Shopify\s*<\/a>/;
-test("page.tsx: Disconnect in Shopify is an owner-only new-tab link for a non-none Shopify card; hub still never disconnects Shopify", () => {
+test("Sources card: Shopify gets the generic owner Disconnect; the #137 Shopify-only link, panel and extra read are gone", () => {
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const gate = src.indexOf('card.source === "shopify" && card.status !== "none" && membership.role === "owner" ? (');
-  const link = src.match(DISC_LINK)?.[0] ?? "";
-  assert.ok(gate > 0 && src.indexOf(link) > gate, "link sits behind the shopify + status + owner gate");
-  assert.match(link, /className="btn btn-out btn-sm"/);
-  assert.match(link, /target="_blank"/);
-  assert.match(link, /rel="noopener noreferrer"/);
-  assert.match(link, /aria-label="Disconnect in Shopify, opens your Shopify admin in a new tab"/);
-  // url null: plain words, no link; and it lives in the shared footer (.sc-f) so cards and rows both get it.
-  assert.match(src, /<p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin \(Settings, Apps\)\.<\/p>/);
-  assert.ok(src.indexOf('<div className="sc-f">') < gate);
-  assert.match(src, /api\.rpc\("source_settings_v1"\)/);
-  assert.match(src, /settings\.error \? null :/);
-  // The hub itself still never disconnects Shopify.
-  assert.equal(DISCONNECTABLE.includes("shopify"), false);
-  assert.match(src, /canDisconnect\(card, membership\.role\) \? \(/);
+  assert.match(src, /canDisconnect\(card, membership\.role, bound\) \? \(/);
+  assert.equal(DISCONNECTABLE.includes("shopify"), true);
+  assert.doesNotMatch(src, /Disconnect in Shopify|shopifyAdminUrl|shopifyAppsUrl/);
+  // The one owner-only read tells the gate which sources still have a schedule row (uninstalled store: no health row).
+  assert.match(src, /isOwner \? api\.rpc\("source_settings_v1"\)/);
+  assert.match(src, /Open Sources, Shopify, then Disconnect/);
+  assert.doesNotMatch(src, /Email us to switch/);
+  const page = readFileSync(new URL("../app/sources/[source]/page.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(page, /Disconnect in Shopify|shopifyAppsUrl|shopSwitchByEmail|switch to a different Shopify store|BCNS_EMAIL/);
+  // One Disconnect panel, the generic one, which Shopify reaches two ways: a dead-token source keeps its enabled schedule, and an uninstalled store (enabled=false, no health row) is reached via stored/bound.
+  assert.equal((page.match(/id="disconnect-h"/g) ?? []).length, 1);
+  assert.match(page, /canDisconnect\(disc, membership\.role, bound\) \?/);
+  assert.equal(canDisconnect({ source: "shopify", status: "auth_failed" }, "owner"), true);
 });
-test("source page: Shopify Disconnect panel for the connected owner, with the uninstall sentence and the email line untouched", () => {
-  const src = readFileSync(new URL("../app/sources/[source]/page.tsx", import.meta.url), "utf8");
-  const gate = src.indexOf('source === "shopify" && page.connected && page.isOwner ? (');
-  const panel = src.slice(gate, src.indexOf(") : null}", gate));
-  assert.ok(gate > 0 && panel.includes('className="panel panel-disc"') && panel.includes('<h2 id="disconnect-h">Disconnect</h2>'));
-  assert.match(panel, /<details className="pop">/);
-  assert.match(panel, /Uninstalling bcns Connect in Shopify stops syncing right away\. About 48 hours later Shopify tells bcns to erase what it stored\./);
-  const link = panel.match(/<a\s[^>]*href=\{page\.shopifyAppsUrl\}[^>]*>\s*Disconnect in Shopify\s*<\/a>/)?.[0] ?? "";
-  assert.match(link, /className="btn btn-out btn-sm"/);
-  assert.match(link, /target="_blank"/);
-  assert.match(link, /rel="noopener noreferrer"/);
-  assert.match(panel, /<p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin \(Settings, Apps\)\.<\/p>/);
-  // Sits after the Disconnect panel it replaces for Shopify (canDisconnect is false there), so only one renders.
-  assert.ok(gate > src.indexOf("canDisconnect(disc, membership.role)"));
-  assert.equal((src.match(/id="disconnect-h"/g) ?? []).length, 2, "one per branch, never both");
-  assert.match(src, /To switch to a different Shopify store, email us\./);
+test("Sources card: a Shopify 401 or 404 reads in plain words with the raw text kept for hover, never the Drive folder text", () => {
+  const card = (last_error) => composeSources([{ source: "shopify", status: "auth_failed", last_success_at: null, last_error }]).find((c) => c.source === "shopify");
+  const c401 = card("401 Unauthorized: [API] Invalid API key or access token");
+  assert.match(c401.lastError, /^Shopify has signed bcns out of this store/);
+  assert.match(c401.lastErrorRaw, /^401 Unauthorized/);
+  const c404 = card("HTTP 404");
+  assert.match(c404.lastError, /^Shopify can't find this store/);
+  assert.equal(c404.lastErrorRaw, "HTTP 404");
+  for (const c of [c401, c404]) assert.doesNotMatch(c.lastError, /folder|HTTP|401|404/);
+  // Anything else Shopify says, and every other source, still shows the truncated raw text.
+  assert.equal(card("Shopify refused the token").lastError, "Shopify refused the token");
+  assert.equal(card(null).lastError, null);
+  const other = composeSources([{ source: "drive", status: "error", last_success_at: null, last_error: "HTTP 404" }]).find((c) => c.source === "drive");
+  assert.equal(other.lastError, "HTTP 404");
+  const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.equal((src.match(/title=\{card\.lastErrorRaw \?\? card\.lastError\}/g) ?? []).length, 2, "cards view and rows view");
 });

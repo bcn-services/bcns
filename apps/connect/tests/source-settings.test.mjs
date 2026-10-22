@@ -18,7 +18,6 @@ import {
   parseDriveFolder,
   resetState,
   resyncSource,
-  shopifyAppsUrl,
   sourcePage,
   targetFor,
 } from "../lib/source-settings.ts";
@@ -125,6 +124,33 @@ test("friendlyError points at the fix, never at the jargon", () => {
   assert.doesNotMatch(friendlyError("TypeError: x is undefined"), /notified/);
 });
 
+test("friendlyError for Shopify: 401 and 404 name Shopify, never the Drive folder; every other source is unchanged", () => {
+  for (const raw of ["HTTP 401 Unauthorized", "[API] Invalid API key or access token (unrecognized login or wrong password) 401", "token revoked"]) {
+    assert.match(friendlyError(raw, "shopify"), /^Shopify has signed bcns out of this store \(the app may have been uninstalled\)\. The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect again\.$/, raw);
+  }
+  for (const raw of ["HTTP 404 Not Found", "shop not found"]) {
+    assert.equal(
+      friendlyError(raw, "shopify"),
+      "Shopify can't find this store. It may have been closed or renamed. The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect on the right store.",
+      raw,
+    );
+  }
+  // A Shopify 403 must not read as Drive's folder text.
+  assert.doesNotMatch(friendlyError("HTTP 403 Forbidden", "shopify"), /folder/);
+  // Non-Shopify 404 and the no-source call keep Drive's wording.
+  assert.match(friendlyError("HTTP 404 Not Found"), /couldn't find that folder/);
+  for (const source of ["drive", "meet", "monday", "meta", "quickbooks"]) {
+    assert.match(friendlyError("HTTP 404 Not Found", source), /couldn't find that folder/, source);
+    assert.match(friendlyError("HTTP 401", source), /signed out/, source);
+  }
+  const page = sourcePage({
+    source: "shopify", settings: [settings({ source: "shopify", target: { shop: "acme.myshopify.com" } })], runs: [], role: "owner", now: NOW,
+    health: [{ source: "shopify", status: "auth_failed", last_success_at: null, last_error: "HTTP 404" }],
+  });
+  assert.match(page.lastError.problem, /Shopify can't find this store/);
+  assert.equal(page.lastError.raw, "HTTP 404");
+});
+
 test("friendlyError: the worker's empty-listing failure reads as the empty-folder warning", () => {
   // Exact text platform/worker/src/run.ts throws (Drive is the only guarded source).
   const drive = "found nothing to sync: the folder is empty or not shared with the connected account, so nothing was removed";
@@ -177,7 +203,8 @@ test("sourcePage: owners get the controls, members and Shopify do not", () => {
   });
   assert.equal(shop.resync, null);
   assert.equal(shop.folder, null);
-  assert.equal(shop.shopSwitchByEmail, true);
+  assert.equal("shopSwitchByEmail" in shop, false);
+  assert.equal("shopifyAppsUrl" in shop, false);
 
   const monday = sourcePage({ source: "monday", settings: [settings({ source: "monday" })], runs: [], role: "owner", now: NOW });
   assert.ok(monday.resync);
@@ -353,44 +380,4 @@ test("sourcePage: Status follows connector health like the Sources card, with it
   assert.deepEqual(
     sourcePage({ source: "drive", settings: [settings({ enabled: false })], runs: [], role: "owner", now: NOW, health: null }).status,
     { label: "Not connected", tone: "idle" });
-});
-
-test("shopifyAppsUrl: the store's admin Apps settings, from the shop or the admin_url handle only", () => {
-  const apps = "https://acme.myshopify.com/admin/settings/apps";
-  assert.equal(shopifyAppsUrl({ shop: "acme.myshopify.com" }), apps);
-  assert.equal(shopifyAppsUrl({ shop: "ACME" }), apps, "bare handle");
-  assert.equal(shopifyAppsUrl({ shop: "acme.myshopify.com", admin_url: "https://admin.shopify.com/store/other" }), apps, "shop wins");
-  const viaAdmin = "https://admin.shopify.com/store/acme-1/settings/apps";
-  assert.equal(shopifyAppsUrl({ admin_url: "https://admin.shopify.com/store/acme-1" }), viaAdmin);
-  assert.equal(shopifyAppsUrl({ admin_url: "https://admin.shopify.com/store/acme-1/apps?x=1" }), viaAdmin);
-  assert.equal(shopifyAppsUrl({ shop: "not a shop.com", admin_url: "https://admin.shopify.com/store/acme-1" }), viaAdmin);
-  for (const target of [
-    { admin_url: "https://evil.com/store/acme" },
-    { admin_url: "https://admin.shopify.com.evil.com/store/acme" },
-    { admin_url: "http://admin.shopify.com/store/acme" },
-    { admin_url: "https://admin.shopify.com/store/-acme" },
-    { admin_url: "https://admin.shopify.com/store/acme.evil.com" },
-    { admin_url: "https://admin.shopify.com/store/acme@evil.com" },
-    { shop: "evil.com" },
-    {},
-    null,
-    undefined,
-    "acme.myshopify.com",
-    ["acme.myshopify.com"],
-    42,
-  ]) {
-    assert.equal(shopifyAppsUrl(target), null, JSON.stringify(target));
-  }
-});
-
-test("sourcePage: shopifyAppsUrl is set for a connected Shopify store only", () => {
-  const row = settings({ source: "shopify", target: { shop: "acme.myshopify.com" } });
-  const shop = sourcePage({ source: "shopify", settings: [row], runs: [], role: "owner", now: NOW });
-  assert.equal(shop.shopifyAppsUrl, "https://acme.myshopify.com/admin/settings/apps");
-  // Not connected, or mid-disconnect: no link.
-  assert.equal(sourcePage({ source: "shopify", settings: [{ ...row, enabled: false }], runs: [], role: "owner", now: NOW }).shopifyAppsUrl, null);
-  assert.equal(sourcePage({ source: "shopify", settings: [row], runs: [], role: "owner", now: NOW, disconnecting: ["shopify"] }).shopifyAppsUrl, null);
-  // Another source never gets one, even with a shop in its target.
-  const other = sourcePage({ source: "drive", settings: [settings({ target: { shop: "acme.myshopify.com" } })], runs: [], role: "owner", now: NOW });
-  assert.equal(other.shopifyAppsUrl, null);
 });

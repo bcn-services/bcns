@@ -8,7 +8,7 @@
  * database re-checks owner, tenant, the one-hour limit and the folder id. Everything here is
  * the friendly layer on top.
  */
-import { HUB_SOURCES, TITLES, composeSources, disconnectingNote, type HealthRow, type HubSource, type Tone } from "./sources";
+import { HUB_SOURCES, TITLES, composeSources, disconnectingNote, shopifyFriendlyError, type HealthRow, type HubSource, type Tone } from "./sources";
 import { normalizeShop } from "./shopify-oauth";
 
 /** The only config keys the page ever reads, matching TARGET_KEYS in the migration. */
@@ -115,20 +115,6 @@ export function targetFor(source: HubSource, target: unknown): TargetLine[] {
   }
 }
 
-/**
- * Where an owner uninstalls bcns Connect: the store's Shopify admin Apps settings. The hub never
- * disconnects Shopify itself; uninstalling fires the app/uninstalled webhook (token revoked,
- * schedule off), and Shopify's shop/redact about 48 hours later erases the data. Built only from a validated shop domain or an
- * admin.shopify.com store handle, never from a stored URL as-is. Null when neither is usable.
- */
-export function shopifyAppsUrl(target: unknown): string | null {
-  const t = target && typeof target === "object" && !Array.isArray(target) ? (target as Record<string, unknown>) : {};
-  const shop = normalizeShop(str(t.shop));
-  if (shop) return `https://${shop}/admin/settings/apps`;
-  const handle = str(t.admin_url)?.match(/^https:\/\/admin\.shopify\.com\/store\/([a-z0-9][a-z0-9-]*)(?:[/?#]|$)/i)?.[1];
-  return handle ? `https://admin.shopify.com/store/${handle}/settings/apps` : null;
-}
-
 export type ResetState =
   | { kind: "ready" }
   | { kind: "running" }
@@ -184,16 +170,21 @@ export const ERROR_MESSAGES: Record<string, string> = {
  * A sync error in plain words. The raw text stays available behind a "Details" toggle, so
  * this only has to point at the fix.
  */
-export function friendlyError(raw: string | null | undefined): string | null {
+export function friendlyError(raw: string | null | undefined, source?: HubSource): string | null {
   const text = typeof raw === "string" ? raw.trim() : "";
   if (!text) return null;
   const t = text.toLowerCase();
+  if (source === "shopify") {
+    const shopify = shopifyFriendlyError(t);
+    if (shopify) return shopify;
+  }
   // The worker's empty-listing guard (§4.1, Drive only): nothing listed, so nothing was removed.
   if (/found nothing to sync/.test(t)) return EMPTY_FOLDER_WARNING;
   if (/invalid_grant|token (has been )?(expired|revoked)|unauthori[sz]ed|\b401\b/.test(t)) {
     return "The connection was signed out. Reconnect it from the Sources page.";
   }
-  if (/insufficient ?permission|permission denied|forbidden|\b403\b/.test(t) && !/rate ?limit/.test(t)) {
+  // The folder wording is Drive's; a Shopify 403 falls through to the generic line.
+  if (source !== "shopify" && /insufficient ?permission|permission denied|forbidden|\b403\b/.test(t) && !/rate ?limit/.test(t)) {
     return "We couldn't open that folder. Check that it is shared with the Google account you connected.";
   }
   if (/not ?found|\b404\b/.test(t)) return "We couldn't find that folder. Check the link.";
@@ -278,6 +269,8 @@ export interface SourcePage {
   title: string;
   /** An enabled schedule: gates the owner controls. */
   connected: boolean;
+  /** Any schedule row for this source, enabled or not, and not mid-disconnect: Disconnect stays offered (an uninstalled Shopify store). */
+  stored: boolean;
   /** The Status badge: the Sources card's label and tone (connector health), or Syncing now. */
   status: { label: string; tone: Tone };
   /** The health row's last error: plain words plus the raw text for "Details". */
@@ -295,10 +288,6 @@ export interface SourcePage {
   resync: (ResetState & { lastResetAt: string | null }) | null;
   /** Null when change-folder is not offered. */
   folder: { current: string | null; check: FolderCheck } | null;
-  /** Shopify: switching store is an email to bcns, never a form here. */
-  shopSwitchByEmail: boolean;
-  /** Shopify only: the store's admin Apps settings, where an owner uninstalls bcns Connect. Else null. */
-  shopifyAppsUrl: string | null;
 }
 
 /** Everything the page renders, from the two reads. `settings` may hold every source of the client. */
@@ -328,6 +317,7 @@ export function sourcePage(input: {
     source,
     title: TITLES[source],
     connected,
+    stored: !disconnecting && (input.settings ?? []).some((s) => s.source === source),
     status: disconnecting
       ? { label: "Disconnecting", tone: "idle" }
       : connected && syncRunning
@@ -337,7 +327,7 @@ export function sourcePage(input: {
           : connected
             ? { label: "Connected", tone: "ok" }
             : { label: "Not connected", tone: "idle" },
-    lastError: lastErrorRaw ? { problem: friendlyError(lastErrorRaw) ?? lastErrorRaw, raw: lastErrorRaw } : null,
+    lastError: lastErrorRaw ? { problem: friendlyError(lastErrorRaw, source) ?? lastErrorRaw, raw: lastErrorRaw } : null,
     disconnecting,
     isOwner,
     lastRunAt: row?.last_run_at ?? null,
@@ -354,7 +344,7 @@ export function sourcePage(input: {
         startedAt: r.started_at,
         finishedAt: r.finished_at,
         rows: r.rows_fetched ?? 0,
-        problem: friendlyError(r.error),
+        problem: friendlyError(r.error, source),
         raw: r.error && r.error.trim() ? r.error : null,
       };
     }),
@@ -366,8 +356,6 @@ export function sourcePage(input: {
       isOwner && connected && FOLDER_SOURCES.includes(source)
         ? { current: target[0]?.text ?? null, check: folderCheck(runs, row?.folder_changed_at) }
         : null,
-    shopSwitchByEmail: source === "shopify",
-    shopifyAppsUrl: source === "shopify" && row ? shopifyAppsUrl(row.target) : null,
   };
 }
 

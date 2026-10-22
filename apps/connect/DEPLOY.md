@@ -64,7 +64,16 @@ Known limitation: nothing ends access when the paid period ends. The end time is
 only logged, in `shopify finish paid through <date>`.
 
 A tenant already bound to a different shop is refused before any of this
-(`?error=shop-mismatch`, log `shopify finish rejected (shop_mismatch)`).
+(`?error=shop-mismatch`, log `shopify finish rejected (shop_mismatch)`). The owner clears
+it with Disconnect on Sources, Shopify, then waits a few minutes for the worker to delete the old
+store's rows before installing again.
+
+Shopify Disconnect needs migration `20261022000100_shopify_disconnect.sql` applied first
+(`supabase db push --workdir platform`, Nate-run), before the hub deploy reaches users. Without
+it the button shows but fails with `?error=disconnect-failed`. A Disconnect that uninstalls the app
+makes Shopify send `shop/redact` about 48 hours later; the worker finds no client for that shop
+and emails a `shop_redact_needs_operator` alert. That is expected (the data is already gone): mark
+the `data.privacy_requests` row done by hand.
 
 Log lines to grep in `journalctl -u bcns-app@connect` for a failed install:
 `shopify finish rejected (<code>)`, `shopify finish sent to Shopify's plan page

@@ -12,7 +12,7 @@ import { relativeTime } from "./relative-time";
 import { KIND, MONO, kindSlug } from "./source-look";
 import { readAiLastUsed } from "@/lib/ai-settings";
 import { firstRun, type MemberRow } from "@/lib/first-run";
-import { shopifyAppsUrl, type SettingsRow } from "@/lib/source-settings";
+import type { SettingsRow } from "@/lib/source-settings";
 import {
   canDisconnect,
   composeSources,
@@ -85,7 +85,7 @@ export default async function SourcesPage({
   const [health, disconnecting, settings, egress, members, aiLastUsedAt] = await Promise.all([
     api.from("connector_health_v1").select("source,status,last_run_at,last_success_at,last_error"),
     api.rpc("disconnecting_sources_v1"),
-    // Read-only; only the Shopify row's target is used, for the "Disconnect in Shopify" link.
+    // Owner-only, read-only: which sources still have a schedule row (an uninstalled store has no health row but keeps one).
     isOwner ? api.rpc("source_settings_v1") : Promise.resolve({ data: null, error: null }),
     api.from("egress_status_v1").select("*").limit(1).maybeSingle(),
     isOwner ? api.from("memberships_v1").select("user_id,role,is_smoke") : Promise.resolve({ data: null }),
@@ -134,9 +134,8 @@ export default async function SourcesPage({
   const matches = (c: SourceCard, type = list.type, attention = list.attention) =>
     (!type || KIND[c.source] === type) && (!attention || needsAttention(c));
   const attentionCount = cards.filter((c) => matches(c, list.type, true)).length;
-  // A failed read leaves the link out; the card then says where to uninstall in words.
-  const shopifyRow = settings.error ? null : ((settings.data as SettingsRow[] | null) ?? []).find((s) => s.source === "shopify" && s.enabled);
-  const ctx: Ctx = { cards, config, membership, searchParams, shopifyAdminUrl: shopifyRow ? shopifyAppsUrl(shopifyRow.target) : null };
+  const bound = settings.error ? [] : ((settings.data as SettingsRow[] | null) ?? []).map((s) => s.source);
+  const ctx: Ctx = { cards, config, membership, searchParams, bound };
   const now = Date.now();
   const rowFor = (card: SourceCard) => ({
     card,
@@ -228,7 +227,7 @@ export default async function SourcesPage({
                   : searchParams.error === "connect-expired"
                     ? "Your Shopify connection timed out before sign-in finished (it is held for 15 minutes), so nothing was saved."
                     : searchParams.error === "shop-mismatch"
-                      ? "This bcns account is already connected to a different Shopify store, and one account connects one store. Email us to switch stores."
+                      ? "This bcns account is already connected to a different Shopify store. Open Sources, Shopify, then Disconnect, wait a few minutes for the old store's data to be removed, then install again."
                       : searchParams.error === "disconnect-failed"
                         ? "That source could not be disconnected. Nothing was changed. Try again."
                         : "Something went wrong. Try again."}
@@ -329,7 +328,7 @@ export default async function SourcesPage({
                       </div>
                       {card.disconnecting ? <p className="meta">{lastSuccess}</p> : null}
                       {card.lastError ? (
-                        <p className="err" title={card.lastError}>
+                        <p className="err" title={card.lastErrorRaw ?? card.lastError}>
                           {card.lastError}
                         </p>
                       ) : null}
@@ -369,7 +368,7 @@ export default async function SourcesPage({
                   <td>
                     {isAttached(card) ? <span className={cn("st", TONE[card.tone])}>{card.label}</span> : <span className="mu">Not connected</span>}
                     {card.lastError ? (
-                      <span className="srct-err" title={card.lastError}>
+                      <span className="srct-err" title={card.lastErrorRaw ?? card.lastError}>
                         {card.lastError}
                       </span>
                     ) : null}
@@ -394,12 +393,12 @@ type Ctx = {
   config: ReturnType<typeof getConfig>;
   membership: Awaited<ReturnType<typeof requireHub>>["membership"];
   searchParams: SearchParams;
-  /** The store's admin Apps settings (where the owner uninstalls bcns Connect), or null. */
-  shopifyAdminUrl: string | null;
+  /** Sources with a schedule row, enabled or not (canDisconnect). */
+  bound: string[];
 };
 
 /** A source's action row, shared by the cards and rows views: Connect, Request connection or Disconnect. */
-function CardActions({ card, cards, config, membership, searchParams, shopifyAdminUrl }: Ctx & { card: SourceCard }) {
+function CardActions({ card, cards, config, membership, searchParams, bound }: Ctx & { card: SourceCard }) {
   return (
     <>
       {/* Disconnecting: no Connect, Request connection or Disconnect until the worker's delete is done. */}
@@ -440,24 +439,8 @@ function CardActions({ card, cards, config, membership, searchParams, shopifyAdm
               </button>
             </form>
           )}
-          {canDisconnect(card, membership.role) ? (
+          {canDisconnect(card, membership.role, bound) ? (
             <DisconnectControl source={card.source} siblingConnected={googleSiblingConnected(card.source, cards)} />
-          ) : null}
-          {/* Shopify is never disconnected from the hub: the owner uninstalls in Shopify, which fires the app-uninstalled webhook. */}
-          {card.source === "shopify" && card.status !== "none" && membership.role === "owner" ? (
-            shopifyAdminUrl ? (
-              <a
-                className="btn btn-out btn-sm"
-                href={shopifyAdminUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Disconnect in Shopify, opens your Shopify admin in a new tab"
-              >
-                Disconnect in Shopify
-              </a>
-            ) : (
-              <p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin (Settings, Apps).</p>
-            )
           ) : null}
         </div>
       )}

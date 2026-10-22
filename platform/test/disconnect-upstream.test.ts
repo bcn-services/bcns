@@ -2,6 +2,7 @@
 // fixtures, and the Google sibling decision. The DB-backed flow is quickbooks-disconnect.test.ts.
 import { describe, expect, it } from 'vitest'
 import { SourceError } from '../worker/src/connectors/index.js'
+import { API_VERSION } from '../worker/src/connectors/shopify-url.js'
 import {
   DISCONNECT_SOURCES, GOOGLE_REVOKE_URL, INTUIT_REVOKE_URL, META_PERMISSIONS_URL,
   googleRevokeNeeded, revokeUpstream,
@@ -22,7 +23,7 @@ describe('constants', () => {
     expect(INTUIT_REVOKE_URL).toBe('https://developer.api.intuit.com/v2/oauth2/tokens/revoke')
     expect(GOOGLE_REVOKE_URL).toBe('https://oauth2.googleapis.com/revoke')
     expect(META_PERMISSIONS_URL).toBe('https://graph.facebook.com/v21.0/me/permissions')
-    expect([...DISCONNECT_SOURCES].sort()).toEqual(['drive', 'meet', 'meta', 'monday', 'quickbooks'])
+    expect([...DISCONNECT_SOURCES].sort()).toEqual(['drive', 'meet', 'meta', 'monday', 'quickbooks', 'shopify'])
   })
 })
 
@@ -107,6 +108,45 @@ describe('revokeUpstream: monday', () => {
     expect(await revokeUpstream(f, 'monday', TOKEN, {})).toBe('none')
     expect(calls).toHaveLength(0)
   })
+})
+
+describe('revokeUpstream: shopify', () => {
+  const SHOP = { ...TOKEN, shop: 'acme-store.myshopify.com' }
+  it('DELETEs api_permissions/current.json on the shop with the access token header', async () => {
+    const { f, calls } = fx(() => new Response('', { status: 200 }))
+    expect(await revokeUpstream(f, 'shopify', SHOP, {})).toBe('revoked')
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe(`https://acme-store.myshopify.com/admin/api/${API_VERSION}/api_permissions/current.json`)
+    expect(calls[0].init.method).toBe('DELETE')
+    expect((calls[0].init.headers as Record<string, string>)['X-Shopify-Access-Token']).toBe('access-tok')
+  })
+  it('401, 402, 403, 404 and 423 are already_invalid (dead token, uninstalled app, closed, frozen or locked store)', async () => {
+    for (const status of [401, 402, 403, 404, 423]) {
+      expect(await revokeUpstream(fx(() => json(status, { errors: 'nope' })).f, 'shopify', SHOP, {}), String(status)).toBe('already_invalid')
+    }
+  })
+  it('5xx and 429 throw a SourceError with the status, so the row stays', async () => {
+    for (const status of [429, 500, 503]) {
+      const err = await revokeUpstream(fx(() => json(status, { errors: 'down' })).f, 'shopify', SHOP, {}).catch(e => e)
+      expect(err).toBeInstanceOf(SourceError)
+      expect(err.status).toBe(status)
+    }
+  })
+  it('a network error propagates', async () => {
+    await expect(revokeUpstream(fx(() => { throw new TypeError('fetch failed') }).f, 'shopify', SHOP, {})).rejects.toThrow('fetch failed')
+  })
+  it('no shop on the schedule row: nothing to call, already_invalid', async () => {
+    const { f, calls } = fx(() => new Response('', { status: 200 }))
+    expect(await revokeUpstream(f, 'shopify', { ...TOKEN, shop: null }, {})).toBe('already_invalid')
+    expect(await revokeUpstream(f, 'shopify', TOKEN, {})).toBe('already_invalid')
+    expect(calls).toHaveLength(0)
+  })
+  it.each(['evil.example.com', 'acme.myshopify.com.evil.com', 'acme.myshopify.com/x', 'a@b.myshopify.com', '.myshopify.com', 'https://acme.myshopify.com', 'acme.myshopify.com:8443'])(
+    'bad shop %s throws without fetching', async shop => {
+      const { f, calls } = fx(() => new Response('', { status: 200 }))
+      await expect(revokeUpstream(f, 'shopify', { ...TOKEN, shop }, {})).rejects.toBeInstanceOf(SourceError)
+      expect(calls).toHaveLength(0)
+    })
 })
 
 describe('googleRevokeNeeded (the other Google source)', () => {
