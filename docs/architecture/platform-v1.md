@@ -20,7 +20,7 @@ https://claude.ai/code/artifact/3e05b987-dbf3-4173-8bc3-8fb3789cf59c
 | SB inside as `apps/sb` | Runtime links (cookie, RLS, app URL) are identical either way; inside removes the publish-and-bump tax. Frozen `bcns-client-sb` stays deployable as fallback until SB is live on the platform. |
 | Behaviour-preserving migration | Nothing in the three repos changes function during the merge. Every "unchanged" claim is backed by a baseline captured before the move. |
 | Marketing never depends on Connect | No build-time import, no runtime call, separate host, separate deploy trigger. Hub down ⇒ site up. |
-| Shopify's Connect button ships dark | Decided 2026-09-19. The OAuth flow merges and deploys before Shopify approves the app, but `OAUTH_APPROVED_SOURCES` is left **unset** in `/srv/connect/env` on the droplet — so every card stays on "Request connection" and nobody can start a handshake that would fail. The variable lives only on the droplet, never in the repo, so a deploy can never open the gate by accident. `w3-oauth-wizard.sh` carries both the check that it is closed and the one-line flip for when approval lands. |
+| Shopify's Connect button ships dark | Decided 2026-09-19. The OAuth flow merges and deploys before Shopify approves the app, but `OAUTH_APPROVED_SOURCES` is left **unset** in `/srv/connect/env` on the droplet — so every card stays on "Request connection" and nobody can start a handshake that would fail. The variable lives only on the droplet, never in the repo, so a deploy can never open the gate by accident. `w3-oauth-wizard.sh` carries both the check that it is closed and the one-line flip for when approval lands. **Superseded 2026-10-22 (verified on the droplet):** the gate is open for all six sources (`shopify,quickbooks,meta,meet,drive,monday`). Live gate state is on the droplet, not in the repo. |
 | SB Shopify bridge (temporary) | Decided 2026-09-21. bcns Connect is public and waits on review, so SB (saunaboy-2) connects through the bcns-data custom app meanwhile. Env-driven: with `SHOPIFY_ALT_SHOP`, `SHOPIFY_ALT_CLIENT_ID` and `SHOPIFY_ALT_CLIENT_SECRET` all set, the hub signs, verifies and exchanges for that one shop with bcns-data's pair and writes `app: "bcns-data"` into the schedule config; with any unset it behaves exactly as before. The worker refreshes by that marker, never by shop, so SB reconnecting through bcns Connect (which replaces config) moves it back. Webhooks stay on bcns Connect's secret. Deleted after SB migrates: `grep -rn sb-bridge`, `apps/connect/shopify.app.bcns-data.toml`, `sb-shopify-bridge-wizard.sh`. |
 
 ## Target layout
@@ -69,7 +69,7 @@ Save under `docs/architecture/baselines/2026-09-15/`. Done when committed. This 
 Verification: `diff -r` old repo vs new folder shows only the enumerated config files; test counts equal baseline; RLS suite green; `supabase db diff` empty (no migration in this PR); web preview deploy HTML equals baseline per route modulo build ids; worker image builds from the new path and a dry tick runs; isolation test green.
 
 ### 2. Domain and infra
-- Squarespace DNS: A records `connect`, `mcp`, `sb` → droplet 146.190.138.141 (wildcard `*` if Squarespace allows it; verify). Nothing else on the zone moves; Workspace MX/SPF/DKIM/DMARC untouched. Vercel apex/www records untouched.
+- Squarespace DNS: A records `connect`, `mcp`, `sb` → droplet 104.236.20.89 (nyc3; moved from 146.190.138.141 sfo3 on 2026-10-22, see `infra/README.md`) (wildcard `*` if Squarespace allows it; verify). Nothing else on the zone moves; Workspace MX/SPF/DKIM/DMARC untouched. Vercel apex/www records untouched.
 - TLS: certbot HTTP-01 per subdomain inside `onboard-client.sh` (cert path argument; l2details.com keeps its current cert). `infra/ports.txt` registry + collision check (l2detailz 3100, sb 3101, connect 3102, mcp 3103).
 - Deploy: `bcns-app@<slug>` unit unchanged; artifact is the app's `next build` standalone output from the monorepo.
 - Supabase Auth: site URL + redirect allowlist for `https://*.bcn-services.com/**` (Nate, dashboard). Cookie domain `.bcn-services.com` lives in `packages/tenant`.
@@ -134,9 +134,9 @@ Done when `/library` lists Drive-sourced rows with a working link, no code path 
 Done (v1 = built + submitted) — stated per source, because they no longer share a state:
 - **Shopify: built.** Flow passes on a real dev store (W2, W3) and tokens are renewable (W3.5,
   #38/#41). Remaining: W5a's confirmed findings fixed, then submit in W6a.
-- **Meta: not built.** Flow is W4. Submission (W6b) additionally waits on business verification —
+- **Meta: built** (verified 2026-10-22: Connect button live, OAuth Test tenant syncing). Console: app in development mode, `ads_read` App Review "Review in progress", business verification Verified, Tech Provider access verification "In review" (Meta developer console, 2026-10-22). Was: Flow is W4. Submission (W6b) additionally waits on business verification —
   see §Calendar constraints, which now bottoms out at a business bank account.
-- **Monday: not built.** Flow is W4, submission W6c, light review.
+- **Monday: built** (verified 2026-10-22: Connect button live, SB and OAuth Test tenants syncing). Developer Center app "bcns Connect", status Shared (created 2026-09-18). Marketplace review status: not verified. Was: Flow is W4, submission W6c, light review.
 The hub flips a source's button from "Request" to "Connect" when its approval lands — by setting
 `OAUTH_APPROVED_SOURCES` on the droplet, not by a deploy.
 

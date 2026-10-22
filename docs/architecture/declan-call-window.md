@@ -116,8 +116,8 @@ expiring access token plus its rotating refresh token only ever come out of an O
 round-trip. There is no value Declan can send that survives the afternoon.
 
 So Option A is the only path: Declan opens the install link and approves scopes. The hub gate
-is already open — `OAUTH_APPROVED_SOURCES=shopify` is set on the droplet (hub-wide, every
-client), so Shopify's card renders a real **Connect** button. Drive it from
+is already open — `OAUTH_APPROVED_SOURCES` is set on the droplet (hub-wide, every
+client; as of 2026-10-22 it lists `shopify,quickbooks,meta,meet,drive,monday`), so Shopify's card renders a real **Connect** button. Drive it from
 `https://connect.bcn-services.com`, either with Declan sharing his screen or from Nate's own
 hub login.
 

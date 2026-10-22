@@ -16,7 +16,7 @@ connect Google without bcns in the loop.
 
 | Question | Decision |
 |---|---|
-| GCP project | `bcns-connect` (number 274953429391), bcns-owned, External consent screen, In production. Not `bcns-leads` (that holds "bcns Internal"). |
+| GCP project | `bcns-connect` (number 274953429391), bcns-owned, External consent screen, In production. Not `bcns-leads` (that holds "bcns Internal"). Verified in the Cloud console 2026-10-22: Publishing status In production, User type External, banner "Your app requires verification", 0 users of the 100 user cap, Data Access lists only `drive.readonly` (restricted, "Approval required"). Verification submission status: not verified (Verification Center failed to load). |
 | OAuth client | One Web-application client for the hub. Redirects `<HUB_BASE_URL>/api/oauth/{meet,drive}/callback`. |
 | Scope | `https://www.googleapis.com/auth/drive.readonly` (restricted). App stays unverified and In production: $0, no CASA, capped at 100 users. `drive.file` was the lead and failed the gate (below): a picked folder grants the folder only, not its children. |
 | Folder selection | Google Picker on `/api/oauth/<source>/pick` after consent. The pick is re-checked server-side (`files.get`, must be a folder) with the owner's own token before `api.connect_source`. "Change folder" (`api.set_source_folder`) stays as is. |
@@ -139,7 +139,7 @@ Run `./google-flow-wizard.sh` from the repo root; it walks these in order. Nothi
 6. **Cloud Run worker**: set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the job `bcns-data-worker`
    (`platform/docs/deploy-worker.md`, `platform/scripts/gcp-setup.sh`). This must happen before step 7,
    or the first hub-connected row fails refresh.
-7. **Open the gate**: add `meet,drive` to `OAUTH_APPROVED_SOURCES` in `/srv/connect/env`, restart, and
+7. **Open the gate** (done: `meet` and `drive` are in the live gate and all `GOOGLE_*` keys are set on the droplet, verified 2026-10-22; live state is on the droplet, not in the repo): add `meet,drive` to `OAUTH_APPROVED_SOURCES` in `/srv/connect/env`, restart, and
    confirm the Connect button.
 8. **Verification** (free, optional until a cold client): brand verification (homepage, privacy, domain
    in Search Console) removes nothing on its own for a restricted scope. The restricted-scope

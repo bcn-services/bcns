@@ -21,7 +21,7 @@ Out of scope for v1 (agreed 2026-09-15): AI features, agent chat. Nothing here t
 
 ## 1. QuickBooks
 
-Production live since 2026-10-05; Intuit assessment Approved 2026-10-15.
+Production live since 2026-10-05; Intuit assessment Approved 2026-10-15 (as recorded before 2026-10-22; not re-verified: the Intuit developer console did not load on 2026-10-22). `quickbooks` is in the live gate and its keys are set, verified 2026-10-22; no tenant has a QuickBooks source row yet.
 
 | # | Who | Step | Hand-check |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Production live since 2026-10-05; Intuit assessment Approved 2026-10-15.
 
 Nate picks the route on the call. Route A is free and recommended.
 
-**Route A (recommended).** Declan adds Nate's Facebook user as Analyst on SB's ad account; Nate connects Meta in the hub as SB (`meta` is in the gate). Token lasts 60 days until the `ads_read` App Review passes (submitted 2026-10-15, up to 20 days). Reconnect reminder at day 55.
+**Route A (recommended).** Declan adds Nate's Facebook user as Analyst on SB's ad account; Nate connects Meta in the hub as SB (`meta` is in the gate). Token lasts 60 days until the `ads_read` App Review passes (submitted 2026-10-15, up to 20 days; Meta console 2026-10-22: "Review in progress", app still in development mode). Reconnect reminder at day 55.
 
 | # | Who | Step | Hand-check |
 |---|---|---|---|
