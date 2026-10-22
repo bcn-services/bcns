@@ -158,6 +158,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   connector_runs_v1: { args: { p_source: 'shopify' }, expect: 'none' },
   reset_source_cursors: { args: { p_source: 'shopify' }, expect: 'BCNS3' },
   set_source_folder: { args: { p_source: 'shopify', p_folder_id: 'rpc-scoped-folder', p_folder_url: null }, expect: 'BCNS3' },
+  // A past date fails validation before any write; the tenant is never an argument.
+  record_shopify_paid_through: { args: { p_shop: 'rpc-scoped.myshopify.com', p_until: '2000-01-01T00:00:00Z' }, expect: 'BCNS3' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
