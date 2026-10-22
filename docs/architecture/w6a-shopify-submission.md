@@ -286,6 +286,12 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 
 ## 6. Reviewer instructions (paste into "Testing instructions")
 
+> **Please review the Shopify connection only.** The other cards on Sources (Meta Ads,
+> Monday.com, Google Meet, Google Drive, QuickBooks) connect other services through those
+> services' own sign-in pages. They are separate from this app review and are not part of it.
+> You do not need to click them. Clicking Connect on one opens that service's login or consent
+> screen and stores nothing unless you approve it.
+>
 > bcns Connect is not embedded. After you approve the install, the app opens at
 > connect.bcn-services.com in the same tab. Use your own development or test store.
 >
@@ -293,20 +299,25 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 > 2. Shopify redirects you to the bcns Connect sign-in page. Sign in with:
 >    Email: `TODO(Nate): reviewer email` · Password: `TODO(Nate): reviewer password`.
 >    This account owns a test workspace set up for review.
-> 3. Shopify then shows the $200/month plan page. On a development store it reads "Free to
->    test". Approve the plan.
+> 3. Shopify may show a plan page. No charge is taken at install. On a development store it
+>    reads "Free to test": approve it. If Shopify shows none (the store already has the plan
+>    active), carry on.
 > 4. You land on connect.bcn-services.com, on Sources. A green banner reads "Shopify is
 >    connected. The first pull starts within the hour." The Shopify card shows Connected and
->    your store domain. The first sync runs within the hour, so Your data fills in after that.
+>    its last sync time (it reads "First sync pending" until the first run, a few minutes).
+>    The card has no store domain; open the card to see "Store: <shop>.myshopify.com". The
+>    first sync fills Your data in within minutes.
 > 5. To test uninstall and the privacy webhooks, uninstall the app from the Shopify admin.
 >    Shopify sends `app/uninstalled`, and bcns revokes the stored token and stops syncing
 >    within seconds. The Sources card then shows Not connected, with a blue "Connect" button
 >    that opens the Shopify App Store listing in a new tab, and a "Disconnect" button beside it
->    (the owner can use it to remove the old store's data). About 48 hours later Shopify sends
+>    (the owner can use it to remove the old store's data). Disconnect also works while the app is
+>    installed: it uninstalls the app, then deletes the store's data (a few minutes; the card
+>    reads "Disconnecting" until then). About 48 hours later Shopify sends
 >    `shop/redact`, which deletes the store's data from bcns.
 >
-> Shopify is the only source under review. The other cards on Sources (Meta Ads, Monday.com,
-> Google Meet, Google Drive, QuickBooks) read "Request connection" and lead to no outside login.
+> Shopify is the only source under review. The other cards show a blue "Connect" button that
+> leads to that service's own login; please skip them.
 >
 > One bcns account connects one Shopify store, by design: a workspace's data never mixes two
 > stores. The review account is bound to the first store you install it on, and uninstalling and
@@ -340,13 +351,13 @@ then clicked Meta's Connect and landed on a Facebook login):
   - Migration `20261022000100_shopify_disconnect.sql` must be applied first
     (`supabase db push --workdir platform`, Nate-run), before the hub deploy reaches users.
     Without it the Shopify Disconnect button shows but fails with `disconnect-failed`.
-- `OAUTH_APPROVED_SOURCES=shopify` in `/srv/connect/env`, so no other card has a Connect button
-  leading to an outside login. Restart `bcns-app@connect` and confirm a new pid.
-  **Stale as of 2026-10-22 (verified on the droplet):** the live gate is
-  `shopify,quickbooks,meta,meet,drive,monday` and every card has a Connect button, so the reviewer
-  paragraph above ("Shopify is the only source under review ... read Request connection") is
-  false until the gate or the testing instructions change. Live gate state is on the droplet,
-  not in the repo; read `/srv/connect/env` there, never this doc.
+- `OAUTH_APPROVED_SOURCES` stays as it is on the droplet (2026-10-22: `shopify,quickbooks,meta,
+  meet,drive,monday`, every card has Connect). Decision 2026-10-22: do NOT narrow it for review.
+  SB and other clients connect Meta, QuickBooks and the Google sources through it. The reviewer is
+  told up front, in the first lines of the testing instructions above, to review Shopify only.
+  Narrowing it is a droplet edit by Nate (then restart `bcns-app@connect`, confirm a new pid); if
+  the reviewer detours into another provider's login again, `shopify,quickbooks` is the fallback.
+  Live gate state is on the droplet, not in the repo; read `/srv/connect/env` there, never this doc.
 
 ---
 
@@ -364,6 +375,8 @@ Capture them from the reviewer workspace after a real sync, so the data is from 
    revenue numbers at the top and the Shopify orders table below. Add a second shot with a
    search or date filter applied, and note that **Export CSV** downloads the filtered rows.
 6. *(Optional)* **Team:** `/team`, which shows the workspace belongs to the merchant's own people.
+   Members appear as 8-character ids, not emails, because the hub cannot read other members'
+   emails; the signed-in owner is marked "you".
 
 Don't include the Access page unless §2's AI-tools check passes.
 

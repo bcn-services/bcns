@@ -24,10 +24,11 @@ export const GUIDES: Record<HubSource, SourceGuide> = {
       "Press Install (Shopify may call it Add app) and sign in to your store if Shopify asks.",
       "Approve the access Shopify shows you. bcns can only read your orders, products, customers, inventory, reports and payouts. It can't change anything in your store.",
       "If asked, sign in to bcns Connect with your owner login.",
-      "Approve the plan on Shopify's next screen. Shopify bills the plan you approve there.",
+      "If Shopify shows a plan page, approve it.",
       "bcns Connect opens in that same tab and your first sync starts within the hour. The tab you started from shows it after a reload.",
     ],
-    after: "One workspace connects one store. To switch stores, email us.",
+    after:
+      "One workspace connects one store. To switch stores, the owner disconnects it under Sources, Shopify, waits a few minutes for its data to be removed, then installs bcns Connect on the new store.",
   },
   meta: {
     intro: "Connect your Meta (Facebook) ad account so bcns can read how your ads are doing.",
@@ -88,4 +89,4 @@ export function guideFilter(param: string | string[] | undefined): HubSource | n
 
 /** Shown under every guide: who sees Connect, and what to do when the card says something else. */
 export const GUIDE_FOOTER =
-  "Only the workspace owner sees Connect. If the card says Request connection instead, press it. That emails bcns and we set it up with you.";
+  "Only the workspace owner sees Connect. Other members see Request connection, which emails bcns and we set it up with you.";

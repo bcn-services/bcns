@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DISCONNECTABLE, canDisconnect, composeSources, shopifyControl } from "../lib/sources.ts";
+import { DISCONNECTABLE, canDisconnect, composeSources, shopifyControl, SHOPIFY_RETRY } from "../lib/sources.ts";
 
 const SHOP = "fa8a00-11.myshopify.com";
 test("valid ?shop= and no error: hidden-input form; Reconnect when a row exists", () => {
@@ -90,9 +90,17 @@ test("Sources card: a Shopify 401 or 404 reads in plain words with the raw text 
   assert.match(c404.lastError, /^Shopify can't find this store/);
   assert.equal(c404.lastErrorRaw, "HTTP 404");
   for (const c of [c401, c404]) assert.doesNotMatch(c.lastError, /folder|HTTP|401|404/);
-  // Anything else Shopify says, and every other source, still shows the truncated raw text.
-  assert.equal(card("Shopify refused the token").lastError, "Shopify refused the token");
+  // A dead refresh token is a sign-out too.
+  assert.match(card("Shopify token refresh failed: requires an active refresh_token").lastError, /^Shopify has signed bcns out of this store/);
+  // Anything else Shopify says reads as a plain retry line, never raw (App Store round 3); the raw stays for hover.
+  for (const raw of ["HTTP 403 Forbidden", "429 Too Many Requests", "HTTP 500", "Shopify refused the token"]) {
+    const c = card(raw);
+    assert.equal(c.lastError, SHOPIFY_RETRY, raw);
+    assert.doesNotMatch(c.lastError, /HTTP|\d{3}|token/);
+    assert.equal(c.lastErrorRaw, raw);
+  }
   assert.equal(card(null).lastError, null);
+  // Every other source still shows the truncated raw text.
   const other = composeSources([{ source: "drive", status: "error", last_success_at: null, last_error: "HTTP 404" }]).find((c) => c.source === "drive");
   assert.equal(other.lastError, "HTTP 404");
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");

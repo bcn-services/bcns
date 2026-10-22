@@ -141,7 +141,8 @@ export function composeSources(
       label,
       tone,
       lastSuccessAt: row?.last_success_at ?? null,
-      lastError: source === "shopify" ? (shopifyFriendlyError(row?.last_error) ?? raw) : raw,
+      // Shopify never shows raw worker text on the card (App Store round 3); the raw stays in the hover title.
+      lastError: source === "shopify" && raw ? (shopifyFriendlyError(raw) ?? SHOPIFY_RETRY) : raw,
       lastErrorRaw: raw,
       disconnecting: false,
       disconnectingNote: null,
@@ -149,13 +150,16 @@ export function composeSources(
   });
 }
 
+/** The Sources card's line for any Shopify error shopifyFriendlyError doesn't name. */
+export const SHOPIFY_RETRY = `Shopify's last sync hit a problem. bcns tries again on the next sync. If it keeps happening, email ${BCNS_EMAIL}.`;
+
 /**
  * Shopify's 401 (signed out / uninstalled) and 404 (store gone) in plain words, else null.
  * Lives here, not in source-settings.ts, because composeSources needs it and source-settings imports this file.
  */
 export function shopifyFriendlyError(raw: string | null | undefined): string | null {
   const t = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (/invalid_grant|token (has been )?(expired|revoked)|revoked|unauthori[sz]ed|\b401\b/.test(t)) {
+  if (/invalid_grant|refresh_token|token (has been )?(expired|revoked)|revoked|unauthori[sz]ed|\b401\b/.test(t)) {
     return "Shopify has signed bcns out of this store (the app may have been uninstalled). The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect again.";
   }
   if (/not ?found|\b404\b/.test(t)) {

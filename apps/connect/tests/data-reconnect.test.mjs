@@ -102,11 +102,11 @@ test("page.tsx routes through composeDataPage, hides Export CSV at zero rows, an
   assert.doesNotMatch(src, /state\.kind === "ready"/);
 });
 
-test("hub card keeps the connector's reason under 'Reconnect needed', flattened and short", () => {
+test("hub card keeps the connector's reason under 'Reconnect needed', flattened and short (raw, for the hover title)", () => {
   const c = shopifyOnly("auth_failed", { last_error: `Shopify refused\nthe token ${"x".repeat(300)}` })[0];
   assert.equal(c.label, "Reconnect needed");
-  assert.match(c.lastError, /^Shopify refused the token x+…$/);
-  assert.ok(c.lastError.length <= 140);
+  assert.match(c.lastErrorRaw, /^Shopify refused the token x+…$/);
+  assert.ok(c.lastErrorRaw.length <= 140);
 });
 
 test("top bar links 'Your data' for a client with no app_url, whatever the source health", () => {
