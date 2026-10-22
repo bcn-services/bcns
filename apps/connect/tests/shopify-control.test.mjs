@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DISCONNECTABLE, canDisconnect, composeSources, shopifyControl, SHOPIFY_RETRY } from "../lib/sources.ts";
+import { DISCONNECTABLE, canDisconnect, composeSources, shopifyControl, SHOPIFY_RETRY, SHOPIFY_SIGNED_OUT } from "../lib/sources.ts";
 
 const SHOP = "fa8a00-11.myshopify.com";
 test("valid ?shop= and no error: hidden-input form; Reconnect when a row exists", () => {
@@ -93,12 +93,17 @@ test("Sources card: a Shopify 401 or 404 reads in plain words with the raw text 
   // A dead refresh token is a sign-out too.
   assert.match(card("Shopify token refresh failed: requires an active refresh_token").lastError, /^Shopify has signed bcns out of this store/);
   // Anything else Shopify says reads as a plain retry line, never raw (App Store round 3); the raw stays for hover.
+  const errored = (last_error) => composeSources([{ source: "shopify", status: "error", last_success_at: null, last_error }]).find((c) => c.source === "shopify");
   for (const raw of ["HTTP 403 Forbidden", "429 Too Many Requests", "HTTP 500", "Shopify refused the token"]) {
-    const c = card(raw);
+    const c = errored(raw);
     assert.equal(c.lastError, SHOPIFY_RETRY, raw);
     assert.doesNotMatch(c.lastError, /HTTP|\d{3}|token/);
     assert.equal(c.lastErrorRaw, raw);
   }
+  // auth_failed with unnamed text (the worker classes a 403 as auth): the sign-out line, never "tries again".
+  assert.equal(card("HTTP 403 Forbidden").lastError, SHOPIFY_SIGNED_OUT);
+  // The match runs on the full error, not the 140-char card truncation.
+  assert.equal(errored(`${"x".repeat(200)} 401 Unauthorized`).lastError, SHOPIFY_SIGNED_OUT);
   assert.equal(card(null).lastError, null);
   // Every other source still shows the truncated raw text.
   const other = composeSources([{ source: "drive", status: "error", last_success_at: null, last_error: "HTTP 404" }]).find((c) => c.source === "drive");

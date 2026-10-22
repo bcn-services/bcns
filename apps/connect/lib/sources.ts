@@ -142,7 +142,9 @@ export function composeSources(
       tone,
       lastSuccessAt: row?.last_success_at ?? null,
       // Shopify never shows raw worker text on the card (App Store round 3); the raw stays in the hover title.
-      lastError: source === "shopify" && raw ? (shopifyFriendlyError(raw) ?? SHOPIFY_RETRY) : raw,
+      // auth_failed (worker classified it as auth, e.g. a 403) gets the sign-out line, not "tries again".
+      lastError:
+        source === "shopify" && raw ? (shopifyFriendlyError(row?.last_error) ?? (status === "auth_failed" ? SHOPIFY_SIGNED_OUT : SHOPIFY_RETRY)) : raw,
       lastErrorRaw: raw,
       disconnecting: false,
       disconnectingNote: null,
@@ -151,6 +153,8 @@ export function composeSources(
 }
 
 /** The Sources card's line for any Shopify error shopifyFriendlyError doesn't name. */
+export const SHOPIFY_SIGNED_OUT =
+  "Shopify has signed bcns out of this store (the app may have been uninstalled). The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect again.";
 export const SHOPIFY_RETRY = `Shopify's last sync hit a problem. bcns tries again on the next sync. If it keeps happening, email ${BCNS_EMAIL}.`;
 
 /**
@@ -160,7 +164,7 @@ export const SHOPIFY_RETRY = `Shopify's last sync hit a problem. bcns tries agai
 export function shopifyFriendlyError(raw: string | null | undefined): string | null {
   const t = typeof raw === "string" ? raw.toLowerCase() : "";
   if (/invalid_grant|refresh_token|token (has been )?(expired|revoked)|revoked|unauthori[sz]ed|\b401\b/.test(t)) {
-    return "Shopify has signed bcns out of this store (the app may have been uninstalled). The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect again.";
+    return SHOPIFY_SIGNED_OUT;
   }
   if (/not ?found|\b404\b/.test(t)) {
     return "Shopify can't find this store. It may have been closed or renamed. The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect on the right store.";

@@ -39,5 +39,5 @@ test("Shopify guide matches the Disconnect flow (#144) and makes no billing clai
   assert.match(GUIDES.shopify.after, /disconnects it under Sources, Shopify/);
   // An owner's card always has Connect now; only other members see Request connection.
   assert.doesNotMatch(GUIDE_FOOTER, /If the card says Request connection/);
-  assert.match(GUIDE_FOOTER, /Other members see Request connection/);
+  assert.match(GUIDE_FOOTER, /Other members, and any source bcns hasn't opened yet, show Request connection/);
 });

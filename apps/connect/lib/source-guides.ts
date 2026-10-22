@@ -89,4 +89,4 @@ export function guideFilter(param: string | string[] | undefined): HubSource | n
 
 /** Shown under every guide: who sees Connect, and what to do when the card says something else. */
 export const GUIDE_FOOTER =
-  "Only the workspace owner sees Connect. Other members see Request connection, which emails bcns and we set it up with you.";
+  "Only the workspace owner sees Connect. Other members, and any source bcns hasn't opened yet, show Request connection instead. It emails bcns and we set it up with you.";
