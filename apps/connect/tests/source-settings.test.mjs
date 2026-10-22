@@ -18,6 +18,7 @@ import {
   parseDriveFolder,
   resetState,
   resyncSource,
+  shopifyAppsUrl,
   sourcePage,
   targetFor,
 } from "../lib/source-settings.ts";
@@ -352,4 +353,44 @@ test("sourcePage: Status follows connector health like the Sources card, with it
   assert.deepEqual(
     sourcePage({ source: "drive", settings: [settings({ enabled: false })], runs: [], role: "owner", now: NOW, health: null }).status,
     { label: "Not connected", tone: "idle" });
+});
+
+test("shopifyAppsUrl: the store's admin Apps settings, from the shop or the admin_url handle only", () => {
+  const apps = "https://acme.myshopify.com/admin/settings/apps";
+  assert.equal(shopifyAppsUrl({ shop: "acme.myshopify.com" }), apps);
+  assert.equal(shopifyAppsUrl({ shop: "ACME" }), apps, "bare handle");
+  assert.equal(shopifyAppsUrl({ shop: "acme.myshopify.com", admin_url: "https://admin.shopify.com/store/other" }), apps, "shop wins");
+  const viaAdmin = "https://admin.shopify.com/store/acme-1/settings/apps";
+  assert.equal(shopifyAppsUrl({ admin_url: "https://admin.shopify.com/store/acme-1" }), viaAdmin);
+  assert.equal(shopifyAppsUrl({ admin_url: "https://admin.shopify.com/store/acme-1/apps?x=1" }), viaAdmin);
+  assert.equal(shopifyAppsUrl({ shop: "not a shop.com", admin_url: "https://admin.shopify.com/store/acme-1" }), viaAdmin);
+  for (const target of [
+    { admin_url: "https://evil.com/store/acme" },
+    { admin_url: "https://admin.shopify.com.evil.com/store/acme" },
+    { admin_url: "http://admin.shopify.com/store/acme" },
+    { admin_url: "https://admin.shopify.com/store/-acme" },
+    { admin_url: "https://admin.shopify.com/store/acme.evil.com" },
+    { admin_url: "https://admin.shopify.com/store/acme@evil.com" },
+    { shop: "evil.com" },
+    {},
+    null,
+    undefined,
+    "acme.myshopify.com",
+    ["acme.myshopify.com"],
+    42,
+  ]) {
+    assert.equal(shopifyAppsUrl(target), null, JSON.stringify(target));
+  }
+});
+
+test("sourcePage: shopifyAppsUrl is set for a connected Shopify store only", () => {
+  const row = settings({ source: "shopify", target: { shop: "acme.myshopify.com" } });
+  const shop = sourcePage({ source: "shopify", settings: [row], runs: [], role: "owner", now: NOW });
+  assert.equal(shop.shopifyAppsUrl, "https://acme.myshopify.com/admin/settings/apps");
+  // Not connected, or mid-disconnect: no link.
+  assert.equal(sourcePage({ source: "shopify", settings: [{ ...row, enabled: false }], runs: [], role: "owner", now: NOW }).shopifyAppsUrl, null);
+  assert.equal(sourcePage({ source: "shopify", settings: [row], runs: [], role: "owner", now: NOW, disconnecting: ["shopify"] }).shopifyAppsUrl, null);
+  // Another source never gets one, even with a shop in its target.
+  const other = sourcePage({ source: "drive", settings: [settings({ target: { shop: "acme.myshopify.com" } })], runs: [], role: "owner", now: NOW });
+  assert.equal(other.shopifyAppsUrl, null);
 });

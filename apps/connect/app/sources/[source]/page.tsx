@@ -15,6 +15,7 @@ import {
 } from "@/lib/source-settings";
 import { changeFolderAction, resyncAction } from "./actions";
 import { DisconnectControl } from "@/app/disconnect";
+import { SourceGuide } from "@/app/source-guide";
 import { canDisconnect, composeSources, googleSiblingConnected, type HealthRow } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
@@ -140,6 +141,8 @@ export default async function SourceSettingsPage({
         ) : null}
       </article>
 
+      <SourceGuide source={source} />
+
       {page.resync ? (
         <section className="panel" aria-labelledby="resync-h">
           <div className="hd">
@@ -225,6 +228,35 @@ export default async function SourceSettingsPage({
               health.error ? null : googleSiblingConnected(source, composeSources(health.data as HealthRow[] | null))
             }
           />
+        </section>
+      ) : null}
+
+      {/* Shopify is never disconnected from the hub: uninstalling in Shopify fires the app-uninstalled webhook. */}
+      {source === "shopify" && page.connected && page.isOwner ? (
+        <section className="panel panel-disc" aria-labelledby="disconnect-h">
+          <div className="hd">
+            <h2 id="disconnect-h">Disconnect</h2>
+            <details className="pop">
+              <summary aria-label="About disconnecting">?</summary>
+              <div className="pop-b">Shopify owns this: uninstall bcns Connect there to stop syncing.</div>
+            </details>
+          </div>
+          <p className="sub">Uninstalling bcns Connect in Shopify stops syncing right away. About 48 hours later Shopify tells bcns to erase what it stored.</p>
+          <div className="ss-act">
+            {page.shopifyAppsUrl ? (
+              <a
+                className="btn btn-out btn-sm"
+                href={page.shopifyAppsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Disconnect in Shopify, opens your Shopify admin in a new tab"
+              >
+                Disconnect in Shopify
+              </a>
+            ) : (
+              <p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin (Settings, Apps).</p>
+            )}
+          </div>
         </section>
       ) : null}
 
