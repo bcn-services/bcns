@@ -296,8 +296,8 @@ banner "SB Shopify bridge — connect fa8a00-11 through bcns-data-2"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
 stage "Hub — replace the three ALT vars and restart" 6
-ask DROPLET_SSH "Droplet ssh target [root@146.190.138.141]:"
-DROPLET_SSH="${DROPLET_SSH:-root@146.190.138.141}"
+ask DROPLET_SSH "Droplet ssh target [root@104.236.20.89]:"
+DROPLET_SSH="${DROPLET_SSH:-root@104.236.20.89}"
 ask SSH_KEY "Private key for it [~/.ssh/id_ed25519_bcns]:"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519_bcns}"
 SSH_KEY="${SSH_KEY/#\~/$HOME}"

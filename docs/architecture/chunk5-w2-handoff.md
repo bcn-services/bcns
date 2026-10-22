@@ -44,7 +44,10 @@ Script half (run by Nate in his own terminal, confirmed healthy):
 ### 3a. The droplet is L2 Detailz's box, reused
 
 `bcns-l2detailz`, **146.190.138.141**, SFO3, **1 GB RAM / 25 GB disk**, DigitalOcean
-project `bcns-web-apps`. It was never provisioned for the platform. Chunk 1 ported the
+project `bcns-web-apps`. **Moved 2026-10-22** to
+`bcns-web-apps-nyc`, **104.236.20.89**, nyc3 (same size), next to Supabase us-east-1;
+sfo3 stays up 48h then is destroyed, and l2detailz is retired, not moved. The rest of
+this section describes the old box. It was never provisioned for the platform. Chunk 1 ported the
 *pipeline* onto a box that already existed for a client.
 
 `bcns-app@.service` is a systemd template; `l2detailz`, `sb` and `connect` are three
