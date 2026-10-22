@@ -92,7 +92,8 @@ they land on the plan page, which offers nothing to approve
 already bound to a *different* shop is refused with `?error=shop-mismatch`
 (`api.shopify_shop_mismatch`, one boolean about the caller's own tenant) so it is never
 offered a charge for a shop `data.attach_source` would then refuse (BCNS7, still the
-authority); a failed read is the generic error page. The subscription check is retried
+authority); the refusal tells the owner to Disconnect Shopify on Sources, wait a few
+minutes for the old store's data to be removed, and install again; a failed read is the generic error page. The subscription check is retried
 once on a transient failure (timeout, network error, non-2xx) because `/callback`'s new
 grant has already killed an existing client's stored refresh token; no `ACTIVE` entry,
 a GraphQL error, a malformed body, or a second transient failure fails closed to
@@ -119,6 +120,11 @@ merchant's token). It is shop-specific, not a `[[webhooks.subscriptions]]` entry
 schedule (`/api/webhooks/shopify/app-uninstalled` → `shopify-shop-redact` →
 `api.record_app_uninstalled`); the uninstall itself deletes no rows
 (`data.revoke_shopify_install`, `20260929000200_shopify_uninstall_shop_mismatch.sql`).
+The owner's Disconnect on Sources, Shopify is the hub's way to clear a store: it revokes bcns's
+access in Shopify (which uninstalls the app there, so Shopify ends the subscription) and the
+worker deletes the old store's rows. If bcns can't reach the store (the token is already dead),
+the app stays installed and billing continues until the merchant also uninstalls it in the
+Shopify admin; the confirm text says so.
 A failed registration only warns; the gate above does not
 depend on it, and the next connect registers again. A shop connected before this shipped
 has no subscription until its next connect.
@@ -291,8 +297,9 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 > 5. To test uninstall and the privacy webhooks, uninstall the app from the Shopify admin.
 >    Shopify sends `app/uninstalled`, and bcns revokes the stored token and stops syncing
 >    within seconds. The Sources card then shows Not connected, with a blue "Connect" button
->    that opens the Shopify App Store listing in a new tab. About 48 hours later Shopify sends `shop/redact`, which
->    deletes the store's data from bcns.
+>    that opens the Shopify App Store listing in a new tab, and a "Disconnect" button beside it
+>    (the owner can use it to remove the old store's data). About 48 hours later Shopify sends
+>    `shop/redact`, which deletes the store's data from bcns.
 >
 > Shopify is the only source under review. The other cards on Sources (Meta Ads, Monday.com,
 > Google Meet, Google Drive, QuickBooks) read "Request connection" and lead to no outside login.
@@ -302,7 +309,8 @@ session, because `middleware.ts` excludes `api/webhooks/`.
 > reinstalling on that same store works any number of times. Installing on a different store with
 > the same account is refused with "This bcns account is already connected to a different Shopify
 > store". That refusal is the intended protection, not an error. To test with a different store,
-> write to nseluga@bcn-services.com and we reset the review account the same day.
+> open Sources, then Shopify, then Disconnect, wait a few minutes for the old store's data to be
+> removed, then install again.
 >
 > The app only reads data. It never changes products, orders or customers. For help, write to
 > nseluga@bcn-services.com or see https://bcn-services.com.
@@ -317,9 +325,17 @@ set, the hub shows "Open your dashboard" and a "Dashboard" top-bar link to it, a
 review tenant bound to `bcns-review-dev`, so the reviewer's store hit BCNS7, and the reviewer
 then clicked Meta's Connect and landed on a Facebook login):
 - The review tenant has no `shopify` row in `data.connector_schedule`. BCNS7 counts a revoked
-  token's row too. Clear it by queueing a `shop/redact` for the old shop (insert into
-  `data.privacy_requests` as an operator; the worker deletes the tenant's Shopify rows on its
-  next tick once the token has been dead 24 hours).
+  token's row too. No manual `shop/redact` queue is needed any more: the reset is the owner
+  Disconnect on Sources, Shopify (signed in as the review account). It revokes bcns's access in
+  Shopify (uninstalling the app there; if the token is already dead and bcns can't reach the
+  store, the app stays installed and billing continues until it is uninstalled in the Shopify
+  admin) and the worker deletes the old store's rows within about 10 minutes.
+  - About 48 hours after a Disconnect that uninstalled the app, Shopify sends `shop/redact`. The
+    worker finds no client for that shop and emails a `shop_redact_needs_operator` alert. That is
+    expected: the data is already gone. Mark the `data.privacy_requests` row done by hand.
+  - Migration `20261022000100_shopify_disconnect.sql` must be applied first
+    (`supabase db push --workdir platform`, Nate-run), before the hub deploy reaches users.
+    Without it the Shopify Disconnect button shows but fails with `disconnect-failed`.
 - `OAUTH_APPROVED_SOURCES=shopify` in `/srv/connect/env`, so no other card has a Connect button
   leading to an outside login. Restart `bcns-app@connect` and confirm a new pid.
 

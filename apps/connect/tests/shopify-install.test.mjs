@@ -1089,7 +1089,8 @@ test("finish route wiring: subscription gate runs before the connect_source writ
   assert.doesNotMatch(route, /connector_health_v1|alreadyConnected/, "no already-connected exemption may come back");
   assert.match(route, /finishErrorCode\(error\)/);
   // The hub shows the shop-mismatch copy, and the uninstall webhook is public and delegates.
-  assert.match(read("../app/page.tsx"), /searchParams\.error === "shop-mismatch"[\s\S]{0,300}one account connects one store/);
+  assert.match(read("../app/page.tsx"), /searchParams\.error === "shop-mismatch"[\s\S]{0,300}Open Sources, Shopify, then Disconnect, wait a few minutes/);
+  assert.doesNotMatch(read("../app/page.tsx"), /Email us to switch stores/);
   assert.match(read("../app/api/webhooks/shopify/app-uninstalled/route.ts"), /appUninstalledRoute\(request\)/);
   assert.ok(read("../middleware.ts").includes("api/webhooks/"), "middleware matcher must leave /api/webhooks/ (Shopify sends no cookie) unauthenticated");
 });

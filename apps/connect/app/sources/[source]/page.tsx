@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { cn } from "@bcn-services/ui";
 import { loadClient, requireHub } from "@/lib/session";
 import { formatDateTime } from "@/lib/data-format";
-import { BCNS_EMAIL } from "@/lib/request-connection";
 import {
   EMPTY_FOLDER_WARNING,
   ERROR_MESSAGES,
@@ -54,6 +53,8 @@ export default async function SourceSettingsPage({
   });
   const ok = searchParams.ok ? OK_MESSAGES[searchParams.ok] : undefined;
   const disc = { source, status: page.connected ? "ok" : "none" } as const;
+  // An uninstalled Shopify store has a disabled schedule row and no health row: still disconnectable.
+  const bound = page.stored ? [source] : [];
 
   return (
     <div className="pg" data-source={source}>
@@ -131,14 +132,6 @@ export default async function SourceSettingsPage({
             </Link>
           </p>
         )}
-        {page.shopSwitchByEmail && page.connected ? (
-          <p className="meta">
-            To switch to a different Shopify store, email us.{" "}
-            <a href={`mailto:${BCNS_EMAIL}`} className="btn btn-out btn-sm">
-              Email us
-            </a>
-          </p>
-        ) : null}
       </article>
 
       <SourceGuide source={source} />
@@ -213,7 +206,7 @@ export default async function SourceSettingsPage({
       ) : null}
 
       {/* Same gate and control as the Sources card; "connected" here is an enabled schedule. */}
-      {canDisconnect(disc, membership.role) ? (
+      {canDisconnect(disc, membership.role, bound) ? (
         <section className="panel panel-disc" aria-labelledby="disconnect-h">
           <div className="hd">
             <h2 id="disconnect-h">Disconnect</h2>
@@ -228,35 +221,6 @@ export default async function SourceSettingsPage({
               health.error ? null : googleSiblingConnected(source, composeSources(health.data as HealthRow[] | null))
             }
           />
-        </section>
-      ) : null}
-
-      {/* Shopify is never disconnected from the hub: uninstalling in Shopify fires the app-uninstalled webhook. */}
-      {source === "shopify" && page.connected && page.isOwner ? (
-        <section className="panel panel-disc" aria-labelledby="disconnect-h">
-          <div className="hd">
-            <h2 id="disconnect-h">Disconnect</h2>
-            <details className="pop">
-              <summary aria-label="About disconnecting">?</summary>
-              <div className="pop-b">Shopify owns this: uninstall bcns Connect there to stop syncing.</div>
-            </details>
-          </div>
-          <p className="sub">Uninstalling bcns Connect in Shopify stops syncing right away. About 48 hours later Shopify tells bcns to erase what it stored.</p>
-          <div className="ss-act">
-            {page.shopifyAppsUrl ? (
-              <a
-                className="btn btn-out btn-sm"
-                href={page.shopifyAppsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Disconnect in Shopify, opens your Shopify admin in a new tab"
-              >
-                Disconnect in Shopify
-              </a>
-            ) : (
-              <p className="tiny">To disconnect, uninstall bcns Connect in your Shopify admin (Settings, Apps).</p>
-            )}
-          </div>
         </section>
       ) : null}
 

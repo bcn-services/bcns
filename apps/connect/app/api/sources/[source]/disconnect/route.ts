@@ -1,6 +1,6 @@
 /**
  * POST /api/sources/<source>/disconnect — owner-only, for every source in
- * DISCONNECTABLE (lib/sources.ts; never Shopify). Calls api.disconnect_source, which
+ * DISCONNECTABLE (lib/sources.ts). Calls api.disconnect_source, which
  * marks the stored token revoked and disables the schedule; the worker then revokes
  * it upstream where the provider allows it and deletes the client's data for that
  * source (platform/worker/src/disconnect.ts). The hub never reads or revokes the token.

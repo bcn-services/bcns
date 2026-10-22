@@ -38,10 +38,10 @@ async function load() {
   return { post };
 }
 
-test("allow-list: exactly the five disconnectable sources, never Shopify", () => {
-  assert.deepEqual([...DISCONNECTABLE].sort(), ["drive", "meet", "meta", "monday", "quickbooks"]);
-  for (const s of ["quickbooks", "meet", "drive", "monday", "meta"]) assert.equal(isDisconnectable(s), true, s);
-  for (const s of ["shopify", "upload", "platform", "", "QUICKBOOKS", "quickbooks/", undefined, null, 1]) {
+test("allow-list: exactly the six disconnectable sources, Shopify included", () => {
+  assert.deepEqual([...DISCONNECTABLE].sort(), ["drive", "meet", "meta", "monday", "quickbooks", "shopify"]);
+  for (const s of ["quickbooks", "meet", "drive", "monday", "meta", "shopify"]) assert.equal(isDisconnectable(s), true, s);
+  for (const s of ["upload", "platform", "", "QUICKBOOKS", "quickbooks/", undefined, null, 1]) {
     assert.equal(isDisconnectable(s), false, String(s));
   }
   assert.equal(disconnectPath("meet"), "/api/sources/meet/disconnect");
@@ -56,9 +56,9 @@ test("a cross-site POST is refused before any session read", async () => {
   }
 });
 
-test("Shopify and unknown sources are refused before the session and the RPC", async () => {
+test("unknown sources are refused before the session and the RPC", async () => {
   const { post } = await load();
-  for (const source of ["shopify", "upload", "nope"]) {
+  for (const source of ["upload", "nope"]) {
     const res = await post(source);
     assert.equal(res.status, 303);
     // No session exists here: reaching ownerSession would answer forbidden instead.
@@ -68,7 +68,7 @@ test("Shopify and unknown sources are refused before the session and the RPC", a
 
 test("every disconnectable source without an owner session is forbidden", async () => {
   const { post } = await load();
-  for (const source of ["quickbooks", "meet", "drive", "monday", "meta"]) {
+  for (const source of ["quickbooks", "meet", "drive", "monday", "meta", "shopify"]) {
     const res = await post(source);
     assert.equal(res.status, 303);
     assert.equal(res.headers.get("location"), `${HUB}/?error=forbidden`, source);
@@ -95,21 +95,47 @@ test("the old QuickBooks-only route is gone and nothing points at it", () => {
   }
 });
 
-test("canDisconnect: every source x role x status; Shopify never", () => {
+test("canDisconnect: every source x role x status, Shopify like the rest", () => {
   const statuses = ["ok", "stale", "auth_failed", "error", "never_ran", "none"];
   for (const source of HUB_SOURCES) {
     for (const role of ["owner", "member", null, undefined, "OWNER"]) {
       for (const status of statuses) {
-        const want = source !== "shopify" && role === "owner" && status !== "none";
+        const want = role === "owner" && status !== "none";
         assert.equal(canDisconnect({ source, status }, role), want, `${source}/${role}/${status}`);
       }
     }
   }
-  assert.equal(canDisconnect({ source: "shopify", status: "ok" }, "owner"), false);
+  // The reviewer's state: the token is dead, the card reads Reconnect needed, and the owner can still disconnect.
+  assert.equal(canDisconnect({ source: "shopify", status: "auth_failed" }, "owner"), true);
+  assert.equal(canDisconnect({ source: "shopify", status: "none" }, "owner"), false);
+  assert.equal(canDisconnect({ source: "shopify", status: "ok" }, "member"), false);
+});
+
+test("canDisconnect: an uninstalled store (status none, schedule row kept) still offers Disconnect to the owner, unless the delete is under way", () => {
+  const card = (over = {}) => ({ source: "shopify", status: "none", ...over });
+  assert.equal(canDisconnect(card(), "owner", ["shopify"]), true);
+  assert.equal(canDisconnect(card({ disconnecting: true }), "owner", ["shopify"]), false);
+  assert.equal(canDisconnect(card(), "member", ["shopify"]), false);
+  assert.equal(canDisconnect(card(), "owner", []), false);
+  assert.equal(canDisconnect(card(), "owner"), false);
+  assert.equal(canDisconnect(card(), "owner", ["meta"]), false, "another source's row does not count");
+  assert.equal(canDisconnect({ source: "upload", status: "none" }, "owner", ["upload"]), false, "not a disconnectable source");
+  // The page models: Sources card via composeSources, source page via sourcePage.
+  const row = { source: "shopify", enabled: false, last_run_at: null, last_success_at: null, next_run_at: null, last_reset_at: null, folder_changed_at: null, sync_running: false, target: { shop: "acme.myshopify.com" } };
+  const run = (extra = {}) => sourcePage({ source: "shopify", settings: [row], runs: [], role: "owner", now: new Date("2026-10-22T12:00:00Z"), health: [], ...extra });
+  const uninstalled = run();
+  assert.equal(uninstalled.connected, false);
+  assert.equal(uninstalled.stored, true);
+  assert.equal(canDisconnect({ source: "shopify", status: uninstalled.connected ? "ok" : "none" }, "owner", uninstalled.stored ? ["shopify"] : []), true);
+  const gone = sourcePage({ source: "shopify", settings: [], runs: [], role: "owner", now: new Date("2026-10-22T12:00:00Z"), health: [] });
+  assert.equal(gone.stored, false);
+  assert.equal(run({ disconnecting: ["shopify"] }).stored, false, "mid-disconnect: no second Disconnect");
+  const cardNow = composeSources([], ["shopify"]).find((c) => c.source === "shopify");
+  assert.equal(canDisconnect(cardNow, "owner", ["shopify"]), false);
 });
 
 test("confirm text: names what is deleted and the fresh re-import, per source", () => {
-  const titles = { quickbooks: "QuickBooks", meet: "Google Meet", drive: "Google Drive", monday: "Monday.com", meta: "Meta Ads" };
+  const titles = { quickbooks: "QuickBooks", meet: "Google Meet", drive: "Google Drive", monday: "Monday.com", meta: "Meta Ads", shopify: "Shopify" };
   for (const [source, title] of Object.entries(titles)) {
     const text = disconnectCopy(source).join(" ");
     assert.ok(text.includes(`deletes the ${title} data bcns has stored for this workspace`), source);
@@ -119,6 +145,11 @@ test("confirm text: names what is deleted and the fresh re-import, per source", 
   }
   assert.match(disconnectCopy("quickbooks").join(" "), /cancels its access to your QuickBooks account/);
   assert.match(disconnectCopy("meta").join(" "), /cancels its access to your Meta Ads account/);
+  // Shopify: removing access uninstalls the app there, and the owner is told so.
+  const shopify = disconnectCopy("shopify");
+  assert.equal(shopify.length, 2);
+  assert.match(shopify[1], /bcns also removes its access to your Shopify store, which uninstalls bcns Connect there\. Shopify ends the subscription when it is uninstalled\. If bcns can't reach your store, also uninstall bcns Connect in your Shopify admin \(Settings, Apps\) to end the subscription\./);
+  assert.doesNotMatch(shopify.join(" "), /email|cancels its access/i);
   // Monday: no revoke endpoint, so the owner is told to remove bcns there too, and never promised a cancel.
   const monday = disconnectCopy("monday").join(" ");
   assert.match(monday, /no way for bcns to cancel its access/);
@@ -171,7 +202,8 @@ test("googleSiblingConnected: the other Google card is anything but Not connecte
 
 test("banner: only for a disconnectable source", () => {
   assert.equal(disconnectedNote("meta"), "Meta Ads is disconnected. bcns is deleting the Meta Ads data it stored for this workspace.");
-  for (const v of ["shopify", "<script>", "", undefined]) assert.equal(disconnectedNote(v), null);
+  assert.equal(disconnectedNote("shopify"), "Shopify is disconnected. bcns is deleting the Shopify data it stored for this workspace.");
+  for (const v of ["upload", "<script>", "", undefined]) assert.equal(disconnectedNote(v), null);
 });
 
 test("pages: both render the one shared two-step <details> control, gated by canDisconnect, no window.confirm", () => {
@@ -182,11 +214,11 @@ test("pages: both render the one shared two-step <details> control, gated by can
   const hub = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(
     hub,
-    /canDisconnect\(card, membership\.role\) \? \(\s*<DisconnectControl source=\{card\.source\} siblingConnected=\{googleSiblingConnected\(card\.source, cards\)\} \/>/,
+    /canDisconnect\(card, membership\.role, bound\) \? \(\s*<DisconnectControl source=\{card\.source\} siblingConnected=\{googleSiblingConnected\(card\.source, cards\)\} \/>/,
   );
   assert.match(hub, /disconnectedNote\(searchParams\.disconnected\)/);
   const page = readFileSync(new URL("../app/sources/[source]/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /canDisconnect\(disc, membership\.role\) \?/);
+  assert.match(page, /canDisconnect\(disc, membership\.role, bound\) \?/);
   assert.match(
     page,
     /<DisconnectControl\s+source=\{disc\.source\}\s+siblingConnected=\{\s*health\.error \? null : googleSiblingConnected\(source, composeSources\(health\.data as HealthRow\[\] \| null\)\)\s*\}\s+\/>/,

@@ -1224,8 +1224,9 @@ marker, an ambiguous shop→client match, or a shopify token not confirmed dead 
 ### 5.9b Owner disconnect (`worker/src/disconnect.ts`)
 
 The hub's `POST /api/sources/<source>/disconnect` calls `api.disconnect_source` (owner only;
-allow-list `quickbooks`, `meet`, `drive`, `monday`, `meta`; Shopify is BCNS3, its uninstall flow
-owns it), which marks the token `revoked` / `owner_disconnect`, disables the schedule and deletes
+allow-list `quickbooks`, `meet`, `drive`, `monday`, `meta`, `shopify`; the SB bridge row
+(`config.app='bcns-data'`) is BCNS3. Shopify's upstream revoke is `DELETE api_permissions/current.json`,
+which uninstalls the app; it is skipped when another client holds an active grant on the same shop), which marks the token `revoked` / `owner_disconnect`, disables the schedule and deletes
 the health row. `revokeDisconnected` runs in housekeeping after `probeAuthFailed`: per
 (client, source), with the token row locked (for meet/drive, both Google rows in one
 statement, so overlapping runs cannot deadlock) and no schedule lease held, it revokes upstream

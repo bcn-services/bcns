@@ -26,7 +26,7 @@ const { NextRequest } = await import("next/server");
 const { POST } = await import(new URL("../app/api/sources/[source]/disconnect/route.ts", import.meta.url).href);
 const post = (source) =>
   POST(new NextRequest(`${HUB}/api/sources/${source}/disconnect`, { method: "POST", headers: SAME }), { params: { source } });
-const SOURCES = ["quickbooks", "meet", "drive", "monday", "meta"];
+const SOURCES = ["quickbooks", "meet", "drive", "monday", "meta", "shopify"];
 const reset = (role, rpcError = null) => Object.assign(state, { role, rpcError, calls: [] });
 
 test("a signed-in MEMBER is refused with forbidden and no RPC call is made", async () => {
@@ -48,8 +48,8 @@ test("an OWNER reaches api.disconnect_source with exactly the posted source", as
   }
 });
 
-test("an owner posting shopify or an unknown source never reaches the RPC", async () => {
-  for (const source of ["shopify", "upload", "nope"]) {
+test("an owner posting an unknown source never reaches the RPC", async () => {
+  for (const source of ["upload", "nope"]) {
     reset("owner");
     const res = await post(source);
     assert.equal(res.headers.get("location"), `${HUB}/?error=disconnect-failed`, source);

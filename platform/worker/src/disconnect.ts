@@ -1,17 +1,19 @@
-// Owner-initiated disconnect, worker half, for quickbooks, meet, drive, monday and meta.
-// api.disconnect_source (migrations 20261002000100, 20261007000500) marks the token 'revoked' /
-// 'owner_disconnect'; this housekeeping step revokes it upstream (revokeUpstream) and then deletes
-// that source's token row, schedule, health row and data for the client. Shopify is never here:
-// its uninstall flow owns it.
+// Owner-initiated disconnect, worker half, for quickbooks, meet, drive, monday, meta and shopify.
+// api.disconnect_source (migrations 20261002000100, 20261007000500, 20261022000100) marks the token
+// 'revoked' / 'owner_disconnect'; this housekeeping step revokes it upstream (revokeUpstream) and
+// then deletes that source's token row, schedule, health row and data for the client. Shopify's
+// uninstall/redact flow (privacy.ts) still owns app/uninstalled and shop/redact; this is the owner's
+// self-serve exit and uses the same deletion (scope.ts).
 //
 // Only status_detail 'owner_disconnect' rows: a row an operator revoked by hand is never
 // auto-deleted. Never logs the token: only client id, source, outcome, and redact()ed error text.
 import { envStr, sql, storage, tx, type Tick } from './db.js'
 import { SourceError, reason, redact } from './connectors/index.js'
+import { API_VERSION } from './connectors/shopify-url.js'
 import { deleteClientRows, deleteRawScoped } from './scope.js'
 
 /** Sources an owner can disconnect. Mirrors api.disconnect_source's allow-list and the hub's DISCONNECTABLE. */
-export const DISCONNECT_SOURCES = ['quickbooks', 'meet', 'drive', 'monday', 'meta'] as const
+export const DISCONNECT_SOURCES = ['quickbooks', 'meet', 'drive', 'monday', 'meta', 'shopify'] as const
 export type DisconnectSource = (typeof DISCONNECT_SOURCES)[number]
 
 /** Intuit's revocation_endpoint (developer.api.intuit.com/.well-known/openid_configuration). */
@@ -21,10 +23,16 @@ export const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke'
 /** Same Graph version as connectors/meta.ts (its GRAPH const is not exported; connectors are read-only). */
 export const META_PERMISSIONS_URL = 'https://graph.facebook.com/v21.0/me/permissions'
 
-const DUE = `source in ('quickbooks', 'meet', 'drive', 'monday', 'meta') and status = 'revoked' and status_detail = 'owner_disconnect'`
+const DUE = `source in ('quickbooks', 'meet', 'drive', 'monday', 'meta', 'shopify') and status = 'revoked' and status_detail = 'owner_disconnect'`
 
 export type Revoke = 'revoked' | 'already_invalid' | 'none'
 export type Outcome = Revoke | 'kept_for_sibling'
+
+/** A plain store host. Anything else is never fetched: the shop comes from a config column. */
+// sb-bridge: the one store on the bcns-data app, never auto-deleted (same literals as privacy.ts;
+// duplicated so the disconnect worker does not import the privacy task). Remove with privacy.ts's.
+const BRIDGE_SHOP = 'fa8a00-11.myshopify.com'
+const SHOP_HOST = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i
 
 export interface RevokeEnv { QUICKBOOKS_CLIENT_ID?: string; QUICKBOOKS_CLIENT_SECRET?: string }
 
@@ -35,7 +43,7 @@ export interface RevokeEnv { QUICKBOOKS_CLIENT_ID?: string; QUICKBOOKS_CLIENT_SE
  */
 export async function revokeUpstream(
   fetchFn: typeof fetch, source: DisconnectSource,
-  token: { secret: string; refresh_secret: string | null }, env: RevokeEnv,
+  token: { secret: string; refresh_secret: string | null; shop?: string | null }, env: RevokeEnv,
 ): Promise<Revoke> {
   const signal = AbortSignal.timeout(10_000)
   // Revoking the refresh token revokes the grant; the access token is the fallback.
@@ -78,6 +86,23 @@ export async function revokeUpstream(
       if (r.status === 400 && body?.error === 'invalid_token') return 'already_invalid'
       throw new SourceError(source, reason(body, r.status), r.status, body)
     }
+    case 'shopify': {
+      // No shop on the schedule row: nothing to call, and the row must not get stuck.
+      if (!token.shop) return 'already_invalid'
+      if (!SHOP_HOST.test(token.shop)) throw new SourceError('shopify', 'shop is not a *.myshopify.com host', 400)
+      // Uninstalls the app in that store; the access token (not the refresh token) authorises it.
+      const r = await fetchFn(`https://${token.shop}/admin/api/${API_VERSION}/api_permissions/current.json`, {
+        method: 'DELETE', headers: { 'X-Shopify-Access-Token': token.secret }, signal,
+      })
+      if (r.ok) return 'revoked'
+      // Token dead, revoked or the app already uninstalled / store gone: the row still gets deleted.
+      // ponytail: an expired (1 hour) access token also 401s and lands here, so the Shopify-side grant
+      // can stay until the merchant uninstalls — upgrade: refresh the token, then retry the DELETE.
+      // 402 / 423: a frozen or locked store refuses Admin calls; nothing more to revoke.
+      if ([401, 402, 403, 404, 423].includes(r.status)) return 'already_invalid'
+      const body = await r.json().catch(() => ({}))
+      throw new SourceError('shopify', reason(body, r.status), r.status, body)
+    }
     case 'meta': {
       const url = `${META_PERMISSIONS_URL}?access_token=${encodeURIComponent(token.secret)}`
       const r = await fetchFn(url, { method: 'DELETE', signal })
@@ -107,7 +132,7 @@ const GOOGLE_SIBLING: Partial<Record<DisconnectSource, DisconnectSource>> = { me
 
 /** Which upstream a failure belongs to: one provider down must not hold up the others. */
 const PROVIDER: Record<DisconnectSource, string> = {
-  quickbooks: 'intuit', meet: 'google', drive: 'google', meta: 'meta', monday: 'monday',
+  quickbooks: 'intuit', meet: 'google', drive: 'google', meta: 'meta', monday: 'monday', shopify: 'shopify',
 }
 
 /**
@@ -138,12 +163,30 @@ async function revokeOne(t: Tick, clientId: string, source: DisconnectSource): P
       `select 1 from data.connector_schedule where client_id = $1 and source = $2 and lease_until > now() for update`, [clientId, source])
     if (leased.rows.length) return null
 
+    // Shopify: the shop lives on the schedule row, which the deletes below remove, so read it first.
+    let shop: string | null = null
+    if (source === 'shopify') {
+      const s = (await c.query<{ shop: string | null; app: string | null }>(
+        `select config->>'shop' shop, config->>'app' app from data.connector_schedule where client_id = $1 and source = $2`, [clientId, source])).rows[0]
+      shop = s?.shop ?? null
+      // sb-bridge: never deleted or purged, whatever the token says. Stays due; logged each tick.
+      if (s?.app === 'bcns-data' || shop?.toLowerCase() === BRIDGE_SHOP) {
+        t.log('shopify_disconnect_skipped_bridge', { client: clientId, source })
+        return null
+      }
+    }
+
     let outcome: Outcome
     if (sibling && !googleRevokeNeeded(sib)) outcome = 'kept_for_sibling'
+    // Another client holds a live grant on this shop (a reinstall elsewhere): our DELETE would uninstall it.
+    else if (shop && (await c.query(
+      `select 1 from data.connector_schedule s join data.source_tokens tk on (tk.client_id, tk.source) = (s.client_id, s.source)
+       where s.source = 'shopify' and s.client_id <> $1 and tk.status = 'active' and lower(s.config->>'shop') = lower($2)`,
+      [clientId, shop])).rows.length) outcome = 'kept_for_sibling'
     else {
       const token = (await c.query<{ secret: string; refresh_secret: string | null }>(
         `select secret, refresh_secret from data.source_tokens where client_id = $1 and source = $2`, [clientId, source])).rows[0]
-      outcome = await revokeUpstream(t.fetch, source, token, {
+      outcome = await revokeUpstream(t.fetch, source, { ...token, shop }, {
         QUICKBOOKS_CLIENT_ID: envStr('QUICKBOOKS_CLIENT_ID'), QUICKBOOKS_CLIENT_SECRET: envStr('QUICKBOOKS_CLIENT_SECRET'),
       })
     }

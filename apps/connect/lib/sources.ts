@@ -53,8 +53,10 @@ export interface SourceCard {
   label: string;
   tone: Tone;
   lastSuccessAt: string | null;
-  /** Truncated — a connector error can be a whole stack trace. */
+  /** Truncated — a connector error can be a whole stack trace. Shopify's 401 and 404 read as plain words. */
   lastError: string | null;
+  /** The truncated connector error as stored, for the card's hover text. */
+  lastErrorRaw: string | null;
   /** Owner disconnected it and the worker has not deleted its data yet (api.disconnecting_sources_v1). */
   disconnecting: boolean;
   /** What the card says instead of "Last success" while disconnecting, else null. */
@@ -117,6 +119,7 @@ export function composeSources(
         tone: "idle",
         lastSuccessAt: null,
         lastError: null,
+        lastErrorRaw: null,
         disconnecting: true,
         disconnectingNote: disconnectingNote(source),
       };
@@ -124,6 +127,7 @@ export function composeSources(
     const row = bySource.get(source);
     const status = row ? asStatus(row.status) : "none";
     const { label, tone } = STATES[status];
+    const raw = truncate(row?.last_error ?? null);
     return {
       source,
       title: TITLES[source],
@@ -137,11 +141,27 @@ export function composeSources(
       label,
       tone,
       lastSuccessAt: row?.last_success_at ?? null,
-      lastError: truncate(row?.last_error ?? null),
+      lastError: source === "shopify" ? (shopifyFriendlyError(row?.last_error) ?? raw) : raw,
+      lastErrorRaw: raw,
       disconnecting: false,
       disconnectingNote: null,
     };
   });
+}
+
+/**
+ * Shopify's 401 (signed out / uninstalled) and 404 (store gone) in plain words, else null.
+ * Lives here, not in source-settings.ts, because composeSources needs it and source-settings imports this file.
+ */
+export function shopifyFriendlyError(raw: string | null | undefined): string | null {
+  const t = typeof raw === "string" ? raw.toLowerCase() : "";
+  if (/invalid_grant|token (has been )?(expired|revoked)|revoked|unauthori[sz]ed|\b401\b/.test(t)) {
+    return "Shopify has signed bcns out of this store (the app may have been uninstalled). The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect again.";
+  }
+  if (/not ?found|\b404\b/.test(t)) {
+    return "Shopify can't find this store. It may have been closed or renamed. The workspace owner can disconnect it under Sources, Shopify, then install bcns Connect on the right store.";
+  }
+  return null;
 }
 
 /** Between Disconnect and the worker's delete: the data is going, so no reconnect is offered yet. */
@@ -219,10 +239,10 @@ export function shopifyControl(
 
 /**
  * Sources an owner can disconnect (api.disconnect_source's allow-list, migration
- * 20261007000500; the worker's DISCONNECT_SOURCES). Never Shopify: its own uninstall
- * flow owns that.
+ * 20261007000500 and the Shopify migration after it; the worker's DISCONNECT_SOURCES).
+ * For Shopify, Disconnect also uninstalls the app in the store (see disconnectCopy).
  */
-export const DISCONNECTABLE = ["quickbooks", "meet", "drive", "monday", "meta"] as const;
+export const DISCONNECTABLE = ["quickbooks", "meet", "drive", "monday", "meta", "shopify"] as const;
 
 export type Disconnectable = (typeof DISCONNECTABLE)[number];
 
@@ -238,12 +258,17 @@ export function disconnectPath(source: Disconnectable): string {
 /**
  * Whether to offer Disconnect: a disconnectable source, owners only, and only when
  * something is stored — including "Reconnect needed", whose token the owner may want gone.
+ * `bound` lists the sources that still have a schedule row (api.source_settings_v1): an
+ * uninstalled Shopify store has no health row (status "none") but its row still blocks a
+ * different store (BCNS7), so Disconnect stays offered, unless the delete is already under way.
  */
-export function canDisconnect<C extends Pick<SourceCard, "source" | "status">>(
+export function canDisconnect<C extends Pick<SourceCard, "source" | "status"> & { disconnecting?: boolean }>(
   card: C,
   role: string | null | undefined,
+  bound: readonly string[] = [],
 ): card is C & { source: Disconnectable } {
-  return isDisconnectable(card.source) && role === "owner" && card.status !== "none";
+  if (!isDisconnectable(card.source) || role !== "owner") return false;
+  return card.status !== "none" || (!card.disconnecting && bound.includes(card.source));
 }
 
 /**
@@ -275,6 +300,10 @@ export function disconnectCopy(source: Disconnectable, opts: { siblingConnected?
   ];
   if (source === "quickbooks" || source === "meta") {
     lines.push(`bcns also cancels its access to your ${title} account.`);
+  } else if (source === "shopify") {
+    lines.push(
+      "bcns also removes its access to your Shopify store, which uninstalls bcns Connect there. Shopify ends the subscription when it is uninstalled. If bcns can't reach your store, also uninstall bcns Connect in your Shopify admin (Settings, Apps) to end the subscription.",
+    );
   } else if (source === "monday") {
     lines.push(
       "Monday has no way for bcns to cancel its access, so remove it in Monday as well. If you connected with the Connect button, uninstall bcns (your profile picture, then Administration, then Apps, then Uninstall). If you gave bcns an API token, regenerate it (your profile picture, then Developers, then My access tokens); anything else using that token stops working too.",

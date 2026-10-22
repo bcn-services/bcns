@@ -119,13 +119,13 @@ describe('api.disconnect_source', () => {
     expect(await counts(client, 'quickbooks')).toEqual(ALL)
   })
 
-  it('shopify raises BCNS3 and leaves that source alone', async () => {
+  it('a source outside the allow-list raises BCNS3 and leaves the others alone', async () => {
     const client = await mkClient()
-    await seed(client, 'shopify')
-    const { error } = await clientWithToken(await mkUser(client, 'owner')).rpc('disconnect_source', { p_source: 'shopify' })
+    await seed(client, 'quickbooks')
+    const { error } = await clientWithToken(await mkUser(client, 'owner')).rpc('disconnect_source', { p_source: 'upload' })
     expect(error?.code).toBe('BCNS3')
-    expect((await tokenOf(client, 'shopify')).status).toBe('active')
-    expect(await counts(client, 'shopify')).toEqual(ALL)
+    expect((await tokenOf(client)).status).toBe('active')
+    expect(await counts(client, 'quickbooks')).toEqual(ALL)
   })
 
   it('touches only the caller\'s tenant', async () => {
@@ -292,9 +292,9 @@ describe('worker revokeDisconnected', () => {
     await revokeDisconnected(mkTick(() => new Response('', { status: 200 })))
   })
 
-  it('leaves a revoked Shopify row and an active QuickBooks row alone', async () => {
+  it('leaves an operator-revoked Shopify row and an active QuickBooks row alone', async () => {
     const shop = await mkClient(), live = await mkClient()
-    await seed(shop, 'shopify', 'revoked')
+    await seed(shop, 'shopify', 'revoked', { detail: 'operator' })
     await seed(live, 'quickbooks')
     const calls: Call[] = []
     await revokeDisconnected(mkTick(() => new Response('', { status: 200 }), calls))
