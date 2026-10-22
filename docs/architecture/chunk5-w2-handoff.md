@@ -19,7 +19,7 @@ The db push applied **four** pending migrations, not one — three older ones on
 
 `OAUTH_APPROVED_SOURCES` is deliberately unset. The gate defaults closed
 (`apps/connect/lib/env.ts:43`), so the hub button still emails a request. Shipping
-dark is intended until W6.
+dark is intended until W6. (Historical: as of 2026-10-22 the live gate on the droplet lists all six sources; live state is on the droplet, not in the repo.)
 
 ## 2. What the wizard completed
 

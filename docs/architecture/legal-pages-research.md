@@ -240,7 +240,7 @@ is planned for now (`docs/architecture/chunk5-windows.md`, "Not in scope, delibe
 The G2–G4 Limited Use duties still apply to internal apps.
 
 Status: Shopify is ready to submit (`w6a-shopify-submission.md`). Meta `ads_read` review
-waits on business verification, and monday.com is not yet submitted (`chunk5-windows.md`
+waits on business verification (2026-10-22: business verification Verified, `ads_read` "Review in progress"), and monday.com is not yet submitted (2026-10-22: Developer Center app status Shared; marketplace review not verified) (`chunk5-windows.md`
 W6b/W6c).
 
 ### Where data lives and who processes it

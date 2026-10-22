@@ -338,6 +338,11 @@ then clicked Meta's Connect and landed on a Facebook login):
     Without it the Shopify Disconnect button shows but fails with `disconnect-failed`.
 - `OAUTH_APPROVED_SOURCES=shopify` in `/srv/connect/env`, so no other card has a Connect button
   leading to an outside login. Restart `bcns-app@connect` and confirm a new pid.
+  **Stale as of 2026-10-22 (verified on the droplet):** the live gate is
+  `shopify,quickbooks,meta,meet,drive,monday` and every card has a Connect button, so the reviewer
+  paragraph above ("Shopify is the only source under review ... read Request connection") is
+  false until the gate or the testing instructions change. Live gate state is on the droplet,
+  not in the repo; read `/srv/connect/env` there, never this doc.
 
 ---
 
