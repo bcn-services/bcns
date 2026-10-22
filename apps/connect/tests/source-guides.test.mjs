@@ -33,3 +33,11 @@ test("the source page keeps its guide at #how", () => {
   assert.match(guide, /anchor = "how"/);
   assert.match(page, /<SourceGuide source=\{source\} \/>/);
 });
+test("Shopify guide matches the Disconnect flow (#144) and makes no billing claim", () => {
+  const t = text(GUIDES.shopify);
+  assert.doesNotMatch(t, /email us|bills/i);
+  assert.match(GUIDES.shopify.after, /disconnects it under Sources, Shopify/);
+  // An owner's card always has Connect now; only other members see Request connection.
+  assert.doesNotMatch(GUIDE_FOOTER, /If the card says Request connection/);
+  assert.match(GUIDE_FOOTER, /Other members, and any source bcns hasn't opened yet, show Request connection/);
+});
