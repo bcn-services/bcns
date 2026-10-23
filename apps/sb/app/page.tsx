@@ -11,7 +11,7 @@
 import { getDataClient } from "@/lib/data";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
-import { commandStateByItem, loadDailyTasks, loadDoneCommands, loadMondayBoardUrl } from "@/lib/monday";
+import { commandStateByItem, keptItemIds, loadDailyTasks, loadDoneCommands, loadMondayBoardUrl } from "@/lib/monday";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
 import { activityEmptyState, panelState } from "@/lib/panels";
 import { loadHomeLayout } from "@/lib/home-layout";
@@ -68,6 +68,8 @@ export default async function HomePage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
+  // Done/undo commands decide which SB-done items the Daily read keeps; the read never rejects.
+  const mondayCommandsP = loadDoneCommands(client);
   const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: rows capped at 1000 (PostgREST's default); a large account over
@@ -79,8 +81,8 @@ export default async function HomePage({
     client.views.media_v1().is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
     client.views.activity_v1().order("occurred_at", { ascending: false }).limit(5),
     financialRecordsQuery(client, range.prevFrom, range.to),
-    // The first five not-done items of the board's Daily group, in board order.
-    loadDailyTasks(client),
+    // Five Daily items in board order: not-done plus the ones marked Done from SB in the last day.
+    mondayCommandsP.then((cmds) => loadDailyTasks(client, keptItemIds(cmds), cmds)),
     client.views.messages_v1().eq("kind", "meeting_note").order("occurred_at", { ascending: false }).limit(50),
   ]);
 
@@ -148,7 +150,7 @@ export default async function HomePage({
   const financialPanelState = entryTotals.count ? "data" : financialState;
   const taskRows = tasks.error ? [] : (tasks.data ?? []);
   const [mondayCommands, mondayBoardUrl] = await Promise.all([
-    loadDoneCommands(client),
+    mondayCommandsP,
     loadMondayBoardUrl(client, taskRows),
   ]);
   const mondayCommandStates = commandStateByItem(mondayCommands, taskRows);

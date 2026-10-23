@@ -22,6 +22,7 @@ beforeAll(() => {
 afterAll(async () => {
   await sql(`delete from data.source_commands where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.beta, ...made]])
   await sql(`update data.clients set home_layout = null where id = $1`, [CLIENTS.acme])
+  if (made.length) await sql(`delete from data.jobs where client_id = any($1::uuid[])`, [made])
   if (made.length) await sql(`delete from data.clients where id = any($1::uuid[])`, [made])
 })
 
@@ -104,6 +105,68 @@ describe('source_commands: worker executor', () => {
     expect(await sourceCommands(mkTick(fetch))).toBe(0) // nothing left to claim
   })
 
+  it('set_status_undone: restores the status the done command recorded from the synced row', async () => {
+    const client = await fixture()
+    await sql(`insert into data.jobs (client_id, source, external_id, kind, title, status, is_done) values ($1, 'monday', '42', 'task', 't', 'Working on it', false)`, [client])
+    const bodies: any[] = []
+    const fetch = (async (_u: unknown, init: any) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { change_simple_column_value: { id: '42' } } })) }) as unknown as typeof globalThis.fetch
+    const doneId = await queue(client, 'monday', 'set_status_done', { item_id: '42' })
+    const undoId = await queue(client, 'monday', 'set_status_undone', { item_id: '42' })
+    expect(await sourceCommands(mkTick(fetch))).toBe(2)
+    expect(await row(doneId)).toMatchObject({ status: 'done', result: { item_id: '42', status: 'Done', previous: 'Working on it' } })
+    expect(await row(undoId)).toMatchObject({ status: 'done', result: { item_id: '42', status: 'Working on it' } })
+    expect(bodies.map(b => b.variables.value)).toEqual(['Done', 'Working on it'])
+  })
+
+  it('set_status_undone with no earlier done command clears the label', async () => {
+    const client = await fixture()
+    const id = await queue(client, 'monday', 'set_status_undone', { item_id: '43' })
+    const bodies: any[] = []
+    const fetch = (async (_u: unknown, init: any) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { change_simple_column_value: { id: '43' } } })) }) as unknown as typeof globalThis.fetch
+    await sourceCommands(mkTick(fetch))
+    expect(await row(id)).toMatchObject({ status: 'done', result: { item_id: '43', status: null } })
+    expect(bodies[0].variables.value).toBe('')
+  })
+
+  // A finished set_status_done as the executor leaves it, `ago` earlier.
+  const finished = (client: string, item: string, status: 'done' | 'failed', result: unknown, ago: string) =>
+    sql(`insert into data.source_commands (client_id, source, kind, payload, status, result, created_at, done_at)
+         values ($1, 'monday', 'set_status_done', $2::jsonb, $3, $4::jsonb, now() - $5::interval, now() - $5::interval)`,
+      [client, JSON.stringify({ item_id: item }), status, JSON.stringify(result), ago])
+  const sent = () => {
+    const bodies: any[] = []
+    const fetch = (async (_u: unknown, init: any) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { change_simple_column_value: { id: '1' } } })) }) as unknown as typeof globalThis.fetch
+    return { bodies, fetch }
+  }
+
+  it('set_status_undone: a newest done that recorded previous: null clears the label, not an older done\'s previous', async () => {
+    const client = await fixture()
+    await finished(client, '45', 'done', { item_id: '45', status: 'Done', previous: 'Working on it' }, '2 hours')
+    await finished(client, '45', 'done', { item_id: '45', status: 'Done', previous: null }, '1 hour')
+    const id = await queue(client, 'monday', 'set_status_undone', { item_id: '45' })
+    const { bodies, fetch } = sent()
+    await sourceCommands(mkTick(fetch))
+    expect(await row(id)).toMatchObject({ status: 'done', result: { item_id: '45', status: null } })
+    expect(bodies.map(b => b.variables.value)).toEqual([''])
+  })
+
+  it('set_status_undone: a no-op when the newest run done failed; runs again once a newer done succeeded', async () => {
+    const client = await fixture()
+    await finished(client, '46', 'done', { item_id: '46', status: 'Done', previous: 'Stuck' }, '3 hours')
+    await finished(client, '46', 'failed', { error: 'Monday 500' }, '2 hours')
+    const first = await queue(client, 'monday', 'set_status_undone', { item_id: '46' })
+    const a = sent()
+    await sourceCommands(mkTick(a.fetch))
+    expect(a.bodies).toHaveLength(0)
+    expect(await row(first)).toMatchObject({ status: 'done', result: { item_id: '46', status: null, skipped: expect.stringContaining('failed') } })
+    await finished(client, '46', 'done', { item_id: '46', status: 'Done', previous: 'Working on it' }, '1 minute')
+    const second = await queue(client, 'monday', 'set_status_undone', { item_id: '46' })
+    const b = sent()
+    await sourceCommands(mkTick(b.fetch))
+    expect(b.bodies.map(x => x.variables.value)).toEqual(['Working on it'])
+    expect(await row(second)).toMatchObject({ status: 'done', result: { item_id: '46', status: 'Working on it' } })
+  })
+
   it('a Monday rejection marks it failed with the reason; the schedule is left alone', async () => {
     const client = await fixture({ board_id: '1001', columns: { status: 'color_x' }, done_statuses: ['Complete'] })
     const id = await queue(client, 'monday', 'set_status_done', { item_id: '5' })
@@ -113,6 +176,16 @@ describe('source_commands: worker executor', () => {
     expect(r.status).toBe('failed')
     expect(r.result.error).toMatch(/Label Complete does not exist/)
     expect(await nextRun(client)).toBe(false)
+  })
+
+  it('set_status_undone: a Monday rejection marks the undo failed with the reason', async () => {
+    const client = await fixture()
+    const id = await queue(client, 'monday', 'set_status_undone', { item_id: '44' })
+    const fetch = (async () => new Response(JSON.stringify({ errors: [{ message: 'Label Working on it does not exist' }] }))) as unknown as typeof globalThis.fetch
+    await sourceCommands(mkTick(fetch))
+    const r = await row(id)
+    expect(r.status).toBe('failed')
+    expect(r.result.error).toMatch(/Label Working on it does not exist/)
   })
 
   it('unknown kind, unknown source and a bad payload fail with a reason and never reach the network', async () => {
@@ -133,6 +206,32 @@ describe('source_commands: worker executor', () => {
     expect(rows[2].result.error).toBe('unknown command: monday/constructor')
     expect(rows[3].result.error).toContain('item_id')
     expect(calls).toBe(0)
+  })
+
+  it('commands run in order per client and source: a newer undo waits while its done is held locked, other clients are not held back', async () => {
+    const client = await fixture(), other = await fixture()
+    const doneId = await queue(client, 'monday', 'set_status_done', { item_id: '60' })
+    const undoId = await queue(client, 'monday', 'set_status_undone', { item_id: '60' })
+    const otherId = await queue(other, 'monday', 'set_status_done', { item_id: '61' })
+    const { bodies, fetch } = sent()
+    // Another task mid-run on the done: its row is locked and still committed as 'queued'.
+    const holder = await pool.connect()
+    try {
+      await holder.query('begin')
+      await holder.query(`select 1 from data.source_commands where id = $1 for update`, [doneId])
+      expect(await sourceCommands(mkTick(fetch))).toBe(1) // only the other client's command
+      expect((await row(otherId)).status).toBe('done')
+      expect((await row(doneId)).status).toBe('queued')
+      expect((await row(undoId)).status).toBe('queued')
+      expect(bodies).toHaveLength(1)
+    } finally {
+      await holder.query('rollback') // a crashed task: the claim rolls back and the done is claimable again
+      holder.release()
+    }
+    expect(await sourceCommands(mkTick(fetch))).toBe(2)
+    expect(bodies.map(b => b.variables.value)).toEqual(['Done', 'Done', ''])
+    expect((await row(doneId)).status).toBe('done')
+    expect((await row(undoId)).status).toBe('done')
   })
 
   it('is idempotent to re-run: a command is claimed once', async () => {

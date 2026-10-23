@@ -22,6 +22,8 @@ export const GAP = 16;
  * old `max-width: 1100px` breakpoint; globals.css repeats these numbers.
  */
 export const GRID_MIN_PX = 1101;
+/** id of the empty AppHeader slot (home page only) HomeGrid portals its Edit layout buttons into. */
+export const LAYOUT_SLOT_ID = "home-layout-slot";
 /** Sanity ceiling on a saved height (rows), so a hand-edited row cannot make a mile-long panel. */
 export const MAX_H = 60;
 

@@ -1,12 +1,13 @@
 /**
- * MondayPanel.tsx — the first five not-done items of the board's "Daily"
- * group. The ring on a row queues a mark-done command (MondayRow, app/monday-actions.ts);
- * the row reads "Done" with a small dot until a later sync shows it done, and a
+ * MondayPanel.tsx — five items of the board's "Daily" group: the not-done ones
+ * plus any marked Done from SB in the last day. The ring on a row queues a mark-done
+ * command, or an undo when it is already checked (MondayRow, app/monday-actions.ts);
+ * the row reads the new state with a small dot until a later sync shows it, and a
  * failed command shows a quiet note. "View All" opens the board itself.
  */
 
-import { taskBadge, type PanelState } from "@/lib/panels";
-import type { CommandState, DailyTask } from "@/lib/monday";
+import type { PanelState } from "@/lib/panels";
+import { isChecked, rowBadge, type DailyTask, type ItemCommand } from "@/lib/monday";
 import { MondayRow } from "./MondayRow";
 import { MondayDots } from "./icons";
 import { Panel, PanelButton, PanelHead, StateNote, ViewAll } from "./Panel";
@@ -20,7 +21,7 @@ export function MondayPanel({
 }: {
   state: PanelState;
   tasks: DailyTask[];
-  commands: ReadonlyMap<string, CommandState>;
+  commands: ReadonlyMap<string, ItemCommand>;
   boardUrl: string | null;
   connectHref: string;
 }) {
@@ -36,7 +37,9 @@ export function MondayPanel({
           <div className="task-list">
             {tasks.map((task, i) => {
               const title = task.title ?? "Untitled task";
-              return <MondayRow key={task.id ?? `${title}-${i}`} itemId={task.external_id ?? ""} title={title} cmd={commands.get(task.external_id ?? "")} badge={taskBadge(task)} />;
+              const cmd = commands.get(task.external_id ?? "");
+              const checked = isChecked(task, cmd);
+              return <MondayRow key={task.id ?? `${title}-${i}`} itemId={task.external_id ?? ""} title={title} cmd={cmd?.state} checked={checked} badge={rowBadge(task, checked)} />;
             })}
           </div>
         ) : (

@@ -5,7 +5,9 @@
  * Edit layout mode (drag by the grip, resize from the corner, vertical
  * compaction). The panels arrive server-rendered; this only places them.
  *
- * The grid and the Edit button exist from GRID_MIN_PX (1101px) up. Below that the
+ * The grid and the Edit button exist from GRID_MIN_PX (1101px) up; the button
+ * (Reset/Done while editing, the save error) is portalled into the header slot
+ * AppHeader renders left of "Sources & data" (LAYOUT_SLOT_ID). Below that the
  * panels render as plain CSS cells in default order (3-column metrics and
  * 2-column panels from 768px, one column under), saved layout ignored. The
  * server render and first client render are those same cells, which at >=1101px
@@ -16,10 +18,11 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import ReactGridLayout, { useContainerWidth, verticalCompactor } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import { saveLayout } from "@/app/home-layout-actions";
-import { COLS, GAP, GRID_MIN_PX, ROW_H, defaultLayout, layoutToSave, mergeLayout, type LayoutItem } from "@/lib/home-layout";
+import { COLS, GAP, GRID_MIN_PX, LAYOUT_SLOT_ID, ROW_H, defaultLayout, layoutToSave, mergeLayout, type LayoutItem } from "@/lib/home-layout";
 import { DragHandleIcon } from "./icons";
 
 export function HomeGrid({ panels, saved }: { panels: Record<string, React.ReactNode>; saved: unknown }) {
@@ -30,6 +33,10 @@ export function HomeGrid({ panels, saved }: { panels: Record<string, React.React
   const [wantsEdit, setWantsEdit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+
+  // The header is server-rendered above this component, so its slot exists by the time effects run.
+  useEffect(() => setSlot(document.getElementById(LAYOUT_SLOT_ID)), []);
 
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${GRID_MIN_PX}px)`);
@@ -71,28 +78,33 @@ export function HomeGrid({ panels, saved }: { panels: Record<string, React.React
   const showGrid = wide === true && mounted;
   const at = new Map(layout.map((d) => [d.i, d]));
 
+  const bar =
+    wide === true && slot
+      ? createPortal(
+          <>
+            {failed ? <span className="hg-bar__error">Couldn&apos;t save the layout. Try again.</span> : null}
+            {editing ? (
+              <>
+                <button type="button" className="page-btn" disabled={busy} onClick={() => persist(null, false)}>
+                  Reset
+                </button>
+                <button type="button" className="page-btn is-active" disabled={busy} onClick={() => persist(layout, true)}>
+                  Done
+                </button>
+              </>
+            ) : (
+              <button type="button" className="page-btn" onClick={() => setWantsEdit(true)}>
+                Edit layout
+              </button>
+            )}
+          </>,
+          slot,
+        )
+      : null;
+
   return (
     <div className={editing ? "hg is-editing" : "hg"}>
-      {wide === true ? (
-        <div className="hg-bar">
-          {failed ? <span className="hg-bar__error">Couldn&apos;t save the layout. Try again.</span> : null}
-          {editing ? (
-            <>
-              <button type="button" className="page-btn" disabled={busy} onClick={() => persist(null, false)}>
-                Reset
-              </button>
-              <button type="button" className="page-btn is-active" disabled={busy} onClick={() => persist(layout, true)}>
-                Done
-              </button>
-            </>
-          ) : (
-            <button type="button" className="page-btn" onClick={() => setWantsEdit(true)}>
-              Edit layout
-            </button>
-          )}
-        </div>
-      ) : null}
-
+      {bar}
       {/* cast: RGL v2 types the ref for React 19's RefObject<T | null>; this app is on React 18 */}
       <div ref={containerRef as React.RefObject<HTMLDivElement>}>
         {!showGrid ? (

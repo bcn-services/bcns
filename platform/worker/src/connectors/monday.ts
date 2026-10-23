@@ -62,15 +62,48 @@ async function* pull(ctx: RunContext): AsyncGenerator<Page> {
 const SET_STATUS = `mutation ($board: ID!, $item: ID!, $column: String!, $value: String!) {
   change_simple_column_value(board_id: $board, item_id: $item, column_id: $column, value: $value) { id } }`
 
-/** Mark one item done on the configured board. Runs under the personal token's user permissions. */
-async function setStatusDone(ctx: RunContext, payload: Json): Promise<Json> {
+/** The item id and status column a write-back command needs, validated before anything is sent. */
+function target(ctx: RunContext, payload: Json): { item: string; column: string } {
   const item = String(payload?.item_id ?? '')
   if (!/^\d{1,20}$/.test(item)) throw new SourceError('monday', 'payload.item_id must be a Monday item id')
   const column = ctx.config.columns?.status
   if (!column) throw new SourceError('monday', 'no status column configured (config.columns.status)')
-  const value: string = (ctx.config.done_statuses ?? ['Done'])[0]
+  return { item, column }
+}
+
+/**
+ * Mark one item done on the configured board. Runs under the personal token's user permissions. The status
+ * text before the write is recorded as `previous` so set_status_undone can restore it: the synced row's text,
+ * or, when that already reads done (a sync landed after an undo), the earlier command's `previous`.
+ */
+async function setStatusDone(ctx: RunContext, payload: Json): Promise<Json> {
+  const { item, column } = target(ctx, payload)
+  const doneStatuses: string[] = ctx.config.done_statuses ?? ['Done']
+  const value = doneStatuses[0]
+  let previous = await ctx.jobStatus(item)
+  if (previous != null && doneStatuses.includes(previous)) previous = await ctx.previousStatus(item)
   await gql(ctx, { board: String(ctx.config.board_id), item, column, value }, SET_STATUS)
-  return { item_id: item, status: value }
+  return { item_id: item, status: value, previous: previous ?? null }
+}
+
+/**
+ * Undo a set_status_done: put back the `previous` it recorded (null, an empty label, clears it). A no-op
+ * when the done it undoes failed, so the item's untouched label is not overwritten.
+ * Clearing: change_simple_column_value with value "" resets a status column
+ * (https://developer.monday.com/api-reference/docs/status, "Pass an empty string in value").
+ * ponytail: writes without re-reading the board, so a label someone set in Monday since the done is overwritten.
+ */
+async function setStatusUndone(ctx: RunContext, payload: Json): Promise<Json> {
+  const { item, column } = target(ctx, payload)
+  // The done it undoes failed, so Monday still holds the untouched label: nothing to restore. Unless Monday now
+  // reads done (a teammate finished it since): the user's uncheck then stands.
+  if (await ctx.lastDoneFailed(item)) {
+    const now = await ctx.jobStatus(item)
+    if (now == null || !(ctx.config.done_statuses ?? ['Done']).includes(now)) return { item_id: item, status: null, skipped: 'the done it undoes failed' }
+  }
+  const previous = await ctx.previousStatus(item)
+  await gql(ctx, { board: String(ctx.config.board_id), item, column, value: previous ?? '' }, SET_STATUS)
+  return { item_id: item, status: previous }
 }
 
 const cv = (it: Json, id: string | undefined) =>
@@ -87,7 +120,7 @@ export const monday: Connector = {
   },
   configSchema,
   tokenKind: 'monday_personal',
-  commands: { set_status_done: setStatusDone },
+  commands: { set_status_done: setStatusDone, set_status_undone: setStatusUndone },
 
   backfill(ctx) { return pull(ctx) },
   incremental(ctx) { return pull(ctx) },
