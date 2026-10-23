@@ -10,6 +10,7 @@ import { renormalize } from './renormalize.js'
 import { shopRedact } from './privacy.js'
 import { revokeDisconnected } from './disconnect.js'
 import { paidPeriods } from './paid-period.js'
+import { sourceCommands } from './commands.js'
 
 export interface TickOpts {
   taskIndex?: number
@@ -91,6 +92,8 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
     await step('pauseLapsed', () => pauseLapsed(t))
   }
 
+  // Before claimAndRun: a done command makes its schedule due now, and the sync below then picks it up.
+  await step('sourceCommands', () => sourceCommands(t))
   await step('claimAndRun', () => claimAndRun(t))
 
   if (housekeeping) {

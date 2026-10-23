@@ -18,7 +18,7 @@ export interface MoneyRow {
 export interface JobRow {
   externalId: string; kind: string; title: string; status?: string | null; is_done: boolean
   priority?: string | null; group_name?: string | null; owner?: string | null; due_on?: string | null
-  url?: string | null; attributes?: Json; source_updated_at?: string | null
+  url?: string | null; position?: number | null; attributes?: Json; source_updated_at?: string | null
 }
 export interface MessageRow {
   externalId: string; kind: string; title?: string | null; body?: string | null; occurred_at: string
@@ -97,6 +97,11 @@ export interface Connector {
    */
   refreshToken?(ctx: RunContext): Promise<{ secret: string; expiresAt: Date; refreshSecret?: string }>
   normalize(ctx: RunContext, rows: RawRow[]): CanonicalWrites
+  /**
+   * Write-back executors for data.source_commands, keyed by `kind`. Run by worker/src/commands.ts with the
+   * stored token; return the `result` jsonb, throw to mark the command failed.
+   */
+  commands?: Record<string, (ctx: RunContext, payload: Json) => Promise<Json>>
 }
 
 // ------------------------------------------------------------------ shared helpers
