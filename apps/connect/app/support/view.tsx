@@ -1,5 +1,6 @@
 /** @jsxRuntime automatic */
 import { cn } from "@bcn-services/ui";
+import { SendButton } from "./send-button";
 import { formatDateTime } from "@/lib/data-format";
 import {
   BODY_MAX,
@@ -87,9 +88,7 @@ export function SupportView({ tickets, historyFailed, sent, error, mailto, timez
             </select>
           </label>
           <div>
-            <button type="submit" className="btn">
-              Send
-            </button>
+            <SendButton />
           </div>
         </form>
       </section>

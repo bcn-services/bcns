@@ -225,3 +225,13 @@ test("/support is a signed-in route: the middleware matcher runs on it, and the 
   assert.match(action, /await requireHub\(\)/);
   assert.match(action, /apiKey: getConfig\(\)\.resendApiKey/);
 });
+
+test("the Send button is a client component that disables while the action is pending", () => {
+  const src = readFileSync(new URL("../app/support/send-button.tsx", import.meta.url), "utf8");
+  assert.match(src, /^"use client";/);
+  assert.match(src, /useFormStatus/);
+  assert.match(src, /disabled=\{pending\}/);
+  const html = renderToStaticMarkup(createElement(SupportView, { tickets: [], mailto: null, action: () => {} }));
+  assert.match(html, /<button type="submit" class="btn"[^>]*>Send<\/button>/);
+  assert.doesNotMatch(html, /<button[^>]* disabled/);
+});

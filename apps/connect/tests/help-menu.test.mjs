@@ -42,3 +42,9 @@ test("the popup stays a floating popup on narrow screens (the generic .pop rule 
   const css = read("../app/globals.css");
   assert.match(css, /@media \(max-width: 639px\) \{\s*\.hmenu\[open\] \{ display: inline-block; \}\s*\.hmenu \.pop-b \{ position: absolute;/);
 });
+
+test("a click on a menu link closes the popup (the header survives client-side navigation)", () => {
+  const src = read("../app/help-menu.tsx");
+  assert.match(src, /^"use client";/);
+  assert.match(src, /onClick=\{[^}]*closest\("details"\)\?\.removeAttribute\("open"\)/);
+});
