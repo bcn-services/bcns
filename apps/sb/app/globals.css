@@ -351,28 +351,9 @@ summary::-webkit-details-marker {
   margin-bottom: 16px;
 }
 
-.grid-primary {
-  display: grid;
-  grid-template-columns: 1fr 1.18fr 1.02fr;
-  gap: 16px;
-  margin-bottom: 16px;
-  align-items: start;
-}
-
-.grid-secondary {
-  display: grid;
-  grid-template-columns: 1.18fr 1fr 1.06fr 1.16fr;
-  gap: 16px;
-  align-items: stretch;
-}
-
 @media (max-width: 1100px) {
   .metric-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .grid-primary,
-  .grid-secondary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .meta-split {
     grid-template-columns: 1fr;
@@ -385,10 +366,6 @@ summary::-webkit-details-marker {
   }
   .metric-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .grid-primary,
-  .grid-secondary {
-    grid-template-columns: minmax(0, 1fr);
   }
   .range-pill {
     min-width: 0;
@@ -2017,4 +1994,145 @@ a.btn-plain {
   .sector-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ------------------------------------------------------- home grid (Edit layout) */
+
+.hg-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hg-bar__error {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * The home panels as plain cells (server render, no JS, and below 1101px):
+ * one column under 768px, then 3-column metrics / 2-column panels (the old
+ * 1100px look), then at >=1101px the same 12-column slots the grid uses.
+ * Breakpoints repeat GRID_MIN_PX in lib/home-layout.ts.
+ */
+.hg-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.hg-cell {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .hg-stack {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .hg-cell {
+    grid-column: span 3;
+  }
+  .hg-cell--metric {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 1101px) {
+  .hg-stack {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-auto-rows: 24px;
+  }
+  .hg-cell,
+  .hg-cell--metric {
+    grid-column: var(--x) / span var(--w);
+    grid-row: var(--y) / span var(--h);
+  }
+
+  /* The cell sizes the panel; whatever overflows scrolls inside it. */
+  .hg-item > .panel,
+  .hg-item > .metric-card,
+  .hg-cell > .panel,
+  .hg-cell > .metric-card {
+    height: 100%;
+    overflow: auto;
+  }
+
+  /* The chart fills what the card leaves, so resizing a card resizes its chart. */
+  .hg-item > .metric-card,
+  .hg-cell > .metric-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hg-item .sparkline,
+  .hg-cell .sparkline {
+    flex: 1 1 30px;
+    height: auto;
+    min-height: 30px;
+  }
+}
+
+.hg-grip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  cursor: grab;
+}
+
+.hg-grip:active {
+  cursor: grabbing;
+}
+
+.is-editing .hg-item > .panel,
+.is-editing .hg-item > .metric-card {
+  outline: 1.5px dashed var(--accent-chrome-border);
+  outline-offset: -1px;
+}
+
+/* Contents are inert while editing, so a drag never lands on a link or button. */
+.is-editing .hg-item > .panel > *,
+.is-editing .hg-item > .metric-card > * {
+  pointer-events: none;
+}
+
+/* Keep the grip clear of right-aligned header content (View All, Join Meeting). */
+.is-editing .hg-item .panel__head,
+.is-editing .hg-item .metric-card__label {
+  padding-right: 34px;
+}
+
+.is-editing .react-grid-item > .react-resizable-handle {
+  opacity: 1;
+  width: 22px;
+  height: 22px;
+  z-index: 4;
+}
+
+.is-editing .react-grid-item > .react-resizable-handle::after {
+  border-color: var(--accent);
+  width: 8px;
+  height: 8px;
+  border-width: 0 2.5px 2.5px 0;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--accent-soft);
+  opacity: 0.7;
+  border-radius: 11px;
 }

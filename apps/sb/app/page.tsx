@@ -14,6 +14,7 @@ import { SERVICE_LINKS } from "@/lib/links";
 import { commandStateByItem, loadDailyTasks, loadDoneCommands, loadMondayBoardUrl } from "@/lib/monday";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
 import { activityEmptyState, panelState } from "@/lib/panels";
+import { loadHomeLayout } from "@/lib/home-layout";
 import { fileCountLabel, fileLink, fileLinkProps, mediaThumbPath, type FileLinkTarget } from "@/lib/library";
 import {
   aggregateCampaigns,
@@ -38,6 +39,7 @@ import { AppHeader, parsePopup } from "@/app/_components/AppHeader";
 import { MeetPanel } from "@/app/_components/MeetPanel";
 import { MondayPanel } from "@/app/_components/MondayPanel";
 import { MetricCard } from "@/app/_components/MetricCard";
+import { HomeGrid } from "@/app/_components/HomeGrid";
 import { Panel, PanelButton, PanelHead, StateNote, Unconfigured, ViewAll, Delta } from "@/app/_components/Panel";
 import { ActivityIcon, FinanceIcon, LibraryIcon, MetaIcon, SourceTile } from "@/app/_components/icons";
 
@@ -60,7 +62,7 @@ export default async function HomePage({
   const client = await getDataClient();
   if (!client) return <Unconfigured />;
 
-  const [shell, email] = await Promise.all([loadShellData(client), getSignedInEmail()]);
+  const [shell, email, savedLayout] = await Promise.all([loadShellData(client), getSignedInEmail(), loadHomeLayout(client)]);
   const today = todayInTimezone(shell.timezone);
   const range = parseRange(searchParams, today);
   const query = rangeQuery(range);
@@ -178,42 +180,28 @@ export default async function HomePage({
 
   const activityRows = activity.error ? [] : (activity.data ?? []);
 
-  return (
-    <>
-      <AppHeader
-        active="home"
-        range={range}
-        today={today}
-        clientName={shell.clientName}
-        timezone={shell.timezone}
-        email={email}
-        health={shell.health}
-        healthError={shell.healthError}
-        branding={shell.branding}
-        openPopup={parsePopup(searchParams.popup)}
+  const panels = {
+    "m-revenue": <MetricCard label="Total Revenue" value={formatMoneyWhole(metrics.revenue.value, metrics.currency)} deltaPct={metrics.revenue.deltaPct} series={metrics.revenue.series} hasData={metrics.revenue.hasData} />,
+    "m-orders": <MetricCard label="Orders" value={formatCount(metrics.orders.value)} deltaPct={metrics.orders.deltaPct} series={metrics.orders.series} hasData={metrics.orders.hasData} />,
+    "m-conversion": <MetricCard label="Conversion Rate" value={formatPercent(metrics.conversionRate.value, 2)} deltaPct={metrics.conversionRate.deltaPct} series={metrics.conversionRate.series} hasData={metrics.conversionRate.hasData} />,
+    "m-roas": <MetricCard label="ROAS" value={formatRoas(metrics.roas.value)} deltaPct={metrics.roas.deltaPct} series={metrics.roas.series} hasData={metrics.roas.hasData} />,
+    "m-aov": <MetricCard label="AOV" value={formatMoney(metrics.aov.value, metrics.currency)} deltaPct={metrics.aov.deltaPct} series={metrics.aov.series} hasData={metrics.aov.hasData} />,
+    "m-inventory": <MetricCard label="Inventory" value={formatCount(metrics.inventory.value)} deltaPct={metrics.inventory.deltaPct} series={metrics.inventory.series} hasData={metrics.inventory.hasData} />,
+    shopify: <ShopifyPanel state={shopifyState} metrics={metrics} connectHref={connectHref} />,
+    meta: (
+      <MetaPanel
+        state={metaState}
+        meta={meta}
+        topCampaign={topCampaigns[0]?.name ?? null}
+        creative={topCreative}
+        creativeThumbUrl={creativeThumbUrl}
+        connectHref={connectHref}
       />
-
-      <div className="metric-row">
-        <MetricCard label="Total Revenue" value={formatMoneyWhole(metrics.revenue.value, metrics.currency)} deltaPct={metrics.revenue.deltaPct} series={metrics.revenue.series} hasData={metrics.revenue.hasData} />
-        <MetricCard label="Orders" value={formatCount(metrics.orders.value)} deltaPct={metrics.orders.deltaPct} series={metrics.orders.series} hasData={metrics.orders.hasData} />
-        <MetricCard label="Conversion Rate" value={formatPercent(metrics.conversionRate.value, 2)} deltaPct={metrics.conversionRate.deltaPct} series={metrics.conversionRate.series} hasData={metrics.conversionRate.hasData} />
-        <MetricCard label="ROAS" value={formatRoas(metrics.roas.value)} deltaPct={metrics.roas.deltaPct} series={metrics.roas.series} hasData={metrics.roas.hasData} />
-        <MetricCard label="AOV" value={formatMoney(metrics.aov.value, metrics.currency)} deltaPct={metrics.aov.deltaPct} series={metrics.aov.series} hasData={metrics.aov.hasData} />
-        <MetricCard label="Inventory" value={formatCount(metrics.inventory.value)} deltaPct={metrics.inventory.deltaPct} series={metrics.inventory.series} hasData={metrics.inventory.hasData} />
-      </div>
-
-      <div className="grid-primary">
-        <ShopifyPanel state={shopifyState} metrics={metrics} connectHref={connectHref} />
-        <MetaPanel
-          state={metaState}
-          meta={meta}
-          topCampaign={topCampaigns[0]?.name ?? null}
-          creative={topCreative}
-          creativeThumbUrl={creativeThumbUrl}
-          connectHref={connectHref}
-        />
-        <Panel>
-          <PanelHead tile={<FinanceIcon />} title="Financial Information" />
+    ),
+    finance: (
+      <Panel className="panel--column">
+        <PanelHead tile={<FinanceIcon />} title="Financial Information" />
+        <div className="panel__fill">
           {financialPanelState === "data" ? (
             <div className="rows">
               {financialRows.map((row) => (
@@ -227,16 +215,16 @@ export default async function HomePage({
           ) : (
             <StateNote state={financialPanelState} label="Shopify and Meta" connectHref={connectHref} />
           )}
-          <PanelButton href={`/financials${query}`} label="Open Financials" />
-        </Panel>
-      </div>
-
-      <div className="grid-secondary">
-        <MeetPanel state={meetState} notes={noteRows} connectHref={connectHref} timezone={shell.timezone} />
-        <MondayPanel state={mondayState} tasks={taskRows} commands={mondayCommandStates} boardUrl={mondayBoardUrl} connectHref={connectHref} />
-
-        <Panel className="panel--column">
-          <PanelHead tile={<LibraryIcon />} title="Content Library" small right={<ViewAll href={`/library${query}`} />} />
+        </div>
+        <PanelButton href={`/financials${query}`} label="Open Financials" />
+      </Panel>
+    ),
+    meet: <MeetPanel state={meetState} notes={noteRows} connectHref={connectHref} timezone={shell.timezone} />,
+    monday: <MondayPanel state={mondayState} tasks={taskRows} commands={mondayCommandStates} boardUrl={mondayBoardUrl} connectHref={connectHref} />,
+    library: (
+      <Panel className="panel--column">
+        <PanelHead tile={<LibraryIcon />} title="Content Library" small right={<ViewAll href={`/library${query}`} />} />
+        <div className="panel__fill">
           {libraryTiles.length ? (
             <div className="thumb-grid">
               {libraryTiles.map((tile) => {
@@ -267,27 +255,47 @@ export default async function HomePage({
           ) : (
             <p className="state-note">No files yet. Add your first creative to the connected Google Drive folder.</p>
           )}
-        </Panel>
+        </div>
+      </Panel>
+    ),
+    activity: (
+      <Panel className="panel--column">
+        <PanelHead tile={<ActivityIcon />} title="Recent Activity" small />
+        <div className="panel__fill">
+          {activityRows.length ? (
+            <div className="activity-list">
+              {activityRows.map((row, i) => (
+                <div className="activity-row" key={`${row.source ?? ""}-${row.occurred_at ?? ""}-${i}`}>
+                  <SourceTile source={row.source} />
+                  <span className="activity-row__text">{row.title ?? row.detail ?? row.kind ?? "Activity"}</span>
+                  <span className="activity-row__time">{row.occurred_at ? formatRelativeTime(row.occurred_at) : "—"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <StateNote state={activityEmptyState(shell.health)} label="a source" connectHref={connectHref} />
+          )}
+        </div>
+      </Panel>
+    ),
+  };
 
-        <Panel className="panel--column">
-          <PanelHead tile={<ActivityIcon />} title="Recent Activity" small />
-          <div className="panel__fill">
-            {activityRows.length ? (
-              <div className="activity-list">
-                {activityRows.map((row, i) => (
-                  <div className="activity-row" key={`${row.source ?? ""}-${row.occurred_at ?? ""}-${i}`}>
-                    <SourceTile source={row.source} />
-                    <span className="activity-row__text">{row.title ?? row.detail ?? row.kind ?? "Activity"}</span>
-                    <span className="activity-row__time">{row.occurred_at ? formatRelativeTime(row.occurred_at) : "—"}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <StateNote state={activityEmptyState(shell.health)} label="a source" connectHref={connectHref} />
-            )}
-          </div>
-        </Panel>
-      </div>
+  return (
+    <>
+      <AppHeader
+        active="home"
+        range={range}
+        today={today}
+        clientName={shell.clientName}
+        timezone={shell.timezone}
+        email={email}
+        health={shell.health}
+        healthError={shell.healthError}
+        branding={shell.branding}
+        openPopup={parsePopup(searchParams.popup)}
+      />
+
+      <HomeGrid panels={panels} saved={savedLayout} />
     </>
   );
 }
@@ -301,21 +309,23 @@ function ShopifyPanel({ state, metrics, connectHref }: { state: ReturnType<typeo
     { label: "Inventory", value: formatCount(metrics.inventory.value), deltaPct: metrics.inventory.deltaPct },
   ];
   return (
-    <Panel>
+    <Panel className="panel--column">
       <PanelHead tile={<span className="brand-tile__letter">S</span>} title="Shopify" />
-      {state === "data" ? (
-        <div className="rows">
-          {rows.map((row) => (
-            <div className="row" key={row.label}>
-              <span className="row__label">{row.label}</span>
-              <span className="row__value">{row.value}</span>
-              <Delta deltaPct={row.deltaPct} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <StateNote state={state} label="Shopify" connectHref={connectHref} />
-      )}
+      <div className="panel__fill">
+        {state === "data" ? (
+          <div className="rows">
+            {rows.map((row) => (
+              <div className="row" key={row.label}>
+                <span className="row__label">{row.label}</span>
+                <span className="row__value">{row.value}</span>
+                <Delta deltaPct={row.deltaPct} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <StateNote state={state} label="Shopify" connectHref={connectHref} />
+        )}
+      </div>
       <PanelButton href={SERVICE_LINKS.shopifyAdmin} label="View Shopify Dashboard" external />
     </Panel>
   );
@@ -344,41 +354,43 @@ function MetaPanel({
     { label: "Impressions", value: formatCompact(meta.impressions.value), deltaPct: meta.impressions.deltaPct },
   ];
   return (
-    <Panel>
+    <Panel className="panel--column">
       <PanelHead tile={<MetaIcon />} title="Meta Ads" />
-      {state === "data" ? (
-        <div className="meta-split">
-          <div className="rows">
-            {rows.map((row) => (
-              <div className="row row--tight" key={row.label}>
-                <span className="row__label">{row.label}</span>
-                <span className="row__value">{row.value}</span>
-                <Delta deltaPct={row.deltaPct} />
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="subhead__label">Top Performing Creative</div>
-            <div className="creative">
-              {creativeThumbUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived thumbnail URL
-                <img className="creative__thumb" src={creativeThumbUrl} alt={creative?.name ?? ""} />
-              ) : (
-                <div className="creative__thumb creative__thumb--placeholder" aria-hidden="true" />
-              )}
-              <div className="creative__stats">
-                <div className="creative__label">ROAS</div>
-                <div className="creative__value">{creative ? formatRoas(creative.roas) : "—"}</div>
-                <div className="creative__label creative__label--spaced">Spend</div>
-                <div className="creative__value creative__value--sm">{creative ? formatMoneyWhole(creative.spendMinor, meta.currency) : "—"}</div>
-              </div>
+      <div className="panel__fill">
+        {state === "data" ? (
+          <div className="meta-split">
+            <div className="rows">
+              {rows.map((row) => (
+                <div className="row row--tight" key={row.label}>
+                  <span className="row__label">{row.label}</span>
+                  <span className="row__value">{row.value}</span>
+                  <Delta deltaPct={row.deltaPct} />
+                </div>
+              ))}
             </div>
-            {topCampaign ? <div className="creative__caption">Top campaign by spend: {topCampaign}</div> : null}
+            <div>
+              <div className="subhead__label">Top Performing Creative</div>
+              <div className="creative">
+                {creativeThumbUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived thumbnail URL
+                  <img className="creative__thumb" src={creativeThumbUrl} alt={creative?.name ?? ""} />
+                ) : (
+                  <div className="creative__thumb creative__thumb--placeholder" aria-hidden="true" />
+                )}
+                <div className="creative__stats">
+                  <div className="creative__label">ROAS</div>
+                  <div className="creative__value">{creative ? formatRoas(creative.roas) : "—"}</div>
+                  <div className="creative__label creative__label--spaced">Spend</div>
+                  <div className="creative__value creative__value--sm">{creative ? formatMoneyWhole(creative.spendMinor, meta.currency) : "—"}</div>
+                </div>
+              </div>
+              {topCampaign ? <div className="creative__caption">Top campaign by spend: {topCampaign}</div> : null}
+            </div>
           </div>
-        </div>
-      ) : (
-        <StateNote state={state} label="Meta Ads" connectHref={connectHref} />
-      )}
+        ) : (
+          <StateNote state={state} label="Meta Ads" connectHref={connectHref} />
+        )}
+      </div>
       <PanelButton href={SERVICE_LINKS.metaAdsManager} label="View Ads Manager" external />
     </Panel>
   );
