@@ -271,6 +271,19 @@ test("an undo superseded by a Monday completion drops its kept row; a pending un
   assert.deepEqual(data.map((t) => t.external_id), ["8", "9", "10", "11"]);
 });
 
+test("supersededUndoIds: a failed undo older than the sync is ignored, and a row that reads not done is never superseded", () => {
+  // 12: done 6h ago, the undo failed 4h ago, board reads done at 2h -> the done still stands, keep.
+  // 13: done 6h ago, undone 4h ago, synced at 2h as not done -> reads unchecked, nothing to drop.
+  // 14: same as 13 but the row is done: the control that does drop.
+  const commands = [
+    cmd("12", "failed", ago(4 * H), "set_status_undone"), cmd("12", "done", ago(6 * H)),
+    cmd("13", "done", ago(4 * H), "set_status_undone"), cmd("13", "done", ago(6 * H)),
+    cmd("14", "done", ago(4 * H), "set_status_undone"), cmd("14", "done", ago(6 * H)),
+  ];
+  const row = (id, is_done) => ({ external_id: id, position: Number(id), due_on: null, is_done, source_updated_at: ago(2 * H) });
+  assert.deepEqual([...supersededUndoIds(commands, [row("12", true), row("13", false), row("14", true)])], ["14"]);
+});
+
 test("loadDailyTasks: kept done items are merged in board order and the list stays five", async () => {
   const open = [1, 2, 4, 5, 6].map((p) => ({ external_id: `o${p}`, position: p, due_on: null }));
   const kept = [{ external_id: "d3", position: 3, due_on: null, is_done: true }, { external_id: "o2", position: 2, due_on: null }];
