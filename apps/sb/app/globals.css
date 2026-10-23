@@ -115,12 +115,6 @@ summary::-webkit-details-marker {
   color: var(--text);
 }
 
-.app-tagline {
-  font-size: 12.5px;
-  color: var(--text-faint);
-  margin-top: 3px;
-}
-
 .app-header__controls {
   display: flex;
   align-items: center;

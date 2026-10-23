@@ -1,5 +1,5 @@
 /**
- * AppHeader.tsx — the shell every page renders: title + tagline, the page
+ * AppHeader.tsx — the shell every page renders: title, the page
  * buttons, the Integrations and Settings popups, and the date-range pill.
  *
  * It lives here rather than in app/layout.tsx because an App Router layout
@@ -79,7 +79,6 @@ export function AppHeader({
             title
           )}
         </Link>
-        <div className="app-tagline">Data. Creativity. Wellness. Growth.</div>
       </div>
 
       <div className="app-header__controls">

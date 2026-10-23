@@ -58,14 +58,14 @@ digest.
 | shadows | none (borders only) |
 | page padding | `22px 26px 34px`; header margin-bottom 18px; grid gaps 14px (metric row) / 16px (panels) |
 
-**Type scale**: page title 23px/700/-0.02em; tagline 12.5px `#71717a`;
+**Type scale**: page title 23px/700/-0.02em;
 metric value 22px/700/-0.02em; metric label 12.5px/600 `#3f3f46`; panel title
 17px/700/-0.01em (16.5px in the bottom row); row label 13px `#3f3f46`; row
 value 13.5px/700; delta 12–12.5px/600 with `↑`/`↓`; list subtitle 14px/700;
 "View All →" 12px/600 accent; button 13.5px/600; small button 12.5px/600;
 meta text 11–11.5px `#a1a1aa`.
 
-**Header**: left = title + tagline "Data. Creativity. Wellness. Growth.".
+**Header**: left = title (logo when set).
 Right = a 10px-gap row: page buttons (amendment), Integrations icon button,
 Settings icon button, date-range pill. Icon buttons 38×38, white, 1px
 `#e4e4e7`, radius 9, 17px stroked icon `#3f3f46` 1.7; hover bg `#fdf2f6`
@@ -128,7 +128,7 @@ columns.
 
 ## Header (every page)
 
-- Title "Saunaboy Command Center" (links to `/`) + tagline.
+- Title "Saunaboy Command Center" (links to `/`).
 - **Date range control**: URL `?from=YYYY-MM-DD&to=YYYY-MM-DD`; default last
   7 days; presets 7d / 30d / this month + custom from/to inside the pill's
   popup; max span 366 days (`lib/overview.ts parseRange`). Pill label shows
