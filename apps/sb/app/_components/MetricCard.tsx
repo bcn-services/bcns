@@ -25,7 +25,7 @@ export function Sparkline({ series }: { series: { day: string; value: number }[]
     .join(" ");
   return (
     <svg className="sparkline" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={points} fill="none" stroke="var(--sparkline)" strokeWidth="1.8" />
+      <polyline points={points} fill="none" stroke="var(--sparkline)" strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

@@ -2018,3 +2018,106 @@ a.btn-plain {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ------------------------------------------------------- home grid (Edit layout) */
+
+.hg-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hg-bar__error {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* The grid cell sizes the panel; whatever overflows scrolls inside it. */
+.hg-item > .panel,
+.hg-item > .metric-card {
+  height: 100%;
+  overflow: auto;
+}
+
+/* The chart fills what the card leaves, so resizing a card resizes its chart. */
+.hg-item > .metric-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.hg-item .sparkline {
+  flex: 1 1 30px;
+  height: auto;
+  min-height: 30px;
+}
+
+.hg-grip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  cursor: grab;
+}
+
+.hg-grip:active {
+  cursor: grabbing;
+}
+
+.is-editing .hg-item > .panel,
+.is-editing .hg-item > .metric-card {
+  outline: 1.5px dashed var(--accent-chrome-border);
+  outline-offset: -1px;
+}
+
+/* Contents are inert while editing, so a drag never lands on a link or button. */
+.is-editing .hg-item > .panel > *,
+.is-editing .hg-item > .metric-card > * {
+  pointer-events: none;
+}
+
+/* Keep the grip clear of right-aligned header content (View All, Join Meeting). */
+.is-editing .hg-item .panel__head,
+.is-editing .hg-item .metric-card__label {
+  padding-right: 34px;
+}
+
+.is-editing .react-grid-item > .react-resizable-handle {
+  opacity: 1;
+  width: 22px;
+  height: 22px;
+  z-index: 4;
+}
+
+.is-editing .react-grid-item > .react-resizable-handle::after {
+  border-color: var(--accent);
+  width: 8px;
+  height: 8px;
+  border-width: 0 2.5px 2.5px 0;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--accent-soft);
+  opacity: 0.7;
+  border-radius: 11px;
+}
