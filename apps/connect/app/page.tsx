@@ -1,6 +1,5 @@
 import { cn } from "@bcn-services/ui";
 import { requestConnectionAction } from "./actions";
-import { DashboardButton } from "./nav";
 import { DisconnectControl } from "./disconnect";
 import { loadClient, requireHub } from "@/lib/session";
 import { mailtoLink } from "@/lib/request-connection";
@@ -163,12 +162,6 @@ export default async function SourcesPage({
           <h1 id="src-h" className="page-title">
             Sources
           </h1>
-          <div className="ph-b">
-            <a className="btn btn-sm" href="/guide">
-              Connection guide
-            </a>
-            <DashboardButton client={client} />
-          </div>
         </div>
         <p className="sum">
           <span>

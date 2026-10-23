@@ -44,13 +44,3 @@ export function HubNav({ client, role }: { client: ClientRow | null; role: "memb
     </nav>
   );
 }
-
-export function DashboardButton({ client }: { client: ClientRow | null }) {
-  const dashboard = dashboardUrl(client);
-  if (!dashboard) return null;
-  return (
-    <a href={dashboard} className="btn btn-sm shrink-0">
-      Open your dashboard
-    </a>
-  );
-}
