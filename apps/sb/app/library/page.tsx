@@ -1,8 +1,8 @@
 /**
- * /library — Content Library + Creative Folder, per DESIGN.md.
+ * /library — Content Library with Folders and Sets, per DESIGN.md.
  *
  * Toolbar (search / tag filter / New set) → media grid with checkbox selection
- * and a bulk bar → item view → the Creative Folder sidebar of sets. The whole
+ * and a bulk bar → item view → the sidebar of Drive Folders and Sets. The whole
  * page is server-rendered: the grid is one <form> of checkboxes whose submit
  * buttons are the bulk operations, so selection needs no client JavaScript (the
  * bar reveals itself with CSS `:has()`).
@@ -23,10 +23,12 @@ import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { parseRange, todayInTimezone } from "@/lib/overview";
 import {
   collectTags,
-  driveLink,
   egressLine,
   fileCountLabel,
+  filterFolder,
   filterMedia,
+  fileLink,
+  folderTree,
   firstParam,
   formatBytes,
   groupSetItems,
@@ -40,6 +42,7 @@ import {
   type MediaSetLike,
 } from "@/lib/library";
 import { AppHeader, parsePopup } from "@/app/_components/AppHeader";
+import { FileLink } from "@/app/_components/FileLink";
 import { Panel, PanelHead, Unconfigured } from "@/app/_components/Panel";
 import { LibraryIcon } from "@/app/_components/icons";
 import { bulkAction, downloadMedia, saveMedia, setAction, type LibraryError } from "./actions";
@@ -87,6 +90,7 @@ interface LibrarySearchParams {
   q?: Param;
   tag?: Param;
   set?: Param;
+  folder?: Param;
   item?: Param;
   dl?: Param;
   error?: Param;
@@ -135,7 +139,10 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
   const scope = openSet
     ? ((setMembers.get(openSet.id as string) ?? []).map((id) => byId.get(id)).filter((m): m is MediaLike => Boolean(m)))
     : allMedia;
-  const rows = filterMedia(scope, { q, tag });
+  const folders = folderTree(allMedia);
+  // Only a folder that exists in the library counts; anything else in the URL is ignored.
+  const openFolder = folders.find((f) => f.path === firstParam(searchParams.folder, 400)) ?? null;
+  const rows = filterMedia(filterFolder(scope, openFolder?.path ?? ""), { q, tag });
   const tagOptions = collectTags(allMedia);
   const openItem = openItemId ? (byId.get(openItemId) ?? null) : null;
   const trayRows = trayIds.map((id) => byId.get(id)).filter((m): m is MediaLike => Boolean(m));
@@ -160,6 +167,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
   if (q) view.set("q", q);
   if (tag) view.set("tag", tag);
   if (openSetId) view.set("set", openSetId);
+  if (openFolder) view.set("folder", openFolder.path);
   if (openItemId) view.set("item", openItemId);
   const back = `?${view.toString()}`;
 
@@ -183,6 +191,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
         email={email}
         health={shell.health}
         healthError={shell.healthError}
+        branding={shell.branding}
         openPopup={parsePopup(firstParam(searchParams.popup, 20))}
       />
 
@@ -202,6 +211,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
           <input type="hidden" name="from" value={range.from} />
           <input type="hidden" name="to" value={range.to} />
           {openSetId ? <input type="hidden" name="set" value={openSetId} /> : null}
+          {openFolder ? <input type="hidden" name="folder" value={openFolder.path} /> : null}
           <input className="lib-input" type="search" name="q" defaultValue={q} placeholder="Search title, filename, tags" aria-label="Search the library" />
           <select className="lib-input lib-input--select" name="tag" defaultValue={tag} aria-label="Filter by tag">
             <option value="">All tags</option>
@@ -271,7 +281,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
                   </Link>
                 }
               />
-              <p className="state-note">Each Storage file is minted full-quality when you click it, so nothing is charged until you do. Drive files open in Drive and are never charged.</p>
+              <p className="state-note">Each Storage file is minted full-quality when you click it, so nothing is charged until you do. Drive files download straight from Drive and are never charged.</p>
               <div className="rows">
                 {trayRows.map((row) => (
                   <div className="row" key={row.id}>
@@ -287,7 +297,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
           <Panel className="panel--column">
             <PanelHead
               tile={<LibraryIcon />}
-              title={openSet ? (openSet.name ?? "Set") : "All files"}
+              title={openSet ? (openSet.name ?? "Set") : (openFolder?.name ?? "All files")}
               small
               right={<span className="lib-count">{rows.length === scope.length ? fileCountLabel(rows.length) : `${rows.length} of ${fileCountLabel(scope.length)}`}</span>}
             />
@@ -324,6 +334,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
                           {mediaLabel(row)}
                         </Link>
                         <div className="media-tile__meta">{formatBytes(row.bytes)}</div>
+                        <FileLink row={row} className="btn-plain btn-plain--inline btn-plain--tile" />
                         {row.tags?.length ? (
                           <div className="tag-row">
                             {row.tags.slice(0, 4).map((t) => (
@@ -376,9 +387,40 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
           <Panel className="panel--column">
             <PanelHead
               tile={<LibraryIcon />}
-              title="Creative Folder"
+              title="Folders"
               small
-              right={openSetId ? <Link className="view-all" href={linkTo({ set: null, item: null })}>{"All files  →"}</Link> : null}
+              right={
+                <>
+                  {openSetId || openFolder ? <Link className="view-all" href={linkTo({ set: null, folder: null, item: null })}>{"All files  →"}</Link> : null}
+                  <HelpPopup label="About folders">Folders mirror the folders inside your connected Google Drive. Click one to see only its files. You can’t change them here.</HelpPopup>
+                </>
+              }
+            />
+            {folders.length === 0 ? (
+              <p className="state-note">No folders yet. Files in the top of your Drive folder show under All files.</p>
+            ) : (
+              <div className="set-list">
+                {folders.map((f) => (
+                  <Link
+                    className={f.path === openFolder?.path ? "folder-row is-active" : "folder-row"}
+                    key={f.path}
+                    href={linkTo({ folder: f.path, set: null, item: null })}
+                    style={{ paddingLeft: f.depth * 14 }}
+                  >
+                    <span className="folder-row__name">{f.name}</span>
+                    <span className="set-row__count">{fileCountLabel(f.count)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel className="panel--column">
+            <PanelHead
+              tile={<LibraryIcon />}
+              title="Sets"
+              small
+              right={<HelpPopup label="About sets">Sets are groups you make yourself, for example one campaign’s creatives. They don’t change anything in Drive.</HelpPopup>}
             />
             {sets.length === 0 ? (
               <p className="state-note">No sets yet. Use New set to group creatives.</p>
@@ -391,7 +433,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
                     <Link
                       className={s.id === openSetId ? "set-row is-active" : "set-row"}
                       key={s.id}
-                      href={linkTo({ set: s.id ?? "", item: null })}
+                      href={linkTo({ set: s.id ?? "", folder: null, item: null })}
                     >
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage URL
@@ -531,18 +573,12 @@ function ItemView({
 /**
  * The one download affordance, so the two callers (the `?dl=` tray and the item
  * view) can never drift apart. A Drive row has no Storage object to sign, so it
- * gets a plain link to Drive and is never gated on egress; everything else goes
+ * gets a direct download link (Open in Drive when Drive gave none) and is never
+ * gated on egress; everything else goes
  * through `downloadMedia`, which mints through `api.download_url` and is metered.
  */
 function DownloadControl({ row, back, exceeded, label }: { row: MediaLike; back: string; exceeded: boolean; label: string }) {
-  const link = driveLink(row);
-  if (link) {
-    return (
-      <a className="btn-plain btn-plain--inline" href={link} target="_blank" rel="noopener noreferrer">
-        Open in Drive
-      </a>
-    );
-  }
+  if (fileLink(row)) return <FileLink row={row} label={label} />;
   return (
     <form action={downloadMedia}>
       <input type="hidden" name="back" value={back} />
@@ -551,5 +587,19 @@ function DownloadControl({ row, back, exceeded, label }: { row: MediaLike; back:
         {label}
       </button>
     </form>
+  );
+}
+
+/** The one-line "what is this" popup; closes on outside click and Escape through PopupDismiss. */
+function HelpPopup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <details className="popup popup--help">
+      <summary className="help-btn" aria-label={label}>
+        ?
+      </summary>
+      <div className="popup-panel popup-panel--help">
+        <p className="popup-help-text">{children}</p>
+      </div>
+    </details>
   );
 }

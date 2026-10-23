@@ -78,6 +78,7 @@ const VIEW_NAMES = [
   'connector_health_v1',
   'egress_status_v1',
   'memberships_v1',
+  'source_commands_v1',
 ] as const satisfies readonly ViewName[]
 
 function viewBuilder<K extends ViewName>(client: SupabaseClient<Database, 'api'>, name: K) {
@@ -123,6 +124,8 @@ const RPC_NAMES = [
   'connector_runs_v1',
   'reset_source_cursors',
   'set_source_folder',
+  'enqueue_source_command',
+  'set_home_layout',
 ] as const satisfies readonly RpcName[]
 
 // A function with no arguments is generated as `Args: never`; it is called with none.
@@ -334,7 +337,7 @@ export class ToolInputError extends Error {}
 
 /** User ids / customer PII stay out of model context unless a repo opts in via `views`. */
 const DEFAULT_AGENT_VIEWS = VIEW_NAMES.filter(
-  (v): v is AgentViewName => v !== 'memberships_v1' && v !== 'customers_v1',
+  (v): v is AgentViewName => v !== 'memberships_v1' && v !== 'customers_v1' && v !== 'source_commands_v1',
 )
 
 /** Hardcoded from supabase/migrations/20260912000400_api_views.sql — a new view needs an entry
@@ -379,6 +382,7 @@ const VIEW_KEY: Record<ViewName, string[]> = {
   connector_health_v1: ['source'],
   egress_status_v1: ['client_id'],
   memberships_v1: ['user_id'],
+  source_commands_v1: ['id'],
 }
 
 const VIEW_DESCRIPTIONS: Record<ViewName, string> = {
@@ -400,6 +404,7 @@ const VIEW_DESCRIPTIONS: Record<ViewName, string> = {
   connector_health_v1: 'Per-connector sync status.',
   egress_status_v1: 'Download-budget usage.',
   memberships_v1: 'User/role rows (user ids — excluded by default).',
+  source_commands_v1: 'Queued write-backs to connected systems (internal queue — excluded by default).',
 }
 
 const MAX_OFFSET = 10_000

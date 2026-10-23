@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { getDataClient } from "@/lib/data";
+import { getConfig } from "@/lib/env";
+import { brandingMetadata, loadBranding } from "@/lib/branding";
+import { PopupDismiss } from "@/app/_components/PopupDismiss";
 import "./globals.css";
 
 // Self-hosted: see fonts/README.md (no build-time Google fetch).
@@ -11,10 +15,20 @@ const interTight = localFont({
   fallback: ["system-ui", "sans-serif"],
 });
 
-export const metadata: Metadata = {
+const FALLBACK: Metadata = {
   title: "Saunaboy Command Center",
   description: "SB Command Center: Shopify, Meta Ads, Monday.com and Google Meet in one view.",
 };
+
+/** Title and favicon from the client's branding when set; the static text above otherwise. */
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const client = await getDataClient();
+    return brandingMetadata(client ? await loadBranding(client, getConfig().supabaseUrl) : null, FALLBACK);
+  } catch {
+    return FALLBACK;
+  }
+}
 
 /** The shell is just the page frame: the header is per-page (app/_components/
  *  AppHeader.tsx), because a layout never receives searchParams and the whole
@@ -24,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={interTight.variable}>
       <body>
         <div className="page">{children}</div>
+        <PopupDismiss />
       </body>
     </html>
   );

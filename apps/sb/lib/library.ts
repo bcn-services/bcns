@@ -12,6 +12,8 @@
  * readable message instead of a BCNS3 error from Postgres.
  */
 
+import { EXTERNAL_LINK_PROPS } from "./links";
+
 /** `data.clean_tags`: lower-cased, trimmed, `[a-z0-9 _-]`, 1-40 chars. */
 export const TAG_PATTERN = /^[a-z0-9 _-]{1,40}$/;
 /** `data.clean_tags` raises above 50 tags. */
@@ -91,6 +93,90 @@ export function driveLink(row: MediaLike): string | null {
   if (row.source !== "drive") return null;
   const link = (row.attributes as { web_view_link?: unknown } | null | undefined)?.web_view_link;
   return typeof link === "string" && link ? link : null;
+}
+
+/** A Drive row's one-tap target: a direct download when Drive gave a `web_content_link`, else Open in Drive. */
+export interface FileLinkTarget {
+  kind: "download" | "open";
+  href: string;
+}
+
+function httpsUrl(value: unknown): string | null {
+  return typeof value === "string" && /^https:\/\/[^\s]+$/.test(value) ? value : null;
+}
+
+/**
+ * Where a Drive row's one-tap button goes. `web_content_link` (Contract: Drive
+ * media attribute, null until the row is refreshed after the platform change)
+ * downloads directly; without it the row falls back to its Drive page. Null for
+ * every other source, which keeps the metered `download_url` path.
+ */
+export function fileLink(row: MediaLike): FileLinkTarget | null {
+  if (row.source !== "drive") return null;
+  const attrs = row.attributes as { web_content_link?: unknown } | null | undefined;
+  const direct = httpsUrl(attrs?.web_content_link);
+  if (direct) return { kind: "download", href: direct };
+  const open = httpsUrl(driveLink(row));
+  return open ? { kind: "open", href: open } : null;
+}
+
+/** Anchor props for a FileLinkTarget: `download` only for a direct download, always out of the app's tab. */
+export function fileLinkProps(link: FileLinkTarget) {
+  return link.kind === "download"
+    ? ({ href: link.href, download: true, ...EXTERNAL_LINK_PROPS } as const)
+    : ({ href: link.href, ...EXTERNAL_LINK_PROPS } as const);
+}
+
+/* ---------------- Folders (Drive media attributes.folder_path) ---------------- */
+
+export interface FolderNode {
+  /** "Sub/Sub2", names joined by "/". */
+  path: string;
+  name: string;
+  depth: number;
+  /** Files in this folder and everything under it. */
+  count: number;
+}
+
+/** Contract: Drive media `attributes.folder_path` ('' = the root folder). */
+export function folderPath(row: MediaLike): string {
+  const p = (row.attributes as { folder_path?: unknown } | null | undefined)?.folder_path;
+  return typeof p === "string" ? p : "";
+}
+
+const bySegments = (a: string, b: string) => {
+  const x = a.split("/");
+  const y = b.split("/");
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const c = (x[i] ?? "").localeCompare(y[i] ?? "");
+    if (c) return c;
+  }
+  return x.length - y.length;
+};
+
+/** Every distinct folder (and each ancestor of one), parents before children. Root files make no node. */
+export function folderTree(rows: MediaLike[]): FolderNode[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const segs = folderPath(row).split("/").filter(Boolean);
+    for (let i = 1; i <= segs.length; i++) {
+      const path = segs.slice(0, i).join("/");
+      counts.set(path, (counts.get(path) ?? 0) + 1);
+    }
+  }
+  return [...counts.keys()].sort(bySegments).map((path) => {
+    const segs = path.split("/");
+    return { path, name: segs.at(-1) ?? path, depth: segs.length - 1, count: counts.get(path) ?? 0 };
+  });
+}
+
+/** Rows in `folder` or any folder under it; an empty `folder` keeps everything. */
+export function filterFolder<T extends MediaLike>(rows: T[], folder: string): T[] {
+  if (!folder) return rows;
+  return rows.filter((row) => {
+    const p = folderPath(row);
+    return p === folder || p.startsWith(`${folder}/`);
+  });
 }
 
 /** Human byte size: "812 B", "9.4 KB", "24 MB", "1.5 GB". */

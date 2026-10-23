@@ -87,8 +87,10 @@ export type Database = {
       }
       client_v1: {
         Row: {
+          branding: Json | null
           client_id: string | null
           egress_quota_bytes: number | null
+          home_layout: Json | null
           name: string | null
           slug: string | null
           source:
@@ -107,8 +109,10 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          branding?: Json | null
           client_id?: string | null
           egress_quota_bytes?: number | null
+          home_layout?: Json | null
           name?: string | null
           slug?: string | null
           source?: never
@@ -117,8 +121,10 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          branding?: Json | null
           client_id?: string | null
           egress_quota_bytes?: number | null
+          home_layout?: Json | null
           name?: string | null
           slug?: string | null
           source?: never
@@ -507,6 +513,7 @@ export type Database = {
           is_done: boolean | null
           kind: string | null
           owner: string | null
+          position: number | null
           priority: string | null
           source:
             | "shopify"
@@ -535,6 +542,7 @@ export type Database = {
           is_done?: boolean | null
           kind?: string | null
           owner?: string | null
+          position?: number | null
           priority?: string | null
           source?:
             | "shopify"
@@ -563,6 +571,7 @@ export type Database = {
           is_done?: boolean | null
           kind?: string | null
           owner?: string | null
+          position?: number | null
           priority?: string | null
           source?:
             | "shopify"
@@ -1285,6 +1294,90 @@ export type Database = {
           },
         ]
       }
+      source_commands_v1: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          done_at: string | null
+          id: string | null
+          kind: string | null
+          payload: Json | null
+          result: Json | null
+          source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+            | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          done_at?: string | null
+          id?: string | null
+          kind?: string | null
+          payload?: Json | null
+          result?: Json | null
+          source?:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+            | null
+          status?: string | null
+          updated_at?: never
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          done_at?: string | null
+          id?: string | null
+          kind?: string | null
+          payload?: Json | null
+          result?: Json | null
+          source?:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+            | null
+          status?: string | null
+          updated_at?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_commands_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_v1"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "source_commands_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "egress_status_v1"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
     }
     Functions: {
       ai_last_used_at: { Args: never; Returns: string }
@@ -1348,6 +1441,23 @@ export type Database = {
         )[]
       }
       download_url: { Args: { media_id: string }; Returns: Json }
+      enqueue_source_command: {
+        Args: {
+          p_kind: string
+          p_payload: Json
+          p_source:
+            | "shopify"
+            | "meta"
+            | "monday"
+            | "meet"
+            | "upload"
+            | "dashboard"
+            | "platform"
+            | "drive"
+            | "quickbooks"
+        }
+        Returns: string
+      }
       get_ai_settings: { Args: never; Returns: Json }
       log_mcp_call: {
         Args: {
@@ -1403,6 +1513,7 @@ export type Database = {
         Args: { p_share_customer_contact: boolean }
         Returns: undefined
       }
+      set_home_layout: { Args: { p_layout: Json }; Returns: undefined }
       set_media_set_items: {
         Args: { action: string; media_ids: string[]; set_id: string }
         Returns: number

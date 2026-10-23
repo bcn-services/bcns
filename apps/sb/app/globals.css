@@ -351,36 +351,6 @@ summary::-webkit-details-marker {
   margin-bottom: 16px;
 }
 
-/* Daily row (chunk 4, not in the artboard): the Daily Financial Report. */
-.grid-daily {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  margin-bottom: 16px;
-  align-items: stretch;
-}
-
-.panel__meta {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-faint);
-}
-
-/* Label/value pairs laid out as a grid; no delta column, no dividers. */
-.rows--pairs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  column-gap: 28px;
-}
-
-.rows--pairs .row {
-  border-bottom: none;
-}
-
-.row--pair {
-  grid-template-columns: 1fr auto;
-}
-
 .grid-primary {
   display: grid;
   grid-template-columns: 1fr 1.18fr 1.02fr;
@@ -839,6 +809,42 @@ summary::-webkit-details-marker {
   font-weight: 500;
 }
 
+/* The ring is a button on Monday rows: click queues a mark-done command. */
+.task-check {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--task-ring);
+  background: transparent;
+  cursor: pointer;
+}
+
+.task-check:hover:not(:disabled) {
+  background: var(--task-ring);
+}
+
+.task-check--done {
+  background: var(--task-ring);
+  cursor: default;
+}
+
+.task-row__note {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Queued, not yet confirmed by a later sync. */
+.task-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
 .badge {
   font-size: 11.5px;
   font-weight: 600;
@@ -884,6 +890,15 @@ summary::-webkit-details-marker {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.thumb-tile--link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.thumb-tile--link:hover .thumb-tile__name {
+  color: var(--accent);
 }
 
 .thumb-tile__img {
@@ -1030,6 +1045,10 @@ summary::-webkit-details-marker {
   grid-template-columns: 1.32fr 1fr;
   gap: 16px;
   align-items: start;
+}
+
+.fin-grid--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 1100px) {
@@ -1363,6 +1382,57 @@ summary::-webkit-details-marker {
   white-space: nowrap;
 }
 
+.btn-plain--tile {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  text-decoration: none;
+}
+
+a.btn-plain {
+  text-align: center;
+  text-decoration: none;
+}
+
+/* The "?" that opens a one-line help popup. */
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-control);
+  border-radius: 50%;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-faint);
+  cursor: pointer;
+  list-style: none;
+}
+
+.help-btn::-webkit-details-marker {
+  display: none;
+}
+
+.popup-panel--help {
+  min-width: 220px;
+  max-width: 260px;
+}
+
+.popup-help-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.app-logo {
+  display: block;
+  max-height: 36px;
+  width: auto;
+}
+
 .btn-plain--danger {
   color: var(--down);
 }
@@ -1591,6 +1661,32 @@ summary::-webkit-details-marker {
 .set-list {
   display: flex;
   flex-direction: column;
+}
+
+/* Folders mirror Drive: read-only filter rows, indented by depth. */
+.folder-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--hairline-list);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.set-list .folder-row:last-child {
+  border-bottom: none;
+}
+
+.folder-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.folder-row.is-active .folder-row__name {
+  color: var(--accent);
 }
 
 .set-row {

@@ -5,14 +5,13 @@
  * to them, always in a new tab.
  *
  * ponytail: generic landing pages until SB hands over its store handle, Meta
- * act_id and Monday slug — swap the constant, not the call sites, when the
+ * act_id — swap the constant, not the call sites, when the
  * open questions in CLIENT.md are answered.
  */
 
 export const SERVICE_LINKS = {
   shopifyAdmin: "https://admin.shopify.com/",
   metaAdsManager: "https://adsmanager.facebook.com/adsmanager/",
-  monday: "https://monday.com/",
   googleMeet: "https://meet.google.com/",
 } as const;
 

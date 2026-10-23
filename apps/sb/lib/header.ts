@@ -11,6 +11,8 @@
 import type { DataClient } from "@bcn-services/data-client";
 import type { HealthLike } from "./panels";
 import { isValidTimezone } from "./overview";
+import { loadBranding, type Branding } from "./branding";
+import { getConfig } from "./env";
 
 export const DEFAULT_TIMEZONE = "America/New_York";
 
@@ -19,13 +21,18 @@ export interface ShellData {
   timezone: string;
   health: HealthLike[];
   healthError: boolean;
+  /** Null = text header; set once the platform's branding column is live and the client has a value. */
+  branding: Branding | null;
 }
 
 export async function loadShellData(client: DataClient): Promise<ShellData> {
-  const [clientR, healthR] = await Promise.allSettled([
+  const [clientR, healthR, brandingR] = await Promise.allSettled([
     client.views.client_v1("name,timezone").single(),
     client.views.connector_health_v1("source,status,last_success_at,last_error"),
+    // Its own read: if the branding column is not deployed yet this query fails alone and the shell still renders.
+    loadBranding(client, getConfig().supabaseUrl),
   ]);
+  const branding = brandingR.status === "fulfilled" ? brandingR.value : null;
 
   let clientName: string | null = null;
   let timezone = DEFAULT_TIMEZONE;
@@ -47,7 +54,7 @@ export async function loadShellData(client: DataClient): Promise<ShellData> {
     console.error("shell: connector_health_v1 read failed", healthR.status === "rejected" ? healthR.reason : healthR.value.error);
   }
 
-  return { clientName, timezone, health, healthError };
+  return { clientName, timezone, health, healthError, branding };
 }
 
 /** The signed-in address for the Settings popup. middleware.ts already
