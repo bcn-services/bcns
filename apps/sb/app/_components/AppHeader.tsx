@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { formatDayLabel, formatRangeLabel, rangePresets, rangeQuery, type ParsedRange } from "@/lib/overview";
 import { integrationRows, type HealthLike } from "@/lib/panels";
+import { LAYOUT_SLOT_ID } from "@/lib/home-layout";
 import type { Branding } from "@/lib/branding";
 import { EXTERNAL_LINK_PROPS } from "@/lib/links";
 import { signOut } from "@/app/login/actions";
@@ -92,6 +93,8 @@ export function AppHeader({
             {page.label}
           </Link>
         ))}
+        {/* Home only: HomeGrid portals Edit layout / Reset / Done into this slot (>=1101px). */}
+        {active === "home" ? <span id={LAYOUT_SLOT_ID} className="hg-slot" /> : null}
         {/* Back to the bcns hub (sources, team, the raw data viewer). Same tab: it is home, not an outbound service. */}
         <a className="page-btn" href={HUB_URL}>
           Sources &amp; data

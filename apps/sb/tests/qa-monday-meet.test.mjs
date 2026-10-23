@@ -93,7 +93,7 @@ test("panelState: health row present but zero rows reads empty, not not_connecte
 test("app/page.tsx: Monday (loadDailyTasks) and messages_v1 reads sit inside the Promise.allSettled and degrade via unwrap, never throw into the page", () => {
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const allSettledBlock = src.slice(src.indexOf("Promise.allSettled(["), src.indexOf("]);", src.indexOf("Promise.allSettled([")));
-  assert.match(allSettledBlock, /loadDailyTasks\(client\)/);
+  assert.match(allSettledBlock, /loadDailyTasks\(client, keptItemIds\(cmds\)\)/);
   assert.match(allSettledBlock, /messages_v1\(\)\.eq\("kind",\s*"meeting_note"\)/);
   // unwrap() turns a rejected settle into { data: null, error }, never a throw
   assert.match(src, /function unwrap<T>\(r: PromiseSettledResult<[^>]+>\): Settled<T> \{\s*\n\s*if \(r\.status === "fulfilled"\) return r\.value;\s*\n\s*return \{ data: null, error: r\.reason \};/);

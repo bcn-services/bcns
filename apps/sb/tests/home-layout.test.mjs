@@ -4,11 +4,13 @@
  */
 
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import {
   COLS,
   DEFAULT_ITEMS,
   GRID_MIN_PX,
+  LAYOUT_SLOT_ID,
   PANEL_IDS,
   defaultLayout,
   layoutToSave,
@@ -177,4 +179,21 @@ test("saveHomeLayout: no client, an unreadable layout, or an RPC failure saves n
   for (const bad of [undefined, "x", 5, {}, { v: 2, items: [] }, { v: 1, items: "no" }]) assert.equal(await saveHomeLayout(c, bad), false);
   assert.deepEqual(c.calls, []); // a garbage payload must not quietly reset the layout
   assert.equal(await saveHomeLayout(fakeClient({ rpcThrows: true }), null), false);
+});
+
+test("Edit layout lives in the header: an empty home-only slot left of Sources & data, HomeGrid portals into it, no in-grid bar", () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.equal(LAYOUT_SLOT_ID, "home-layout-slot");
+  const header = read("../app/_components/AppHeader.tsx");
+  const slotAt = header.indexOf('{active === "home" ? <span id={LAYOUT_SLOT_ID} className="hg-slot" /> : null}');
+  assert.ok(slotAt > 0, "slot renders on the home page only");
+  assert.ok(slotAt < header.indexOf("Sources &amp; data"), "slot sits before the Sources & data link");
+  const grid = read("../app/_components/HomeGrid.tsx");
+  assert.match(grid, /createPortal\(/);
+  assert.match(grid, /document\.getElementById\(LAYOUT_SLOT_ID\)/);
+  assert.match(grid, /wide === true && slot/, "still >=1101px only");
+  assert.doesNotMatch(grid, /className="hg-bar"/);
+  const css = read("../app/globals.css");
+  assert.doesNotMatch(css, /\.hg-bar\s*\{/);
+  assert.match(css, /\.hg-slot\s*\{\s*display: contents;/);
 });

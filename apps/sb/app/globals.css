@@ -786,7 +786,7 @@ summary::-webkit-details-marker {
   font-weight: 500;
 }
 
-/* The ring is a button on Monday rows: click queues a mark-done command. */
+/* The ring is a button on Monday rows: click queues a mark-done command (or an undo when checked). */
 .task-check {
   width: 15px;
   height: 15px;
@@ -804,7 +804,11 @@ summary::-webkit-details-marker {
 
 .task-check--done {
   background: var(--task-ring);
-  cursor: default;
+}
+
+/* A checked ring undoes on click: hover hollows it. */
+.task-check--done:hover:not(:disabled) {
+  background: transparent;
 }
 
 .task-row__note {
@@ -1998,12 +2002,10 @@ a.btn-plain {
 
 /* ------------------------------------------------------- home grid (Edit layout) */
 
-.hg-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-bottom: 12px;
+/* Home only: AppHeader renders this empty slot left of "Sources & data"; HomeGrid portals the
+ * Edit layout / Reset / Done buttons into it at >=1101px. display: contents keeps an empty slot out of the header's gap. */
+.hg-slot {
+  display: contents;
 }
 
 .hg-bar__error {

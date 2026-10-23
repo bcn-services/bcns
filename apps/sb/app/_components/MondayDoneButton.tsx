@@ -2,21 +2,21 @@
 
 /**
  * MondayDoneButton.tsx — the ring on a Monday row. Submitting the surrounding
- * form queues the mark-done command; while it is in flight (and after, until a
- * later sync shows the item done) the row reads "Done" with a small dot.
+ * form queues mark-done (or undo, when checked); while it is in flight the ring
+ * already shows the new state, and it stays clickable once the command lands.
  */
 
 import { useFormStatus } from "react-dom";
 
-export function MondayDoneButton({ title, pending: queued }: { title: string; pending: boolean }) {
+export function MondayDoneButton({ title, checked }: { title: string; checked: boolean }) {
   const { pending: submitting } = useFormStatus();
-  const waiting = submitting || queued;
+  const shown = submitting ? !checked : checked;
   return (
     <button
-      className={`task-check${waiting ? " task-check--done" : ""}`}
+      className={`task-check${shown ? " task-check--done" : ""}`}
       type="submit"
-      disabled={waiting}
-      aria-label={waiting ? `Marked done: ${title}` : `Mark done: ${title}`}
+      disabled={submitting}
+      aria-label={checked ? `Undo done: ${title}` : `Mark done: ${title}`}
     />
   );
 }

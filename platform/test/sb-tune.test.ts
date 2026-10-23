@@ -22,6 +22,7 @@ beforeAll(() => {
 afterAll(async () => {
   await sql(`delete from data.source_commands where client_id = any($1::uuid[])`, [[CLIENTS.acme, CLIENTS.beta, ...made]])
   await sql(`update data.clients set home_layout = null where id = $1`, [CLIENTS.acme])
+  if (made.length) await sql(`delete from data.jobs where client_id = any($1::uuid[])`, [made])
   if (made.length) await sql(`delete from data.clients where id = any($1::uuid[])`, [made])
 })
 
@@ -102,6 +103,29 @@ describe('source_commands: worker executor', () => {
     expect((await row(id)).done_at).not.toBeNull()
     expect(await nextRun(client)).toBe(true)
     expect(await sourceCommands(mkTick(fetch))).toBe(0) // nothing left to claim
+  })
+
+  it('set_status_undone: restores the status the done command recorded from the synced row', async () => {
+    const client = await fixture()
+    await sql(`insert into data.jobs (client_id, source, external_id, kind, title, status, is_done) values ($1, 'monday', '42', 'task', 't', 'Working on it', false)`, [client])
+    const bodies: any[] = []
+    const fetch = (async (_u: unknown, init: any) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { change_simple_column_value: { id: '42' } } })) }) as unknown as typeof globalThis.fetch
+    const doneId = await queue(client, 'monday', 'set_status_done', { item_id: '42' })
+    const undoId = await queue(client, 'monday', 'set_status_undone', { item_id: '42' })
+    expect(await sourceCommands(mkTick(fetch))).toBe(2)
+    expect(await row(doneId)).toMatchObject({ status: 'done', result: { item_id: '42', status: 'Done', previous: 'Working on it' } })
+    expect(await row(undoId)).toMatchObject({ status: 'done', result: { item_id: '42', status: 'Working on it' } })
+    expect(bodies.map(b => b.variables.value)).toEqual(['Done', 'Working on it'])
+  })
+
+  it('set_status_undone with no earlier done command clears the label', async () => {
+    const client = await fixture()
+    const id = await queue(client, 'monday', 'set_status_undone', { item_id: '43' })
+    const bodies: any[] = []
+    const fetch = (async (_u: unknown, init: any) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { change_simple_column_value: { id: '43' } } })) }) as unknown as typeof globalThis.fetch
+    await sourceCommands(mkTick(fetch))
+    expect(await row(id)).toMatchObject({ status: 'done', result: { item_id: '43', status: null } })
+    expect(bodies[0].variables.value).toBe('')
   })
 
   it('a Monday rejection marks it failed with the reason; the schedule is left alone', async () => {
