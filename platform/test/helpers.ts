@@ -171,6 +171,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   set_home_layout: { args: { p_layout: [] }, expect: 'BCNS3' },
   // A past date fails validation before any write; the tenant is never an argument.
   record_shopify_paid_through: { args: { p_shop: 'rpc-scoped.myshopify.com', p_until: '2000-01-01T00:00:00Z' }, expect: 'BCNS3' },
+  // Support tickets: an empty subject fails validation (after the tenant check) before any write; the tenant is never an argument.
+  ticket_create: { args: { p_subject: '', p_body: 'x', p_severity: 'normal' }, expect: 'BCNS3' },
 }
 
 /** Fill the runtime-only beta ids (record, media set) into RPC_ARGS. */
