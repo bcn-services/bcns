@@ -44,7 +44,7 @@ Returns a postgrest-js query builder (chain `.eq()`, `.order()`, `.limit()`, …
 `api.*_v1` view: `client_v1`, `money_v1`, `daily_metrics_v1`, `daily_summary_v1`,
 `campaign_daily_v1`, `creative_daily_v1`, `products_v1`, `customers_v1`, `jobs_v1`,
 `messages_v1`, `records_v1`, `media_v1`, `media_sets_v1`, `media_set_items_v1`, `activity_v1`,
-`connector_health_v1`, `egress_status_v1`, `memberships_v1`.
+`connector_health_v1`, `egress_status_v1`, `memberships_v1`, `source_commands_v1`.
 
 ```ts
 const { data } = await dc.views.money_v1().eq('kind', 'order').order('day', { ascending: false })

@@ -1,6 +1,6 @@
 /**
  * branding.ts — per-client logo, name and favicon, read generically from
- * api.client_v1.branding (Contract: `{logo_path?, name?, accent?}`, files in the
+ * api.client_v1.branding (`{logo_path?, name?, favicon_path?, accent?}`, files in the
  * public `branding` bucket under `<client_id>/`). Null branding, or a read that
  * fails because the platform change is not deployed yet, means the text
  * fallback: the app's own title and no logo.
@@ -8,8 +8,9 @@
  * Same file ships in apps/_template; keep them in step.
  */
 
-import type { DataClient } from "@bcn-services/data-client";
-import type { BrandingJson } from "./contract-b";
+import type { DataClient, Database } from "@bcn-services/data-client";
+
+type ClientRow = Database["api"]["Views"]["client_v1"]["Row"];
 
 export interface Branding {
   name: string | null;
@@ -27,16 +28,19 @@ export function brandingPublicUrl(supabaseUrl: string | undefined, path: string)
 
 /** Null when the client has no branding row value; otherwise whatever it names. */
 export function resolveBranding(
-  row: { client_id?: string | null; branding?: unknown } | null | undefined,
+  row: Partial<Pick<ClientRow, "client_id" | "branding">> | null | undefined,
   supabaseUrl: string | undefined,
 ): Branding | null {
   const raw = row?.branding;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  // Contract: branding is {logo_path?, name?, accent?}; fields are checked below, not trusted.
-  const b = raw as BrandingJson;
+  // branding is free-form jsonb: every field is checked below, not trusted.
+  const b = raw;
   const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 80) : null;
   const logoUrl = typeof b.logo_path === "string" ? brandingPublicUrl(supabaseUrl, b.logo_path) : null;
-  const faviconUrl = row?.client_id ? brandingPublicUrl(supabaseUrl, `${row.client_id}/favicon.png`) : null;
+  // favicon_path wins when present and safe; otherwise the conventional <client_id>/favicon.png.
+  const faviconUrl =
+    (typeof b.favicon_path === "string" ? brandingPublicUrl(supabaseUrl, b.favicon_path) : null) ??
+    (row?.client_id ? brandingPublicUrl(supabaseUrl, `${row.client_id}/favicon.png`) : null);
   return { name, logoUrl, faviconUrl };
 }
 
@@ -45,8 +49,7 @@ export async function loadBranding(client: DataClient, supabaseUrl: string | und
   try {
     const { data, error } = await client.views.client_v1("client_id,branding").single();
     if (error || !data) return null;
-    // Contract: api.client_v1.branding is missing from database.types.ts until it is regenerated after B's db push.
-    return resolveBranding(data as unknown as { client_id?: string | null; branding?: unknown }, supabaseUrl);
+    return resolveBranding(data, supabaseUrl);
   } catch {
     return null;
   }

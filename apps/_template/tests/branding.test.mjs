@@ -32,6 +32,15 @@ test("resolveBranding: null when the client has none; name, logo and favicon whe
   });
 });
 
+test("resolveBranding: favicon_path wins when present; a hostile one falls back to <client_id>/favicon.png", () => {
+  const url = (path) => `${URL_}/storage/v1/object/public/branding/${path}`;
+  assert.equal(resolveBranding({ client_id: CID, branding: { favicon_path: `${CID}/fav-v2.png` } }, URL_).faviconUrl, url(`${CID}/fav-v2.png`));
+  for (const bad of ["../x.png", "https://evil.example/f.png", 7, ""]) {
+    assert.equal(resolveBranding({ client_id: CID, branding: { favicon_path: bad } }, URL_).faviconUrl, url(`${CID}/favicon.png`));
+  }
+  assert.equal(resolveBranding({ client_id: null, branding: { name: "A" } }, URL_).faviconUrl, null);
+});
+
 test("resolveBranding: a hostile logo_path or non-string fields fall back to text", () => {
   const b = resolveBranding({ client_id: CID, branding: { name: 42, logo_path: "../../x" } }, URL_);
   assert.equal(b.name, null);

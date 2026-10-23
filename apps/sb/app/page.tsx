@@ -12,7 +12,6 @@ import { getDataClient } from "@/lib/data";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
 import { commandStateByItem, loadDailyTasks, loadDoneCommands, loadMondayBoardUrl } from "@/lib/monday";
-import { createSupabaseServer } from "@/lib/supabase-server";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
 import { activityEmptyState, panelState } from "@/lib/panels";
 import { fileCountLabel, fileLink, fileLinkProps, mediaThumbPath, type FileLinkTarget } from "@/lib/library";
@@ -147,7 +146,7 @@ export default async function HomePage({
   const financialPanelState = entryTotals.count ? "data" : financialState;
   const taskRows = tasks.error ? [] : (tasks.data ?? []);
   const [mondayCommands, mondayBoardUrl] = await Promise.all([
-    loadDoneCommands(createSupabaseServer()),
+    loadDoneCommands(client),
     loadMondayBoardUrl(client, taskRows),
   ]);
   const mondayCommandStates = commandStateByItem(mondayCommands, taskRows);

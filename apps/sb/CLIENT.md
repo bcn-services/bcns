@@ -8,7 +8,7 @@
 
 SB is a Shopify retailer. It wants one Command Center over its Shopify, Meta
 Ads, Monday.com and Google Meet data. It is a reporting and reference layer; its
-one write is marking a Monday item Done, queued as a source command (`api.enqueue_source_command`) that the platform worker applies, so SB holds no Monday token.
+one write back to a connected system is marking a Monday item Done, queued as a source command (`api.enqueue_source_command`) that the platform worker applies, so SB holds no Monday token. It also writes its own manual entries, sets and tags.
 
 - **Overview:** six headline metrics (revenue, orders, conversion rate, ROAS,
   AOV, inventory), each with a trend line and a change against the previous
