@@ -8,6 +8,7 @@ import { BillingBanner } from "./billing-banner";
 import { signOut } from "./login/actions";
 import { HelpMenu } from "./help-menu";
 import { HubNav } from "./nav";
+import { StaffSwitcher } from "./staff-switcher";
 import "./globals.css";
 
 // Self-hosted (next/font/local), never next/font/google: see fonts/README.md.
@@ -65,6 +66,7 @@ function Header({ membership, client }: { membership: NonNullable<Awaited<Return
             </span>
             <span className="wsc-n">{client?.name ?? "Your workspace"}</span>
           </span>
+          <StaffSwitcher />
           <HelpMenu />
           <form action={signOut}>
             <button type="submit" className="btn btn-out btn-sm">
