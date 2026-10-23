@@ -6,6 +6,7 @@ import type { ClientRow } from "@/lib/sources";
 import { loadBilling } from "@/lib/stripe-billing";
 import { BillingBanner } from "./billing-banner";
 import { signOut } from "./login/actions";
+import { HelpMenu } from "./help-menu";
 import { HubNav } from "./nav";
 import "./globals.css";
 
@@ -64,6 +65,7 @@ function Header({ membership, client }: { membership: NonNullable<Awaited<Return
             </span>
             <span className="wsc-n">{client?.name ?? "Your workspace"}</span>
           </span>
+          <HelpMenu />
           <form action={signOut}>
             <button type="submit" className="btn btn-out btn-sm">
               Sign out
