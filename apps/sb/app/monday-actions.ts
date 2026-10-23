@@ -21,6 +21,7 @@ export type MarkDoneState = { error: boolean } | null;
 
 export async function markMondayDone(_prev: MarkDoneState, form: FormData): Promise<MarkDoneState> {
   const ok = await queueMarkDone(await getDataClient(), form.get("item_id"));
-  if (ok) revalidatePath("/");
+  // Both outcomes: a refused click (item already done / gone from Daily) means the page is stale.
+  revalidatePath("/");
   return { error: !ok };
 }

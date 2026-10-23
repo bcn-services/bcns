@@ -172,9 +172,9 @@ test("loadDoneCommands: reads source_commands_v1 through the typed client; a fai
   assert.deepEqual(await loadDoneCommands(null), []);
 });
 
-test("MondayRow: form posts through useActionState; a refused enqueue shows the quiet note, pending a dot", () => {
+test("MondayRow: form posts through useFormState; a refused enqueue shows the quiet note, pending a dot", () => {
   const row = read("../app/_components/MondayRow.tsx");
-  assert.match(row, /useActionState<MarkDoneState, FormData>\(markMondayDone, null\)/);
+  assert.match(row, /useFormState<MarkDoneState, FormData>\(markMondayDone, null\)/);
   assert.match(row, /<form className="task-row" action=\{action\}>/);
   assert.match(row, /name="item_id"/);
   assert.match(row, /cmd === "failed" \|\| state\?\.error/);

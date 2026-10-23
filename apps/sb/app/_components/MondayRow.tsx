@@ -6,7 +6,7 @@
  * the same quiet "Couldn’t update" note as a command the worker marked failed.
  */
 
-import { useActionState } from "react";
+import { useFormState } from "react-dom";
 import { markMondayDone, type MarkDoneState } from "@/app/monday-actions";
 import type { CommandState } from "@/lib/monday";
 import { MondayDoneButton } from "./MondayDoneButton";
@@ -22,7 +22,7 @@ export function MondayRow({
   cmd: CommandState | undefined;
   badge: { label: string; tone: string };
 }) {
-  const [state, action] = useActionState<MarkDoneState, FormData>(markMondayDone, null);
+  const [state, action] = useFormState<MarkDoneState, FormData>(markMondayDone, null);
   const done = cmd === "pending" || cmd === "done";
   const shown = done ? { label: "Done", tone: "done" } : badge;
   return (
