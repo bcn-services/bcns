@@ -57,13 +57,14 @@ export async function refreshGoogleToken(ctx: RunContext, source: Source): Promi
  * BFS over rootId and its subfolders: one files.list per folder page (`'<id>' in parents and trashed=false`
  * plus `match`), children split here — folders queued, shortcuts skipped (not followed), the rest yielded once
  * even if multi-parented. Yields every page, empty ones too; `last` = final page of the whole tree.
+ * `folderPath` = the names of the folders from the root down to this page's folder, joined by '/' ('' = the root).
  * A cap trip throws (no status → run `error`) before any `last` page, so a fullList source never tombstones.
  * ponytail: a budget-stopped walk restarts from root next run; move the queue into the cursor if a tree outgrows the budget.
  */
 export async function* walkFolder(
   ctx: RunContext, source: Source, rootId: string, opts: { match?: string; fields: string },
-): AsyncGenerator<{ files: Json[]; last: boolean }> {
-  const queue = [{ id: rootId, depth: 0 }]
+): AsyncGenerator<{ files: Json[]; last: boolean; folderPath: string }> {
+  const queue = [{ id: rootId, depth: 0, path: '' }]
   const folders = new Set([rootId])
   const seen = new Set<string>()
   let shortcuts = 0
@@ -72,7 +73,7 @@ export async function* walkFolder(
     throw new SourceError(source, `folder walk stopped: ${why}`)
   }
   while (queue.length) {
-    const { id, depth } = queue.shift()!
+    const { id, depth, path } = queue.shift()!
     let pageToken: string | undefined
     do {
       const u = new URL(`${DRIVE}/files`)
@@ -91,13 +92,13 @@ export async function* walkFolder(
           if (depth + 1 > MAX_DEPTH) cap(`deeper than ${MAX_DEPTH} levels`)
           if (folders.size >= MAX_FOLDERS) cap(`more than ${MAX_FOLDERS} folders under ${rootId}`)
           folders.add(fid)
-          queue.push({ id: fid, depth: depth + 1 })
+          queue.push({ id: fid, depth: depth + 1, path: path ? `${path}/${f.name ?? fid}` : String(f.name ?? fid) })
         } else if (f.mimeType === SHORTCUT) shortcuts++
         else if (!seen.has(fid)) { seen.add(fid); files.push(f) }
       }
       const last = !pageToken && !queue.length
       if (last && shortcuts) ctx.log('google_walk_shortcut_skip', { count: shortcuts })
-      yield { files, last }
+      yield { files, last, folderPath: path }
     } while (pageToken)
   }
 }
