@@ -14,6 +14,7 @@
  */
 
 import { verifyStripeSignature } from "../_shared/stripe-signature.ts";
+import { SIGNUP_REDIRECT } from "../signup/handler.ts";
 import {
   billingSignal,
   decideBilling,
@@ -28,6 +29,10 @@ const EVENT_ID = /^evt_[A-Za-z0-9]{1,250}$/;
 const CUSTOMER_ID = /^cus_[A-Za-z0-9]{1,250}$/;
 const SUBSCRIPTION_ID = /^sub_[A-Za-z0-9]{1,250}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Metadata keys apps/connect/lib/stripe-billing.ts puts on a pay-first Checkout session. */
+const SIGNUP_NAME_KEY = "signup_name";
+const SIGNUP_EMAIL_KEY = "signup_email";
 const STATUSES: readonly ClientStatus[] = ["pending", "active", "paused", "churned"];
 
 export interface ApplyInput {
@@ -43,6 +48,27 @@ export interface ApplyInput {
   graceUntil: number | null;
 }
 
+export interface SignupWorkspaceInput {
+  eventId: string;
+  eventType: string;
+  /** Unix seconds. */
+  eventCreated: number;
+  userId: string;
+  name: string;
+  customerId: string;
+  subscriptionId: string | null;
+}
+
+/** Pay-first sign-up (checkout.session.completed with signup metadata and no client ref). */
+export interface SignupWorkspaceDeps {
+  /** userId null = not created (most often: a prior attempt already made it). */
+  createUser(email: string): Promise<{ userId: string | null; error?: string }>;
+  findUserId(email: string): Promise<string | null>;
+  /** api.stripe_signup_workspace. */
+  createWorkspace(input: SignupWorkspaceInput): Promise<"created" | "duplicate" | "has_workspace">;
+  sendConfirmation(email: string, redirectTo: string): Promise<{ error?: string }>;
+}
+
 export interface StripeWebhookDeps {
   /** Unix seconds; the signature's timestamp tolerance is measured against it. */
   now(): number;
@@ -50,6 +76,8 @@ export interface StripeWebhookDeps {
   readState(clientId: string | null, customerId: string | null): Promise<unknown>;
   /** api.stripe_apply_billing. */
   apply(input: ApplyInput): Promise<"applied" | "duplicate" | "conflict">;
+  /** Pay-first sign-up wiring. Absent = a signup session is answered 503 (Stripe retries) rather than dropped. */
+  signup?: SignupWorkspaceDeps;
   /** Event id, type, client id and outcome ONLY — never the payload, header or secret. */
   log(event: string, data: Record<string, unknown>): void;
 }
@@ -137,6 +165,14 @@ export async function handle(request: Request, secret: string | undefined, deps:
   const customerId = signal.customerId && CUSTOMER_ID.test(signal.customerId) ? signal.customerId : null;
   const subscriptionId = signal.subscriptionId && SUBSCRIPTION_ID.test(signal.subscriptionId) ? signal.subscriptionId : null;
 
+  // Pay-first sign-up: a paid session that names no client but carries the signup metadata. Routed
+  // before readState, which would answer unknown_client for it.
+  const meta = event.data?.object?.metadata;
+  const signupEmail = meta && typeof meta === "object" ? (meta as Record<string, unknown>)[SIGNUP_EMAIL_KEY] : undefined;
+  if (event.type.startsWith("checkout.session.") && !signal.clientRef && typeof signupEmail === "string") {
+    return handleSignup(event, signal.at, customerId, subscriptionId, deps, base);
+  }
+
   const state = parseState(await deps.readState(clientRef, customerId));
   if (!state) {
     deps.log("stripe_webhook_ignored", { ...base, reason: "unknown_client" });
@@ -162,4 +198,58 @@ export async function handle(request: Request, secret: string | undefined, deps:
   deps.log("stripe_webhook_applied", { ...base, clientId: state.clientId, action: decision.action, outcome });
   // conflict: the row moved between read and write. Nothing changed; Stripe's retry re-decides.
   return outcome === "conflict" ? json({ error: "retry" }, 503) : json({ ok: true }, 200);
+}
+
+/**
+ * One paid pay-first session -> one user, one active client, one owner membership, one mail.
+ * Retry-safe at every step: a user left by a prior attempt is found and reused, the RPC is
+ * idempotent on the Stripe customer, and the mail goes out only when this call created the
+ * workspace. A failure before the RPC commits is 503 (Stripe retries); once it has committed,
+ * a mail failure is logged and answered 200, because a retry could not tell it from a replay.
+ */
+async function handleSignup(
+  event: StripeEvent,
+  at: number,
+  customerId: string | null,
+  subscriptionId: string | null,
+  deps: StripeWebhookDeps,
+  base: { eventId: string; type: string },
+): Promise<Response> {
+  const meta = event.data.object.metadata as Record<string, unknown>;
+  const email = String(meta[SIGNUP_EMAIL_KEY]).trim().toLowerCase();
+  const rawName = meta[SIGNUP_NAME_KEY];
+  const name = typeof rawName === "string" ? rawName.trim() : "";
+  if (!customerId || !name || name.length > 100 || email.length > 254 || !EMAIL.test(email)) {
+    deps.log("stripe_webhook_ignored", { ...base, reason: "bad_signup_session" });
+    return json({ ok: true }, 200);
+  }
+  const signup = deps.signup;
+  if (!signup) {
+    deps.log("stripe_webhook_rejected", { ...base, reason: "signup_unwired" });
+    return json({ error: "retry" }, 503);
+  }
+
+  let result: "created" | "duplicate" | "has_workspace";
+  try {
+    const created = await signup.createUser(email);
+    const userId = created.userId ?? (await signup.findUserId(email));
+    if (!userId) throw new Error("no user");
+    result = await signup.createWorkspace({
+      eventId: event.id, eventType: event.type, eventCreated: at, userId, name, customerId, subscriptionId,
+    });
+  } catch {
+    deps.log("stripe_signup_failed", base);
+    return json({ error: "retry" }, 503);
+  }
+
+  if (result === "created") {
+    try {
+      const sent = await signup.sendConfirmation(email, SIGNUP_REDIRECT);
+      if (sent.error) deps.log("stripe_signup_mail_failed", base);
+    } catch {
+      deps.log("stripe_signup_mail_failed", base);
+    }
+  }
+  deps.log("stripe_signup_applied", { ...base, outcome: result });
+  return json({ ok: true }, 200);
 }
