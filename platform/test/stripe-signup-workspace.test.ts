@@ -1,4 +1,4 @@
-// api.stripe_signup_workspace (20261023163848): pay-first sign-up's one write. Called exactly as
+// api.stripe_signup_workspace (20261023175336): pay-first sign-up's one write. Called exactly as
 // the stripe-webhook Edge Function calls it (service role, api schema). Checks the workspace is
 // born active and owned, a replayed event and a second event for the same customer write nothing,
 // a user who already has a workspace gets none (and bcns gets a notification), bad input is

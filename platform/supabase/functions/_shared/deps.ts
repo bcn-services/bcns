@@ -226,7 +226,7 @@ export function signupDeps(): SignupDeps {
 /**
  * stripe-webhook (item 1) has no caller JWT either: the Stripe signature is its auth. Two more
  * service-role grants, both narrow SECURITY DEFINER RPCs (20261007000100): one client's billing
- * state, and the guarded apply; plus api.stripe_signup_workspace (20261023163848) for pay-first
+ * state, and the guarded apply; plus api.stripe_signup_workspace (20261023175336) for pay-first
  * sign-up. Still no privilege on any data.* table.
  */
 export function stripeWebhookDeps(): StripeWebhookDeps {
