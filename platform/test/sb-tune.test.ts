@@ -208,6 +208,32 @@ describe('source_commands: worker executor', () => {
     expect(calls).toBe(0)
   })
 
+  it('commands run in order per client and source: a newer undo waits while its done is held locked, other clients are not held back', async () => {
+    const client = await fixture(), other = await fixture()
+    const doneId = await queue(client, 'monday', 'set_status_done', { item_id: '60' })
+    const undoId = await queue(client, 'monday', 'set_status_undone', { item_id: '60' })
+    const otherId = await queue(other, 'monday', 'set_status_done', { item_id: '61' })
+    const { bodies, fetch } = sent()
+    // Another task mid-run on the done: its row is locked and still committed as 'queued'.
+    const holder = await pool.connect()
+    try {
+      await holder.query('begin')
+      await holder.query(`select 1 from data.source_commands where id = $1 for update`, [doneId])
+      expect(await sourceCommands(mkTick(fetch))).toBe(1) // only the other client's command
+      expect((await row(otherId)).status).toBe('done')
+      expect((await row(doneId)).status).toBe('queued')
+      expect((await row(undoId)).status).toBe('queued')
+      expect(bodies).toHaveLength(1)
+    } finally {
+      await holder.query('rollback') // a crashed task: the claim rolls back and the done is claimable again
+      holder.release()
+    }
+    expect(await sourceCommands(mkTick(fetch))).toBe(2)
+    expect(bodies.map(b => b.variables.value)).toEqual(['Done', 'Done', ''])
+    expect((await row(doneId)).status).toBe('done')
+    expect((await row(undoId)).status).toBe('done')
+  })
+
   it('is idempotent to re-run: a command is claimed once', async () => {
     const client = await fixture()
     await queue(client, 'monday', 'set_status_done', { item_id: '9' })

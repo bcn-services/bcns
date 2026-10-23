@@ -95,7 +95,12 @@ async function setStatusDone(ctx: RunContext, payload: Json): Promise<Json> {
  */
 async function setStatusUndone(ctx: RunContext, payload: Json): Promise<Json> {
   const { item, column } = target(ctx, payload)
-  if (await ctx.lastDoneFailed(item)) return { item_id: item, status: null, skipped: 'the done it undoes failed' }
+  // The done it undoes failed, so Monday still holds the untouched label: nothing to restore. Unless Monday now
+  // reads done (a teammate finished it since): the user's uncheck then stands.
+  if (await ctx.lastDoneFailed(item)) {
+    const now = await ctx.jobStatus(item)
+    if (now == null || !(ctx.config.done_statuses ?? ['Done']).includes(now)) return { item_id: item, status: null, skipped: 'the done it undoes failed' }
+  }
   const previous = await ctx.previousStatus(item)
   await gql(ctx, { board: String(ctx.config.board_id), item, column, value: previous ?? '' }, SET_STATUS)
   return { item_id: item, status: previous }

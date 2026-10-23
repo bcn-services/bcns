@@ -15,13 +15,19 @@ export async function sourceCommands(t: Tick): Promise<number> {
   return n
 }
 
-/** Claim and run the oldest queued command; false when the queue is empty. */
+/**
+ * Claim and run the oldest queued command; false when nothing is claimable. Per (client, source) the queue is
+ * strictly ordered: a command waits while an older one is still queued, including one another task holds
+ * locked mid-run (it stays 'queued' until that task commits), so a done and its undo never run concurrently.
+ */
 async function runOneCommand(t: Tick): Promise<boolean> {
   return tx(async c => {
     const r = await c.query<{ id: string; client_id: string; source: Source; kind: string; payload: Json }>(
       `select sc.id, sc.client_id, sc.source, sc.kind, sc.payload
        from data.source_commands sc join data.clients cl on cl.id = sc.client_id
        where sc.status = 'queued' and cl.status = 'active'
+         and not exists (select 1 from data.source_commands o
+                         where o.client_id = sc.client_id and o.source = sc.source and o.status = 'queued' and o.created_at < sc.created_at)
        order by sc.created_at limit 1 for update of sc skip locked`)
     const cmd = r.rows[0]
     if (!cmd) return false

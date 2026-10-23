@@ -90,6 +90,18 @@ describe('monday set_status_undone', () => {
     expect(calls).toHaveLength(0)
   })
 
+  it('a failed done is skipped only while the synced row is not done; if Monday reads done now the undo runs', async () => {
+    const stale = ctxWith(cfg(), ok, 'Working on it', 'Stuck', true)
+    expect((await undo(stale.ctx, { item_id: '555' })).skipped).toContain('failed')
+    expect(stale.calls).toHaveLength(0)
+    const finished = ctxWith(cfg(), ok, 'Done', 'Stuck', true)
+    expect(await undo(finished.ctx, { item_id: '555' })).toEqual({ item_id: '555', status: 'Stuck' })
+    expect(finished.calls.map(c => c.body.variables.value)).toEqual(['Stuck'])
+    const custom = ctxWith(monday.configSchema.parse({ board_id: 1, columns: { status: 'c' }, done_statuses: ['Complete'] }), ok, 'Complete', null, true)
+    await undo(custom.ctx, { item_id: '555' })
+    expect(custom.calls.map(c => c.body.variables.value)).toEqual([''])
+  })
+
   it('throws (nothing sent) on a bad item id or a missing status column; throws the Monday reason on a GraphQL error', async () => {
     const a = ctxWith(cfg(), ok)
     for (const item_id of [undefined, '', 'abc', '12 34', '1'.repeat(21)]) await expect(undo(a.ctx, { item_id })).rejects.toThrow('item_id')

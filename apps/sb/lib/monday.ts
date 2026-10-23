@@ -47,7 +47,11 @@ function byBoardOrder(a: DailyTask, b: DailyTask): number {
  * or undone from SB, see keptItemIds), so a just-clicked item holds its place instead of a sixth sliding in.
  * Never throws: a failed read is `{ data: null, error }`.
  */
-export async function loadDailyTasks(client: DataClient, keepIds: string[] = []): Promise<{ data: DailyTask[] | null; error: unknown }> {
+export async function loadDailyTasks(
+  client: DataClient,
+  keepIds: string[] = [],
+  commands: CommandRow[] = [],
+): Promise<{ data: DailyTask[] | null; error: unknown }> {
   const base = () =>
     client.views.jobs_v1().eq("source", "monday").eq("kind", "task").eq("group_name", DAILY_GROUP).is("deleted_at", null);
   try {
@@ -66,7 +70,8 @@ export async function loadDailyTasks(client: DataClient, keepIds: string[] = [])
     // A failed kept read degrades to the plain not-done list.
     if (kept.error || !kept.data) return open;
     const seen = new Set((open.data ?? []).map((t) => t.external_id));
-    const merged = [...(open.data ?? []), ...kept.data.filter((t) => !seen.has(t.external_id))];
+    const superseded = supersededUndoIds(commands, kept.data);
+    const merged = [...(open.data ?? []), ...kept.data.filter((t) => !seen.has(t.external_id) && !superseded.has(t.external_id ?? ""))];
     return { data: merged.sort(byBoardOrder).slice(0, DAILY_LIMIT), error: null };
   } catch (error) {
     return { data: null, error };
@@ -122,6 +127,25 @@ export function keptItemIds(commands: CommandRow[], now: Date = new Date()): str
     if (id && c.status !== "failed" && (c.kind === MARK_DONE_KIND || c.kind === MARK_UNDO_KIND) && Date.parse(c.created_at ?? "") >= since) ids.add(id);
   }
   return [...ids];
+}
+
+/**
+ * Kept rows to drop: the board reads done, the newest command that ran or is in flight is an undo, and the
+ * row's last sync is newer than it, so someone finished the item in Monday after the undo. Without this the
+ * row would sit checked for the rest of the window. No sync time to compare: keep.
+ */
+export function supersededUndoIds(commands: CommandRow[], tasks: DailyTask[]): Set<string> {
+  const newest = new Map<string, CommandRow>();
+  for (const c of commands) {
+    const id = itemIdOf(c);
+    if (id && c.status !== "failed" && !newest.has(id)) newest.set(id, c);
+  }
+  const out = new Set<string>();
+  for (const t of tasks) {
+    const c = newest.get(t.external_id ?? "");
+    if (c?.kind === MARK_UNDO_KIND && t.is_done && Date.parse(c.created_at ?? "") < Date.parse(t.source_updated_at ?? "")) out.add(t.external_id ?? "");
+  }
+  return out;
 }
 
 /** Done (or undo) as the row should read it. A failed newest command is shown with its note and the board's state. */

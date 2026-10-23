@@ -82,7 +82,7 @@ export default async function HomePage({
     client.views.activity_v1().order("occurred_at", { ascending: false }).limit(5),
     financialRecordsQuery(client, range.prevFrom, range.to),
     // Five Daily items in board order: not-done plus the ones marked Done from SB in the last day.
-    mondayCommandsP.then((cmds) => loadDailyTasks(client, keptItemIds(cmds))),
+    mondayCommandsP.then((cmds) => loadDailyTasks(client, keptItemIds(cmds), cmds)),
     client.views.messages_v1().eq("kind", "meeting_note").order("occurred_at", { ascending: false }).limit(50),
   ]);
 

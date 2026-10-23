@@ -19,6 +19,7 @@ import {
   queueMarkDone,
   queueMarkUndone,
   rowBadge,
+  supersededUndoIds,
 } from "../lib/monday.ts";
 import { SERVICE_LINKS } from "../lib/links.ts";
 
@@ -249,6 +250,25 @@ test("undo of a synced done: the row stays listed, reads unchecked, and the list
   const state = commandStateByItem(commands, data).get("3");
   assert.deepEqual(state, { kind: "undo", state: "pending" });
   assert.equal(isChecked(data.find((t) => t.external_id === "3"), state), false, "reads unchecked at once");
+});
+
+test("an undo superseded by a Monday completion drops its kept row; a pending undo, a done and an unsynced row stay", async () => {
+  // 7: done 5h ago, undone 4h ago, a teammate finished it at 2h (synced after the undo) -> drop.
+  // 8: undo still pending, its synced row predates it -> keep (reads unchecked). 9: newest is a done, synced done -> keep.
+  // 10: undo, but no sync time to compare -> keep. 11: the newest undo failed, the done before it is newest -> keep.
+  const commands = [
+    cmd("7", "done", ago(4 * H), "set_status_undone"), cmd("7", "done", ago(5 * H)),
+    cmd("8", "queued", ago(1000), "set_status_undone"),
+    cmd("9", "done", ago(3 * H)),
+    cmd("10", "done", ago(4 * H), "set_status_undone"),
+    cmd("11", "failed", ago(1 * H), "set_status_undone"), cmd("11", "done", ago(5 * H)),
+  ];
+  const row = (id, syncedAgo) => ({ external_id: id, position: Number(id), due_on: null, is_done: true, source_updated_at: syncedAgo == null ? null : ago(syncedAgo) });
+  const rows = [row("7", 2 * H), row("8", 3 * H), row("9", 2 * H), row("10", null), row("11", 2 * H)];
+  assert.deepEqual([...supersededUndoIds(commands, rows)], ["7"]);
+  const { client } = fakeJobs([{ data: [], error: null }, { data: rows, error: null }]);
+  const { data } = await loadDailyTasks(client, keptItemIds(commands, NOW), commands);
+  assert.deepEqual(data.map((t) => t.external_id), ["8", "9", "10", "11"]);
 });
 
 test("loadDailyTasks: kept done items are merged in board order and the list stays five", async () => {
