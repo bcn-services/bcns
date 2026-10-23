@@ -23,11 +23,11 @@ const QUERY = `query ($board: [ID!], $cursor: String) {
       items { id name created_at updated_at group { id title }
               column_values { id type text value } } } } }`
 
-async function gql(ctx: RunContext, variables: Json): Promise<Json> {
+async function gql(ctx: RunContext, variables: Json, query = QUERY): Promise<Json> {
   const r = await ctx.fetch(API, {
     method: 'POST',
     headers: { 'content-type': 'application/json', Authorization: ctx.token.secret, 'API-Version': '2025-01' },
-    body: JSON.stringify({ query: QUERY, variables }),
+    body: JSON.stringify({ query, variables }),
   })
   const body = await r.json().catch(() => ({}))
   if (body?.errors?.length) throw new SourceError('monday', reason(body, r.status), r.status, body)
@@ -39,6 +39,7 @@ async function gql(ctx: RunContext, variables: Json): Promise<Json> {
 async function* pull(ctx: RunContext): AsyncGenerator<Page> {
   let cursor: string | null = null
   let first = true
+  let position = 0 // 0-based index in items_page order across the whole board pull
   for (;;) {
     const d: Json = await gql(ctx, { board: [ctx.config.board_id], cursor })
     const b = d.boards?.[0]
@@ -46,7 +47,7 @@ async function* pull(ctx: RunContext): AsyncGenerator<Page> {
     const raw: RawRow[] = []
     if (first) raw.push({ entity: 'board', externalId: String(b.id), payload: { id: b.id, name: b.name, columns: b.columns, groups: b.groups } })
     for (const it of b.items_page?.items ?? []) {
-      raw.push({ entity: 'item', externalId: String(it.id), sourceUpdatedAt: it.updated_at ? new Date(it.updated_at) : undefined, payload: it })
+      raw.push({ entity: 'item', externalId: String(it.id), sourceUpdatedAt: it.updated_at ? new Date(it.updated_at) : undefined, payload: { ...it, position: position++ } })
     }
     cursor = b.items_page?.cursor ?? null
     const done = !cursor
@@ -54,6 +55,22 @@ async function* pull(ctx: RunContext): AsyncGenerator<Page> {
     first = false
     if (done) return
   }
+}
+
+// Deliberately no create_labels_if_missing: a board without the done label fails the command (the
+// executor records Monday's reason) instead of Monday rewriting the status column's structure.
+const SET_STATUS = `mutation ($board: ID!, $item: ID!, $column: String!, $value: String!) {
+  change_simple_column_value(board_id: $board, item_id: $item, column_id: $column, value: $value) { id } }`
+
+/** Mark one item done on the configured board. Runs under the personal token's user permissions. */
+async function setStatusDone(ctx: RunContext, payload: Json): Promise<Json> {
+  const item = String(payload?.item_id ?? '')
+  if (!/^\d{1,20}$/.test(item)) throw new SourceError('monday', 'payload.item_id must be a Monday item id')
+  const column = ctx.config.columns?.status
+  if (!column) throw new SourceError('monday', 'no status column configured (config.columns.status)')
+  const value: string = (ctx.config.done_statuses ?? ['Done'])[0]
+  await gql(ctx, { board: String(ctx.config.board_id), item, column, value }, SET_STATUS)
+  return { item_id: item, status: value }
 }
 
 const cv = (it: Json, id: string | undefined) =>
@@ -70,6 +87,7 @@ export const monday: Connector = {
   },
   configSchema,
   tokenKind: 'monday_personal',
+  commands: { set_status_done: setStatusDone },
 
   backfill(ctx) { return pull(ctx) },
   incremental(ctx) { return pull(ctx) },
@@ -90,6 +108,7 @@ export const monday: Connector = {
         priority: txt(it, cols.priority), group_name: it.group?.title ?? null, owner: txt(it, cols.owner),
         due_on: due && /^\d{4}-\d{2}-\d{2}/.test(due) ? due.slice(0, 10) : null,
         url: txt(it, cols.link) || (boardUrl ? `${boardUrl}/pulses/${it.id}` : null),
+        position: Number.isInteger(it.position) ? it.position : null,
         attributes: {
           group_id: it.group?.id ?? null,
           column_values: Object.fromEntries((it.column_values ?? []).map((c: Json) => [c.id, { text: c.text ?? null, value: c.value ?? null }])),

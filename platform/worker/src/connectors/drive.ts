@@ -6,7 +6,7 @@ import {
 } from './index.js'
 import { refreshGoogleToken, walkFolder } from './google.js'
 
-const FIELDS = 'nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))'
+const FIELDS = 'nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,webContentLink,thumbnailLink,imageMediaMetadata(width,height))'
 
 const configSchema = z.object({
   folder_id: z.string().regex(/^[\w-]+$/, 'the id segment of the folder URL, not the URL'),
@@ -30,14 +30,14 @@ async function thumb(ctx: RunContext, f: Json): Promise<string | null> {
 
 /** Every run walks the whole tree (like Monday): fullList tombstones need every file seen, not only changed ones. */
 async function* pull(ctx: RunContext): AsyncGenerator<Page> {
-  for await (const { files, last } of walkFolder(ctx, 'drive', String(ctx.config.folder_id), { fields: FIELDS })) {
+  for await (const { files, last, folderPath } of walkFolder(ctx, 'drive', String(ctx.config.folder_id), { fields: FIELDS })) {
     const known = await ctx.knownMedia(files.map(f => String(f.id)))
     const raw: RawRow[] = []
     for (const f of files) {
       // ponytail: thumbnail fetched until one lands (known = row with a thumb); a file edited in place keeps its old thumb.
       // Upgrade: knownMedia returns source_updated_at, refetch when modifiedTime is newer.
       const thumb_path = known.has(String(f.id)) ? null : await thumb(ctx, f)
-      raw.push({ entity: 'file', externalId: String(f.id), sourceUpdatedAt: new Date(f.modifiedTime), payload: { ...f, thumb_path } })
+      raw.push({ entity: 'file', externalId: String(f.id), sourceUpdatedAt: new Date(f.modifiedTime), payload: { ...f, thumb_path, folder_path: folderPath } })
     }
     // Only the tree's final page is done: a budget stop or cap throw before it never tombstones.
     yield { raw, entity: 'file', cursor: last ? { pulled_at: new Date().toISOString() } : {}, entityDone: last, done: last }
@@ -73,7 +73,7 @@ export const drive: Connector = {
         bytes: p.size != null ? Number(p.size) : null,
         width: p.imageMediaMetadata?.width ?? null, height: p.imageMediaMetadata?.height ?? null,
         thumb_path: p.thumb_path ?? null,
-        attributes: { web_view_link: p.webViewLink ?? null },
+        attributes: { web_view_link: p.webViewLink ?? null, web_content_link: p.webContentLink ?? null, folder_path: p.folder_path ?? '' },
         source_updated_at: p.modifiedTime ?? null,
       })
     }

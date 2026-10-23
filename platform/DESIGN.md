@@ -565,7 +565,7 @@ read with `createSignedUrl` too (or `createSignedUrls` in batches of 100) — ne
 ### 3.2 Views
 
 **`api.client_v1`** — `client_id (= clients.id), source ('platform'), name, slug, timezone, status,
-egress_quota_bytes, updated_at`. One row.
+egress_quota_bytes, updated_at, app_url, home_layout, branding`. One row. `home_layout` = per-client dashboard layout (`{"v":1,"items":[{"i","x","y","w","h"}]}`, null = default; written by `api.set_home_layout`); `branding` = `{logo_path?, favicon_path?, name?, accent?}` (written by `set-branding`, files in the public `branding` bucket).
 
 **`api.money_v1`** — every `data.money` column: `id, client_id, source, external_id, kind,
 occurred_at, day, amount_minor, currency, status, order_number, customer_external_id, items_count,
@@ -642,7 +642,7 @@ attributes, updated_at`.
 **`api.customers_v1`** — all `customers` columns.
 
 **`api.jobs_v1`** — `id, client_id, source, external_id, kind, title, status, is_done, priority,
-group_name, owner, due_on, url, deleted_at, source_updated_at, updated_at`. Includes deleted rows
+group_name, owner, due_on, url, deleted_at, source_updated_at, updated_at, position`. `position` = 0-based index in Monday `items_page` order across one board pull (null for other sources). Includes deleted rows
 (`deleted_at` non-null) so a dashboard can show "removed from board"; filter client-side.
 
 **`api.messages_v1`** — `id, client_id, source, external_id, kind, title, body, occurred_at,
@@ -741,6 +741,8 @@ PostgREST returns these as HTTP 400 with `{code, message, details, hint}`.
 | `api.connector_runs_v1` | `(p_source data.source) returns table(source, mode, status, started_at, finished_at, rows_fetched, rows_upserted, error)` | Any role. Last 20 runs of that source, newest first; no `lease_owner`. |
 | `api.reset_source_cursors` | `(p_source data.source) returns void` | Owner only (`BCNS2`); Shopify refused (`BCNS3` detail `source`). Same cursor reset as `add-source --reset-cursors` (`backfill_cursor = incremental_cursor = '{}'`, `next_run_at = now()`) in one guarded UPDATE: enabled row, `last_reset_at` older than 1 h, no live lease — else `BCNS4` / `BCNS9`. |
 | `api.set_source_folder` | `(p_source data.source, p_folder_id text, p_folder_url text default null) returns void` | Owner only. `meet`/`drive` only; id `^[A-Za-z0-9_-]{10,128}$`, url `https://drive.google.com/…` ≤ 500 chars (`BCNS3` detail `folder_id`/`folder_url`). Writes `config.folder_id` + `notes_url` and resets the cursors in the same UPDATE; not held to the 1-hour limit; refused while leased (`BCNS9`). |
+| `api.enqueue_source_command` | `(p_source data.source, p_kind text, p_payload jsonb) returns uuid` | `W`. Queues a write-back in `data.source_commands` (worker `commands.ts` runs it with the stored token, marks `done`/`failed`, and for `monday` `set_status_done` `{item_id}` sets the item to `done_statuses[0]` or `Done`). `kind` `^[a-z_]{1,64}$` and `payload` an object ≤ 4096 chars (`BCNS3`); source must have an enabled schedule (`BCNS4`); ≥ 50 queued → `BCNS9`. Read results through `api.source_commands_v1`. |
+| `api.set_home_layout` | `(p_layout jsonb) returns void` | `W`. Replaces `clients.home_layout`; JSON/SQL null resets; non-object → `BCNS3`, > 16 KB → `BCNS5`. |
 
 No RPC takes `client_id` as an argument (R16). Every RPC that writes checks `W`; `download_url` and
 `report_dashboard_version` accept any role. `data.register_media(client uuid, path, title, tags,
@@ -959,7 +961,7 @@ dashboard — the next complete run un-deletes anything still in the folder.
 | config | `{ folder_id: "<Drive folder of the content library>", oauth_client_id: "…" }` — `folder_id` is the id segment of the folder URL (`[A-Za-z0-9_-]+`; the schema rejects a pasted URL). |
 | defaults | `interval = '1 hour'`, `backfillDepth = '0'`, `rateLimit = { concurrency: 2, minDelayMs: 200 }`, `fullList = [{ entity: 'file', table: 'media' }]`. |
 | Pull `file` | Every run walks the whole folder tree — no `modifiedTime` filter, because a changed-only page would tombstone every unchanged file: per folder page `GET drive/v3/files?q='<id>' in parents and trashed=false&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,imageMediaMetadata(width,height))&pageSize=100`; subfolders are queued and shortcuts skipped client-side, same walk and caps as §4.5 Pull `drive_file`. Only the tree's last page is `done`, so a budget stop (walk restarts from the root next run) or a cap trip never tombstones. For rows that have no thumbnail yet (`knownMedia` = a row whose bytes or thumbnail landed) the connector fetches `thumbnailLink` (`=s512`) and writes it to `<client_id>/thumb/<file_id>.jpg`; a missing or failed thumbnail is logged (`drive_thumb_skip`) and the row still lands. |
-| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule and, like a dashboard delete, purged (row and thumbnail) 30 days later unless they return first. A walk that finds no files at all fails the run instead (§4.1 empty-listing guard). |
+| Normalize → `media` | `external_id = file.id`, `kind` = `image` / `video` by mime prefix else `file`, `filename = title = name`, `mime`, `bytes = size` (absent for Google-native files), `width/height` from `imageMediaMetadata`, `thumb_path` as above (a re-upsert without one keeps the existing value), `attributes = { web_view_link, web_content_link (null when Drive gives none), folder_path ('' at the root, else folder names joined by "/") }`, `source_updated_at = modifiedTime`, `storage_path` null. Files that leave the folder are soft-deleted by the §4.1 tombstone rule and, like a dashboard delete, purged (row and thumbnail) 30 days later unless they return first. A walk that finds no files at all fails the run instead (§4.1 empty-listing guard). |
 
 ### 4.7 QuickBooks Online
 
@@ -1255,6 +1257,7 @@ stuck 24 h raises one `<source>_revoke_stuck` notification per client per day.
 | `rotate-smoke --slug` | Sets a new random password on the smoke user, updates the password manager entry and the dashboard repo's CI secret via `gh secret set`. Run at onboarding and on any suspected leak; `--remove` deletes the membership + auth user (the only path that can, §3.3). |
 | `renormalize` | §5.8 |
 | `set-quota --slug --gb <n>` | `clients.egress_quota_bytes`. |
+| `set-branding <client_id> --logo <png> [--favicon <png>] [--name ..] [--accent #hex]` | Uploads PNGs (magic-byte checked, ≤ 1 MB) to the public `branding` bucket as `<client_id>/logo.png` / `favicon.png` and merges `clients.branding`. Needs `DATABASE_URL` + `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`. |
 | `add-source --slug --source <s> [--reset-cursors]` | Attaches or rotates one source's credential (connection-day.md). `--reset-cursors` re-backfills a changed target. Stays the operator path; an owner can now do the same reset and the meet/drive folder change from the hub page `/sources/<source>` (`api.reset_source_cursors`, `api.set_source_folder`). |
 
 ## 6. SB panel map — quote § 2 → views

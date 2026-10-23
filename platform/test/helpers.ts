@@ -165,6 +165,10 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   connector_runs_v1: { args: { p_source: 'shopify' }, expect: 'none' },
   reset_source_cursors: { args: { p_source: 'shopify' }, expect: 'BCNS3' },
   set_source_folder: { args: { p_source: 'shopify', p_folder_id: 'rpc-scoped-folder', p_folder_url: null }, expect: 'BCNS3' },
+  // SB tuning (20261023162900). A malformed kind / a non-object layout fail validation before any write,
+  // so the probe never queues a command or touches acme's layout; tenant is never an argument.
+  enqueue_source_command: { args: { p_source: 'monday', p_kind: 'BAD KIND', p_payload: {} }, expect: 'BCNS3' },
+  set_home_layout: { args: { p_layout: [] }, expect: 'BCNS3' },
   // A past date fails validation before any write; the tenant is never an argument.
   record_shopify_paid_through: { args: { p_shop: 'rpc-scoped.myshopify.com', p_until: '2000-01-01T00:00:00Z' }, expect: 'BCNS3' },
   // Support tickets: an empty subject fails validation (after the tenant check) before any write; the tenant is never an argument.
