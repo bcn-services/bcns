@@ -139,6 +139,16 @@ describe('source_commands: worker executor', () => {
     expect(await nextRun(client)).toBe(false)
   })
 
+  it('set_status_undone: a Monday rejection marks the undo failed with the reason', async () => {
+    const client = await fixture()
+    const id = await queue(client, 'monday', 'set_status_undone', { item_id: '44' })
+    const fetch = (async () => new Response(JSON.stringify({ errors: [{ message: 'Label Working on it does not exist' }] }))) as unknown as typeof globalThis.fetch
+    await sourceCommands(mkTick(fetch))
+    const r = await row(id)
+    expect(r.status).toBe('failed')
+    expect(r.result.error).toMatch(/Label Working on it does not exist/)
+  })
+
   it('unknown kind, unknown source and a bad payload fail with a reason and never reach the network', async () => {
     const client = await fixture()
     const ids = [
