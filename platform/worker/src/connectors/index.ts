@@ -78,8 +78,10 @@ export interface RunContext {
   mergeConfig(patch: Record<string, unknown>): Promise<void>
   /** Monday write-back: the status text the synced jobs row holds for an item (null when none). */
   jobStatus(externalId: string): Promise<string | null>
-  /** Monday write-back: `previous` recorded by the newest succeeded set_status_done for an item (null when none). */
+  /** Monday write-back: `previous` recorded by the newest succeeded set_status_done for an item (null when none, or when it recorded an empty label). */
   previousStatus(externalId: string): Promise<string | null>
+  /** Monday write-back: whether the newest set_status_done that already ran for an item failed (false when none ran). */
+  lastDoneFailed(externalId: string): Promise<boolean>
 }
 
 export interface Connector {

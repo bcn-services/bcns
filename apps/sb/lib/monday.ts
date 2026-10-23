@@ -2,9 +2,9 @@
  * monday.ts — the Monday panel's reads and its write-back (mark Done).
  *
  * Reads: five items of the board's "Daily" group in the board's own order
- * (api.jobs_v1.position): the not-done ones, plus any item marked Done from SB in
- * the last KEEP_DONE_MS that was not since undone, so a click leaves the row in
- * place (checked) and a second click undoes it. Write: Done / undo are queued
+ * (api.jobs_v1.position): the not-done ones, plus any item with a Done or undo from SB
+ * in the last KEEP_DONE_MS that did not fail, so a click leaves the row in place (checked),
+ * a second click flips it back, and the row never vanishes mid-flight. Write: Done / undo are queued
  * source commands (api.enqueue_source_command, via queueMarkDone / queueMarkUndone
  * and app/monday-actions.ts); the worker applies them to Monday. SB holds no
  * Monday token and learns the result from a later sync or from source_commands_v1
@@ -44,7 +44,7 @@ function byBoardOrder(a: DailyTask, b: DailyTask): number {
 
 /**
  * Five "Daily" items in board order: the not-done ones plus the `keepIds` (items marked Done
- * from SB, see keptItemIds), so a just-done item holds its place instead of a sixth sliding in.
+ * or undone from SB, see keptItemIds), so a just-clicked item holds its place instead of a sixth sliding in.
  * Never throws: a failed read is `{ data: null, error }`.
  */
 export async function loadDailyTasks(client: DataClient, keepIds: string[] = []): Promise<{ data: DailyTask[] | null; error: unknown }> {
@@ -109,18 +109,19 @@ function itemIdOf(c: CommandRow): string | null {
 }
 
 /**
- * Items to keep in the panel although done: the newest command that did not fail (within KEEP_DONE_MS
- * of `now`) is a mark-done. A later undo drops the item; a failed command changed nothing and is skipped.
+ * Items to keep in the panel: any with a mark-done or undo that did not fail within KEEP_DONE_MS of `now`.
+ * An undo keeps the row too: its done may already be synced (is_done=true, so the not-done read skips it),
+ * and the row must stay to flip unchecked. A failed command changed nothing; loadDailyTasks dedupes the
+ * kept ids against the not-done read and caps the list at five.
  */
 export function keptItemIds(commands: CommandRow[], now: Date = new Date()): string[] {
   const since = now.getTime() - KEEP_DONE_MS;
-  const decided = new Map<string, boolean>();
-  for (const c of [...commands].sort((a, b) => Date.parse(b.created_at ?? "") - Date.parse(a.created_at ?? ""))) {
+  const ids = new Set<string>();
+  for (const c of commands) {
     const id = itemIdOf(c);
-    if (!id || decided.has(id) || c.status === "failed" || !(Date.parse(c.created_at ?? "") >= since)) continue;
-    if (c.kind === MARK_DONE_KIND || c.kind === MARK_UNDO_KIND) decided.set(id, c.kind === MARK_DONE_KIND);
+    if (id && c.status !== "failed" && (c.kind === MARK_DONE_KIND || c.kind === MARK_UNDO_KIND) && Date.parse(c.created_at ?? "") >= since) ids.add(id);
   }
-  return [...decided].filter(([, kept]) => kept).map(([id]) => id);
+  return [...ids];
 }
 
 /** Done (or undo) as the row should read it. A failed newest command is shown with its note and the board's state. */

@@ -6,15 +6,16 @@ const monday = connectors.monday
 const cmd = monday.commands!.set_status_done
 const undo = monday.commands!.set_status_undone
 
-// `stored` = the synced row's status text (ctx.jobStatus); `prior` = the earlier done command's `previous` (ctx.previousStatus).
-function ctxWith(config: Json, respond: (body: Json) => unknown, stored: string | null = null, prior: string | null = null) {
+// `stored` = the synced row's status text (ctx.jobStatus); `prior` = the earlier done command's `previous` (ctx.previousStatus);
+// `doneFailed` = the newest run set_status_done failed (ctx.lastDoneFailed).
+function ctxWith(config: Json, respond: (body: Json) => unknown, stored: string | null = null, prior: string | null = null, doneFailed = false) {
   const calls: { url: string; headers: Record<string, string>; body: Json }[] = []
   const fetch = (async (url: unknown, init: RequestInit) => {
     const body = JSON.parse(String(init.body))
     calls.push({ url: String(url), headers: init.headers as Record<string, string>, body })
     return new Response(JSON.stringify(respond(body)))
   }) as unknown as typeof globalThis.fetch
-  const ctx = ({ clientId: 'c1', source: 'monday', config, timezone: 'UTC', token: { secret: 'tok-123' }, fetch, log: () => {}, jobStatus: async () => stored, previousStatus: async () => prior }) as unknown as RunContext
+  const ctx = ({ clientId: 'c1', source: 'monday', config, timezone: 'UTC', token: { secret: 'tok-123' }, fetch, log: () => {}, jobStatus: async () => stored, previousStatus: async () => prior, lastDoneFailed: async () => doneFailed }) as unknown as RunContext
   return { ctx, calls }
 }
 const ok = () => ({ data: { change_simple_column_value: { id: '555' } } })
@@ -81,6 +82,12 @@ describe('monday set_status_undone', () => {
     const { ctx, calls } = ctxWith(cfg(), ok, null, null)
     expect(await undo(ctx, { item_id: '555' })).toEqual({ item_id: '555', status: null })
     expect(calls[0].body.variables).toEqual({ board: '1001', item: '555', column: 'color_mm72czhc', value: '' })
+  })
+
+  it('is a no-op (nothing sent, still a success) when the done it undoes failed', async () => {
+    const { ctx, calls } = ctxWith(cfg(), ok, null, 'Working on it', true)
+    expect(await undo(ctx, { item_id: '555' })).toEqual({ item_id: '555', status: null, skipped: 'the done it undoes failed' })
+    expect(calls).toHaveLength(0)
   })
 
   it('throws (nothing sent) on a bad item id or a missing status column; throws the Monday reason on a GraphQL error', async () => {

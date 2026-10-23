@@ -210,29 +210,45 @@ test("KEEP_DONE_MS is 24 hours", () => {
   assert.equal(KEEP_DONE_MS, 86_400_000);
 });
 
-test("keptItemIds: a mark-done within 24h is kept; a later undo drops it; a failed command is skipped", () => {
+test("keptItemIds: a done or undo within 24h that did not fail is kept; a failed-only item is not", () => {
   const kept = keptItemIds(
     [
       cmd("1", "done", ago(1 * H)), // kept
-      cmd("2", "done", ago(1 * H), "set_status_undone"), // undone after...
-      cmd("2", "done", ago(2 * H)), // ...its done
+      cmd("2", "done", ago(1 * H), "set_status_undone"), // undone after its done: still kept (its done may be synced)
+      cmd("2", "done", ago(2 * H)),
       cmd("3", "failed", ago(1 * H)), // failed done alone: nothing changed
       cmd("4", "failed", ago(1 * H), "set_status_undone"), // failed undo: still done, still kept
       cmd("4", "done", ago(3 * H)),
       cmd("5", "queued", ago(1000)), // in flight counts
+      cmd("6", "queued", ago(1000), "set_status_undone"), // an undo alone (done already synced) keeps the row
     ],
     NOW,
   );
-  assert.deepEqual(kept.sort(), ["1", "4", "5"]);
+  assert.deepEqual(kept.sort(), ["1", "2", "4", "5", "6"]);
 });
 
-test("keptItemIds: the window edge is 24h exactly; re-marking after an undo keeps it again", () => {
+test("keptItemIds: the window edge is 24h exactly; any non-failed command keeps, whatever the order", () => {
   assert.deepEqual(keptItemIds([cmd("1", "done", ago(24 * H - 1000))], NOW), ["1"]);
   assert.deepEqual(keptItemIds([cmd("1", "done", ago(24 * H + 1000))], NOW), []);
+  assert.deepEqual(keptItemIds([cmd("1", "done", ago(24 * H + 1000), "set_status_undone")], NOW), []);
   assert.deepEqual(keptItemIds([cmd("1", "queued", ago(1 * H)), cmd("1", "done", ago(2 * H), "set_status_undone"), cmd("1", "done", ago(3 * H))], NOW), ["1"]);
-  // order of the input does not matter
-  assert.deepEqual(keptItemIds([cmd("1", "done", ago(3 * H)), cmd("1", "done", ago(2 * H), "set_status_undone")], NOW), []);
+  assert.deepEqual(keptItemIds([cmd("1", "done", ago(3 * H)), cmd("1", "done", ago(2 * H), "set_status_undone")], NOW), ["1"]);
   assert.deepEqual(keptItemIds([cmd("1", "done", ago(1 * H), "set_status_other"), cmd("x", "done", ago(1 * H))], NOW), []);
+});
+
+test("undo of a synced done: the row stays listed, reads unchecked, and the list stays five", async () => {
+  // d3's done already synced (is_done=true); the newest command is a pending undo.
+  const commands = [cmd("3", "queued", ago(1000), "set_status_undone"), cmd("3", "done", ago(2 * H))];
+  const keep = keptItemIds(commands, NOW);
+  assert.deepEqual(keep, ["3"]);
+  const open = [1, 2, 4, 5, 6].map((p) => ({ external_id: `${p}`, position: p, due_on: null, is_done: false }));
+  const row = { external_id: "3", position: 3, due_on: null, is_done: true, source_updated_at: ago(1 * H) };
+  const { client } = fakeJobs([{ data: open, error: null }, { data: [row], error: null }]);
+  const { data } = await loadDailyTasks(client, keep);
+  assert.deepEqual(data.map((t) => t.external_id), ["1", "2", "3", "4", "5"], "3 holds its slot; 6 does not slide in");
+  const state = commandStateByItem(commands, data).get("3");
+  assert.deepEqual(state, { kind: "undo", state: "pending" });
+  assert.equal(isChecked(data.find((t) => t.external_id === "3"), state), false, "reads unchecked at once");
 });
 
 test("loadDailyTasks: kept done items are merged in board order and the list stays five", async () => {

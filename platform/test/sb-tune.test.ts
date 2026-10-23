@@ -128,6 +128,45 @@ describe('source_commands: worker executor', () => {
     expect(bodies[0].variables.value).toBe('')
   })
 
+  // A finished set_status_done as the executor leaves it, `ago` earlier.
+  const finished = (client: string, item: string, status: 'done' | 'failed', result: unknown, ago: string) =>
+    sql(`insert into data.source_commands (client_id, source, kind, payload, status, result, created_at, done_at)
+         values ($1, 'monday', 'set_status_done', $2::jsonb, $3, $4::jsonb, now() - $5::interval, now() - $5::interval)`,
+      [client, JSON.stringify({ item_id: item }), status, JSON.stringify(result), ago])
+  const sent = () => {
+    const bodies: any[] = []
+    const fetch = (async (_u: unknown, init: any) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { change_simple_column_value: { id: '1' } } })) }) as unknown as typeof globalThis.fetch
+    return { bodies, fetch }
+  }
+
+  it('set_status_undone: a newest done that recorded previous: null clears the label, not an older done\'s previous', async () => {
+    const client = await fixture()
+    await finished(client, '45', 'done', { item_id: '45', status: 'Done', previous: 'Working on it' }, '2 hours')
+    await finished(client, '45', 'done', { item_id: '45', status: 'Done', previous: null }, '1 hour')
+    const id = await queue(client, 'monday', 'set_status_undone', { item_id: '45' })
+    const { bodies, fetch } = sent()
+    await sourceCommands(mkTick(fetch))
+    expect(await row(id)).toMatchObject({ status: 'done', result: { item_id: '45', status: null } })
+    expect(bodies.map(b => b.variables.value)).toEqual([''])
+  })
+
+  it('set_status_undone: a no-op when the newest run done failed; runs again once a newer done succeeded', async () => {
+    const client = await fixture()
+    await finished(client, '46', 'done', { item_id: '46', status: 'Done', previous: 'Stuck' }, '3 hours')
+    await finished(client, '46', 'failed', { error: 'Monday 500' }, '2 hours')
+    const first = await queue(client, 'monday', 'set_status_undone', { item_id: '46' })
+    const a = sent()
+    await sourceCommands(mkTick(a.fetch))
+    expect(a.bodies).toHaveLength(0)
+    expect(await row(first)).toMatchObject({ status: 'done', result: { item_id: '46', status: null, skipped: expect.stringContaining('failed') } })
+    await finished(client, '46', 'done', { item_id: '46', status: 'Done', previous: 'Working on it' }, '1 minute')
+    const second = await queue(client, 'monday', 'set_status_undone', { item_id: '46' })
+    const b = sent()
+    await sourceCommands(mkTick(b.fetch))
+    expect(b.bodies.map(x => x.variables.value)).toEqual(['Working on it'])
+    expect(await row(second)).toMatchObject({ status: 'done', result: { item_id: '46', status: 'Working on it' } })
+  })
+
   it('a Monday rejection marks it failed with the reason; the schedule is left alone', async () => {
     const client = await fixture({ board_id: '1001', columns: { status: 'color_x' }, done_statuses: ['Complete'] })
     const id = await queue(client, 'monday', 'set_status_done', { item_id: '5' })

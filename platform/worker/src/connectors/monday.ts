@@ -87,13 +87,15 @@ async function setStatusDone(ctx: RunContext, payload: Json): Promise<Json> {
 }
 
 /**
- * Undo a set_status_done: put back the `previous` it recorded, else clear the label.
+ * Undo a set_status_done: put back the `previous` it recorded (null, an empty label, clears it). A no-op
+ * when the done it undoes failed, so the item's untouched label is not overwritten.
  * Clearing: change_simple_column_value with value "" resets a status column
  * (https://developer.monday.com/api-reference/docs/status, "Pass an empty string in value").
  * ponytail: writes without re-reading the board, so a label someone set in Monday since the done is overwritten.
  */
 async function setStatusUndone(ctx: RunContext, payload: Json): Promise<Json> {
   const { item, column } = target(ctx, payload)
+  if (await ctx.lastDoneFailed(item)) return { item_id: item, status: null, skipped: 'the done it undoes failed' }
   const previous = await ctx.previousStatus(item)
   await gql(ctx, { board: String(ctx.config.board_id), item, column, value: previous ?? '' }, SET_STATUS)
   return { item_id: item, status: previous }
