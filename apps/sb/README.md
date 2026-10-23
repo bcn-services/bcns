@@ -10,7 +10,7 @@ status: active
 **SB Command Center**: one dashboard over SB's Shopify, Meta Ads, Monday.com
 and Google Meet data (plus Drive-sourced library files and QuickBooks budget
 rows), read from the shared bcns platform (`DATA_SOURCE=shared`), with a
-content library and a Daily Financial Report (no AI in v1). See
+content library (no AI in v1). Its one write is marking a Monday item Done, queued as a source command the platform worker applies. See
 [`CLIENT.md`](CLIENT.md) for the brief and config decisions.
 
 Lives in the bcns monorepo as `apps/sb` (workspace package `@bcn-services/sb`),

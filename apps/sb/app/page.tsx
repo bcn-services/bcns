@@ -11,10 +11,11 @@
 import { getDataClient } from "@/lib/data";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
+import { commandStateByItem, loadDailyTasks, loadDoneCommands, loadMondayBoardUrl } from "@/lib/monday";
+import { createSupabaseServer } from "@/lib/supabase-server";
 import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
-import { dailyReportLines, loadDailyReport, yesterdayInTimezone, type DailyReport } from "@/lib/daily-report";
 import { activityEmptyState, panelState } from "@/lib/panels";
-import { fileCountLabel, mediaThumbPath } from "@/lib/library";
+import { fileCountLabel, fileLink, fileLinkProps, mediaThumbPath, type FileLinkTarget } from "@/lib/library";
 import {
   aggregateCampaigns,
   bestCreative,
@@ -22,7 +23,6 @@ import {
   computeOverviewMetrics,
   formatCompact,
   formatCount,
-  formatDayLabel,
   formatMoney,
   formatMoneyWhole,
   formatPercent,
@@ -67,11 +67,7 @@ export default async function HomePage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
-  const yesterday = yesterdayInTimezone(shell.timezone);
-
-  const [dailyR, summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
-    // Fixed to yesterday, not the header range (DESIGN.md "Daily Financial Report").
-    loadDailyReport(client, yesterday),
+  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR, tasksR, notesR] = await Promise.allSettled([
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: rows capped at 1000 (PostgREST's default); a large account over
     // a long range gets partial rollups. Upgrade: a per-range aggregate RPC in
@@ -82,19 +78,10 @@ export default async function HomePage({
     client.views.media_v1().is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
     client.views.activity_v1().order("occurred_at", { ascending: false }).limit(5),
     financialRecordsQuery(client, range.prevFrom, range.to),
-    // ponytail: capped at 50 (well above the panel's top-5), sorting/tone stay
-    // in lib/panels.ts so the DB just narrows the row count.
-    client.views.jobs_v1().eq("kind", "task").order("due_on", { ascending: true, nullsFirst: false }).limit(50),
+    // The first five not-done items of the board's Daily group, in board order.
+    loadDailyTasks(client),
     client.views.messages_v1().eq("kind", "meeting_note").order("occurred_at", { ascending: false }).limit(50),
   ]);
-
-  let dailyReport: DailyReport | null = null;
-  if (dailyR.status === "fulfilled") {
-    dailyReport = dailyR.value.report;
-    if (dailyR.value.errors.length) console.error(`home: daily report read failed for ${dailyR.value.errors.join(", ")}`);
-  } else {
-    console.error("home: daily report failed", dailyR.reason instanceof Error ? dailyR.reason.message : dailyR.reason);
-  }
 
   const summary = unwrap(summaryR);
   const campaigns = unwrap(campaignR);
@@ -159,15 +146,21 @@ export default async function HomePage({
   // Manual entries need no connector, so they alone are enough to render rows.
   const financialPanelState = entryTotals.count ? "data" : financialState;
   const taskRows = tasks.error ? [] : (tasks.data ?? []);
+  const [mondayCommands, mondayBoardUrl] = await Promise.all([
+    loadDoneCommands(createSupabaseServer()),
+    loadMondayBoardUrl(client, taskRows),
+  ]);
+  const mondayCommandStates = commandStateByItem(mondayCommands, taskRows);
   const noteRows = notes.error ? [] : (notes.data ?? []);
   const mondayState = panelState(shell.health, ["monday"], taskRows.length > 0);
   const meetState = panelState(shell.health, ["meet"], noteRows.length > 0);
 
   const setRows = mediaSets.error ? [] : (mediaSets.data ?? []);
   const mediaRows = media.error ? [] : (media.data ?? []);
-  const libraryTiles = [
-    ...setRows.map((s) => ({ key: `set-${s.id}`, name: s.name ?? "Untitled set", sub: fileCountLabel(s.file_count), thumbPath: s.cover_thumb_path })),
-    ...mediaRows.map((m) => ({ key: `media-${m.id}`, name: m.title ?? m.filename ?? "Untitled", sub: m.kind ?? "File", thumbPath: mediaThumbPath(m) })),
+  // A Drive file's tile is one tap: a direct download, or Open in Drive without one.
+  const libraryTiles: { key: string; name: string; sub: string; thumbPath: string | null; link: FileLinkTarget | null }[] = [
+    ...setRows.map((s) => ({ key: `set-${s.id}`, name: s.name ?? "Untitled set", sub: fileCountLabel(s.file_count), thumbPath: s.cover_thumb_path, link: null })),
+    ...mediaRows.map((m) => ({ key: `media-${m.id}`, name: m.title ?? m.filename ?? "Untitled", sub: m.kind ?? "File", thumbPath: mediaThumbPath(m), link: fileLink(m) })),
   ].slice(0, 6);
 
   const thumbPaths = [
@@ -197,6 +190,7 @@ export default async function HomePage({
         email={email}
         health={shell.health}
         healthError={shell.healthError}
+        branding={shell.branding}
         openPopup={parsePopup(searchParams.popup)}
       />
 
@@ -207,10 +201,6 @@ export default async function HomePage({
         <MetricCard label="ROAS" value={formatRoas(metrics.roas.value)} deltaPct={metrics.roas.deltaPct} series={metrics.roas.series} hasData={metrics.roas.hasData} />
         <MetricCard label="AOV" value={formatMoney(metrics.aov.value, metrics.currency)} deltaPct={metrics.aov.deltaPct} series={metrics.aov.series} hasData={metrics.aov.hasData} />
         <MetricCard label="Inventory" value={formatCount(metrics.inventory.value)} deltaPct={metrics.inventory.deltaPct} series={metrics.inventory.series} hasData={metrics.inventory.hasData} />
-      </div>
-
-      <div className="grid-daily">
-        <DailyReportPanel day={yesterday} report={dailyReport} />
       </div>
 
       <div className="grid-primary">
@@ -244,7 +234,7 @@ export default async function HomePage({
 
       <div className="grid-secondary">
         <MeetPanel state={meetState} notes={noteRows} connectHref={connectHref} timezone={shell.timezone} />
-        <MondayPanel state={mondayState} tasks={taskRows} connectHref={connectHref} />
+        <MondayPanel state={mondayState} tasks={taskRows} commands={mondayCommandStates} boardUrl={mondayBoardUrl} connectHref={connectHref} />
 
         <Panel className="panel--column">
           <PanelHead tile={<LibraryIcon />} title="Content Library" small right={<ViewAll href={`/library${query}`} />} />
@@ -252,8 +242,8 @@ export default async function HomePage({
             <div className="thumb-grid">
               {libraryTiles.map((tile) => {
                 const url = tile.thumbPath ? thumbUrls[tile.thumbPath] : null;
-                return (
-                  <div className="thumb-tile" key={tile.key}>
+                const inner = (
+                  <>
                     {url ? (
                       // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived thumbnail URLs; next/image would proxy every one
                       <img className="thumb-tile__img" src={url} alt="" />
@@ -262,6 +252,15 @@ export default async function HomePage({
                     )}
                     <div className="thumb-tile__name">{tile.name}</div>
                     <div className="thumb-tile__sub">{tile.sub}</div>
+                  </>
+                );
+                return tile.link ? (
+                  <a className="thumb-tile thumb-tile--link" key={tile.key} {...fileLinkProps(tile.link)} title={tile.link.kind === "download" ? `Download ${tile.name}` : `Open ${tile.name} in Drive`}>
+                    {inner}
+                  </a>
+                ) : (
+                  <div className="thumb-tile" key={tile.key}>
+                    {inner}
                   </div>
                 );
               })}
@@ -291,29 +290,6 @@ export default async function HomePage({
         </Panel>
       </div>
     </>
-  );
-}
-
-function DailyReportPanel({ day, report }: { day: string; report: DailyReport | null }) {
-  return (
-    <Panel className="panel--column">
-      <PanelHead tile={<FinanceIcon />} title="Daily Financial Report" right={<span className="panel__meta">Yesterday · {formatDayLabel(day)}</span>} />
-      <div className="panel__fill">
-        {report?.hasData ? (
-          <div className="rows rows--pairs">
-            {dailyReportLines(report).map((line) => (
-              <div className="row row--pair" key={line.key}>
-                <span className="row__label">{line.label}</span>
-                <span className="row__value">{line.value}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="state-note">No data yet.</p>
-        )}
-      </div>
-      <PanelButton href={`/financials${rangeQuery({ from: day, to: day })}`} label="Open Financials" />
-    </Panel>
   );
 }
 

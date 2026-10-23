@@ -7,8 +7,8 @@
 ## Brief
 
 SB is a Shopify retailer. It wants one Command Center over its Shopify, Meta
-Ads, Monday.com and Google Meet data. It is a read-only reporting and reference
-layer; it never writes back to those systems.
+Ads, Monday.com and Google Meet data. It is a reporting and reference layer; its
+one write is marking a Monday item Done, queued as a source command (`api.enqueue_source_command`) that the platform worker applies, so SB holds no Monday token.
 
 - **Overview:** six headline metrics (revenue, orders, conversion rate, ROAS,
   AOV, inventory), each with a trend line and a change against the previous
@@ -16,13 +16,13 @@ layer; it never writes back to those systems.
   feed and a Content Library preview.
 - **Connected systems:** a Shopify panel, and a Meta Ads panel with a
   per-campaign ROAS breakdown and a Top Performing Creative callout. Also a
-  Monday.com board, Google Meet / Note AI meeting notes, and a Daily Financial
-  Report (Shopify revenue, orders and AOV only; no QuickBooks). An integrations
-  page shows each connection's live status.
-- **Content Library and Creative Folder:** upload, tag, search, creative sets,
-  bulk tagging, and full-quality download.
+  Monday.com board (the first five open items of its Daily group), Google Meet /
+  Note AI meeting notes, and (taken off the home 2026-10-23 at Declan's request) a Daily
+  Financial Report. An integrations page shows each connection's live status.
+- **Content Library:** Drive files, filtered by Drive Folders or by Sets (groups
+  the client makes), with tagging, search and one-tap download.
 - **No AI in v1** (agreed with Declan 2026-09-15): the Daily Financial Report
-  is script-generated (`lib/daily-report.ts`, computed on every page load).
+  (no longer shown on the home) is script-generated (`lib/daily-report.ts`, computed on every page load).
   There's no AI summary and no chat assistant. A daily briefing of tasks to do
   comes in the next version.
 

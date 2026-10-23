@@ -1,6 +1,6 @@
 /**
  * /financials — DESIGN.md "Financial Information": the seven range tiles, the
- * daily table, and the manual entries panel (form + list + delete).
+ * quarterly budget, and the manual entries panel (form + list + delete).
  *
  * Shopify and Meta figures follow ?from&to and the panel-state rules in
  * lib/panels.ts; manual entries are dashboard-sourced, so they work whether or
@@ -46,13 +46,12 @@ import {
   formatRelativeTime,
   isValidYmd,
   parseRange,
-  rangeQuery,
   splitPeriods,
   todayInTimezone,
 } from "@/lib/overview";
 import { AppHeader, parsePopup } from "@/app/_components/AppHeader";
 import { MetricCard } from "@/app/_components/MetricCard";
-import { Panel, PanelHead, StateNote, Unconfigured } from "@/app/_components/Panel";
+import { Panel, PanelHead, Unconfigured } from "@/app/_components/Panel";
 import { FinanceIcon } from "@/app/_components/icons";
 import { createFinancialEntry, deleteFinancialEntry } from "./actions";
 import { QuarterlyBudgetPanel, RecentTransactionsPanel } from "./transactions";
@@ -84,8 +83,6 @@ export default async function FinancialsPage({
   const [shell, email] = await Promise.all([loadShellData(client), getSignedInEmail()]);
   const today = todayInTimezone(shell.timezone);
   const range = parseRange(searchParams, today);
-  const query = rangeQuery(range);
-  const connectHref = `${query}&popup=integrations`;
 
   const quarter = quarterOf(today);
   const bounds = quarterBounds(quarter);
@@ -202,6 +199,7 @@ export default async function FinancialsPage({
         email={email}
         health={shell.health}
         healthError={shell.healthError}
+        branding={shell.branding}
         openPopup={parsePopup(searchParams.popup)}
       />
 
@@ -227,43 +225,16 @@ export default async function FinancialsPage({
       </div>
 
       <div className="fin-grid">
-        <Panel className="panel--column">
-          <PanelHead tile={<FinanceIcon />} title="Daily Breakdown" />
-          {dailyRows.length ? (
-            <div className="table-scroll">
-              <table className="fin-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Date</th>
-                    <th scope="col" className="fin-table__num">Revenue</th>
-                    <th scope="col" className="fin-table__num">Orders</th>
-                    <th scope="col" className="fin-table__num">Ad Spend</th>
-                    <th scope="col" className="fin-table__num">Manual Income</th>
-                    <th scope="col" className="fin-table__num">Manual Expenses</th>
-                    <th scope="col" className="fin-table__num">Profit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dailyRows.map((row) => (
-                    <tr key={row.day}>
-                      <td>{formatDayLabel(row.day)}</td>
-                      <td className="fin-table__num">{formatMoney(row.revenueMinor, currency)}</td>
-                      <td className="fin-table__num">{formatCount(row.orders)}</td>
-                      <td className="fin-table__num">{formatMoney(row.adSpendMinor, currency)}</td>
-                      <td className="fin-table__num">{formatMoney(row.manualIncomeMinor, currency)}</td>
-                      <td className="fin-table__num">{formatMoney(row.manualExpensesMinor, currency)}</td>
-                      <td className={`fin-table__num fin-table__num--strong${(row.profitMinor ?? 0) < 0 ? " fin-table__num--neg" : ""}`}>
-                        {formatMoney(row.profitMinor, currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <StateNote state={tableState === "data" ? "empty" : tableState} label="Shopify and Meta" connectHref={connectHref} />
-          )}
-        </Panel>
+        <QuarterlyBudgetPanel
+          quarter={quarter}
+          sectors={budgetTotals.sectors}
+          totalBudgetCents={budgetTotals.totalBudgetCents}
+          totalSpentCents={budgetTotals.totalSpentCents}
+          totalRemainingCents={budgetTotals.totalRemainingCents}
+          skippedCurrencyCount={budgetTotals.skippedCurrencyCount}
+          currency={qboCurrency}
+          range={range}
+        />
 
         <Panel className="panel--column">
           <PanelHead tile={<FinanceIcon />} title="Manual Entries" />
@@ -347,17 +318,7 @@ export default async function FinancialsPage({
         </Panel>
       </div>
 
-      <div className="fin-grid">
-        <QuarterlyBudgetPanel
-          quarter={quarter}
-          sectors={budgetTotals.sectors}
-          totalBudgetCents={budgetTotals.totalBudgetCents}
-          totalSpentCents={budgetTotals.totalSpentCents}
-          totalRemainingCents={budgetTotals.totalRemainingCents}
-          skippedCurrencyCount={budgetTotals.skippedCurrencyCount}
-          currency={qboCurrency}
-          range={range}
-        />
+      <div className="fin-grid fin-grid--single">
         <RecentTransactionsPanel
           connected={qboConnected}
           lastSyncedLabel={qboLastSynced}
