@@ -16,7 +16,7 @@ own-project mode.
 
 Stamped into `apps/<slug>` by `scripts/new-app.sh <slug> <port>` (the
 `/new-client-app` skill runs it and fills in `CLIENT.md`). See `TEMPLATE.md`
-for exactly what the script changes.
+for exactly what the script changes. The page title, favicon and heading logo come from the client's `api.client_v1.branding` when set (`lib/branding.ts`), text otherwise.
 
 ## Quick start
 

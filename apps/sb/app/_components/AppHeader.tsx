@@ -6,14 +6,18 @@
  * never receives `searchParams`, and the header is entirely driven by the
  * ?from&to range and the active route. Each page passes both.
  *
- * Popups are native <details>. `openPopup` seeds the open state from the URL
- * so a panel's "Connect …" link can open the Integrations popup without any
- * client JavaScript; the summary toggles it natively after that.
+ * Popups are native <details className="popup">. `openPopup` seeds the open
+ * state from the URL so a panel's "Connect …" link can open the Integrations
+ * popup without any client JavaScript; the summary toggles it natively, and
+ * PopupDismiss (mounted in layout.tsx) closes every popup on outside click or
+ * Escape.
  */
 
 import Link from "next/link";
 import { formatDayLabel, formatRangeLabel, rangePresets, rangeQuery, type ParsedRange } from "@/lib/overview";
 import { integrationRows, type HealthLike } from "@/lib/panels";
+import type { Branding } from "@/lib/branding";
+import { EXTERNAL_LINK_PROPS } from "@/lib/links";
 import { signOut } from "@/app/login/actions";
 import { CalendarIcon, ChevronDownIcon, IntegrationsIcon, SettingsIcon } from "./icons";
 
@@ -26,6 +30,8 @@ export function parsePopup(value: string | undefined): OpenPopup {
 }
 
 export const HUB_URL = "https://connect.bcn-services.com";
+export const HELP_URL = `${HUB_URL}/support`;
+const DEFAULT_TITLE = "Saunaboy Command Center";
 
 const PAGES: { key: ActivePage; href: string; label: string }[] = [
   { key: "financials", href: "/financials", label: "Financial Information" },
@@ -42,6 +48,7 @@ export function AppHeader({
   health,
   healthError,
   openPopup,
+  branding,
 }: {
   active: ActivePage;
   range: ParsedRange;
@@ -52,16 +59,24 @@ export function AppHeader({
   health: HealthLike[];
   healthError: boolean;
   openPopup: OpenPopup;
+  /** shell.branding: logo and title when the client has them, null for the text header. */
+  branding: Branding | null;
 }) {
   const query = rangeQuery(range);
   const presets = rangePresets(today);
   const rows = integrationRows(health);
+  const title = branding?.name ?? DEFAULT_TITLE;
 
   return (
     <header className="app-header">
       <div>
         <Link className="app-title" href={`/${query}`}>
-          Saunaboy Command Center
+          {branding?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- public bucket URL, per-client; next/image would need its host allow-listed
+            <img className="app-logo" src={branding.logoUrl} alt={title} />
+          ) : (
+            title
+          )}
         </Link>
         <div className="app-tagline">Data. Creativity. Wellness. Growth.</div>
       </div>
@@ -121,6 +136,9 @@ export function AppHeader({
               <dt>Timezone</dt>
               <dd>{timezone}</dd>
             </dl>
+            <a className="btn-plain" href={HELP_URL} {...EXTERNAL_LINK_PROPS}>
+              Get help
+            </a>
             <form action={signOut}>
               <button className="btn-plain" type="submit">
                 Sign out
