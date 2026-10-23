@@ -9,7 +9,7 @@ const QUAL_ALLOW: Record<string, string> = {
   records: `((client_id = ${T}) AND (deleted_at IS NULL))`,
 }
 const HELPERS = ['data.active_client_id', 'data.active_client_role', 'data.egress_exceeded', 'data.has_download_ticket']
-const INTERNAL = ['raw', 'raw_latest', 'connector_schedule', 'connector_runs', 'notifications', 'source_tokens', 'worker_leases', 'download_tickets', 'metric_defs']
+const INTERNAL = ['raw', 'raw_latest', 'connector_schedule', 'connector_runs', 'notifications', 'source_tokens', 'worker_leases', 'download_tickets', 'metric_defs', 'staff']
 // Supabase's own roles carry BYPASSRLS/SUPERUSER on every stack; nothing we create may.
 const PLATFORM_ROLES = ['postgres', 'supabase_admin', 'service_role', 'supabase_read_only_user', 'supabase_etl_admin'] // etl_admin: PG17 image (Supabase ETL replication)
 
