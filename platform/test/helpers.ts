@@ -110,6 +110,13 @@ export const PNG_1x1 = Buffer.from(
 export const SERVICE_ROLE_ONLY_API_FNS = new Set(['record_shop_redact', 'record_app_uninstalled', 'signup_create_client', 'stripe_billing_state', 'stripe_apply_billing', 'stripe_signup_workspace'])
 
 /**
+ * RPCs scoped by auth.uid() against data.staff, not by the JWT's client claim (20261023173744_staff_switch):
+ * a non-staff caller gets [] / BCNS2, never BCNS0. Skipped by `no_claim_zero_rows` and `rpc_every_write_scoped`;
+ * staff-switch.test.ts covers their access control.
+ */
+export const STAFF_API_FNS = new Set(['staff_workspaces', 'staff_switch_client'])
+
+/**
  * One argument builder per api RPC, every id pointing at seeded `beta` rows. Used by the
  * cross-tenant and no-claim tests; a new RPC without an entry fails `rpc_every_write_scoped`.
  * `expect`: 'BCNS3'/'BCNS4' — single-id RPC must raise that code; 'ignored' — array RPC must return 0 / touch nothing;
