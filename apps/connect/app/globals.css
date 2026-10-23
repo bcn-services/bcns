@@ -298,7 +298,6 @@
 
 /* Sources head: title, one summary line, a thin usage bar (neutral; red only over quota) */
 .ph-r { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.ph-b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sum { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 13.5px; color: hsl(var(--muted-foreground)); }
 .sum > span + span::before { content: "·"; margin: 0 8px; }
 .sum .m { font: 12.5px var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }

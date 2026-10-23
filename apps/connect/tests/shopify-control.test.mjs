@@ -57,7 +57,8 @@ test("page.tsx: every card's title links to its source page, connected or not (w
   const src = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(src, /card\.connected \? <a href=\{`\/sources\//);
   assert.equal((src.match(/<a href=\{`\/sources\/\$\{card\.source\}`\}>\{card\.title\}<\/a>/g) ?? []).length, 2, "cards view and rows view");
-  assert.match(src, /<a className="btn btn-sm" href="\/guide">\s*Connection guide/);
+  // The guide and dashboard buttons left the page header: the help menu and the top bar carry them.
+  assert.doesNotMatch(src, /Connection guide|DashboardButton/);
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /\.grid-src \.sc-t a::after \{[^}]*position: absolute; inset: 0/);
   assert.match(css, /\.grid-src \.sc \{ position: relative; \}/);
