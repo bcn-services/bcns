@@ -13,6 +13,7 @@ const ERRORS: Record<string, string> = {
   "signed-out": "Please sign in to continue.",
   "no-membership": "Your account isn't a member of any workspace yet. Ask bcns for an invite.",
   "link-expired": "That link has expired or was already used. Request a new one, or ask bcns to resend your invite.",
+  "signup-exists": "That email already has an account. Sign in below, or reset your password.",
   "wrong-client": "That account belongs to a different workspace. Sign in with this workspace's account.",
 };
 

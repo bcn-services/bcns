@@ -213,6 +213,10 @@ export function signupDeps(): SignupDeps {
       });
       return { error: error?.message };
     },
+    // Pay-first sign-up's lookup. Throws on a GoTrue failure so the handler answers 502, never a false "no".
+    async userExists(email) {
+      return (await findUser(email)) !== null;
+    },
     log(event, data) {
       console.log(JSON.stringify({ event, ...data }));
     },
@@ -222,9 +226,11 @@ export function signupDeps(): SignupDeps {
 /**
  * stripe-webhook (item 1) has no caller JWT either: the Stripe signature is its auth. Two more
  * service-role grants, both narrow SECURITY DEFINER RPCs (20261007000100): one client's billing
- * state, and the guarded apply. Still no privilege on any data.* table.
+ * state, and the guarded apply; plus api.stripe_signup_workspace (20261023163848) for pay-first
+ * sign-up. Still no privilege on any data.* table.
  */
 export function stripeWebhookDeps(): StripeWebhookDeps {
+  const sign = signupDeps();
   const iso = (sec: number | null) => (sec === null ? null : new Date(sec * 1000).toISOString());
   return {
     now: () => Math.floor(Date.now() / 1000),
@@ -250,6 +256,28 @@ export function stripeWebhookDeps(): StripeWebhookDeps {
       if (error) throw new Error(`stripe_apply_billing: ${error.message}`);
       if (data !== "applied" && data !== "duplicate" && data !== "conflict") throw new Error("stripe_apply_billing: bad result");
       return data;
+    },
+    // Pay-first sign-up: same user + mail calls as the signup function, plus the one new RPC.
+    signup: {
+      createUser: sign.createUser,
+      sendConfirmation: sign.sendConfirmation,
+      async findUserId(email) {
+        return (await findUser(email))?.id ?? null;
+      },
+      async createWorkspace(i) {
+        const { data, error } = await admin().schema("api").rpc("stripe_signup_workspace", {
+          p_event_id: i.eventId,
+          p_event_type: i.eventType,
+          p_event_created: iso(i.eventCreated),
+          p_user_id: i.userId,
+          p_name: i.name,
+          p_customer: i.customerId,
+          p_subscription: i.subscriptionId,
+        });
+        if (error) throw new Error(`stripe_signup_workspace: ${error.message}`);
+        if (data !== "created" && data !== "duplicate" && data !== "has_workspace") throw new Error("stripe_signup_workspace: bad result");
+        return data;
+      },
     },
     log(event, data) {
       console.log(JSON.stringify({ event, ...data }));

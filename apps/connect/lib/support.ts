@@ -1,7 +1,7 @@
 /**
  * support.ts — /support: a member writes to bcns from the hub.
  *
- * The row (api.ticket_create, 20261023163358_support_tickets.sql) is the record; the Resend mail to
+ * The row (api.ticket_create, 20261023171354_support_tickets.sql) is the record; the Resend mail to
  * Nate is the delivery, built on the request-connection helpers. Order matters: the row is written
  * FIRST, so a send that fails never loses the ticket. RESEND_API_KEY is optional here as everywhere:
  * with no key the page offers a mailto: instead. Pure: the api and fetch are injected, so tests run

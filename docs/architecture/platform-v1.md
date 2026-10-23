@@ -231,11 +231,14 @@ What exists today (read from `origin/main`):
   `egress_quota_bytes`, `OAUTH_APPROVED_SOURCES` on the droplet, the "Request connection" email.
   There is no trial or plan column and no per-client source limit.
 
-**Decided (Nate, 2026-09-30): sign-up ships with billing deferred.** A new owner signs up and gets an
-account in a pending state. No Stripe, no card, no charge. bcns approves and activates the account
-by hand. Stripe billing is a later item that waits on an EIN and a business bank account; when it
-lands, the approve step becomes "payment succeeded". (The alternatives weighed were a free trial
-with automatic activation, and waiting for Stripe before shipping any sign-up.)
+**Decided (2026-10-23): sign-up is pay-first; this supersedes "billing deferred" (2026-09-30).**
+`/signup` (name + email, then a confirm step that shows the address back) creates no user and no
+workspace. It sends the visitor to Stripe Checkout ($50/mo); the paid `checkout.session.completed`
+makes the `stripe-webhook` Edge Function create the auth user, call `api.stripe_signup_workspace`
+(the client, already `active`, plus its owner membership, in one transaction, idempotent on the
+Stripe customer id), and mail the sign-in link only when the RPC returns `created`. An email that already has an account is sent to
+`/login`; one Checkout per address per 10 minutes. Owners manage billing from `/team` (Stripe portal).
+A Shopify App Store install (`/signup?from=shopify`) keeps the pending-and-review flow described below.
 
 Scope: a `/signup` page on the hub (email, business name, password); Supabase email confirmation;
 on confirm, one database function creates the `data.clients` row and the owner membership in one

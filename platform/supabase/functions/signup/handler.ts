@@ -43,6 +43,8 @@ export interface SignupDeps {
   createClient(userId: string, name: string): Promise<string>;
   deleteUser(userId: string): Promise<void>;
   sendConfirmation(email: string, redirectTo: string): Promise<{ error?: string }>;
+  /** Pay-first sign-up's lookup (`{mode:"exists"}`): does this address already have an auth user? Absent = 503. */
+  userExists?(email: string): Promise<boolean>;
   /** Event + ids only — never the email or the request body. */
   log(event: string, data: Record<string, unknown>): void;
 }
@@ -54,6 +56,19 @@ export async function handle(request: Request, deps: SignupDeps): Promise<Respon
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  // Pay-first mode: the hub asks before it opens a Stripe Checkout (the hub holds no service-role key).
+  // Creates nothing and mails nothing. It does reveal whether an address is registered, on purpose: the
+  // hub tells that visitor to sign in instead of paying. Still behind the SIGNUP_ENABLED gate above.
+  if (body?.mode === "exists") {
+    if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) return json({ error: "invalid_email" }, 400);
+    if (!deps.userExists) return json({ error: "unavailable" }, 503);
+    try {
+      return json({ exists: await deps.userExists(email) }, 200);
+    } catch {
+      deps.log("signup_lookup_failed", {});
+      return json({ error: "lookup_failed" }, 502);
+    }
+  }
   if (!name || name.length > MAX_NAME_LENGTH) return json({ error: "invalid_name" }, 400);
   if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) return json({ error: "invalid_email" }, 400);
 

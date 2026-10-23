@@ -20,7 +20,8 @@ import type { HubConfig } from "./env";
 export const PRICE_LABEL = "$50/mo";
 const STRIPE_API = "https://api.stripe.com/v1";
 const STRIPE_TIMEOUT_MS = 10_000;
-const FORWARD_TIMEOUT_MS = 5_000;
+/** The pay-first branch makes the user, writes the workspace and sends the mail inline; Stripe itself gives up at ~20 s. */
+const FORWARD_TIMEOUT_MS = 15_000;
 /** Stripe's events are a few KB; anything this big is not one. */
 const MAX_WEBHOOK_BYTES = 256 * 1024;
 
@@ -244,18 +245,60 @@ export async function checkoutTarget(
   return (await stripePost(fetchImpl, config.stripeSecretKey, "checkout/sessions", form, "checkout.stripe.com")) ?? "/pending?error=billing";
 }
 
-async function openPortal(customerId: string | null, secretKey: string, hub: string, fetchImpl: typeof fetch): Promise<string> {
-  if (!customerId) return "/pending?error=billing";
-  const form = new URLSearchParams({ customer: customerId, return_url: `${hub}/pending` });
-  return (await stripePost(fetchImpl, secretKey, "billing_portal/sessions", form, "billing.stripe.com")) ?? "/pending?error=billing";
+/** Hub pages the billing portal can return to ("Update card" from /pending, "Manage billing" from /team). */
+export type PortalReturn = "/pending" | "/team";
+
+async function openPortal(
+  customerId: string | null,
+  secretKey: string,
+  hub: string,
+  fetchImpl: typeof fetch,
+  returnTo: PortalReturn = "/pending"
+): Promise<string> {
+  if (!customerId) return `${returnTo}?error=billing`;
+  const form = new URLSearchParams({ customer: customerId, return_url: `${hub}${returnTo}` });
+  return (await stripePost(fetchImpl, secretKey, "billing_portal/sessions", form, "billing.stripe.com")) ?? `${returnTo}?error=billing`;
 }
 
-/** "Update card": Stripe's billing portal for this owner's own customer, or a hub path. */
-export async function portalTarget(billing: BillingSelf | null, config: HubConfig, fetchImpl: typeof fetch = fetch): Promise<string> {
+/** The billing portal for this owner's own customer, or a hub path (on `returnTo`) saying why not. */
+export async function portalTarget(
+  billing: BillingSelf | null,
+  config: HubConfig,
+  fetchImpl: typeof fetch = fetch,
+  returnTo: PortalReturn = "/pending"
+): Promise<string> {
   if (!billing) return "/login?error=signed-out";
-  if (billing.role !== "owner") return "/pending?error=owner";
-  if (!billing.customerId || !config.stripeSecretKey) return "/pending";
-  return openPortal(billing.customerId, config.stripeSecretKey, config.hubBaseUrl, fetchImpl);
+  if (billing.role !== "owner") return `${returnTo}?error=owner`;
+  if (!billing.customerId || !config.stripeSecretKey) return returnTo;
+  return openPortal(billing.customerId, config.stripeSecretKey, config.hubBaseUrl, fetchImpl, returnTo);
+}
+
+/**
+ * Pay-first sign-up's Checkout: a Stripe URL, or null (Stripe unreachable / refused). No client
+ * exists yet, so the session carries the business name and owner email as metadata (on the session
+ * AND the subscription, so later invoice events keep them); the webhook creates the workspace from
+ * them once the session is paid. Key names mirror platform/supabase/functions/stripe-webhook.
+ */
+export async function signupCheckoutTarget(
+  form: { name: string; email: string },
+  config: HubConfig & { stripeSecretKey: string; stripePriceId: string },
+  fetchImpl: typeof fetch = fetch
+): Promise<string | null> {
+  const hub = config.hubBaseUrl;
+  const body = new URLSearchParams({
+    mode: "subscription",
+    "line_items[0][price]": config.stripePriceId,
+    "line_items[0][quantity]": "1",
+    customer_email: form.email,
+    allow_promotion_codes: "true",
+    "metadata[signup_name]": form.name,
+    "metadata[signup_email]": form.email,
+    "subscription_data[metadata][signup_name]": form.name,
+    "subscription_data[metadata][signup_email]": form.email,
+    success_url: `${hub}/signup?paid=1`,
+    cancel_url: `${hub}/signup?canceled=1`,
+  });
+  return stripePost(fetchImpl, config.stripeSecretKey, "checkout/sessions", body, "checkout.stripe.com");
 }
 
 const json = (status: number, body: Record<string, string>) =>
