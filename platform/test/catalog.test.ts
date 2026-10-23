@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { sql, pool, rest, signIn, mintJwt, apiViews, betaRpcArgs, SERVICE_ROLE_ONLY_API_FNS, USERS, CLIENTS } from './helpers.js'
+import { sql, pool, rest, signIn, mintJwt, apiViews, betaRpcArgs, SERVICE_ROLE_ONLY_API_FNS, STAFF_API_FNS, USERS, CLIENTS } from './helpers.js'
 
 const T = '( SELECT data.active_client_id() AS active_client_id)'
 // Allowed policy quals per table (§2.4). Anything not listed must be exactly `client_id = T`.
@@ -195,7 +195,7 @@ describe('catalog', () => {
     }
     const rpcs = await sql<{ proname: string }>(`select proname from pg_proc where pronamespace = 'api'::regnamespace`)
     const argsFor = await betaRpcArgs()
-    for (const f of rpcs.rows.filter((f) => !SERVICE_ROLE_ONLY_API_FNS.has(f.proname))) {
+    for (const f of rpcs.rows.filter((f) => !SERVICE_ROLE_ONLY_API_FNS.has(f.proname) && !STAFF_API_FNS.has(f.proname))) {
       expect(argsFor[f.proname], `no RPC_ARGS entry for ${f.proname}`).toBeDefined()
       const { status, body } = await rest(`rpc/${f.proname}`, token, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(argsFor[f.proname].args) })
       expect(status, f.proname).toBeGreaterThanOrEqual(400)

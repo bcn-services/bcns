@@ -10,7 +10,9 @@
 
 import { requireMembership } from "@bcn-services/tenant";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { HubConfig } from "./env";
 import { BCNS_EMAIL, REQUEST_FROM, sendMail, type RequestDeps, type ResendEmail } from "./request-connection";
+import { signupCheckoutTarget, stripeReady } from "./stripe-billing";
 
 export const SIGNUP_PATH = "/signup";
 export const PENDING_PATH = "/pending";
@@ -54,6 +56,101 @@ export async function signupTarget(form: SignupForm, deps: SignupDeps): Promise<
     // unreachable or timed out: same answer as a 5xx
   }
   return `${SIGNUP_PATH}?error=failed`;
+}
+
+/* ---------------------------------------------------------------- pay-first */
+
+/** One Checkout per address per this long. */
+export const CHECKOUT_COOLDOWN_MS = 10 * 60 * 1000;
+const NAME_MAX = 100;
+const EMAIL_MAX = 254;
+/** Same loose shape as the signup function: Stripe and GoTrue are the real validators. */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * "At most one Checkout session per email per 10 minutes." `once` keys on the lowercased address
+ * and remembers the in-flight/finished Checkout URL, so a double-click or a visitor who backed
+ * out of Stripe and tries again gets the SAME URL back instead of a second session (or a dead end).
+ * A failed attempt (no URL) is forgotten so the visitor can retry at once.
+ * ponytail: per-process Map, valid because the droplet runs one `bcns-app@connect` process and it
+ * resets on restart — move to a table (or Stripe idempotency) if the hub ever runs two processes.
+ */
+export function createCheckoutLimiter(now: () => number = Date.now) {
+  const entries = new Map<string, { at: number; url: Promise<string | null> }>();
+  return {
+    once(email: string, make: () => Promise<string | null>): Promise<string | null> {
+      const t = now();
+      for (const [key, e] of entries) if (t - e.at >= CHECKOUT_COOLDOWN_MS) entries.delete(key);
+      const key = email.toLowerCase();
+      const hit = entries.get(key);
+      if (hit) return hit.url;
+      const url = make().then(
+        (u) => (u ? u : (entries.delete(key), u)),
+        (e) => {
+          entries.delete(key);
+          throw e;
+        }
+      );
+      entries.set(key, { at: t, url });
+      return url;
+    },
+  };
+}
+export type CheckoutLimiter = ReturnType<typeof createCheckoutLimiter>;
+const defaultLimiter = createCheckoutLimiter();
+
+/** The `/signup?confirm=1&...` view that shows the typed address back, or an error path. */
+export function signupConfirmPath(form: SignupForm): string {
+  const name = form.name.trim();
+  const email = form.email.trim().toLowerCase();
+  if (!name || name.length > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) return `${SIGNUP_PATH}?error=invalid`;
+  return `${SIGNUP_PATH}?${new URLSearchParams({ confirm: "1", name, email })}`;
+}
+
+/**
+ * Does this address already have an auth user? Asked of the signup Edge Function (it holds the
+ * service role and the SIGNUP_ENABLED switch; the hub holds no key). undefined = could not tell.
+ */
+async function emailHasAccount(email: string, deps: SignupDeps): Promise<boolean | undefined> {
+  const { supabaseUrl, supabaseAnonKey, fetchImpl = fetch } = deps;
+  if (!supabaseUrl || !supabaseAnonKey) return undefined;
+  try {
+    const response = await fetchImpl(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/signup`, {
+      method: "POST",
+      headers: { apikey: supabaseAnonKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "exists", email }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { exists?: unknown };
+    return typeof body.exists === "boolean" ? body.exists : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface PayFirstDeps extends SignupDeps {
+  config: HubConfig;
+  limiter?: CheckoutLimiter;
+}
+
+/**
+ * Where the confirm step's submit goes: Stripe Checkout, or a hub path saying why not. Creates no
+ * user and no workspace; the paid webhook does. Order matters: shape check, Stripe configured,
+ * existing address (-> /login, no session made), then the session (one per address per 10 min).
+ */
+export async function payFirstTarget(form: SignupForm, deps: PayFirstDeps): Promise<string> {
+  const name = form.name.trim();
+  const email = form.email.trim().toLowerCase();
+  if (!name || name.length > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) return `${SIGNUP_PATH}?error=invalid`;
+  const config = deps.config;
+  if (!stripeReady(config)) return `${SIGNUP_PATH}?error=unconfigured`;
+  const exists = await emailHasAccount(email, deps);
+  if (exists === undefined) return `${SIGNUP_PATH}?error=failed`;
+  if (exists) return "/login?error=signup-exists";
+  const limiter = deps.limiter ?? defaultLimiter;
+  const url = await limiter.once(email, () => signupCheckoutTarget({ name, email }, config, deps.fetchImpl));
+  return url ?? `${SIGNUP_PATH}?error=billing`;
 }
 
 export function signupNotice(ownerEmail: string): ResendEmail {

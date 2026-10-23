@@ -1,5 +1,6 @@
 import { requireHub } from "@/lib/session";
-import { inviteMember, removeMember } from "./actions";
+import { loadBilling, PRICE_LABEL } from "@/lib/stripe-billing";
+import { inviteMember, openTeamBilling, removeMember } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ const ERRORS: Record<string, string> = {
   self: "You can't remove your own access.",
   smoke: "That's the automated health-check login; it can't be removed here.",
   "not-found": "That member is already gone.",
+  billing: "We couldn't open the billing page. Try again in a few minutes, or email bcns.",
+  owner: "Only an owner can manage billing.",
   unconfigured: "Team management isn't configured for this app yet.",
   failed: "That didn't work. Try again, or email bcns.",
 };
@@ -38,6 +41,8 @@ export default async function TeamPage({
     .select("user_id,role,is_smoke,created_at")
     .order("created_at", { ascending: true });
   const members = ((data as MemberRow[] | null) ?? []).filter((m) => !m.is_smoke || isOwner);
+
+  const billing = isOwner ? await loadBilling() : null;
 
   return (
     <>
@@ -95,6 +100,28 @@ export default async function TeamPage({
               Send invite
             </button>
           </form>
+        </section>
+      ) : null}
+
+      {billing ? (
+        <section className="panel" aria-labelledby="billing-h">
+          <h2 id="billing-h">Billing</h2>
+          {billing.view === "exempt" ? (
+            <p className="sub">Billing for this workspace is handled through Shopify.</p>
+          ) : billing.customerId && billing.status !== "pending" ? (
+            <>
+              <p className="sub">
+                {PRICE_LABEL} · {billing.view === "grace" ? "payment problem, please update your card" : billing.status}
+              </p>
+              <form action={openTeamBilling}>
+                <button type="submit" className="btn btn-out">
+                  Manage billing
+                </button>
+              </form>
+            </>
+          ) : (
+            <p className="sub">There is no subscription on this workspace yet, so there is nothing to manage.</p>
+          )}
         </section>
       ) : null}
     </>

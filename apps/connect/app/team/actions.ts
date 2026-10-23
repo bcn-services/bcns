@@ -2,7 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getConfig } from "@/lib/env";
 import { callFunction, requireOwner } from "@/lib/session";
+import { portalTarget, readBilling } from "@/lib/stripe-billing";
 
 /** Deliberately loose: the real check is GoTrue's, one round trip later. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,4 +43,10 @@ export async function removeMember(form: FormData): Promise<void> {
   }
   revalidatePath("/team");
   redirect("/team?ok=removed");
+}
+
+/** "Manage billing": Stripe's portal for the owner's own customer, back to /team. Owners only (requireOwner). */
+export async function openTeamBilling(): Promise<void> {
+  const { supabase } = await requireOwner("/team");
+  redirect(await portalTarget(await readBilling(supabase), getConfig(), fetch, "/team"));
 }

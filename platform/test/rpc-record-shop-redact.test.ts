@@ -46,13 +46,14 @@ describe('api.record_shop_redact', () => {
     expect(error).not.toBeNull()
   })
 
-  it('N1: service_role can execute no function in schema api except the two webhook RPCs, signup_create_client and the two Stripe billing RPCs, and holds no table/view privileges there', async () => {
+  it('N1: service_role can execute no function in schema api except the two webhook RPCs, signup_create_client and the two Stripe billing RPCs, the pay-first signup RPC, and holds no table/view privileges there', async () => {
     const executable = await sql<{ proname: string }>(
       `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'api' and has_function_privilege('service_role', p.oid, 'execute')`
     )
     expect(executable.rows.map((r) => r.proname).sort()).toEqual([
       'record_app_uninstalled', 'record_shop_redact', 'signup_create_client', 'stripe_apply_billing', 'stripe_billing_state',
+      'stripe_signup_workspace',
     ])
 
     const tableGrants = await sql(
