@@ -234,9 +234,9 @@ What exists today (read from `origin/main`):
 **Decided (2026-10-23): sign-up is pay-first; this supersedes "billing deferred" (2026-09-30).**
 `/signup` (name + email, then a confirm step that shows the address back) creates no user and no
 workspace. It sends the visitor to Stripe Checkout ($50/mo); the paid `checkout.session.completed`
-makes the `stripe-webhook` Edge Function create the auth user, mail the sign-in link, and call
-`api.stripe_signup_workspace`, which writes the client (already `active`, owner membership) in one
-transaction, idempotent on the Stripe customer id. An email that already has an account is sent to
+makes the `stripe-webhook` Edge Function create the auth user, call `api.stripe_signup_workspace`
+(the client, already `active`, plus its owner membership, in one transaction, idempotent on the
+Stripe customer id), and mail the sign-in link only when the RPC returns `created`. An email that already has an account is sent to
 `/login`; one Checkout per address per 10 minutes. Owners manage billing from `/team` (Stripe portal).
 A Shopify App Store install (`/signup?from=shopify`) keeps the pending-and-review flow described below.
 

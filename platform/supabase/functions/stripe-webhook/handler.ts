@@ -129,6 +129,31 @@ async function readBodyCapped(request: Request, maxBytes: number): Promise<Uint8
   return out;
 }
 
+/** A Stripe id field is a string, or an expanded object carrying `id`. */
+const idOf = (v: unknown): string | null =>
+  typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string" ? (v as { id: string }).id : null;
+
+/**
+ * The pay-first session in `event`, or null. Subscription mode, settled (paid, or nothing due
+ * because a promo code covered it), no client reference, signup metadata present.
+ */
+function signupSession(event: StripeEvent): { customerId: string | null; subscriptionId: string | null } | null {
+  if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") return null;
+  if (typeof event.created !== "number" || !Number.isFinite(event.created)) return null;
+  const o = event.data?.object as Record<string, unknown> | undefined;
+  if (!o || typeof o !== "object" || o.mode !== "subscription") return null;
+  if (o.payment_status !== "paid" && o.payment_status !== "no_payment_required") return null;
+  if (typeof o.client_reference_id === "string" && o.client_reference_id) return null;
+  const meta = o.metadata;
+  if (!meta || typeof meta !== "object" || typeof (meta as Record<string, unknown>)[SIGNUP_EMAIL_KEY] !== "string") return null;
+  const customer = idOf(o.customer);
+  const subscription = idOf(o.subscription);
+  return {
+    customerId: customer && CUSTOMER_ID.test(customer) ? customer : null,
+    subscriptionId: subscription && SUBSCRIPTION_ID.test(subscription) ? subscription : null,
+  };
+}
+
 export async function handle(request: Request, secret: string | undefined, deps: StripeWebhookDeps): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   if (!secret) {
@@ -156,6 +181,14 @@ export async function handle(request: Request, secret: string | undefined, deps:
   }
   const base = { eventId: event.id, type: event.type };
 
+  // Pay-first sign-up: a completed subscription session that names no client but carries the signup
+  // metadata. Routed before billingSignal and readState: billingSignal reads only
+  // payment_status "paid", but a 100%-off / free-first-period promo code completes with
+  // "no_payment_required" and is still a live subscription that needs its workspace; readState
+  // would answer unknown_client. Any other payment_status (e.g. "unpaid") creates nothing.
+  const session = signupSession(event);
+  if (session) return handleSignup(event, event.created, session.customerId, session.subscriptionId, deps, base);
+
   const signal = billingSignal(event);
   if (!signal) {
     deps.log("stripe_webhook_ignored", { ...base, reason: "not_billing" });
@@ -164,14 +197,6 @@ export async function handle(request: Request, secret: string | undefined, deps:
   const clientRef = signal.clientRef && UUID.test(signal.clientRef) ? signal.clientRef : null;
   const customerId = signal.customerId && CUSTOMER_ID.test(signal.customerId) ? signal.customerId : null;
   const subscriptionId = signal.subscriptionId && SUBSCRIPTION_ID.test(signal.subscriptionId) ? signal.subscriptionId : null;
-
-  // Pay-first sign-up: a paid session that names no client but carries the signup metadata. Routed
-  // before readState, which would answer unknown_client for it.
-  const meta = event.data?.object?.metadata;
-  const signupEmail = meta && typeof meta === "object" ? (meta as Record<string, unknown>)[SIGNUP_EMAIL_KEY] : undefined;
-  if (event.type.startsWith("checkout.session.") && !signal.clientRef && typeof signupEmail === "string") {
-    return handleSignup(event, signal.at, customerId, subscriptionId, deps, base);
-  }
 
   const state = parseState(await deps.readState(clientRef, customerId));
   if (!state) {

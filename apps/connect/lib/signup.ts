@@ -68,25 +68,31 @@ const EMAIL_MAX = 254;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * "At most one Checkout per email per 10 minutes." Keyed on the lowercased address; `reserve`
- * claims the slot before Stripe is called (two fast clicks cannot both pass), `release` gives it
- * back when no session came of it.
+ * "At most one Checkout session per email per 10 minutes." `once` keys on the lowercased address
+ * and remembers the in-flight/finished Checkout URL, so a double-click or a visitor who backed
+ * out of Stripe and tries again gets the SAME URL back instead of a second session (or a dead end).
+ * A failed attempt (no URL) is forgotten so the visitor can retry at once.
  * ponytail: per-process Map, valid because the droplet runs one `bcns-app@connect` process and it
  * resets on restart — move to a table (or Stripe idempotency) if the hub ever runs two processes.
  */
 export function createCheckoutLimiter(now: () => number = Date.now) {
-  const startedAt = new Map<string, number>();
+  const entries = new Map<string, { at: number; url: Promise<string | null> }>();
   return {
-    reserve(email: string): boolean {
+    once(email: string, make: () => Promise<string | null>): Promise<string | null> {
       const t = now();
-      for (const [key, at] of startedAt) if (t - at >= CHECKOUT_COOLDOWN_MS) startedAt.delete(key);
+      for (const [key, e] of entries) if (t - e.at >= CHECKOUT_COOLDOWN_MS) entries.delete(key);
       const key = email.toLowerCase();
-      if (startedAt.has(key)) return false;
-      startedAt.set(key, t);
-      return true;
-    },
-    release(email: string): void {
-      startedAt.delete(email.toLowerCase());
+      const hit = entries.get(key);
+      if (hit) return hit.url;
+      const url = make().then(
+        (u) => (u ? u : (entries.delete(key), u)),
+        (e) => {
+          entries.delete(key);
+          throw e;
+        }
+      );
+      entries.set(key, { at: t, url });
+      return url;
     },
   };
 }
@@ -131,24 +137,20 @@ export interface PayFirstDeps extends SignupDeps {
 /**
  * Where the confirm step's submit goes: Stripe Checkout, or a hub path saying why not. Creates no
  * user and no workspace; the paid webhook does. Order matters: shape check, Stripe configured,
- * existing address (-> /login, no session and no cooldown spent), cooldown, then the session.
+ * existing address (-> /login, no session made), then the session (one per address per 10 min).
  */
 export async function payFirstTarget(form: SignupForm, deps: PayFirstDeps): Promise<string> {
   const name = form.name.trim();
   const email = form.email.trim().toLowerCase();
   if (!name || name.length > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) return `${SIGNUP_PATH}?error=invalid`;
-  if (!stripeReady(deps.config)) return `${SIGNUP_PATH}?error=unconfigured`;
+  const config = deps.config;
+  if (!stripeReady(config)) return `${SIGNUP_PATH}?error=unconfigured`;
   const exists = await emailHasAccount(email, deps);
   if (exists === undefined) return `${SIGNUP_PATH}?error=failed`;
   if (exists) return "/login?error=signup-exists";
   const limiter = deps.limiter ?? defaultLimiter;
-  if (!limiter.reserve(email)) return `${SIGNUP_PATH}?error=recent`;
-  const url = await signupCheckoutTarget({ name, email }, deps.config, deps.fetchImpl);
-  if (!url) {
-    limiter.release(email);
-    return `${SIGNUP_PATH}?error=billing`;
-  }
-  return url;
+  const url = await limiter.once(email, () => signupCheckoutTarget({ name, email }, config, deps.fetchImpl));
+  return url ?? `${SIGNUP_PATH}?error=billing`;
 }
 
 export function signupNotice(ownerEmail: string): ResendEmail {

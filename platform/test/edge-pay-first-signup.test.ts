@@ -109,6 +109,28 @@ describe('pay-first sign-up: stripe-webhook creates the workspace', () => {
     expect(w.logs.at(-1)).toEqual({ event: 'stripe_signup_applied', data: { eventId: 'evt_TestSignup0003', type: 'checkout.session.completed', outcome: 'has_workspace' } })
   })
 
+  it('a 100%-off / free-first-period promo session (payment_status no_payment_required) creates exactly one workspace, once', async () => {
+    const w = world()
+    const free = JSON.parse(signupEvent())
+    free.data.object.payment_status = 'no_payment_required'
+    const body = JSON.stringify(free)
+    for (const b of [body, body, JSON.stringify({ ...free, id: 'evt_TestSignup0009' })]) expect((await handle(post(b), SECRET, w.deps)).status).toBe(200)
+    expect(w.users.size).toBe(1)
+    expect(w.workspaces.size).toBe(1)
+    expect(w.mails.length).toBe(1)
+    expect(w.reads).toEqual([])
+  })
+
+  it('an unsettled session (payment_status unpaid) or a non-subscription one creates nothing', async () => {
+    for (const patch of [{ payment_status: 'unpaid' }, { mode: 'payment' }]) {
+      const w = world()
+      const e = JSON.parse(signupEvent())
+      Object.assign(e.data.object, patch)
+      expect((await handle(post(JSON.stringify(e)), SECRET, w.deps)).status).toBe(200)
+      expect(w.users.size + w.workspaces.size + w.mails.length + w.reads.length).toBe(0)
+    }
+  })
+
   it('a mail failure after the workspace commits is logged, not retried (a retry would only see a duplicate)', async () => {
     for (const mode of [{ mailFails: true }, { mailThrows: true }]) {
       const w = world(mode)

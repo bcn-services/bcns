@@ -20,7 +20,8 @@ import type { HubConfig } from "./env";
 export const PRICE_LABEL = "$50/mo";
 const STRIPE_API = "https://api.stripe.com/v1";
 const STRIPE_TIMEOUT_MS = 10_000;
-const FORWARD_TIMEOUT_MS = 5_000;
+/** The pay-first branch makes the user, writes the workspace and sends the mail inline; Stripe itself gives up at ~20 s. */
+const FORWARD_TIMEOUT_MS = 15_000;
 /** Stripe's events are a few KB; anything this big is not one. */
 const MAX_WEBHOOK_BYTES = 256 * 1024;
 

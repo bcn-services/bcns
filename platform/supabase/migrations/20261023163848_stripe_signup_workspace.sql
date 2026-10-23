@@ -69,6 +69,9 @@ begin
 
   -- Slug exactly as api.signup_create_client builds it (kept in step by hand: that function also
   -- enforces the pending cap and inserts a pending client, neither of which applies here).
+  -- Different customers, same business name: serialize slug choice + insert (held to commit) so
+  -- the loser sees the winner's row instead of failing on the unique slug.
+  perform pg_advisory_xact_lock(hashtext('stripe_signup_slug'));
   v_base := btrim(left(btrim(regexp_replace(lower(v_name), '[^a-z0-9]+', '-', 'g'), '-'), 32), '-');
   if length(v_base) < 2 then v_base := 'client'; end if;
   v_slug := v_base;

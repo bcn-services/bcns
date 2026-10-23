@@ -10,7 +10,6 @@ const ERRORS: Record<string, string> = {
   invalid: "Check the business name and email, then try again.",
   unconfigured: "Sign-up is not configured for this app yet.",
   failed: "Something went wrong creating your account. Please try again in a few minutes.",
-  recent: "A checkout for that email was started a few minutes ago. Finish it, or try again in 10 minutes.",
   billing: "We couldn't open the payment page. Please try again in a few minutes.",
 };
 
@@ -28,7 +27,7 @@ export default function SignupPage({ searchParams }: { searchParams: Search }) {
     return (
       <Frame
         title="Check your email"
-        description="Payment received. We've sent a link to the address you gave us so you can choose your password and sign in."
+        description="If your payment went through, we've emailed your sign-in link to the address you gave us. Use it to choose your password."
       >
         <a href="/login" className="lnk">
           Back to sign in
@@ -104,7 +103,7 @@ export default function SignupPage({ searchParams }: { searchParams: Search }) {
           </p>
         ) : null}
         <button type="submit" className="btn">
-          Create account
+          {searchParams.from === SHOPIFY_FROM ? "Create account" : "Continue"}
         </button>
         <a href="/login" className="lnk">
           Already have an account? Sign in

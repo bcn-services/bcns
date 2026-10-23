@@ -154,7 +154,7 @@ test("an email that already has an account goes to /login with a note, and Strip
   const email = fixtureEmail();
   assert.equal(await payFirstTarget({ name: "Acme", email }, deps(fetchImpl, limiter)), "/login?error=signup-exists");
   assert.ok(!calls.some((c) => c.url.includes("stripe.com")), "no Stripe fetch");
-  assert.equal(limiter.reserve(email), true, "the cooldown was not spent on a refused address");
+  assert.equal(await limiter.once(email, async () => "fresh"), "fresh", "no session was remembered for a refused address");
   const { default: LoginPage } = await import("../app/login/page.tsx");
   assert.match(renderToStaticMarkup(createElement(LoginPage, { searchParams: { error: "signup-exists" } })), /already has an account/);
 });
@@ -169,24 +169,37 @@ test("the lookup failing refuses the signup instead of guessing, and Stripe is n
 
 /* ------------------------------------------------------------------- rate limit */
 
-test("a second Checkout for the same email within 10 minutes is refused; after 10 it is allowed", async () => {
+test("one Checkout session per email per 10 minutes: a retry within the window gets the SAME url, no second session", async () => {
   setup();
   let t = 1_000_000;
   const limiter = createCheckoutLimiter(() => t);
   const email = fixtureEmail();
   const { calls, fetchImpl } = world();
+  const sessions = () => calls.filter((c) => c.url.includes("checkout/sessions")).length;
   const go = (e = email) => payFirstTarget({ name: "Acme", email: e }, deps(fetchImpl, limiter));
   assert.equal(await go(), CHECKOUT_URL);
   t += CHECKOUT_COOLDOWN_MS - 1;
-  assert.equal(await go(), "/signup?error=recent");
-  assert.equal(await go(email.toUpperCase()), "/signup?error=recent", "case does not dodge it");
-  assert.equal(calls.filter((c) => c.url.includes("checkout/sessions")).length, 1, "one Checkout session in the window");
-  assert.equal(await go(fixtureEmail()), CHECKOUT_URL, "another address is unaffected");
+  assert.equal(await go(), CHECKOUT_URL, "back out of Stripe and retry: same url");
+  assert.equal(await go(email.toUpperCase()), CHECKOUT_URL, "case does not dodge it");
+  assert.equal(sessions(), 1, "one Checkout session in the window");
+  assert.equal(await go(fixtureEmail()), CHECKOUT_URL, "another address gets its own");
+  assert.equal(sessions(), 2);
   t += 1;
   assert.equal(await go(), CHECKOUT_URL);
+  assert.equal(sessions(), 3, "after 10 minutes a new session is allowed");
 });
 
-test("a Stripe failure gives the slot back so the visitor can retry", async () => {
+test("a double-click (two concurrent submits) makes one session and both get its url", async () => {
+  setup();
+  const limiter = createCheckoutLimiter(() => 1);
+  const email = fixtureEmail();
+  const { calls, fetchImpl } = world();
+  const go = () => payFirstTarget({ name: "Acme", email }, deps(fetchImpl, limiter));
+  assert.deepEqual(await Promise.all([go(), go()]), [CHECKOUT_URL, CHECKOUT_URL]);
+  assert.equal(calls.filter((c) => c.url.includes("checkout/sessions")).length, 1);
+});
+
+test("a Stripe failure is forgotten so the visitor can retry at once", async () => {
   setup();
   const limiter = createCheckoutLimiter(() => 5);
   const email = fixtureEmail();
@@ -211,7 +224,7 @@ test("confirm step: shows the typed email back, posts name + email, offers edit-
   const evil = renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1", name: "x", email: 'a"><script>alert(1)</script>@b.co' } }));
   assert.doesNotMatch(evil, /<script>/);
   // a confirm link with nothing usable falls back to the plain form
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1" } })), /Create <b>account<\/b>|Create account/);
+  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1" } })), />Continue</);
   // the Shopify hand-off never shows the pay-first confirm step
   assert.doesNotMatch(renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1", name: "x", email: "a@b.co", from: "shopify" } })), /Continue to payment/);
 });
@@ -223,7 +236,9 @@ test("page branches: paid -> check your email; canceled -> a note and the form; 
   const canceled = renderToStaticMarkup(SignupPage({ searchParams: { canceled: "1" } }));
   assert.match(canceled, /canceled/);
   assert.match(canceled, /name="name"/);
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { error: "recent" } })), /10 minutes/);
+  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { paid: "1" } })), /If your payment went through/);
+  assert.match(renderToStaticMarkup(SignupPage({ searchParams: {} })), />Continue</);
+  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { from: "shopify" } })), />Create account</);
   const prefilled = renderToStaticMarkup(SignupPage({ searchParams: { name: "Acme Bakery", email: "o@acme.example" } }));
   assert.match(prefilled, /value="Acme Bakery"/);
   assert.match(prefilled, /value="o@acme\.example"/);
