@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   COLS,
   DEFAULT_ITEMS,
+  GRID_MIN_PX,
   PANEL_IDS,
   defaultLayout,
   layoutToSave,
@@ -22,6 +23,7 @@ const saved = (items) => ({ v: 1, items });
 
 test("pinned literals: 12 columns, 13 panels, six individually-movable metric cards at w=2", () => {
   assert.equal(COLS, 12);
+  assert.equal(GRID_MIN_PX, 1101);
   assert.equal(PANEL_IDS.length, 13);
   assert.deepEqual(PANEL_IDS.slice(0, 6), ["m-revenue", "m-orders", "m-conversion", "m-roas", "m-aov", "m-inventory"]);
   assert.ok(DEFAULT_ITEMS.slice(0, 6).every((d, n) => d.w === 2 && d.x === n * 2 && d.y === 0));

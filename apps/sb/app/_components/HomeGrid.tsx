@@ -5,9 +5,12 @@
  * Edit layout mode (drag by the grip, resize from the corner, vertical
  * compaction). The panels arrive server-rendered; this only places them.
  *
- * Below 768px the grid is not used at all: a fixed single column in default
- * order, no Edit button, the saved layout ignored. Before mount (server render
- * and first client render) it is that same column, so hydration matches.
+ * The grid and the Edit button exist from GRID_MIN_PX (1101px) up. Below that the
+ * panels render as plain CSS cells in default order (3-column metrics and
+ * 2-column panels from 768px, one column under), saved layout ignored. The
+ * server render and first client render are those same cells, which at >=1101px
+ * CSS places exactly where the grid will (--x/--y/--w/--h), so there is no
+ * layout jump and no-JS still shows the page; hydration matches at any width.
  * Charts are SVG with a viewBox that fills their card, so they follow any
  * resize with no measuring code (see .sparkline in globals.css).
  */
@@ -16,30 +19,36 @@ import { useEffect, useMemo, useState } from "react";
 import ReactGridLayout, { useContainerWidth, verticalCompactor } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import { saveLayout } from "@/app/home-layout-actions";
-import { COLS, GAP, MOBILE_PX, ROW_H, defaultLayout, layoutToSave, mergeLayout, type LayoutItem } from "@/lib/home-layout";
+import { COLS, GAP, GRID_MIN_PX, ROW_H, defaultLayout, layoutToSave, mergeLayout, type LayoutItem } from "@/lib/home-layout";
 import { DragHandleIcon } from "./icons";
 
 export function HomeGrid({ panels, saved }: { panels: Record<string, React.ReactNode>; saved: unknown }) {
   const ids = useMemo(() => Object.keys(panels), [panels]);
   const { width, containerRef, mounted } = useContainerWidth();
-  const [narrow, setNarrow] = useState<boolean | null>(null);
+  const [wide, setWide] = useState<boolean | null>(null);
   const [layout, setLayout] = useState<LayoutItem[]>(() => mergeLayout(saved, ids));
   const [wantsEdit, setWantsEdit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_PX - 1}px)`);
-    const sync = () => setNarrow(mq.matches);
+    const mq = window.matchMedia(`(min-width: ${GRID_MIN_PX}px)`);
+    const sync = () => {
+      setWide(mq.matches);
+      if (!mq.matches) setWantsEdit(false); // shrinking past the grid closes the editor
+    };
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  // A fresh server read (after a save elsewhere) replaces what was last rendered.
-  useEffect(() => setLayout(mergeLayout(saved, ids)), [saved, ids]);
+  // A fresh server read (after a save elsewhere) replaces what was last rendered. Keyed on
+  // values, not identity: a header re-render (range pill, popup) must not wipe unsaved drags.
+  const idsKey = ids.join(",");
+  const savedKey = JSON.stringify(saved ?? null);
+  useEffect(() => setLayout(mergeLayout(JSON.parse(savedKey), idsKey.split(","))), [savedKey, idsKey]);
 
-  const editing = wantsEdit && narrow === false;
+  const editing = wantsEdit && wide === true;
   const dragConfig = useMemo(() => ({ enabled: editing, handle: ".hg-grip" }), [editing]);
   const resizeConfig = useMemo(() => ({ enabled: editing }), [editing]);
 
@@ -59,11 +68,12 @@ export function HomeGrid({ panels, saved }: { panels: Record<string, React.React
     if (leave) setWantsEdit(false);
   };
 
-  const stacked = !mounted || narrow !== false;
+  const showGrid = wide === true && mounted;
+  const at = new Map(layout.map((d) => [d.i, d]));
 
   return (
     <div className={editing ? "hg is-editing" : "hg"}>
-      {narrow === false ? (
+      {wide === true ? (
         <div className="hg-bar">
           {failed ? <span className="hg-bar__error">Couldn&apos;t save the layout. Try again.</span> : null}
           {editing ? (
@@ -85,11 +95,18 @@ export function HomeGrid({ panels, saved }: { panels: Record<string, React.React
 
       {/* cast: RGL v2 types the ref for React 19's RefObject<T | null>; this app is on React 18 */}
       <div ref={containerRef as React.RefObject<HTMLDivElement>}>
-        {stacked ? (
+        {!showGrid ? (
           <div className="hg-stack">
-            {defaultLayout(ids).map((d) => (
-              <div key={d.i}>{panels[d.i]}</div>
-            ))}
+            {defaultLayout(ids).map((d) => {
+              const p = at.get(d.i) ?? d;
+              // cast: React's CSSProperties has no custom properties; read by .hg-cell at >=1101px
+              const pos = { "--x": p.x + 1, "--y": p.y + 1, "--w": p.w, "--h": p.h } as React.CSSProperties;
+              return (
+                <div key={d.i} className={d.i.startsWith("m-") ? "hg-cell hg-cell--metric" : "hg-cell"} style={pos}>
+                  {panels[d.i]}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <ReactGridLayout

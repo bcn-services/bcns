@@ -15,8 +15,13 @@ import type { DataClient } from "@bcn-services/data-client";
 export const COLS = 12;
 export const ROW_H = 24;
 export const GAP = 16;
-/** Below this viewport width the home is a fixed single column (no editing). */
-export const MOBILE_PX = 768;
+/**
+ * The 12-column grid (and Edit layout) exists from this viewport width up. Below
+ * it the home is the reflowed default (3-column metrics / 2-column panels from
+ * 768px, one column under that), ignoring any saved layout. 1101 = the page's
+ * old `max-width: 1100px` breakpoint; globals.css repeats these numbers.
+ */
+export const GRID_MIN_PX = 1101;
 /** Sanity ceiling on a saved height (rows), so a hand-edited row cannot make a mile-long panel. */
 export const MAX_H = 60;
 
