@@ -67,6 +67,8 @@ export interface SignupWorkspaceDeps {
   /** api.stripe_signup_workspace. */
   createWorkspace(input: SignupWorkspaceInput): Promise<"created" | "duplicate" | "has_workspace">;
   sendConfirmation(email: string, redirectTo: string): Promise<{ error?: string }>;
+  /** api.stripe_signup_alert: tells bcns a paid sign-up needs hand-fixing. Deduped per customer + reason. */
+  alert(customerId: string, eventId: string, reason: "create_failed" | "mail_failed"): Promise<void>;
 }
 
 export interface StripeWebhookDeps {
@@ -225,6 +227,22 @@ export async function handle(request: Request, secret: string | undefined, deps:
   return outcome === "conflict" ? json({ error: "retry" }, 503) : json({ ok: true }, 200);
 }
 
+/** An alert failure is logged and never changes the webhook's answer. */
+async function tellBcns(
+  signup: SignupWorkspaceDeps,
+  customerId: string,
+  eventId: string,
+  reason: "create_failed" | "mail_failed",
+  deps: StripeWebhookDeps,
+  base: { eventId: string; type: string },
+): Promise<void> {
+  try {
+    await signup.alert(customerId, eventId, reason);
+  } catch {
+    deps.log("stripe_signup_alert_failed", { ...base, reason });
+  }
+}
+
 /**
  * One paid pay-first session -> one user, one active client, one owner membership, one mail.
  * Retry-safe at every step: a user left by a prior attempt is found and reused, the RPC is
@@ -264,15 +282,17 @@ async function handleSignup(
     });
   } catch {
     deps.log("stripe_signup_failed", base);
+    await tellBcns(signup, customerId, event.id, "create_failed", deps, base);
     return json({ error: "retry" }, 503);
   }
 
   if (result === "created") {
     try {
       const sent = await signup.sendConfirmation(email, SIGNUP_REDIRECT);
-      if (sent.error) deps.log("stripe_signup_mail_failed", base);
+      if (sent.error) throw new Error("mail");
     } catch {
       deps.log("stripe_signup_mail_failed", base);
+      await tellBcns(signup, customerId, event.id, "mail_failed", deps, base);
     }
   }
   deps.log("stripe_signup_applied", { ...base, outcome: result });

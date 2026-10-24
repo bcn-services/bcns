@@ -123,3 +123,107 @@ describe('api.stripe_signup_workspace', () => {
     expect(res.status).toBeGreaterThanOrEqual(400)
   })
 })
+
+// api.take_rate_budget + api.stripe_signup_alert (20261024200000): the Edge Functions' rolling
+// budget and the paid-signup-failed alert. Service role only.
+describe('api.take_rate_budget', () => {
+  const buckets: string[] = []
+  const bucket = () => {
+    const b = `zz_${randomUUID().slice(0, 8)}`
+    buckets.push(b)
+    return b
+  }
+  afterAll(async () => {
+    if (buckets.length) await sql(`delete from data.rate_hits where bucket = any($1::text[])`, [buckets])
+  })
+  const take = (b: string, k: string, limit = 3, window = 3600) =>
+    serviceClient().rpc('take_rate_budget', { p_bucket: b, p_key: k, p_limit: limit, p_window_seconds: window })
+
+  it('allows the limit, then refuses; keys and buckets are independent', async () => {
+    const b = bucket()
+    for (let i = 0; i < 3; i++) expect((await take(b, 'k1')).data).toBe(true)
+    expect((await take(b, 'k1')).data).toBe(false)
+    expect((await take(b, 'k1')).data).toBe(false)
+    expect((await take(b, 'k2')).data).toBe(true)
+    expect((await take(bucket(), 'k1')).data).toBe(true)
+  })
+
+  it('a refused hit is not recorded, and hits older than the window stop counting', async () => {
+    const b = bucket()
+    for (let i = 0; i < 3; i++) await take(b, 'k')
+    await take(b, 'k')
+    expect((await sql(`select count(*)::int n from data.rate_hits where bucket = $1`, [b])).rows[0].n).toBe(3)
+    await sql(`update data.rate_hits set at = now() - interval '2 hours' where bucket = $1`, [b])
+    expect((await take(b, 'k')).data).toBe(true)
+  })
+
+  it('parallel calls on separate connections never exceed the limit (advisory lock)', async () => {
+    const b = bucket()
+    const results = await Promise.all(Array.from({ length: 10 }, () => take(b, 'race')))
+    expect(results.map((r) => r.data).filter((v) => v === true).length).toBe(3)
+    expect((await sql(`select count(*)::int n from data.rate_hits where bucket = $1`, [b])).rows[0].n).toBe(3)
+  })
+
+  it('prunes day-old hits of any key, and rejects a window over a day', async () => {
+    const [old, fresh] = [bucket(), bucket()]
+    await sql(`insert into data.rate_hits (bucket, key, at) values ($1, 'other', now() - interval '2 days')`, [old])
+    expect((await take(fresh, 'k')).data).toBe(true)
+    expect((await sql(`select count(*)::int n from data.rate_hits where bucket = $1`, [old])).rows[0].n).toBe(0)
+    expect((await take(fresh, 'k', 3, 86400)).error).toBeNull()
+    expect((await take(fresh, 'k', 3, 86401)).error?.code).toBe('BCNS3')
+  })
+
+  it('refuses bad input', async () => {
+    for (const bad of [{ p_bucket: '' }, { p_key: '' }, { p_limit: 0 }, { p_window_seconds: 0 }, { p_bucket: null }]) {
+      const { error } = await serviceClient().rpc('take_rate_budget', { p_bucket: bucket(), p_key: 'k', p_limit: 1, p_window_seconds: 60, ...bad })
+      expect(error?.code, JSON.stringify(bad)).toBe('BCNS3')
+    }
+  })
+
+  it('execute is refused to anon and to a signed-in member', async () => {
+    const args = { p_bucket: bucket(), p_key: 'k', p_limit: 5, p_window_seconds: 60 }
+    expect((await anonClient().rpc('take_rate_budget', args)).error).not.toBeNull()
+    const res = await rest('rpc/take_rate_budget', await mintJwt(USERS.acmeOwner.id), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: JSON.stringify(args),
+    })
+    expect(res.status).toBeGreaterThanOrEqual(400)
+  })
+})
+
+describe('api.stripe_signup_alert', () => {
+  const made: string[] = []
+  afterAll(async () => {
+    if (made.length) await sql(`delete from data.notifications where dedupe_key like any($1::text[])`, [made.map((c) => `stripe_signup_failed:${c}:%`)])
+  })
+  const alert = (customer: string | null, reason = 'create_failed', event = evt()) =>
+    serviceClient().rpc('stripe_signup_alert', { p_customer: customer, p_event: event, p_reason: reason })
+  const notes = async (customer: string) =>
+    (await sql<{ kind: string; client_id: string | null; payload: Record<string, string> }>(
+      `select kind, client_id, payload from data.notifications where dedupe_key like $1 order by dedupe_key`, [`stripe_signup_failed:${customer}:%`])).rows
+
+  it('the same customer + reason twice (a Stripe retry) is one notifications row; another reason is its own', async () => {
+    const customer = `cus_zz${randomUUID().slice(0, 10).replace(/-/g, '')}`
+    made.push(customer)
+    const event = evt()
+    expect((await alert(customer, 'create_failed', event)).error).toBeNull()
+    expect((await alert(customer, 'create_failed', evt())).error).toBeNull()
+    expect(await notes(customer)).toEqual([{ kind: 'stripe_signup_failed', client_id: null, payload: { customer, event, reason: 'create_failed' } }])
+    expect((await alert(customer, 'mail_failed')).error).toBeNull()
+    expect((await notes(customer)).length).toBe(2)
+  })
+
+  it('refuses a bad customer, event or reason', async () => {
+    for (const [c, r, e] of [['nope', 'create_failed', evt()], [null, 'create_failed', evt()], ['cus_zz1', 'other', evt()], ['cus_zz1', 'create_failed', 'bad']] as const) {
+      expect((await alert(c, r, e)).error?.code, JSON.stringify([c, r, e])).toBe('BCNS3')
+    }
+  })
+
+  it('execute is refused to anon and to a signed-in member', async () => {
+    const args = { p_customer: 'cus_zz1', p_event: evt(), p_reason: 'create_failed' }
+    expect((await anonClient().rpc('stripe_signup_alert', args)).error).not.toBeNull()
+    const res = await rest('rpc/stripe_signup_alert', await mintJwt(USERS.acmeOwner.id), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: JSON.stringify(args),
+    })
+    expect(res.status).toBeGreaterThanOrEqual(400)
+  })
+})

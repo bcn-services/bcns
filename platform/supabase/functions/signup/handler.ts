@@ -32,6 +32,24 @@ const MAX_EMAIL_LENGTH = 254;
 /** Same loose shape as invite-member: GoTrue is the real validator. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Budget key for an address: IPv4 as is, IPv4-mapped IPv6 as its IPv4, other IPv6 as its /64 (a host rotates inside its /64). */
+export function ipKey(ip: string): string {
+  const addr = ip.split("%")[0].toLowerCase();
+  if (!addr.includes(":")) return addr;
+  const mapped = addr.match(/^(?:0*:)*:ffff:(\d+\.\d+\.\d+\.\d+)$/) ?? addr.match(/^(?:0*:)*:ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mapped) {
+    if (mapped[2] === undefined) return mapped[1];
+    const hi = parseInt(mapped[1], 16);
+    const lo = parseInt(mapped[2], 16);
+    return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  }
+  const [head, tail = ""] = addr.split("::");
+  const h = head ? head.split(":") : [];
+  const t = addr.includes("::") && tail ? tail.split(":") : [];
+  const groups = addr.includes("::") ? [...h, ...Array<string>(Math.max(0, 8 - h.length - t.length)).fill("0"), ...t] : h;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
 export const ACCEPTED = { ok: true } as const;
 
 export interface SignupDeps {
@@ -45,6 +63,10 @@ export interface SignupDeps {
   sendConfirmation(email: string, redirectTo: string): Promise<{ error?: string }>;
   /** Pay-first sign-up's lookup (`{mode:"exists"}`): does this address already have an auth user? Absent = 503. */
   userExists?(email: string): Promise<boolean>;
+  /** api.take_rate_budget: true = within budget (and counted). Absent or throws = 503, fail closed. */
+  takeBudget?(bucket: string, key: string, limit: number, windowSec: number): Promise<boolean>;
+  /** The hub's egress IP: it asks on behalf of every visitor, so it gets the larger exists budget. */
+  hubIp?: string;
   /** Event + ids only — never the email or the request body. */
   log(event: string, data: Record<string, unknown>): void;
 }
@@ -61,7 +83,30 @@ export async function handle(request: Request, deps: SignupDeps): Promise<Respon
   // hub tells that visitor to sign in instead of paying. Still behind the SIGNUP_ENABLED gate above.
   if (body?.mode === "exists") {
     if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) return json({ error: "invalid_email" }, 400);
-    if (!deps.userExists) return json({ error: "unavailable" }, 503);
+    if (!deps.userExists || !deps.takeBudget) return json({ error: "unavailable" }, 503);
+    // Per-IP budget on the presence check: it is a public email oracle. Refused is 429, never a
+    // false {exists:false}, which would send an existing owner to Stripe to pay twice.
+    const cf = request.headers.get("cf-connecting-ip");
+    if (!cf) deps.log("signup_budget_no_ip", {});
+    const ip = cf ?? "unknown";
+    let key = ipKey(ip);
+    let limit = 10;
+    if (ip === deps.hubIp) {
+      // The hub asks for every visitor from one IP. It forwards the visitor's own address, trusted
+      // ONLY on a call from the hub's IP (a direct caller cannot originate from the droplet).
+      // An older hub sends none: its shared bucket gets the larger allowance.
+      const visitor = request.headers.get("x-bcns-visitor-ip")?.trim() ?? "";
+      if (visitor && visitor.length <= 64 && /^[0-9a-fA-F:.]+$/.test(visitor)) key = `hub:${ipKey(visitor)}`;
+      else limit = 60;
+    }
+    try {
+      if (!(await deps.takeBudget("signup_exists", key, limit, 3600))) {
+        return json({ error: "rate_limited" }, 429);
+      }
+    } catch {
+      deps.log("signup_budget_failed", {});
+      return json({ error: "unavailable" }, 503);
+    }
     try {
       return json({ exists: await deps.userExists(email) }, 200);
     } catch {

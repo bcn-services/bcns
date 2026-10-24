@@ -11,6 +11,7 @@ const OWNER = '11111111-1111-4111-8111-111111111111'
 const NEW_USER = '22222222-2222-4222-8222-222222222222'
 
 interface Recorded {
+  budgets: unknown[][]
   memberships: Array<{ userId: string; clientId: string; role: string }>
   invites: Array<{ email: string; redirectTo: string }>
   lookups: string[]
@@ -19,7 +20,7 @@ interface Recorded {
 function deps(
   over: Partial<InviteDeps> & { role?: string | null; inviteFails?: boolean; existingUserId?: string | null } = {},
 ): { deps: InviteDeps; rec: Recorded } {
-  const rec: Recorded = { memberships: [], invites: [], lookups: [] }
+  const rec: Recorded = { budgets: [], memberships: [], invites: [], lookups: [] }
   const role = over.role === undefined ? 'owner' : over.role
   const base: InviteDeps = {
     getUser: async (token) => (token === 'good' ? { userId: OWNER, email: 'owner@acme.example' } : null),
@@ -32,6 +33,7 @@ function deps(
       rec.lookups.push(email)
       return over.existingUserId === undefined ? NEW_USER : over.existingUserId
     },
+    takeBudget: async (...args) => (rec.budgets.push(args), true),
     insertMembership: async (userId, clientId, memberRole) => {
       rec.memberships.push({ userId, clientId, role: memberRole })
     },
@@ -48,6 +50,33 @@ function post(body: unknown, token: string | null = 'good'): Request {
 }
 
 describe('invite-member', () => {
+  it('a refused invite budget is 429 rate_limited and sends nothing; the key is the caller\'s own client', async () => {
+    const rec0: unknown[][] = []
+    const { deps: d, rec } = deps({ takeBudget: async (...a) => (rec0.push(a), false) })
+    const res = await handle(post({ email: 'new@acme.example', clientId: CLIENT_B }), d)
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({ error: 'rate_limited', message: 'Too many invites this hour. Try again later.' })
+    expect(rec0).toEqual([['invite', CLIENT_A, 20, 3600]])
+    expect(rec.invites).toEqual([])
+    expect(rec.memberships).toEqual([])
+  })
+
+  it('a budget that throws is 503 and sends nothing', async () => {
+    const logs: string[] = []
+    const { deps: d, rec } = deps({ takeBudget: async () => { throw new Error('rpc down') }, log: (e) => logs.push(e) })
+    expect((await handle(post({ email: 'new@acme.example' }), d)).status).toBe(503)
+    expect(logs).toEqual(['invite_budget_failed'])
+    expect(rec.invites).toEqual([])
+  })
+
+  it('the budget is only spent after the caller and email check', async () => {
+    const forbidden = deps({ role: 'member' })
+    await handle(post({ email: 'new@acme.example' }), forbidden.deps)
+    const bad = deps()
+    await handle(post({ email: 'nope' }), bad.deps)
+    expect([forbidden.rec.budgets, bad.rec.budgets]).toEqual([[], []])
+  })
+
   it('no Authorization header is 401 and touches nothing', async () => {
     const { deps: d, rec } = deps()
     const res = await handle(post({ email: 'new@acme.example' }, null), d)

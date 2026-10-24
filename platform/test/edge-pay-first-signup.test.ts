@@ -5,7 +5,7 @@
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { handle as signupHandle, SIGNUP_REDIRECT, type SignupDeps } from '../supabase/functions/signup/handler.ts'
+import { handle as signupHandle, ipKey, SIGNUP_REDIRECT, type SignupDeps } from '../supabase/functions/signup/handler.ts'
 import { handle, type SignupWorkspaceInput, type StripeWebhookDeps } from '../supabase/functions/stripe-webhook/handler.ts'
 
 const SECRET = 'whsec_test_fixture_secret'
@@ -26,7 +26,8 @@ function signupEvent(over: { eventId?: string; email?: string; name?: string; me
 }
 
 /** In-memory twin of the stripe-webhook signup deps: auth users, and the RPC's idempotency on customer id. */
-function world(over: { rpcFails?: number; mailFails?: boolean; mailThrows?: boolean; withSignup?: boolean } = {}) {
+function world(over: { rpcFails?: number; mailFails?: boolean; mailThrows?: boolean; withSignup?: boolean; alertThrows?: boolean } = {}) {
+  const alerts: Array<[string, string, string]> = []
   const users = new Map<string, string>() // email -> id
   const workspaces = new Map<string, SignupWorkspaceInput>() // customer -> input
   const memberships = new Set<string>()
@@ -59,9 +60,13 @@ function world(over: { rpcFails?: number; mailFails?: boolean; mailThrows?: bool
         if (over.mailThrows) throw new Error('smtp down')
         return over.mailFails ? { error: 'rate limited' } : {}
       },
+      async alert(customerId, eventId, reason) {
+        alerts.push([customerId, eventId, reason])
+        if (over.alertThrows) throw new Error('alert rpc down')
+      },
     },
   }
-  return { deps, users, workspaces, mails, logs, reads }
+  return { deps, users, workspaces, mails, logs, reads, alerts }
 }
 
 describe('pay-first sign-up: stripe-webhook creates the workspace', () => {
@@ -140,6 +145,31 @@ describe('pay-first sign-up: stripe-webhook creates the workspace', () => {
     }
   })
 
+  it('a createWorkspace failure answers 503 and raises exactly one create_failed alert; a clean run raises none', async () => {
+    const w = world({ rpcFails: 1 })
+    expect((await handle(post(signupEvent()), SECRET, w.deps)).status).toBe(503)
+    expect(w.alerts).toEqual([['cus_TestFixture0001', 'evt_TestSignup0001', 'create_failed']])
+    expect((await handle(post(signupEvent()), SECRET, w.deps)).status).toBe(200)
+    expect(w.alerts.length).toBe(1)
+  })
+
+  it('a mail failure or throw answers 200 and raises a mail_failed alert', async () => {
+    for (const mode of [{ mailFails: true }, { mailThrows: true }]) {
+      const w = world(mode)
+      expect((await handle(post(signupEvent()), SECRET, w.deps)).status).toBe(200)
+      expect(w.alerts).toEqual([['cus_TestFixture0001', 'evt_TestSignup0001', 'mail_failed']])
+    }
+  })
+
+  it('an alert that throws is logged and never changes the answer (503 on create, 200 on mail)', async () => {
+    const create = world({ rpcFails: 1, alertThrows: true })
+    expect((await handle(post(signupEvent()), SECRET, create.deps)).status).toBe(503)
+    expect(create.logs.map((l) => l.event)).toContain('stripe_signup_alert_failed')
+    const mail = world({ mailFails: true, alertThrows: true })
+    expect((await handle(post(signupEvent()), SECRET, mail.deps)).status).toBe(200)
+    expect(mail.logs.map((l) => l.event)).toContain('stripe_signup_alert_failed')
+  })
+
   it('an unwired deps object answers 503 so Stripe retries; a session without a usable email/name/customer is ignored 200', async () => {
     expect((await handle(post(signupEvent()), SECRET, world({ withSignup: false }).deps)).status).toBe(503)
     for (const body of [
@@ -172,9 +202,22 @@ describe('pay-first sign-up: stripe-webhook creates the workspace', () => {
 })
 
 describe('signup function: the exists lookup mode', () => {
+  /** In-memory twin of api.take_rate_budget: allows `limit` hits per bucket+key, then refuses. */
+  const budget = () => {
+    const hits = new Map<string, number>()
+    return async (bucket: string, key: string, limit: number) => {
+      const k = `${bucket}:${key}`
+      const n = (hits.get(k) ?? 0) + 1
+      if (n > limit) return false
+      hits.set(k, n)
+      return true
+    }
+  }
   const base = (over: Partial<SignupDeps> = {}): { deps: SignupDeps; calls: string[] } => {
     const calls: string[] = []
     const deps: SignupDeps = {
+      takeBudget: budget(),
+      hubIp: '104.236.20.89',
       enabled: true,
       createUser: async (e) => (calls.push(`createUser:${e}`), { userId: 'u' }),
       createClient: async () => (calls.push('createClient'), 'slug'),
@@ -185,8 +228,16 @@ describe('signup function: the exists lookup mode', () => {
     }
     return { deps, calls }
   }
-  const ask = (deps: SignupDeps, body: unknown) =>
-    signupHandle(new Request('https://p.supabase.co/functions/v1/signup', { method: 'POST', body: JSON.stringify(body) }), deps)
+  const ask = (deps: SignupDeps, body: unknown, ip?: string, visitor?: string) =>
+    signupHandle(
+      new Request('https://p.supabase.co/functions/v1/signup', {
+        method: 'POST',
+        headers: { ...(ip ? { 'cf-connecting-ip': ip } : {}), ...(visitor ? { 'x-bcns-visitor-ip': visitor } : {}) },
+        body: JSON.stringify(body),
+      }),
+      deps,
+    )
+  const exists = { mode: 'exists', email: 'a@b.example' }
 
   it('answers {exists} for a valid address and creates, deletes and mails nothing', async () => {
     const asked: string[] = []
@@ -204,6 +255,92 @@ describe('signup function: the exists lookup mode', () => {
     expect((await ask(base({ userExists: async () => true }).deps, { mode: 'exists', email: 'nope' })).status).toBe(400)
     expect((await ask(base().deps, { mode: 'exists', email: 'a@b.example' })).status).toBe(503)
     expect((await ask(base({ userExists: async () => { throw new Error('gotrue') } }).deps, { mode: 'exists', email: 'a@b.example' })).status).toBe(502)
+  })
+
+  it('the 11th exists call from one IP is 429 rate_limited while another IP still passes', async () => {
+    const { deps } = base({ userExists: async () => true })
+    for (let i = 0; i < 10; i++) expect((await ask(deps, exists, '203.0.113.7')).status).toBe(200)
+    const over = await ask(deps, exists, '203.0.113.7')
+    expect([over.status, await over.json()]).toEqual([429, { error: 'rate_limited' }])
+    expect((await ask(deps, exists, '203.0.113.8')).status).toBe(200)
+  })
+
+  it('the hub IP gets 60 an hour, then 429; a request with no cf-connecting-ip shares one "unknown" bucket of 10', async () => {
+    const { deps } = base({ userExists: async () => true })
+    for (let i = 0; i < 60; i++) expect((await ask(deps, exists, '104.236.20.89')).status).toBe(200)
+    expect((await ask(deps, exists, '104.236.20.89')).status).toBe(429)
+    for (let i = 0; i < 10; i++) expect((await ask(deps, exists)).status).toBe(200)
+    expect((await ask(deps, exists)).status).toBe(429)
+  })
+
+  it('via the hub, the visitor header sets the key: one visitor exhausting 10 does not block another', async () => {
+    const asked: unknown[][] = []
+    const inner = budget()
+    const { deps } = base({ userExists: async () => true, takeBudget: async (...a) => (asked.push(a), inner(a[0], a[1], a[2])) })
+    const hub = '104.236.20.89'
+    for (let i = 0; i < 10; i++) expect((await ask(deps, exists, hub, '198.51.100.5')).status).toBe(200)
+    expect((await ask(deps, exists, hub, '198.51.100.5')).status).toBe(429)
+    expect((await ask(deps, exists, hub, '198.51.100.6')).status).toBe(200)
+    expect(asked[0]).toEqual(['signup_exists', 'hub:198.51.100.5', 10, 3600])
+  })
+
+  it('the visitor header is ignored unless the call comes from the hub IP (a spoofed one cannot dodge the budget)', async () => {
+    const asked: unknown[][] = []
+    const { deps } = base({ userExists: async () => true, takeBudget: async (...a) => (asked.push(a), true) })
+    await ask(deps, exists, '203.0.113.7', '198.51.100.99')
+    await ask(deps, exists, undefined, '198.51.100.99')
+    expect(asked).toEqual([['signup_exists', '203.0.113.7', 10, 3600], ['signup_exists', 'unknown', 10, 3600]])
+  })
+
+  it('a hub call with a missing or implausible visitor header falls back to the hub-wide 60', async () => {
+    for (const visitor of [undefined, 'x'.repeat(65), '1.2.3.4, 5.6.7.8', 'evil<script>']) {
+      const asked: unknown[][] = []
+      const { deps } = base({ userExists: async () => true, takeBudget: async (...a) => (asked.push(a), true) })
+      await ask(deps, exists, '104.236.20.89', visitor)
+      expect(asked, String(visitor)).toEqual([['signup_exists', '104.236.20.89', 60, 3600]])
+    }
+  })
+
+  it('IPv6 callers share one budget per /64; an IPv4-mapped address is its IPv4', async () => {
+    const { deps } = base({ userExists: async () => true })
+    for (let i = 0; i < 10; i++) expect((await ask(deps, exists, `2001:db8:0:1::${i + 1}`)).status).toBe(200)
+    expect((await ask(deps, exists, '2001:db8:0:1:ffff:ffff:ffff:ffff')).status).toBe(429)
+    expect((await ask(deps, exists, '2001:db8:0:2::1')).status).toBe(200)
+    expect(ipKey('::ffff:1.2.3.4')).toBe('1.2.3.4')
+    expect(ipKey('::ffff:102:304')).toBe('1.2.3.4')
+    expect(ipKey('1.2.3.4')).toBe('1.2.3.4')
+    expect(ipKey('2001:DB8:0:1::5')).toBe('2001:db8:0:1::/64')
+    expect(ipKey('2001:db8::1')).toBe('2001:db8:0:0::/64')
+  })
+
+  it('a request with no cf-connecting-ip is budgeted as "unknown" and logged', async () => {
+    const logs: string[] = []
+    const { deps } = base({ userExists: async () => true, log: (e) => logs.push(e) })
+    expect((await ask(deps, exists)).status).toBe(200)
+    expect(logs).toEqual(['signup_budget_no_ip'])
+  })
+
+  it('the budget is asked with the exists bucket, the caller IP, and the lookup is skipped once refused', async () => {
+    const asked: unknown[][] = []
+    let lookups = 0
+    const { deps } = base({
+      userExists: async () => (lookups++, true),
+      takeBudget: async (...a) => (asked.push(a), false),
+    })
+    expect((await ask(deps, exists, '203.0.113.7')).status).toBe(429)
+    expect(asked).toEqual([['signup_exists', '203.0.113.7', 10, 3600]])
+    expect(lookups).toBe(0)
+  })
+
+  it('a budget that throws, or no budget dep at all, fails closed: 503, no lookup', async () => {
+    let lookups = 0
+    const userExists = async () => (lookups++, true)
+    const logs: string[] = []
+    const thrown = base({ userExists, takeBudget: async () => { throw new Error('rpc down') }, log: (e) => logs.push(e) })
+    expect((await ask(thrown.deps, exists, '203.0.113.7')).status).toBe(503)
+    expect(logs).toEqual(['signup_budget_failed'])
+    expect((await ask(base({ userExists, takeBudget: undefined }).deps, exists, '203.0.113.7')).status).toBe(503)
+    expect(lookups).toBe(0)
   })
 
   it('the Shopify-path request (name + email, no mode) is unchanged: still created and mailed, lookup never consulted', async () => {

@@ -18,6 +18,7 @@ const ERRORS: Record<string, string> = {
   billing: "We couldn't open the billing page. Try again in a few minutes, or email bcns.",
   owner: "Only an owner can manage billing.",
   unconfigured: "Team management isn't configured for this app yet.",
+  "rate-limited": "Too many invites this hour. Try again later.",
   failed: "That didn't work. Try again, or email bcns.",
 };
 
