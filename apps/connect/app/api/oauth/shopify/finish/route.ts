@@ -1,11 +1,19 @@
 /**
  * GET /api/oauth/shopify/finish
  *
- * The one place a Shopify token is written. /callback hands it over sealed in
- * the shopify_pending cookie (lib/shopify-oauth.ts, sealPending). Signed out —
- * the usual case after a Shopify-initiated install — goes to /login, which sends
- * the owner straight back here. Binding needs a signed-in OWNER, and a
- * tenant-bound handshake binds only to its own tenant (openPending).
+ * The one place a Shopify code is exchanged and the token written. /callback
+ * hands over the unspent code sealed in the shopify_pending cookie
+ * (lib/shopify-oauth.ts, sealPending). Signed out — the usual case after a
+ * Shopify-initiated install or "Open app" — goes to /login, which sends the
+ * owner straight back here. Binding needs a signed-in OWNER, and a tenant-bound
+ * handshake binds only to its own tenant (openPending).
+ *
+ * The order is the fix for 2026-10-24 (an exchange retires the shop's stored
+ * refresh token): sign-in, owner, pending, then shopChecks (BCNS6 in use, BCNS7
+ * mismatch), and only then the exchange. After it come only the subscription
+ * gate (it needs the fresh token) and the write. An exchange failure (the code is
+ * one-time and short-lived, so a slow sign-in can outlive it) is the
+ * expired page, whose "Start again" reopens the app for a fresh code.
  *
  * Managed pricing (W6a follow-up, App Store rule 1.2.2) is gated HERE, not at
  * /callback. `middleware.ts` sends both a first-time install AND an existing
@@ -16,11 +24,10 @@
  * passes; a first install, a lapsed plan and a not-yet-approved charge all land
  * on Shopify's plan page. A reinstall inside a period already paid for (Shopify
  * cancels the subscription on uninstall but offers nothing to approve until the
- * period ends) is let through by the Partner API check, when configured. A
- * tenant already bound to a DIFFERENT shop is refused before that, so it is never
- * offered a charge for a shop the write would refuse (BCNS7). The
+ * period ends) is let through by the Partner API check, when configured.
+ * shopChecks runs before that, so a refused shop is never offered a charge. The
  * bridge app (SB, `app === ALT_APP`) and any tenant-bound (hub-initiated) pending
- * are never gated — untouched, no network call, straight to the RPC as before.
+ * are never gated: no subscription call, straight to the RPC after the exchange.
  * The whole decision is lib/shopify-oauth.ts's `managedPricingRedirect`,
  * unit-tested there with a fake fetch.
  */
@@ -35,12 +42,16 @@ import {
   PENDING_COOKIE,
   SHOPIFY_DEFAULTS,
   SHOPIFY_TOKEN_KIND,
+  exchange,
+  exchangeDiagnostic,
   finishErrorCode,
   managedPricingRedirect,
   normalizeShop,
   openPending,
   registerUninstallWebhook,
   scheduleConfig,
+  shopChecks,
+  shopifyAppFor,
 } from "@/lib/shopify-oauth";
 import { oauthEnabled } from "@/lib/oauth-config";
 
@@ -90,9 +101,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!opened.ok) return opened.reason === "expired" ? expired("expired") : fail(opened.reason);
   const { pending } = opened;
 
+  // Before the exchange: a refusal here leaves the holder's stored token alive.
+  const refused = await shopChecks(session.api, pending.shop, fail);
+  if (refused) return refused;
+
+  // The new grant, with the app that issued the code (sb-bridge). If SHOPIFY_ALT_*
+  // changed since /callback, the pair no longer matches the code: refuse.
+  const { clientId, clientSecret, app } = shopifyAppFor(config, pending.shop);
+  if (app !== pending.app) return fail("app_changed");
+  const exchanged = await exchange(pending.shop, clientId, clientSecret, pending.code);
+  if (!exchanged.ok) {
+    const reason = `exchange_${exchanged.reason}${exchangeDiagnostic(exchanged)}`;
+    // A stale or spent code, or a blip, is worth "Start again"; anything else repeats on retry.
+    return exchanged.reason === "http_error" || exchanged.reason === "network_error" ? expired(reason) : fail(reason);
+  }
+  const { token } = exchanged;
+
   const gated = await managedPricingRedirect({
     api: session.api,
     pending,
+    accessToken: token.accessToken,
     appHandle: config.shopifyAppHandle,
     partner: { token: config.shopifyPartnerApiToken, orgId: config.shopifyPartnerOrgId, appGid: config.shopifyAppGid },
     fail,
@@ -105,12 +133,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { error } = await session.api.rpc("connect_source", {
     p_source: "shopify",
     p_kind: SHOPIFY_TOKEN_KIND,
-    p_secret: pending.accessToken,
+    p_secret: token.accessToken,
     p_config: scheduleConfig(pending.shop, pending.app), // sb-bridge: remove after SB migrates to bcns Connect
     p_interval: SHOPIFY_DEFAULTS.interval,
     p_backfill_depth: SHOPIFY_DEFAULTS.backfillDepth,
-    p_refresh_secret: pending.refreshToken,
-    p_expires_at: pending.expiresAt,
+    p_refresh_secret: token.refreshToken,
+    p_expires_at: new Date(Date.now() + token.expiresIn * 1000).toISOString(),
   });
   // `error.message` can echo a parameter value, and one of them is the token.
   if (error) return fail(`write_failed:${error.code ?? "rpc"}`, finishErrorCode(error));
@@ -121,7 +149,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // install). A failure only delays the revoke; the next connect registers again.
   // Public app only — the revoke ignores bridge-app rows.
   if (pending.app !== ALT_APP) {
-    const registered = await registerUninstallWebhook(pending.shop, pending.accessToken, hub);
+    const registered = await registerUninstallWebhook(pending.shop, token.accessToken, hub);
     if (!registered.ok) {
       console.warn(`[connect] shopify uninstall webhook not registered (${registered.reason}) shop=${pending.shop}`);
     } else {

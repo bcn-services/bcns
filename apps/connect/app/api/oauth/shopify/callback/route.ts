@@ -1,7 +1,7 @@
 /**
  * GET /api/oauth/shopify/callback
  *
- * Where a stranger's request turns into a stored credential. The order below is
+ * Where a stranger's request becomes a sealed, unspent code. The order below is
  * the security property, not a style choice:
  *
  *   1. approval gate      — an unapproved source has no callback at all
@@ -10,16 +10,21 @@
  *   4. the state cookie   — the browser that finished is the one that started
  *   5. the session        — owner, and the SAME tenant the state was minted for
  *                           (skipped for an install-initiated state: no tenant yet)
- *   6. token exchange     — only now does anything leave this server
- *   7. the hand-off       — the token, sealed, to /finish, which does the write
+ *   6. the hand-off       — the code, sealed, to /finish
+ *
+ * No token exchange here. The exchange is a new grant, and a new grant retires
+ * the refresh token already stored for the shop (2026-10-24: a reviewer's "Open
+ * app" with no hub session exchanged here, abandoned sign-in, and the stored
+ * token died at the next refresh). /finish exchanges only once an owner is
+ * signed in and the shop checks pass, so an abandoned sign-in spends nothing.
  *
  * Managed pricing (W6a follow-up) is NOT gated here. `middleware.ts` sends both
  * a first-time install AND an existing client's "Open app" click through this
  * same install-initiated path, and /finish checks the subscription for every
  * one of them once an owner is signed in — see finish/route.ts's header.
  *
- * Nothing before step 6 touches the network and nothing here touches the
- * database, so a forged callback costs an HMAC comparison and a redirect.
+ * Nothing here calls Shopify and nothing here touches the database, so a forged
+ * callback costs an HMAC comparison and a redirect.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -32,9 +37,6 @@ import {
   LAST_SHOP_TTL_MS,
   PENDING_COOKIE,
   PENDING_TTL_MS,
-  SHOPIFY_TOKEN_PATH,
-  type ExchangeResult,
-  handleTokenResponse,
   normalizeShop,
   safeEqual,
   sealPending,
@@ -46,53 +48,6 @@ import {
 import { oauthEnabled } from "@/lib/oauth-config";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Exchange the one-time code for an Admin API token.
- *
- * `expiring: "1"` is load-bearing. Without it Shopify mints a non-expiring
- * token, and the Admin API rejects those: a real install on 2026-09-19 stored
- * an `shpat_` token that came back HTTP 403 "[API] Non-expiring access tokens
- * are no longer accepted for the Admin API" on the worker's first request.
- * The parameter belongs in THIS body, not on the authorize redirect, and it
- * works under use_legacy_install_flow — there is no dashboard toggle for it.
- * What comes back lasts an hour and carries a 90-day refresh_token.
- */
-async function exchange(shop: string, clientId: string, clientSecret: string, code: string) {
-  let response: Response;
-  try {
-    response = await fetch(`https://${shop}${SHOPIFY_TOKEN_PATH}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, expiring: "1" }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch (err) {
-    // DNS failure, TLS failure, connection reset, or the 10s timeout above —
-    // all throw instead of resolving. Caught here so a Shopify-side network
-    // blip redirects the merchant instead of 500ing the route.
-    return { ok: false, reason: "network_error", detail: err instanceof Error ? err.name : "unknown" } as const;
-  }
-  const body = await response.json().catch(() => null);
-  return handleTokenResponse(response.status, body);
-}
-
-/**
- * A safe, allowlisted diagnostic suffix for the reject log. Never the raw
- * `detail` field wholesale — it can carry provider- or request-controlled
- * text (missing-scope names, response bodies). Only an error name
- * (network_error) or a bare numeric HTTP status (http_error) is let
- * through; every other reason logs with no suffix at all.
- */
-function exchangeDiagnostic(exchanged: Extract<ExchangeResult, { ok: false }>): string {
-  if (exchanged.reason === "network_error" && exchanged.detail) return `:${exchanged.detail}`;
-  if (exchanged.reason === "http_error") {
-    const status = exchanged.detail?.match(/^HTTP (\d+)$/)?.[1];
-    if (status) return `:${status}`;
-  }
-  return "";
-}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const config = getConfig();
@@ -118,7 +73,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (!oauthEnabled(config, "shopify")) return fail("unavailable");
   // The raw shop only CHOOSES which secret to try; it is trusted after the HMAC below.
-  const { clientId, clientSecret: secret, app } = shopifyAppFor(config, normalizeShop(params.get("shop"))); // sb-bridge: remove after SB migrates to bcns Connect
+  const { clientSecret: secret, app } = shopifyAppFor(config, normalizeShop(params.get("shop"))); // sb-bridge: remove after SB migrates to bcns Connect
 
   // 2. Shopify's signature over the whole query string, before a single value
   // from it is read for anything. A tampered `shop`, `code` or `state` dies here.
@@ -138,7 +93,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!cookie || !safeEqual(cookie, String(params.get("state")))) return fail("state_cookie");
 
   // 5. A tenant-bound state needs its owner signed in NOW, before the code is
-  // spent. Signing back in as a different client mid-handshake must not write
+  // sealed. Signing back in as a different client mid-handshake must not write
   // this token into that other client. An install-initiated state has no
   // tenant; /finish makes the owner sign in before anything is written.
   if (state.payload.clientId !== INSTALL_CLIENT_ID) {
@@ -147,14 +102,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (session.membership.clientId !== state.payload.clientId) return fail("tenant_mismatch");
   }
 
-  // 6. Only now does the code leave this process.
-  const exchanged = await exchange(shop, clientId, secret, code);
-  if (!exchanged.ok) return fail(`exchange_${exchanged.reason}${exchangeDiagnostic(exchanged)}`);
-
-  // 7. /finish writes it (and, for an install-initiated state on the public
-  // app, decides whether managed pricing needs to be gated first — see its own
-  // doc comment). Sealed under the DEFAULT app's secret whichever app issued
-  // the token: it is our key, and /finish has no shop to choose by. `host` is
+  // 6. /finish exchanges and writes it (and, for an install-initiated state on
+  // the public app, decides whether managed pricing needs to be gated first —
+  // see its own doc comment). Sealed under the DEFAULT app's secret whichever
+  // app issued the code: it is our key, and /finish has no shop to choose by. `host` is
   // under the query HMAC verified in step 2, so it is safe to decode here even
   // though nothing before this point trusted it.
   const storeHandle = storeHandleFromHost(params.get("host"));
@@ -163,9 +114,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       clientId: state.payload.clientId,
       shop,
       app, // sb-bridge: remove after SB migrates to bcns Connect
-      accessToken: exchanged.token.accessToken,
-      refreshToken: exchanged.token.refreshToken,
-      expiresAt: new Date(Date.now() + exchanged.token.expiresIn * 1000).toISOString(),
+      code,
       storeHandle,
     },
     config.shopifyClientSecret!

@@ -289,7 +289,7 @@ export function handleTokenResponse(status: number, body: unknown): ExchangeResu
    * An expiring token is not optional any more. Shopify answered the Admin API
    * with HTTP 403 "Non-expiring access tokens are no longer accepted" on
    * 2026-09-19, and public apps must be off them entirely by 2027-01-01.
-   * `expiring: "1"` on the exchange (callback/route.ts) is what asks for one,
+   * `expiring: "1"` on the exchange (`exchange` below) is what asks for one,
    * and `expires_in` is the only proof Shopify honoured it. Refuse here rather
    * than store a token that installs cleanly and 403s on the first worker run —
    * that failure reads as a connector bug and costs a debugging session.
@@ -299,6 +299,61 @@ export function handleTokenResponse(status: number, body: unknown): ExchangeResu
   if (expiresIn <= 0) return { ok: false, reason: "not_expiring", detail: "no expires_in" };
 
   return { ok: true, token: { accessToken, scopes, expiresIn, refreshToken } };
+}
+
+/**
+ * Exchange the one-time code for an Admin API token. Called by /finish, after
+ * the owner is signed in and shopChecks passed: the exchange is a new grant,
+ * and a new grant retires the refresh token already stored for this shop.
+ *
+ * `expiring: "1"` is load-bearing. Without it Shopify mints a non-expiring
+ * token, and the Admin API rejects those: a real install on 2026-09-19 stored
+ * an `shpat_` token that came back HTTP 403 "[API] Non-expiring access tokens
+ * are no longer accepted for the Admin API" on the worker's first request.
+ * The parameter belongs in THIS body, not on the authorize redirect, and it
+ * works under use_legacy_install_flow — there is no dashboard toggle for it.
+ * What comes back lasts an hour and carries a 90-day refresh_token.
+ */
+export async function exchange(
+  shop: string,
+  clientId: string,
+  clientSecret: string,
+  code: string,
+  fetchImpl: typeof fetch = globalThis.fetch
+): Promise<ExchangeResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://${shop}${SHOPIFY_TOKEN_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, expiring: "1" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    // DNS failure, TLS failure, connection reset, or the 10s timeout above —
+    // all throw instead of resolving. Caught here so a Shopify-side network
+    // blip redirects the merchant instead of 500ing the route.
+    return { ok: false, reason: "network_error", detail: err instanceof Error ? err.name : "unknown" };
+  }
+  const body = await response.json().catch(() => null);
+  return handleTokenResponse(response.status, body);
+}
+
+/**
+ * A safe, allowlisted diagnostic suffix for the reject log. Never the raw
+ * `detail` field wholesale — it can carry provider- or request-controlled
+ * text (missing-scope names, response bodies). Only an error name
+ * (network_error) or a bare numeric HTTP status (http_error) is let
+ * through; every other reason logs with no suffix at all.
+ */
+export function exchangeDiagnostic(exchanged: Extract<ExchangeResult, { ok: false }>): string {
+  if (exchanged.reason === "network_error" && exchanged.detail) return `:${exchanged.detail}`;
+  if (exchanged.reason === "http_error") {
+    const status = exchanged.detail?.match(/^HTTP (\d+)$/)?.[1];
+    if (status) return `:${status}`;
+  }
+  return "";
 }
 
 /**
@@ -713,10 +768,12 @@ export interface PendingConnection {
   clientId: string;
   shop: string;
   app?: string; // sb-bridge: remove after SB migrates to bcns Connect
-  accessToken: string;
-  refreshToken: string;
-  /** ISO time the access token dies, fixed at exchange time. */
-  expiresAt: string;
+  /**
+   * Shopify's one-time code, NOT yet exchanged. /finish exchanges it only after
+   * an owner is signed in and shopChecks passed: an abandoned sign-in then drops
+   * an unspent code, and the refresh token already stored for the shop lives.
+   */
+  code: string;
   /**
    * The store's admin handle, decoded at /callback from Shopify's `host` query
    * param (storeHandleFromHost). Not a secret — carried through only because
@@ -730,7 +787,8 @@ export interface PendingConnection {
 
 /**
  * Sealed with lib/oauth-state.ts (AES-256-GCM, key derived from the client
- * secret under this label): the payload IS the access and refresh token.
+ * secret under this label): the payload carries the one-time code, which with
+ * the app secret is a token.
  */
 const PENDING_LABEL = "pending-connection:v1";
 
@@ -761,6 +819,9 @@ export function openPending(
   if (!opened.ok) return opened;
   const raw = opened.value as unknown as PendingConnection;
   if (typeof raw.clientId !== "string" || !normalizeShop(raw.shop)) return { ok: false, reason: "malformed" };
+  // A cookie sealed by a deploy before the exchange moved to /finish carries
+  // tokens, not a code: read as expired, so /finish offers "Start again".
+  if (typeof raw.code !== "string" || !raw.code) return { ok: false, reason: "expired" };
   if (raw.clientId !== INSTALL_CLIENT_ID && raw.clientId !== clientId) return { ok: false, reason: "tenant_mismatch" };
   // A cookie sealed by a deploy before storeHandle existed on PendingConnection
   // decodes with that key simply absent (undefined), not null — coalesce so it
@@ -775,23 +836,17 @@ export function openPending(
  * returns whatever it gets back). `null` means "proceed to the write"; anything
  * else is what the route should return instead.
  *
- * Four steps, in this order, each for a reason:
+ Runs after shopChecks (a tenant bound to a DIFFERENT shop never reaches a
+ * plan page) and after /finish exchanged the code, with that fresh token.
+ * Three steps, in this order, each for a reason:
  *
- *  1. Shop mismatch (api.shopify_shop_mismatch, one boolean about the caller's
- *     own tenant). A tenant already bound to a DIFFERENT shop is refused here,
- *     before it can be shown a plan page and approve a charge for a shop the
- *     write would then refuse (BCNS7 — data.attach_source stays the authority).
- *     A failed read is the generic error page: falling through could charge and
- *     then refuse, and skipping to the write would skip the subscription check.
- *     Whether the tenant has the SAME shop already changes nothing (see
- *     managedPricingGate).
- *  2. The subscription check, retried once when the failure is transient.
- *     /callback has already exchanged the code, and that new grant killed the
+ *  1. The subscription check, retried once when the failure is transient.
+ *     /finish has already exchanged the code, and that new grant killed the
  *     refresh token stored for an existing client — so dropping this fresh token
  *     over a blip breaks a live, paying connection within the hour. A definitive
  *     answer (none_active, graphql_error, malformed) is not retried, and a second
  *     transient failure still fails closed to the plan page.
- *  3. Only on a definitive `none_active`, and only with all three Partner values
+ *  2. Only on a definitive `none_active`, and only with all three Partner values
  *     set: shopGid (a second Admin call), then paidThrough. A store uninstalled
  *     and reinstalled inside a period it already paid for has no ACTIVE
  *     subscription, yet Shopify's plan page has nothing for it to approve — so
@@ -799,7 +854,7 @@ export function openPending(
  *     (recordPaidThrough) for the worker to end access when it passes. Neither is asked after an ACTIVE
  *     answer or a failed check, and every failure of either is the plan page,
  *     as before.
- *  4. The plan-page redirect. SHOPIFY_APP_HANDLE is only needed to build that
+ *  3. The plan-page redirect. SHOPIFY_APP_HANDLE is only needed to build that
  *     URL, so it is only required here: an existing client's "Open app" click
  *     with an active subscription must not fail on an unset handle.
  *
@@ -810,8 +865,12 @@ export function openPending(
 /** Failures of the subscription check that say nothing about the subscription itself. */
 const TRANSIENT_CHECK_FAILURES: ReadonlySet<string> = new Set(["timeout", "network_error", "http_error"]);
 
-/** The two RPCs the gate makes; structural so a test can fake them without a Supabase client. */
+/** The RPCs shopChecks and the gate make; structural so a test can fake them without a Supabase client. */
 export interface ShopMismatchApi {
+  rpc(
+    fn: "shopify_shop_in_use",
+    args: { p_shop: string }
+  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
   rpc(
     fn: "shopify_shop_mismatch",
     args: { p_shop: string }
@@ -838,9 +897,39 @@ async function recordPaidThrough(api: ShopMismatchApi, shop: string, until: stri
   }
 }
 
+/**
+ * The two refusals data.attach_source would make at the write, asked BEFORE
+ * /finish exchanges the code. Asked after, the exchange's new grant has already
+ * retired the refresh token the holder stored. Each RPC is one boolean, owner only:
+ *
+ *  1. In use (api.shopify_shop_in_use, BCNS6's predicate): another client holds
+ *     this shop with a live token. One shop = one tenant.
+ *  2. Mismatch (api.shopify_shop_mismatch, BCNS7's): the caller's tenant is
+ *     already bound to a DIFFERENT shop, which a connect must never replace.
+ *
+ * A failed read is the generic error page, never a fall-through to the exchange.
+ * attach_source stays the authority; these only move its answer earlier.
+ */
+export async function shopChecks(
+  api: ShopMismatchApi,
+  shop: string,
+  fail: (code: string, hubError?: string) => NextResponse
+): Promise<NextResponse | null> {
+  const inUse = await api.rpc("shopify_shop_in_use", { p_shop: shop });
+  if (inUse.error || typeof inUse.data !== "boolean") return fail("shop_check");
+  if (inUse.data) return fail("shop_in_use", "shop-in-use");
+
+  const mismatch = await api.rpc("shopify_shop_mismatch", { p_shop: shop });
+  if (mismatch.error || typeof mismatch.data !== "boolean") return fail("shop_check");
+  if (mismatch.data) return fail("shop_mismatch", "shop-mismatch");
+  return null;
+}
+
 export async function managedPricingRedirect(params: {
   api: ShopMismatchApi;
   pending: PendingConnection;
+  /** The fresh token /finish just exchanged pending.code for. */
+  accessToken: string;
   appHandle: string | undefined;
   fail: (code: string, hubError?: string) => NextResponse;
   /** Optional as a whole and per field: any of the three unset = no Partner call. */
@@ -848,17 +937,13 @@ export async function managedPricingRedirect(params: {
   fetchImpl?: typeof fetch;
   now?: number;
 }): Promise<NextResponse | null> {
-  const { api, pending, appHandle, fail, fetchImpl = fetch, now = Date.now() } = params;
+  const { api, pending, accessToken, appHandle, fail, fetchImpl = fetch, now = Date.now() } = params;
 
   if (!managedPricingGate(pending)) return null;
 
-  const mismatch = await api.rpc("shopify_shop_mismatch", { p_shop: pending.shop });
-  if (mismatch.error || typeof mismatch.data !== "boolean") return fail("shop_check");
-  if (mismatch.data) return fail("shop_mismatch", "shop-mismatch");
-
-  let checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
+  let checked = await hasActiveSubscription(pending.shop, accessToken, fetchImpl);
   if (!checked.active && TRANSIENT_CHECK_FAILURES.has(checked.reason)) {
-    checked = await hasActiveSubscription(pending.shop, pending.accessToken, fetchImpl);
+    checked = await hasActiveSubscription(pending.shop, accessToken, fetchImpl);
   }
   // subscriptionOutcome is the pure "write vs plan_page" decision; the
   // `checked.active` re-check exists only so TS narrows `checked` to the
@@ -870,7 +955,7 @@ export async function managedPricingRedirect(params: {
     const { token, orgId, appGid } = params.partner ?? {};
     if (!token || !orgId || !appGid) why += "; partner: unconfigured";
     else {
-      const gid = await shopGid(pending.shop, pending.accessToken, fetchImpl);
+      const gid = await shopGid(pending.shop, accessToken, fetchImpl);
       const paid = gid ? await paidThrough(gid, { token, orgId, appGid }, fetchImpl, now) : null;
       if (paid?.paid) {
         console.info(`[connect] shopify finish paid through ${paid.until} shop=${pending.shop}`);
