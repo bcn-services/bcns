@@ -10,6 +10,7 @@ import {
   dashboardUrl,
   egressLine,
   formatBytes,
+  inUseNoun,
   truncate,
 } from "../lib/sources.ts";
 
@@ -139,4 +140,11 @@ test("only never_ran is pending; auth_failed/error/stale/none/ok keep their conn
   }
   const none = composeSources([]).find((c) => c.status === "none");
   assert.deepEqual([none.connected, none.pending, none.label], [false, false, "Not connected"]);
+});
+
+test("inUseNoun: the three guarded sources get their noun; anything else, including hostile ?source=, is 'account'", () => {
+  assert.equal(inUseNoun("meta"), "Meta ad account");
+  assert.equal(inUseNoun("monday"), "Monday board");
+  assert.equal(inUseNoun("quickbooks"), "QuickBooks company");
+  for (const v of ["constructor", "__proto__", "<b>", "", undefined, ["meta"], ["meta", "monday"]]) assert.equal(inUseNoun(v), "account", String(v));
 });

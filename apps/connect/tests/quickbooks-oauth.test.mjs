@@ -185,6 +185,22 @@ test("callback: a non-numeric realmId would be rejected before exchangeCode's fe
   assert.ok(validIdx > 0 && exchangeIdx > validIdx, "the realmId guard runs before the one network call");
 });
 
+/* --------------------------------------------------- another tenant's realm */
+
+test("callback: source_in_use is asked after isValidRealmId and before exchangeCode, and write errors go through writeError", () => {
+  // Same constraint as above: requireOwner needs a live Supabase session, so no route-level
+  // run; assert the guard's presence and order in the source instead.
+  const route = readFileSync(new URL("../app/api/oauth/quickbooks/callback/route.ts", import.meta.url), "utf8");
+  const validIdx = route.indexOf("isValidRealmId(realmId)");
+  const inUseIdx = route.indexOf('"source_in_use"');
+  const exchangeIdx = route.indexOf("exchangeCode(");
+  assert.ok(validIdx > 0 && inUseIdx > validIdx && exchangeIdx > inUseIdx, "in-use check sits between the realmId guard and the exchange");
+  assert.match(route, /if \(inUse\.error\) return fail\("in_use_check"/); // an RPC error never falls through to the exchange
+  assert.match(route, /rpc\(\s*"source_in_use",\s*\{\s*p_source:\s*"quickbooks",\s*p_id:\s*realmId\s*\}\s*\)/); // exact RPC args
+  assert.match(route, /inUse\.data === true\) return fail\("source_in_use", "[^"]+", "source-in-use&source=quickbooks"\)/); // logs a detail
+  assert.match(route, /writeError\("quickbooks", error\)/);
+});
+
 /* ------------------------------------------------------ config + wiring */
 
 test("registered URL, dark-by-default gate, and no picker route exists", () => {

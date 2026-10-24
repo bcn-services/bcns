@@ -28,6 +28,12 @@ export const HUB_SOURCES = ["shopify", "meta", "monday", "meet", "drive", "quick
 
 export type HubSource = (typeof HUB_SOURCES)[number];
 
+const IN_USE_NOUN: Record<string, string> = { meta: "Meta ad account", monday: "Monday board", quickbooks: "QuickBooks company" };
+
+/** Noun for the `source-in-use` banner. `?source=` is user-controlled: own keys of a string only. */
+export const inUseNoun = (source: unknown): string =>
+  typeof source === "string" && Object.hasOwn(IN_USE_NOUN, source) ? IN_USE_NOUN[source]! : "account";
+
 /** `data.health_status`. An unknown value from a newer migration reads as "error". */
 export type HealthStatus = "ok" | "stale" | "auth_failed" | "error" | "never_ran";
 

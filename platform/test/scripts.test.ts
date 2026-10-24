@@ -354,10 +354,10 @@ describe('scripts', () => {
 
     it('attaches monday to an existing client exactly as onboard does', async () => {
       await onboard(['--slug', SLUG3, '--name', 'ZZ3', '--timezone', 'UTC'], async () => '')
-      const out = await run(['--slug', SLUG3, '--source', 'monday'], ['123', 'https://m.example', 'tok'])
+      const out = await run(['--slug', SLUG3, '--source', 'monday'], ['3123', 'https://m.example', 'tok'])
       expect(out).toMatch(/attached monday to zz-script-test3/)
       expect((await tokens('monday')).rows).toEqual([{ kind: 'monday_personal', secret: 'tok', status: 'active', status_detail: null }])
-      expect((await schedule('monday')).rows[0].config).toEqual({ board_id: '123', board_url: 'https://m.example', columns: { status: 'status', due: 'date4' } })
+      expect((await schedule('monday')).rows[0].config).toEqual({ board_id: '3123', board_url: 'https://m.example', columns: { status: 'status', due: 'date4' } })
     })
 
     it('re-run rotates the token, clears auth_failed, and keeps the backfill cursor', async () => {
@@ -366,7 +366,7 @@ describe('scripts', () => {
       await sql(`update data.connector_schedule s set backfill_cursor = '{"page": 7}', incremental_cursor = '{"since": "x"}',
         next_run_at = now() + interval '3 hours' from data.clients c where c.id = s.client_id and c.slug = $1 and s.source = 'monday'`, [SLUG3])
       const before = (await schedule('monday')).rows[0]
-      const out = await run(['--slug', SLUG3, '--source', 'monday'], ['123', 'https://m.example', 'tok2'])
+      const out = await run(['--slug', SLUG3, '--source', 'monday'], ['3123', 'https://m.example', 'tok2'])
       expect(out).not.toContain('tok2')
       expect(out).toContain(`next pull ${before.next_run_at.toISOString()}`)
       expect((await tokens('monday')).rows).toEqual([{ kind: 'monday_personal', secret: 'tok2', status: 'active', status_detail: null }])
@@ -379,11 +379,11 @@ describe('scripts', () => {
       const lease = (v: string) => sql(`update data.connector_schedule s set lease_until = ${v} from data.clients c
         where c.id = s.client_id and c.slug = $1 and s.source = 'monday'`, [SLUG3])
       await lease(`now() + interval '5 minutes'`)
-      await expect(run(['--slug', SLUG3, '--source', 'monday'], ['123', 'https://m.example', 'tok3'])).rejects.toThrow(/in flight/)
+      await expect(run(['--slug', SLUG3, '--source', 'monday'], ['3123', 'https://m.example', 'tok3'])).rejects.toThrow(/in flight/)
       await lease('null')
       await expect(run(['--slug', SLUG3, '--source', 'monday'], ['456', 'https://m.example', 'tok3'])).rejects.toThrow(/--reset-cursors/)
       expect((await tokens('monday')).rows[0].secret).toBe('tok2') // refused before anything was written
-      expect((await schedule('monday')).rows[0].config.board_id).toBe('123')
+      expect((await schedule('monday')).rows[0].config.board_id).toBe('3123')
       await run(['--slug', SLUG3, '--source', 'monday', '--reset-cursors'], ['456', 'https://m.example', 'tok3'])
       expect((await schedule('monday')).rows[0]).toMatchObject({ backfill_cursor: {}, incremental_cursor: {}, config: { board_id: '456' } })
     })

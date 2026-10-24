@@ -16,15 +16,16 @@ import { requireOwner } from "@/lib/session";
 import { safeEqual, verifyState } from "@/lib/oauth-state";
 import { connectArgs, exchangeCode, isValidRealmId, QUICKBOOKS_STATE_COOKIE } from "@/lib/quickbooks-oauth";
 import { oauthEnabled, redirectUri } from "@/lib/oauth-config";
+import { writeError } from "@/lib/oauth-connect";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const config = getConfig();
   const hub = config.hubBaseUrl;
-  const fail = (code: string, detail?: string) => {
+  const fail = (code: string, detail?: string, errorQuery = "connect-failed") => {
     if (detail) console.warn(`[connect] quickbooks callback rejected (${code}): ${detail}`);
-    const response = NextResponse.redirect(`${hub}/?error=connect-failed`, 303);
+    const response = NextResponse.redirect(`${hub}/?error=${errorQuery}`, 303);
     response.cookies.delete({ name: QUICKBOOKS_STATE_COOKIE, path: "/api/oauth/quickbooks" });
     return response;
   };
@@ -49,6 +50,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Checked before exchangeCode so a malformed realmId never spends the single-use code.
   if (!isValidRealmId(realmId)) return fail("bad_realm_id");
 
+  // The code exchange is a new Intuit grant, and whether it retires another tenant's
+  // stored refresh token is unknown (.claude/rules/oauth-grants.md), so refuse before
+  // spending it. An RPC error is connect-failed, never a fall-through to the exchange.
+  const inUse = await session.api.rpc("source_in_use", { p_source: "quickbooks", p_id: realmId });
+  if (inUse.error) return fail("in_use_check", inUse.error.code ?? "rpc");
+  if (inUse.data === true) return fail("source_in_use", "held by another client", "source-in-use&source=quickbooks");
+
   // A timeout or DNS failure is a connect-failed with the cookie cleared, not a 500.
   const token = await exchangeCode(config.quickbooksClientId!, secret, redirectUri(config, "quickbooks"), code).catch(
     () => ({ ok: false as const, reason: "http_error" as const, detail: "network" })
@@ -61,7 +69,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     connectArgs(token.accessToken, token.refreshToken, expiresAt, realmId)
   );
   // error.message can echo a parameter value, and one of them is the token.
-  if (error) return fail("write_failed", error.code ?? "rpc");
+  if (error) return fail("write_failed", error.code ?? "rpc", writeError("quickbooks", error));
 
   const response = NextResponse.redirect(`${hub}/?connected=quickbooks`, 303);
   response.cookies.delete({ name: QUICKBOOKS_STATE_COOKIE, path: "/api/oauth/quickbooks" });

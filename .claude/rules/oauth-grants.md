@@ -27,10 +27,12 @@ All five: `/start` is POST-only, cross-site refused, owner-only (`startPOST` `oa
 
 | Source | New grant retires prior credential? | Wrong-tenant guard | New token obtained, not persisted | Worker refresh |
 |---|---|---|---|---|
-| meta | unknown (docs: new long-lived token is "a different string", older ones not stated) | none (only Shopify has `shop_in_use`, `attach_source`) | `no_ad_account` after both exchanges; `write_failed`; multi-account pick abandoned (cookie expires) | none: no `refreshToken` in `connectors/meta.ts`; ~60-day token ends `auth_failed` |
-| monday | unknown (docs: tokens do not expire; re-authorize not stated) | none | `no_board`; `write_failed`; pick abandoned | none (non-expiring) |
-| meet, drive | no: Google keeps up to 100 refresh tokens per account per client; only past that the oldest dies | none | callback seals tokens in a cookie and writes nothing; cancel, bad folder, failed `verifyFolder`, `write_failed` drop them. Old stored token stays valid | `refreshGoogleToken` (`connectors/google.ts:39`); no rotation, `coalesce` keeps the stored refresh secret |
-| quickbooks | unknown for a new grant; refresh rotates (Intuit FAQ: always store the latest) | none (`realm_id` shape only, `api.connect_source`) | `exchangeCode` then `connect_source` error: `write_failed` (`callback/route.ts:64`) | `connectors/quickbooks.ts:156`, persists the new `refresh_secret` in the `refreshOne` tx; throws if none returned |
+| meta | unknown (docs: new long-lived token is "a different string", older ones not stated) | `attach_source` BCNS6 `source_in_use` at write (ids only known after exchange) | `no_ad_account` after both exchanges; `write_failed`; multi-account pick abandoned (cookie expires) | none: no `refreshToken` in `connectors/meta.ts`; ~60-day token ends `auth_failed` |
+| monday | unknown (docs: tokens do not expire; re-authorize not stated) | `attach_source` BCNS6 `source_in_use` at write (ids only known after exchange) | `no_board`; `write_failed`; pick abandoned | none (non-expiring) |
+| meet, drive | no: Google keeps up to 100 refresh tokens per account per client; only past that the oldest dies | none by design: Google keeps 100 refresh tokens per account+client, per-user quota, a shared folder across tenants is legitimate | callback seals tokens in a cookie and writes nothing; cancel, bad folder, failed `verifyFolder`, `write_failed` drop them. Old stored token stays valid | `refreshGoogleToken` (`connectors/google.ts:39`); no rotation, `coalesce` keeps the stored refresh secret |
+| quickbooks | unknown for a new grant; refresh rotates (Intuit FAQ: always store the latest) | `api.source_in_use` before `exchangeCode` + BCNS6 at write | `exchangeCode` then `connect_source` error: `write_failed` (`callback/route.ts:72`) | `connectors/quickbooks.ts:156`, persists the new `refresh_secret` in the `refreshOne` tx; throws if none returned |
+
+Accepted gap: the worker's `probeAuthFailed` (`platform/worker/src/tokens.ts`) can revive an `auth_failed` holder to active after another tenant bound the same id, so two active holders are possible in that rare case. Not fixed (worker out of scope).
 
 ## Worker purge paths
 

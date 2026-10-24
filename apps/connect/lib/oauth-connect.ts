@@ -51,13 +51,17 @@ function clearCookies(response: NextResponse, source: PickSource): NextResponse 
 }
 
 /**
- * Every failure lands on the hub as `connect-failed`. 303 so a POST is not
- * replayed at the target. Coarse on purpose; the code goes to the server log,
- * never a token or a response body.
+ * Every failure lands on the hub as `connect-failed`, except a BCNS6 from the
+ * write: another tenant already holds this account, which the owner can act on.
+ * 303 so a POST is not replayed at the target. Coarse on purpose; the code goes
+ * to the server log, never a token or a response body.
  */
-export function failRedirect(hub: string, source: PickSource, where: string, code: string, detail?: string): NextResponse {
+export const writeError = (source: string, error: { code?: string } | null): string =>
+  error?.code === "BCNS6" ? `source-in-use&source=${source}` : "connect-failed";
+
+export function failRedirect(hub: string, source: PickSource, where: string, code: string, detail?: string, errorQuery = "connect-failed"): NextResponse {
   console.warn(`[connect] ${source} ${where} rejected (${code})${detail ? `: ${detail}` : ""}`);
-  return clearCookies(NextResponse.redirect(`${hub}/?error=connect-failed`, 303), source);
+  return clearCookies(NextResponse.redirect(`${hub}/?error=${errorQuery}`, 303), source);
 }
 
 /** Under the ~4096-byte per-cookie limit with room for the name and attributes. */
@@ -117,7 +121,7 @@ export async function bindOrPick(
   if (handoff.options.length === 1) {
     const { error } = await write(session, source, handoff, handoff.options[0]!.id);
     // error.message can echo a parameter value, and one of them is the token.
-    if (error) return failRedirect(hub, source, "callback", "write_failed", error.code ?? "rpc");
+    if (error) return failRedirect(hub, source, "callback", "write_failed", error.code ?? "rpc", writeError(source, error));
     return clearCookies(NextResponse.redirect(`${hub}/?connected=${source}`), source);
   }
 
@@ -206,6 +210,6 @@ export async function pickPOST(request: NextRequest, source: PickSource): Promis
   if (session.membership.clientId !== opened.pick.clientId) return failRedirect(hub, source, "pick", "tenant_mismatch");
 
   const { error } = await write(session, source, opened.pick, id);
-  if (error) return failRedirect(hub, source, "pick", "write_failed", error.code ?? "rpc");
+  if (error) return failRedirect(hub, source, "pick", "write_failed", error.code ?? "rpc", writeError(source, error));
   return clearCookies(NextResponse.redirect(`${hub}/?connected=${source}`, 303), source);
 }
