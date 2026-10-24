@@ -1,2 +1,2 @@
-// Root Prettier config re-exports the shared config from @bcn-services/config.
-export { default } from "@bcn-services/config/prettier";
+// Root Prettier config re-exports the shared config by relative path (the root has no @bcn-services/config dependency to resolve it through).
+export { default } from "./packages/config/prettier/index.js";

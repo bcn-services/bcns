@@ -16,8 +16,8 @@
     "test:docs": "node --test docs/architecture/__tests__/*.mjs",
     "test:infra": "bash infra/__tests__/infra.check.sh",
     "test:new-app": "bash scripts/__tests__/new-app.check.sh",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore --ignore-path .prettierignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore --ignore-path .prettierignore",
     "clean": "turbo run clean"
   },
   "devDependencies": {
