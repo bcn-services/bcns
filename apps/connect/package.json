@@ -15,6 +15,7 @@
     "@bcn-services/app-core": "workspace:*",
     "@bcn-services/tenant": "workspace:*",
     "@bcn-services/ui": "workspace:*",
+    "@sentry/nextjs": "10.76.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "next": "14.2.35",

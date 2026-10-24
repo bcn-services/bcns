@@ -49,6 +49,8 @@ MCP_RATE_LIMIT_PER_MIN=60
 
 `MCP_RATE_LIMIT_PER_MIN` is optional and defaults to 60.
 
+`SENTRY_DSN` is optional: set it to report unhandled errors to Sentry (errors only, no tracing). Unset = Sentry off.
+
 ## Deployed layout
 
 `infra/bcns-app@.service` runs `node server.js` with `WorkingDirectory=/srv/mcp/current`, so the
