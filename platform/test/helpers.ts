@@ -147,6 +147,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   shopify_shop_mismatch: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
   // A read: one boolean about the caller's own tenant (owner only); no tenant argument to aim elsewhere.
   source_in_use: { args: { p_source: 'meta', p_id: 'act_0' }, expect: 'none' },
+  // A read: one boolean (another client holds this shop live), never which client.
+  shopify_shop_in_use: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
   // 'upload' is not disconnectable, so it fails validation before any write and the probe never
   // revokes a real row. Tenant comes from the JWT, never an argument.
   disconnect_source: { args: { p_source: 'upload' }, expect: 'BCNS3' },

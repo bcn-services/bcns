@@ -414,27 +414,26 @@ test("the scope list opens every field the worker actually queries", () => {
   assert.ok(SHOPIFY_SCOPES.includes("read_shopify_payments_accounts"));
 });
 
-test("the callback asks Shopify for an expiring token", () => {
+test("the exchange asks Shopify for an expiring token", () => {
   // handleTokenResponse refuses a non-expiring token, so forgetting `expiring`
   // on the POST body would fail every install rather than fail it late. The
   // parameter goes in the token-exchange body, never on the authorize redirect.
-  const route = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
-  assert.match(route, /expiring:\s*"1"/);
+  const lib = readFileSync(new URL("../lib/shopify-oauth.ts", import.meta.url), "utf8");
+  assert.match(lib, /expiring:\s*"1"/);
 });
 
-test("the callback stores the refresh token and the expiry, not just the access token", () => {
+test("/finish stores the refresh token and the expiry, not just the access token", () => {
   // The access token dies in an hour. Without BOTH of these on the RPC call the row
   // is unrenewable — the worker's refresh query skips a null expires_at, and there is
   // no refresh_secret to spend even if it did not. This failed silently in W3: the
   // install succeeded, the dashboard said connected, and the merchant was cut off by
   // the afternoon. Nothing at runtime reports it, so the assertion lives here.
-  // The callback seals both into the hand-off; /finish writes them.
-  const route = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
-  assert.match(route, /refreshToken:\s*exchanged\.token\.refreshToken/);
-  assert.match(route, /expiresAt:[^\n]*exchanged\.token\.expiresIn\s*\*\s*1000/);
+  // /finish exchanges the code and writes both; the callback seals only the code.
   const finish = readFileSync(new URL("../app/api/oauth/shopify/finish/route.ts", import.meta.url), "utf8");
-  assert.match(finish, /p_refresh_secret:\s*pending\.refreshToken/);
-  assert.match(finish, /p_expires_at:\s*pending\.expiresAt/);
+  assert.match(finish, /p_refresh_secret:\s*token\.refreshToken/);
+  assert.match(finish, /p_expires_at:[^\n]*token\.expiresIn\s*\*\s*1000/);
+  const callback = readFileSync(new URL("../app/api/oauth/shopify/callback/route.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(callback, /expiring|exchange\(/, "the callback never redeems the code");
 });
 
 /* -------------------------------------------------------------- assembly */
@@ -624,9 +623,10 @@ test("sb-bridge: the callback route picks the pair before the query HMAC and use
   assert.doesNotMatch(route, /config\.shopifyClientId/, "callback reads the default pair directly");
   assert.equal(route.match(/config\.shopifyClientSecret/g)?.length, 1);
   assert.match(route, /config\.shopifyClientSecret!\s*\);\s*const done/);
-  assert.match(route, /exchange\(shop, clientId, secret, code\)/);
   assert.match(route, /^\s*app, \/\/ sb-bridge/m);
+  // /finish redeems the code with the same pair, picked again from the sealed shop.
   const finish = readFileSync(new URL("../app/api/oauth/shopify/finish/route.ts", import.meta.url), "utf8");
+  assert.match(finish, /const \{ clientId, clientSecret, app \} = shopifyAppFor\(config, pending\.shop\);\s*if \(app !== pending\.app\) return fail\("app_changed"\);\s*const exchanged = await exchange\(pending\.shop, clientId, clientSecret, pending\.code\)/);
   assert.match(finish, /p_config:\s*scheduleConfig\(pending\.shop, pending\.app\)/);
 });
 

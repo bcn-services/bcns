@@ -438,45 +438,67 @@ export async function finishError(t: Tick, row: ScheduleRow, runId: number, e: u
  *  miscategorized as a refresh failure. */
 export async function refreshOne(ctx: RunContext, conn: Connector): Promise<string | null> {
   if (!conn.refreshToken) return null
-  return tx(async c => {
-    const got = await c.query<{ secret: string; status: string }>(
-      `select secret, status from data.source_tokens where client_id = $1 and source = $2 and expires_at < now() + interval '10 minutes'
-         and status <> 'revoked'
-       for update skip locked`, [ctx.clientId, ctx.source])
-    if (!got.rows.length) return null
+  type Fresh = { secret: string; expiresAt: Date; refreshSecret?: string | null }
+  const st: { rotated: Fresh | null; wasFailed: boolean } = { rotated: null, wasFailed: false }
 
-    let fresh: { secret: string; expiresAt: Date; refreshSecret?: string | null }
-    try {
-      fresh = await conn.refreshToken!(ctx)
-    } catch (e) {
-      if (classify(e) === 'auth') {
-        // Also on connector_schedule.last_error: computeHealth copies that onto the hub
-        // card (connector_health_v1.last_error). No run fails for a refresh, so without
-        // this an auth_failed card showed no reason and the worker logged nothing.
-        const detail = redact(e instanceof Error ? e.message : String(e))
-        await c.query(`update data.source_tokens set status = 'auth_failed', status_detail = $3 where client_id = $1 and source = $2 and status <> 'revoked'`,
-          [ctx.clientId, ctx.source, detail])
-        await c.query(`update data.connector_schedule set last_error = $3, last_error_at = now() where client_id = $1 and source = $2`,
-          [ctx.clientId, ctx.source, detail])
-        ctx.log('token_refresh_auth_failed', { error: detail })
-      }
-      return null
-    }
-
-    // `coalesce`: a connector that does not rotate (Google) returns no refreshSecret
-    // and must keep the one it has. `status`/`status_detail` are reset because a
-    // successful refresh IS the proof the credential works — without this an
-    // auth_failed row that recovers stays marked broken forever.
-    await c.query(
+  // `coalesce`: a connector that does not rotate (Google) returns no refreshSecret
+  // and must keep the one it has. `status`/`status_detail` are reset because a
+  // successful refresh IS the proof the credential works — without this an
+  // auth_failed row that recovers stays marked broken forever.
+  const save = async (q: (text: string, params: unknown[]) => Promise<unknown>, fresh: Fresh) => {
+    await q(
       `update data.source_tokens set secret = $3, expires_at = $4, last_refreshed_at = now(),
          refresh_secret = coalesce($5, refresh_secret), status = 'active', status_detail = null
        where client_id = $1 and source = $2 and status <> 'revoked'`,
       [ctx.clientId, ctx.source, fresh.secret, fresh.expiresAt, fresh.refreshSecret ?? null])
     // Only when recovering: a healthy row refreshes hourly and must not wipe a sync run's error.
-    if (got.rows[0].status === 'auth_failed') {
-      await c.query(`update data.connector_schedule set last_error = null, last_error_at = null where client_id = $1 and source = $2`,
+    if (st.wasFailed) {
+      await q(`update data.connector_schedule set last_error = null, last_error_at = null where client_id = $1 and source = $2`,
         [ctx.clientId, ctx.source])
     }
-    return fresh.secret
-  })
+  }
+
+  try {
+    return await tx(async c => {
+      const got = await c.query<{ secret: string; status: string }>(
+        `select secret, status from data.source_tokens where client_id = $1 and source = $2 and expires_at < now() + interval '10 minutes'
+           and status <> 'revoked'
+         for update skip locked`, [ctx.clientId, ctx.source])
+      if (!got.rows.length) return null
+      st.wasFailed = got.rows[0].status === 'auth_failed'
+
+      let fresh: Fresh
+      try {
+        fresh = await conn.refreshToken!(ctx)
+      } catch (e) {
+        if (classify(e) === 'auth') {
+          // Also on connector_schedule.last_error: computeHealth copies that onto the hub
+          // card (connector_health_v1.last_error). No run fails for a refresh, so without
+          // this an auth_failed card showed no reason and the worker logged nothing.
+          const detail = redact(e instanceof Error ? e.message : String(e))
+          await c.query(`update data.source_tokens set status = 'auth_failed', status_detail = $3 where client_id = $1 and source = $2 and status <> 'revoked'`,
+            [ctx.clientId, ctx.source, detail])
+          await c.query(`update data.connector_schedule set last_error = $3, last_error_at = now() where client_id = $1 and source = $2`,
+            [ctx.clientId, ctx.source, detail])
+          ctx.log('token_refresh_auth_failed', { error: detail })
+        }
+        return null
+      }
+
+      st.rotated = fresh
+      await save((text, params) => c.query(text, params), fresh)
+      return fresh.secret
+    })
+  } catch (e) {
+    // The provider answered, so a rotating one (Intuit) has already spent the stored
+    // refresh token; the rollback would strand the new pair and the next attempt
+    // dies on invalid_grant. Write it once more on a fresh connection (the tx, and its
+    // row lock, are gone), keeping the original error if that fails too.
+    // ponytail: one retry, no queue; another worker can claim the row in the gap.
+    const { rotated } = st
+    if (!rotated) throw e
+    ctx.log('token_write_retry', { error: redact(e instanceof Error ? e.message : String(e)) })
+    await save(sql, rotated).catch(() => { throw e })
+    return rotated.secret
+  }
 }
