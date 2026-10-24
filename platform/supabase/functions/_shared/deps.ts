@@ -12,6 +12,10 @@
  *    write, so RLS and api.add_member's owner check apply to the real user. The
  *    service role has no usage on the `api` or `data` schemas and PostgREST
  *    exposes only `api`; keeping it that way is the point.
+ *
+ * Service-role RPC grants (all narrow SECURITY DEFINER, no table privilege): record_shop_redact,
+ * record_app_uninstalled, signup_create_client, stripe_billing_state, stripe_apply_billing,
+ * stripe_signup_workspace, and (20261024200000) take_rate_budget + stripe_signup_alert.
  */
 
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2.116";
@@ -54,6 +58,18 @@ async function findUser(email: string): Promise<AdminUser | null> {
   if (!response.ok) throw new Error(`admin user lookup failed: ${response.status}`);
   const body = (await response.json()) as { users?: AdminUser[] };
   return body.users?.find((u) => u.email?.toLowerCase() === wanted) ?? null;
+}
+
+/** api.take_rate_budget as the service role (the caller role cannot execute it). Throws on error: callers fail closed. */
+async function takeBudget(bucket: string, key: string, limit: number, windowSec: number): Promise<boolean> {
+  const { data, error } = await admin().schema("api").rpc("take_rate_budget", {
+    p_bucket: bucket,
+    p_key: key,
+    p_limit: limit,
+    p_window_seconds: windowSec,
+  });
+  if (error) throw new Error(`take_rate_budget: ${error.message}`);
+  return data === true;
 }
 
 function caller(request: Request): SupabaseClient {
@@ -105,6 +121,10 @@ export function inviteDeps(request: Request): InviteDeps {
     },
     async findUserByEmail(email: string) {
       return (await findUser(email))?.id ?? null;
+    },
+    takeBudget,
+    log(event, data) {
+      console.log(JSON.stringify({ event, ...data }));
     },
   };
 }
@@ -188,6 +208,9 @@ export function shopRedactDeps(): ShopRedactDeps {
 export function signupDeps(): SignupDeps {
   return {
     enabled: Deno.env.get("SIGNUP_ENABLED") === "1",
+    takeBudget,
+    // The droplet egress IP the hub calls from (override via function secret if it moves).
+    hubIp: Deno.env.get("SIGNUP_HUB_IP") ?? "104.236.20.89",
     async createUser(email) {
       // No password: the inbox owner sets it on /set-password after confirming (pre-hijack fix).
       const { data, error } = await admin().auth.admin.createUser({ email, email_confirm: false });
@@ -277,6 +300,14 @@ export function stripeWebhookDeps(): StripeWebhookDeps {
         if (error) throw new Error(`stripe_signup_workspace: ${error.message}`);
         if (data !== "created" && data !== "duplicate" && data !== "has_workspace") throw new Error("stripe_signup_workspace: bad result");
         return data;
+      },
+      async alert(customerId, eventId, reason) {
+        const { error } = await admin().schema("api").rpc("stripe_signup_alert", {
+          p_customer: customerId,
+          p_event: eventId,
+          p_reason: reason,
+        });
+        if (error) throw new Error(`stripe_signup_alert: ${error.message}`);
       },
     },
     log(event, data) {

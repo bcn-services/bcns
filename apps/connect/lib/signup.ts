@@ -8,9 +8,11 @@
  * only forwards the form and maps the answer onto a redirect.
  */
 
+import { createHmac } from "node:crypto";
 import { requireMembership } from "@bcn-services/tenant";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { HubConfig } from "./env";
+import { safeEqual } from "./oauth-state";
 import { BCNS_EMAIL, REQUEST_FROM, sendMail, type RequestDeps, type ResendEmail } from "./request-connection";
 import { signupCheckoutTarget, stripeReady } from "./stripe-billing";
 
@@ -99,25 +101,76 @@ export function createCheckoutLimiter(now: () => number = Date.now) {
 export type CheckoutLimiter = ReturnType<typeof createCheckoutLimiter>;
 const defaultLimiter = createCheckoutLimiter();
 
-/** The `/signup?confirm=1&...` view that shows the typed address back, or an error path. */
-export function signupConfirmPath(form: SignupForm): string {
+/** Trimmed name + lowercased email, or null when either is empty, over-long or not email-shaped. */
+function cleanForm(form: SignupForm): SignupForm | null {
   const name = form.name.trim();
   const email = form.email.trim().toLowerCase();
-  if (!name || name.length > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) return `${SIGNUP_PATH}?error=invalid`;
-  return `${SIGNUP_PATH}?${new URLSearchParams({ confirm: "1", name, email })}`;
+  if (!name || name.length > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) return null;
+  return { name, email };
+}
+
+/**
+ * The typed name + address ride to the confirm view in a signed cookie, never in the URL (logs,
+ * history and Referer would keep them). `<base64url(json{name,email,exp})>.<hex hmac>`, signed under
+ * a key derived from the Stripe secret key with its own label, so it is no MAC any other check takes.
+ * Signed, not encrypted: it only goes back to the browser that typed it.
+ */
+export const SIGNUP_COOKIE = "bcns_signup";
+export const SIGNUP_CONFIRM_PATH = `${SIGNUP_PATH}?confirm=1`;
+export const SIGNUP_COOKIE_TTL_MS = 10 * 60 * 1000;
+
+const signupMac = (body: string, secret: string) =>
+  createHmac("sha256", createHmac("sha256", secret).update("signup-confirm:").digest()).update(body).digest("hex");
+
+/** httpOnly, lax, secure on https; path /signup so only the sign-up page ever sees it. */
+export const signupCookieOptions = (hubBaseUrl: string) => ({
+  path: SIGNUP_PATH,
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: hubBaseUrl.startsWith("https://"),
+  maxAge: SIGNUP_COOKIE_TTL_MS / 1000,
+});
+
+/** `{ path: "/signup?confirm=1", value }` to set the cookie, or `{ path: "/signup?error=invalid" }`. */
+export function signupConfirmCookie(
+  form: SignupForm,
+  secret: string,
+  now: number = Date.now()
+): { path: string; value?: string } {
+  const clean = cleanForm(form);
+  if (!clean) return { path: `${SIGNUP_PATH}?error=invalid` };
+  const body = Buffer.from(JSON.stringify({ ...clean, exp: now + SIGNUP_COOKIE_TTL_MS }), "utf8").toString("base64url");
+  return { path: SIGNUP_CONFIRM_PATH, value: `${body}.${signupMac(body, secret)}` };
+}
+
+/** The form a valid, unexpired cookie holds, else null. MAC first: an unsigned `exp` is attacker-chosen. */
+export function verifySignupCookie(value: unknown, secret: string | undefined, now: number = Date.now()): SignupForm | null {
+  if (!secret) return null;
+  const parts = String(value ?? "").split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  const [body, mac] = parts;
+  if (!safeEqual(mac, signupMac(body, secret))) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { name?: unknown; email?: unknown; exp?: unknown };
+    if (typeof p.exp !== "number" || p.exp < now || typeof p.name !== "string" || typeof p.email !== "string") return null;
+    return cleanForm({ name: p.name, email: p.email });
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Does this address already have an auth user? Asked of the signup Edge Function (it holds the
  * service role and the SIGNUP_ENABLED switch; the hub holds no key). undefined = could not tell.
  */
-async function emailHasAccount(email: string, deps: SignupDeps): Promise<boolean | undefined> {
+async function emailHasAccount(email: string, deps: SignupDeps, visitorIp?: string): Promise<boolean | undefined> {
   const { supabaseUrl, supabaseAnonKey, fetchImpl = fetch } = deps;
   if (!supabaseUrl || !supabaseAnonKey) return undefined;
   try {
     const response = await fetchImpl(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/signup`, {
       method: "POST",
-      headers: { apikey: supabaseAnonKey, "Content-Type": "application/json" },
+      // The function trusts x-bcns-visitor-ip only from the droplet, and keys its budget on it.
+      headers: { apikey: supabaseAnonKey, "Content-Type": "application/json", ...(visitorIp ? { "x-bcns-visitor-ip": visitorIp } : {}) },
       body: JSON.stringify({ mode: "exists", email }),
       signal: AbortSignal.timeout(15_000),
     });
@@ -132,6 +185,8 @@ async function emailHasAccount(email: string, deps: SignupDeps): Promise<boolean
 export interface PayFirstDeps extends SignupDeps {
   config: HubConfig;
   limiter?: CheckoutLimiter;
+  /** The visitor's address as nginx saw it; forwarded so the exists-check budget is per visitor. */
+  visitorIp?: string;
 }
 
 /**
@@ -140,12 +195,12 @@ export interface PayFirstDeps extends SignupDeps {
  * existing address (-> /login, no session made), then the session (one per address per 10 min).
  */
 export async function payFirstTarget(form: SignupForm, deps: PayFirstDeps): Promise<string> {
-  const name = form.name.trim();
-  const email = form.email.trim().toLowerCase();
-  if (!name || name.length > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) return `${SIGNUP_PATH}?error=invalid`;
+  const clean = cleanForm(form);
+  if (!clean) return `${SIGNUP_PATH}?error=invalid`;
+  const { name, email } = clean;
   const config = deps.config;
   if (!stripeReady(config)) return `${SIGNUP_PATH}?error=unconfigured`;
-  const exists = await emailHasAccount(email, deps);
+  const exists = await emailHasAccount(email, deps, deps.visitorIp);
   if (exists === undefined) return `${SIGNUP_PATH}?error=failed`;
   if (exists) return "/login?error=signup-exists";
   const limiter = deps.limiter ?? defaultLimiter;

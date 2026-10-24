@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { getConfig } from "@/lib/env";
+import { SIGNUP_COOKIE, verifySignupCookie } from "@/lib/signup";
 import { PRICE_LABEL, SHOPIFY_FROM } from "@/lib/stripe-billing";
 import { confirmSignup, signUp } from "./actions";
 import { Frame } from "../login/frame";
@@ -13,13 +15,7 @@ const ERRORS: Record<string, string> = {
   billing: "We couldn't open the payment page. Please try again in a few minutes.",
 };
 
-type Search = { error?: string; ok?: string; from?: string; paid?: string; canceled?: string; confirm?: string; name?: string; email?: string };
-
-/** Query values come from the URL, so they are re-checked before they are shown or posted. */
-const prefill = (s: Search) => ({
-  name: typeof s.name === "string" ? s.name.slice(0, 100) : "",
-  email: typeof s.email === "string" ? s.email.slice(0, 254) : "",
-});
+type Search = { error?: string; ok?: string; from?: string; paid?: string; canceled?: string; confirm?: string };
 
 export default function SignupPage({ searchParams }: { searchParams: Search }) {
   if (!getConfig().signupEnabled) notFound();
@@ -35,8 +31,11 @@ export default function SignupPage({ searchParams }: { searchParams: Search }) {
       </Frame>
     );
   }
-  const { name, email } = prefill(searchParams);
-  if (searchParams.confirm === "1" && searchParams.from !== SHOPIFY_FROM && name.trim() && email.includes("@")) {
+  // Name + email live in a signed cookie (never the URL); a missing or bad one is just the plain form.
+  const saved = verifySignupCookie(cookies().get(SIGNUP_COOKIE)?.value, getConfig().stripeSecretKey);
+  const name = saved?.name ?? "";
+  const email = saved?.email ?? "";
+  if (saved && searchParams.confirm === "1" && searchParams.from !== SHOPIFY_FROM) {
     return (
       <Frame
         title={
@@ -55,7 +54,7 @@ export default function SignupPage({ searchParams }: { searchParams: Search }) {
           <button type="submit" className="btn">
             Continue to payment
           </button>
-          <a href={`/signup?${new URLSearchParams({ name, email })}`} className="lnk">
+          <a href="/signup" className="lnk">
             Edit name or email
           </a>
         </form>

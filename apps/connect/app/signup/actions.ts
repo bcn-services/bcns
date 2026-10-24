@@ -1,9 +1,9 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getConfig } from "@/lib/env";
-import { payFirstTarget, signupConfirmPath, signupTarget } from "@/lib/signup";
+import { payFirstTarget, signupConfirmCookie, signupCookieOptions, SIGNUP_COOKIE, signupTarget } from "@/lib/signup";
 import { SHOPIFY_FROM, SHOPIFY_INSTALL_COOKIE, shopifyInstallCookie } from "@/lib/stripe-billing";
 
 const fields = (form: FormData) => ({
@@ -22,7 +22,13 @@ const fields = (form: FormData) => ({
 export async function signUp(form: FormData): Promise<void> {
   const config = getConfig();
   if (!config.signupEnabled) notFound();
-  if (form.get("from") !== SHOPIFY_FROM) redirect(signupConfirmPath(fields(form)));
+  if (form.get("from") !== SHOPIFY_FROM) {
+    // Name + email go to the confirm view in a signed cookie, never in the URL.
+    if (!config.stripeSecretKey) redirect("/signup?error=unconfigured");
+    const { path, value } = signupConfirmCookie(fields(form), config.stripeSecretKey);
+    if (value) cookies().set(SIGNUP_COOKIE, value, signupCookieOptions(config.hubBaseUrl));
+    redirect(path);
+  }
   // Signing up during a Shopify App Store install: /pending shows them review, never Pay.
   cookies().set(SHOPIFY_INSTALL_COOKIE, "1", shopifyInstallCookie(config.hubBaseUrl));
   redirect(await signupTarget(fields(form), { supabaseUrl: config.supabaseUrl, supabaseAnonKey: config.supabaseAnonKey }));
@@ -32,5 +38,7 @@ export async function signUp(form: FormData): Promise<void> {
 export async function confirmSignup(form: FormData): Promise<void> {
   const config = getConfig();
   if (!config.signupEnabled) notFound();
-  redirect(await payFirstTarget(fields(form), { supabaseUrl: config.supabaseUrl, supabaseAnonKey: config.supabaseAnonKey, config }));
+  // nginx appends the address it saw as the LAST hop; earlier hops are whatever the caller claimed.
+  const visitorIp = headers().get("x-forwarded-for")?.split(",").pop()?.trim() || undefined;
+  redirect(await payFirstTarget(fields(form), { supabaseUrl: config.supabaseUrl, supabaseAnonKey: config.supabaseAnonKey, config, visitorIp }));
 }

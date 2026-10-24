@@ -22,7 +22,7 @@ export async function inviteMember(form: FormData): Promise<void> {
 
   const result = await callFunction(supabase, "invite-member", { email });
   if (!result.ok) {
-    redirect(`/team?error=${result.status === 503 ? "unconfigured" : "failed"}`);
+    redirect(`/team?error=${result.status === 503 ? "unconfigured" : result.status === 429 ? "rate-limited" : "failed"}`);
   }
   revalidatePath("/team");
   redirect("/team?ok=invited");

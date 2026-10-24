@@ -24,6 +24,15 @@ const { NextRequest } = await import("next/server");
 const { requestAsyncStorage } = require("next/dist/client/components/request-async-storage.external.js");
 const { actionAsyncStorage } = require("next/dist/client/components/action-async-storage.external.js");
 
+/** SignupPage reads the bcns_signup cookie, so it renders inside a (cookie-less) request. */
+const renderSignupPage = (SignupPage, searchParams) =>
+  renderToStaticMarkup(
+    requestAsyncStorage.run(
+      { headers: new Headers(), cookies: new NextRequest("https://connect.bcn-services.com/signup").cookies, mutableCookies: undefined, draftMode: {} },
+      () => SignupPage({ searchParams })
+    )
+  );
+
 const { signupTarget, notifySignupConfirmed, signupNotice, SIGNUP_SENT_PATH } = await import("../lib/signup.ts");
 const { BCNS_EMAIL } = await import("../lib/request-connection.ts");
 const { FINISH_PATH, PENDING_COOKIE, sealPending, INSTALL_CLIENT_ID } = await import("../lib/shopify-oauth.ts");
@@ -99,10 +108,10 @@ test("switch on vs off: the login page (plain and Shopify finish) differs ONLY b
 test("switch on: /signup renders the form (business name and email only, no password)", async () => {
   process.env.SIGNUP_ENABLED = "true";
   const { default: SignupPage } = await import("../app/signup/page.tsx");
-  const html = renderToStaticMarkup(SignupPage({ searchParams: {} }));
+  const html = renderSignupPage(SignupPage, {});
   for (const name of ["name", "email"]) assert.match(html, new RegExp(`name="${name}"`));
   assert.doesNotMatch(html, /password/i);
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { ok: "check-email" } })), /Check your email/);
+  assert.match(renderSignupPage(SignupPage, { ok: "check-email" }), /Check your email/);
 });
 
 /* -------------------------------------------------------- form → function */
@@ -216,8 +225,8 @@ test("Shopify hand-off marker: /signup carries it, and signing in or up during t
   Object.assign(process.env, STRIPE_ENV, { SIGNUP_ENABLED: "1" });
   const { SHOPIFY_INSTALL_COOKIE } = await import("../lib/stripe-billing.ts");
   const { default: SignupPage } = await import("../app/signup/page.tsx");
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { from: "shopify" } })), /<input type="hidden" name="from" value="shopify"\/>/);
-  assert.doesNotMatch(renderToStaticMarkup(SignupPage({ searchParams: { from: "elsewhere" } })), /name="from"/);
+  assert.match(renderSignupPage(SignupPage, { from: "shopify" }), /<input type="hidden" name="from" value="shopify"\/>/);
+  assert.doesNotMatch(renderSignupPage(SignupPage, { from: "elsewhere" }), /name="from"/);
 
   globalThis.fetch = async () => jsonResponse({ error: "invalid_grant" }, 400); // the signup function / a wrong password
   const { signUp } = await import("../app/signup/actions.ts");

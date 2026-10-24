@@ -8,6 +8,7 @@
  */
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,7 +22,7 @@ const { NextRequest } = await import("next/server");
 const { requestAsyncStorage } = require("next/dist/client/components/request-async-storage.external.js");
 const { actionAsyncStorage } = require("next/dist/client/components/action-async-storage.external.js");
 
-const { payFirstTarget, signupConfirmPath, createCheckoutLimiter, CHECKOUT_COOLDOWN_MS } = await import("../lib/signup.ts");
+const { payFirstTarget, signupConfirmCookie, verifySignupCookie, SIGNUP_COOKIE, SIGNUP_COOKIE_TTL_MS, createCheckoutLimiter, CHECKOUT_COOLDOWN_MS } = await import("../lib/signup.ts");
 const { portalTarget, parseBillingSelf } = await import("../lib/stripe-billing.ts");
 const { getConfig } = await import("../lib/env.ts");
 
@@ -100,6 +101,30 @@ test("pay-first: the confirm submit asks only the signup fn (exists) and Stripe 
   assert.equal(sent.get("client_reference_id"), null, "no client exists yet: the webhook takes the signup branch");
 });
 
+test("the exists call carries x-bcns-visitor-ip = the LAST x-forwarded-for hop (spoofed leading hops ignored); none when absent", async () => {
+  setup();
+  const { confirmSignup } = await import("../app/signup/actions.ts");
+  const run = async (xff) => {
+    const seen = [];
+    globalThis.fetch = async (input, init) => {
+      const u = String(input?.url ?? input);
+      seen.push({ u, headers: new Headers(init?.headers) });
+      if (u.endsWith("/functions/v1/signup")) return json({ exists: false });
+      if (u.endsWith("/checkout/sessions")) return json({ url: CHECKOUT_URL });
+      return json({}, 500);
+    };
+    const form = new FormData();
+    form.set("name", "Acme Bakery");
+    form.set("email", fixtureEmail());
+    const request = new NextRequest(`${HUB}/signup`, { method: "POST", headers: { host: "connect.bcn-services.com", ...(xff ? { "x-forwarded-for": xff } : {}) } });
+    await actionAsyncStorage.run({ isAction: true }, () => inRequest(request, () => confirmSignup(form))).catch(() => {});
+    return seen.find((c) => c.u.endsWith("/functions/v1/signup")).headers.get("x-bcns-visitor-ip");
+  };
+  assert.equal(await run("6.6.6.6, 7.7.7.7,  203.0.113.9 "), "203.0.113.9");
+  assert.equal(await run("203.0.113.10"), "203.0.113.10");
+  assert.equal(await run(undefined), null);
+});
+
 test("the confirm action itself: no auth, no database, no admin call (redirect swallowed)", async () => {
   setup();
   const email = fixtureEmail();
@@ -125,24 +150,71 @@ test("the confirm action itself: no auth, no database, no admin call (redirect s
   assert.deepEqual(seen, [`${SUPABASE_URL}/functions/v1/signup`, "https://api.stripe.com/v1/checkout/sessions"]);
 });
 
-test("the first submit only goes to the confirm view and calls nothing", async () => {
+test("the first submit sets a signed cookie, redirects to exactly /signup?confirm=1 (no name/email), and calls nothing", async () => {
   setup();
   let called = 0;
   globalThis.fetch = async () => (called++, json({}));
   const { signUp } = await import("../app/signup/actions.ts");
+  const { NextResponse } = await import("next/server");
   const form = new FormData();
   form.set("name", "Acme Bakery");
   form.set("email", "Owner@Acme.Example");
   const request = new NextRequest(`${HUB}/signup`, { method: "POST", headers: { host: "connect.bcn-services.com" } });
+  const jar = NextResponse.next().cookies;
   let digest = "";
   await actionAsyncStorage
-    .run({ isAction: true }, () => requestAsyncStorage.run({ headers: request.headers, cookies: request.cookies, mutableCookies: request.cookies, draftMode: {} }, () => signUp(form)))
+    .run({ isAction: true }, () => requestAsyncStorage.run({ headers: request.headers, cookies: request.cookies, mutableCookies: jar, draftMode: {} }, () => signUp(form)))
     .catch((error) => (digest = String(error?.digest)));
-  assert.match(digest, /NEXT_REDIRECT/);
-  assert.ok(digest.includes(encodeURIComponent("owner@acme.example")) || digest.includes("owner%40acme.example"), digest);
+  assert.match(digest, /^NEXT_REDIRECT;[a-z]+;\/signup\?confirm=1;/, digest);
+  assert.doesNotMatch(digest, /owner|acme|%40/i, "no name or email in the redirect");
+  const cookie = jar.get(SIGNUP_COOKIE);
+  assert.ok(cookie, "cookie set");
+  assert.deepEqual(verifySignupCookie(cookie.value, ENV.STRIPE_SECRET_KEY), { name: "Acme Bakery", email: "owner@acme.example" });
+  assert.equal(cookie.httpOnly, true);
+  assert.equal(cookie.sameSite, "lax");
+  assert.equal(cookie.secure, true);
+  assert.equal(cookie.path, "/signup");
+  assert.equal(cookie.maxAge, 600);
   assert.equal(called, 0);
-  assert.equal(signupConfirmPath({ name: "Acme", email: "no-at" }), "/signup?error=invalid");
-  assert.equal(signupConfirmPath({ name: " ", email: "a@b.co" }), "/signup?error=invalid");
+
+  // an invalid form keeps the existing error path and sets no cookie
+  const bad = new FormData();
+  bad.set("name", "Acme");
+  bad.set("email", "no-at");
+  const jar2 = NextResponse.next().cookies;
+  let digest2 = "";
+  await actionAsyncStorage
+    .run({ isAction: true }, () => requestAsyncStorage.run({ headers: request.headers, cookies: request.cookies, mutableCookies: jar2, draftMode: {} }, () => signUp(bad)))
+    .catch((error) => (digest2 = String(error?.digest)));
+  assert.match(digest2, /\/signup\?error=invalid;/);
+  assert.equal(jar2.get(SIGNUP_COOKIE), undefined);
+});
+
+test("signup confirm cookie: sign -> verify round-trips; tampered MAC, tampered body, expired, wrong key and junk all fail", () => {
+  const key = "sk_test_fixture";
+  const now = 1_000_000;
+  const { path, value } = signupConfirmCookie({ name: "  Acme Bakery ", email: " Owner@Acme.Example " }, key, now);
+  assert.equal(path, "/signup?confirm=1");
+  assert.deepEqual(verifySignupCookie(value, key, now), { name: "Acme Bakery", email: "owner@acme.example" });
+  assert.deepEqual(verifySignupCookie(value, key, now + SIGNUP_COOKIE_TTL_MS), { name: "Acme Bakery", email: "owner@acme.example" }, "valid up to expiry");
+  assert.equal(verifySignupCookie(value, key, now + SIGNUP_COOKIE_TTL_MS + 1), null, "expired");
+  assert.equal(verifySignupCookie(value, "sk_test_other", now), null, "wrong key");
+  const [body, mac] = value.split(".");
+  assert.equal(verifySignupCookie(`${body}.${mac.replace(/.$/, mac.endsWith("0") ? "1" : "0")}`, key, now), null, "tampered MAC");
+  const forged = Buffer.from(JSON.stringify({ name: "Evil", email: "evil@x.co", exp: now + 1e9 }), "utf8").toString("base64url");
+  assert.equal(verifySignupCookie(`${forged}.${mac}`, key, now), null, "tampered body under the old MAC");
+  for (const junk of [undefined, "", "abc", `${body}`, `${body}.${mac}.x`, ".", `${body}.`]) assert.equal(verifySignupCookie(junk, key, now), null, String(junk));
+  assert.equal(verifySignupCookie(value, undefined, now), null, "no key configured");
+  // not an HMAC the Stripe key signs elsewhere: the label separates the key
+  assert.notEqual(mac, createHmac("sha256", key).update(body).digest("hex"));
+  // over-length / malformed fields are refused at sign time, and a validly signed over-length body is refused at verify
+  assert.equal(signupConfirmCookie({ name: "x".repeat(101), email: "a@b.co" }, key).value, undefined);
+  assert.equal(signupConfirmCookie({ name: "Acme", email: `${"x".repeat(250)}@b.co` }, key).value, undefined);
+  assert.equal(signupConfirmCookie({ name: "Acme", email: "no-at" }, key).path, "/signup?error=invalid");
+  assert.equal(signupConfirmCookie({ name: " ", email: "a@b.co" }, key).path, "/signup?error=invalid");
+  const longBody = Buffer.from(JSON.stringify({ name: "x".repeat(101), email: "a@b.co", exp: now + 1000 }), "utf8").toString("base64url");
+  const signed = `${longBody}.${createHmac("sha256", createHmac("sha256", key).update("signup-confirm:").digest()).update(longBody).digest("hex")}`;
+  assert.equal(verifySignupCookie(signed, key, now), null, "over-length name");
 });
 
 /* ------------------------------------------------------------------ existing email */
@@ -210,38 +282,63 @@ test("a Stripe failure is forgotten so the visitor can retry at once", async () 
 
 /* ---------------------------------------------------------------------- the page */
 
-test("confirm step: shows the typed email back, posts name + email, offers edit-back, escapes input", async () => {
+/** SignupPage reads its cookie, so it renders inside a request carrying (optionally) the bcns_signup cookie. */
+async function renderSignup(searchParams, cookieValue) {
   setup();
   const { default: SignupPage } = await import("../app/signup/page.tsx");
-  const html = renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1", name: "Acme Bakery", email: "owner@acme.example" } }));
+  const headers = { host: "connect.bcn-services.com", ...(cookieValue ? { cookie: `${SIGNUP_COOKIE}=${cookieValue}` } : {}) };
+  const request = new NextRequest(`${HUB}/signup`, { headers });
+  return renderToStaticMarkup(inRequest(request, () => SignupPage({ searchParams })));
+}
+const goodCookie = (form = { name: "Acme Bakery", email: "owner@acme.example" }, now = Date.now()) => signupConfirmCookie(form, ENV.STRIPE_SECRET_KEY, now).value;
+
+test("confirm step: renders from a valid cookie, shows the typed email back, posts name + email, edit-back is plain /signup", async () => {
+  const html = await renderSignup({ confirm: "1" }, goodCookie());
   assert.match(html, /We(&#x27;|')ll send your sign-in link to owner@acme\.example/);
   assert.match(html, /<input type="hidden" name="email" value="owner@acme\.example"\/>/);
   assert.match(html, /<input type="hidden" name="name" value="Acme Bakery"\/>/);
   assert.match(html, /Continue to payment/);
-  assert.match(html, /href="\/signup\?name=Acme\+Bakery&amp;email=owner%40acme\.example"/);
+  assert.match(html, /href="\/signup"/);
+  assert.doesNotMatch(html, /href="\/signup\?/, "no link carries a query");
   assert.doesNotMatch(html, /name="from"|password/i);
 
-  const evil = renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1", name: "x", email: 'a"><script>alert(1)</script>@b.co' } }));
-  assert.doesNotMatch(evil, /<script>/);
-  // a confirm link with nothing usable falls back to the plain form
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1" } })), />Continue</);
+  // query-string name/email are ignored now: no cookie, no confirm view
+  assert.doesNotMatch(await renderSignup({ confirm: "1", name: "Acme", email: "a@b.co" }), /Continue to payment/);
   // the Shopify hand-off never shows the pay-first confirm step
-  assert.doesNotMatch(renderToStaticMarkup(SignupPage({ searchParams: { confirm: "1", name: "x", email: "a@b.co", from: "shopify" } })), /Continue to payment/);
+  assert.doesNotMatch(await renderSignup({ confirm: "1", from: "shopify" }, goodCookie()), /Continue to payment/);
 });
 
-test("page branches: paid -> check your email; canceled -> a note and the form; errors; edit-back prefills", async () => {
-  setup();
-  const { default: SignupPage } = await import("../app/signup/page.tsx");
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { paid: "1" } })), /Check your email/);
-  const canceled = renderToStaticMarkup(SignupPage({ searchParams: { canceled: "1" } }));
+test("confirm step: a bad cookie (tampered, expired, wrong key, junk) or none falls back to the plain form", async () => {
+  const plain = (html) => {
+    assert.match(html, />Continue</);
+    assert.doesNotMatch(html, /Continue to payment|owner@acme\.example/);
+  };
+  const good = goodCookie();
+  const [body, mac] = good.split(".");
+  plain(await renderSignup({ confirm: "1" }));
+  plain(await renderSignup({ confirm: "1" }, `${body}.${mac.replace(/.$/, mac.endsWith("0") ? "1" : "0")}`));
+  plain(await renderSignup({ confirm: "1" }, goodCookie(undefined, Date.now() - SIGNUP_COOKIE_TTL_MS - 1000)));
+  plain(await renderSignup({ confirm: "1" }, signupConfirmCookie({ name: "Acme", email: "owner@acme.example" }, "sk_test_other").value));
+  plain(await renderSignup({ confirm: "1" }, "junk"));
+});
+
+test("confirm step escapes cookie-held input", async () => {
+  const evil = await renderSignup({ confirm: "1" }, goodCookie({ name: "<script>alert(1)</script>", email: "a@b.co" }));
+  assert.doesNotMatch(evil, /<script>/);
+});
+
+test("page branches: paid -> check your email; canceled -> a note and the form; errors; edit-back prefills from the cookie", async () => {
+  assert.match(await renderSignup({ paid: "1" }), /Check your email/);
+  const canceled = await renderSignup({ canceled: "1" });
   assert.match(canceled, /canceled/);
   assert.match(canceled, /name="name"/);
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { paid: "1" } })), /If your payment went through/);
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: {} })), />Continue</);
-  assert.match(renderToStaticMarkup(SignupPage({ searchParams: { from: "shopify" } })), />Create account</);
-  const prefilled = renderToStaticMarkup(SignupPage({ searchParams: { name: "Acme Bakery", email: "o@acme.example" } }));
+  assert.match(await renderSignup({ paid: "1" }), /If your payment went through/);
+  assert.match(await renderSignup({}), />Continue</);
+  assert.match(await renderSignup({ from: "shopify" }), />Create account</);
+  const prefilled = await renderSignup({}, goodCookie({ name: "Acme Bakery", email: "o@acme.example" }));
   assert.match(prefilled, /value="Acme Bakery"/);
   assert.match(prefilled, /value="o@acme\.example"/);
+  assert.doesNotMatch(await renderSignup({ name: "Acme Bakery", email: "o@acme.example" }), /value="Acme Bakery"|o@acme/, "the URL no longer prefills");
 });
 
 /* ------------------------------------------------- Shopify path unchanged (action) */
@@ -342,4 +439,40 @@ test("/pending is unchanged: a pending owner and a lapsed (paused after paying) 
     const html = renderToStaticMarkup(await inRequest(request, () => PendingPage({ searchParams: {} })));
     assert.match(html, /Pay \$50\/mo/, JSON.stringify(over));
   }
+});
+
+/* -------------------------------------------------------- invite: hourly cap (429) */
+
+test("inviteMember: the invite-member function's 429 redirects to /team?error=rate-limited, and the page words it", async () => {
+  setup();
+  const { inviteMember } = await import("../app/team/actions.ts");
+  const run = async (status) => {
+    globalThis.fetch = async (input) => {
+      const u = String(input?.url ?? input);
+      if (u.includes("/auth/v1/user")) return json(USER);
+      if (u.includes("/functions/v1/invite-member")) return json({ error: "rate_limited" }, status);
+      return json([]);
+    };
+    const form = new FormData();
+    form.set("email", "new@acme.example");
+    const request = new NextRequest(`${HUB}/team`, { method: "POST", headers: { host: "connect.bcn-services.com", cookie: sessionCookie({ client_id: CLIENT, client_role: "owner" }) } });
+    let digest = "";
+    await actionAsyncStorage.run({ isAction: true }, () => inRequest(request, () => inviteMember(form))).catch((error) => (digest = String(error?.digest)));
+    return digest;
+  };
+  assert.match(await run(429), /\/team\?error=rate-limited;/);
+  assert.match(await run(500), /\/team\?error=failed;/);
+  assert.match(await run(503), /\/team\?error=unconfigured;/);
+
+  const { default: TeamPage } = await import("../app/team/page.tsx");
+  globalThis.fetch = async (input) => {
+    const u = String(input?.url ?? input);
+    if (u.includes("/auth/v1/user")) return json(USER);
+    if (u.includes("/rpc/billing_self")) return json(row());
+    if (u.includes("memberships_v1")) return json([{ user_id: USER_ID, role: "owner", is_smoke: false, created_at: "2026-01-01T00:00:00Z" }]);
+    return json([]);
+  };
+  const request = new NextRequest(`${HUB}/team`, { headers: { host: "connect.bcn-services.com", cookie: sessionCookie({ client_id: CLIENT, client_role: "owner" }) } });
+  const html = renderToStaticMarkup(await inRequest(request, () => TeamPage({ searchParams: { error: "rate-limited" } })));
+  assert.match(html, /Too many invites this hour\. Try again later\./);
 });

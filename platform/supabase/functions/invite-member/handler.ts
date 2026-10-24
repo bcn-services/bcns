@@ -20,6 +20,10 @@ export interface InviteDeps extends GuardDeps {
   /** Re-inviting someone who already has an account must still add the membership. */
   findUserByEmail(email: string): Promise<string | null>;
   insertMembership(userId: string, clientId: string, role: "member"): Promise<void>;
+  /** api.take_rate_budget (service role). true = within budget. */
+  takeBudget(bucket: string, key: string, limit: number, windowSec: number): Promise<boolean>;
+  /** Event + ids only. Optional: absent = silent. */
+  log?(event: string, data: Record<string, unknown>): void;
 }
 
 export async function handle(request: Request, deps: InviteDeps): Promise<Response> {
@@ -31,6 +35,16 @@ export async function handle(request: Request, deps: InviteDeps): Promise<Respon
   const body = (await request.json().catch(() => null)) as { email?: unknown } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!EMAIL.test(email)) return json({ error: "invalid_email" }, 400);
+
+  // Each invite sends a real email: cap them per client.
+  try {
+    if (!(await deps.takeBudget("invite", guard.clientId, 20, 3600))) {
+      return json({ error: "rate_limited", message: "Too many invites this hour. Try again later." }, 429);
+    }
+  } catch {
+    deps.log?.("invite_budget_failed", { clientId: guard.clientId });
+    return json({ error: "unavailable" }, 503);
+  }
 
   const invited = await deps.inviteUser(email, INVITE_REDIRECT);
   // An existing user makes inviteUserByEmail fail; that is the idempotent path,
