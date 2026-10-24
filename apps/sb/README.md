@@ -56,6 +56,8 @@ signs in as). `SUPABASE_SERVICE_ROLE_KEY` must be **unset** in shared mode:
 `AGENT_*`, `ANTHROPIC_API_KEY`, `AI_ENABLED` and `AI_MONTHLY_BUDGET_USD` exist in
 `.env.example` but are unused in v1 (own-project mode, agent and AI are off).
 
+`SENTRY_DSN` is optional, set in `/srv/sb/env` on the droplet: server-side error reporting to Sentry (errors only, no source-map upload). Unset = Sentry off.
+
 ## What the template ships (the template contract)
 
 The template is a **pure skeleton**: wiring, env, tests, and docs. The shared

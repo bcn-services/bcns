@@ -189,6 +189,8 @@ cat <<EOF
 PORT=$port
 HOSTNAME=127.0.0.1
 # DATABASE_URL=
+# Optional Sentry error reporting; unset = off.
+# SENTRY_DSN=
 EOF
 if [ "$kind" = mcp ]; then
 cat <<EOF

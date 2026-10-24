@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
+
 // Report-only CSP: nothing is blocked yet, tighten after a clean soak.
 const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -18,9 +20,12 @@ const nextConfig = {
   transpilePackages: ["@bcn-services/ui", "@bcn-services/app-core"],
   // Self-contained server bundle — CI ships .next/standalone as the deploy artifact.
   output: "standalone",
+  // Next 14.2 loads instrumentation.ts (Sentry init) only behind this flag.
+  experimental: { instrumentationHook: true },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
 };
 
-export default nextConfig;
+// Errors only, no source-map upload (needs SENTRY_AUTH_TOKEN; not set in CI).
+export default withSentryConfig(nextConfig, { silent: true, telemetry: false, sourcemaps: { disable: true } });

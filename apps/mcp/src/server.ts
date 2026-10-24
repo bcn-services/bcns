@@ -19,6 +19,9 @@ import {
   supabaseSessionDeps,
 } from './oauth.js'
 import { handleMcpPost } from './mcp.js'
+import { captureException, initSentry } from './sentry.js'
+
+initSentry()
 
 const PORT = Number(process.env.PORT ?? 3103)
 
@@ -74,7 +77,8 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
     // Unauthenticated by design: this is how a connector gets a token in the first place.
     try {
       if (await oauth(req, res)) return
-    } catch {
+    } catch (err) {
+      captureException(err)
       if (!res.headersSent) json(res, 500, { error: 'internal_error' })
       else res.end()
       return
@@ -93,7 +97,8 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
 
     try {
       await handleMcpPost(req, res, clientForToken(auth.token, env))
-    } catch {
+    } catch (err) {
+      captureException(err)
       // The transport owns the response once it starts writing; only a pre-write failure lands here.
       if (!res.headersSent) json(res, 500, { error: 'internal_error' })
       else res.end()

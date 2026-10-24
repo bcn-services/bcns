@@ -131,6 +131,8 @@ if printf '%s\n' "$defenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "ki
 emptyenv=$(renderenv sb 3101 sb.bcn-services.com certbot "")
 if printf '%s\n' "$emptyenv" | grep -qx '# NEXT_PUBLIC_SUPABASE_URL='; then ok "kind defaults to next when the 5th arg is an explicit empty string"; else bad "kind default is not next for an explicit empty string"; fi
 
+if printf '%s\n' "$mcpenv" "$nextenv" | grep -cx '# SENTRY_DSN=' | grep -qx 2; then ok "both kinds seed an optional SENTRY_DSN"; else bad "SENTRY_DSN placeholder missing"; fi
+
 echo "onboard-client.sh cert modes"
 
 render() { BCNS_PORTS_FILE="$reg" BCNS_RENDER_ONLY=1 bash "$here/onboard-client.sh" "$@" 2>/dev/null; }
