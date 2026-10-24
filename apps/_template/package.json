@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "agent": "tsx agent/index.ts",
-    "test": "tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs tests/tenant-pin.test.mjs tests/branding.test.mjs tests/react-hooks.test.mjs",
+    "test": "tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs tests/tenant-pin.test.mjs tests/branding.test.mjs tests/react-hooks.test.mjs tests/sentry-scrub.test.mjs",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "@bcn-services/data-client": "workspace:*",
     "@bcn-services/tenant": "workspace:*",
     "@bcn-services/ui": "workspace:*",
+    "@sentry/nextjs": "10.76.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "next": "14.2.35",

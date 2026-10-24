@@ -38,6 +38,9 @@ importers:
       '@bcn-services/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@sentry/nextjs':
+        specifier: 10.76.2
+        version: 10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(next@14.2.35(@opentelemetry/api@1.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.112.2)
       '@supabase/ssr':
         specifier: ^0.12.7
         version: 0.12.7(@supabase/supabase-js@2.116.0(@opentelemetry/api@1.10.0))
@@ -89,7 +92,7 @@ importers:
         version: link:../../packages/ui
       '@sentry/nextjs':
         specifier: 10.76.2
-        version: 10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(next@14.2.35(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.112.2(postcss@8.5.28))
+        version: 10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(next@14.2.35(@opentelemetry/api@1.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.112.2(postcss@8.5.28))
       '@supabase/ssr':
         specifier: ^0.12.7
         version: 0.12.7(@supabase/supabase-js@2.116.0(@opentelemetry/api@1.10.0))
@@ -123,7 +126,7 @@ importers:
         version: 10.5.2(postcss@8.5.28)
       eslint:
         specifier: ^9.15.0
-        version: 9.39.4(jiti@2.7.0)
+        version: 9.39.4(jiti@1.21.7)
       postcss:
         specifier: ^8.5.28
         version: 8.5.28
@@ -319,17 +322,17 @@ importers:
         version: 15.5.20
       eslint-config-prettier:
         specifier: ^9.1.0
-        version: 9.1.2(eslint@9.39.4(jiti@1.21.7))
+        version: 9.1.2(eslint@9.39.4(jiti@2.7.0))
       globals:
         specifier: ^15.12.0
         version: 15.15.0
       typescript-eslint:
         specifier: ^8.15.0
-        version: 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+        version: 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
     devDependencies:
       eslint:
         specifier: ^9.15.0
-        version: 9.39.4(jiti@1.21.7)
+        version: 9.39.4(jiti@2.7.0)
       tailwindcss:
         specifier: ^3.4.14
         version: 3.4.19(tsx@4.23.1)
@@ -3961,7 +3964,7 @@ snapshots:
     dependencies:
       '@sentry/core': 10.76.2
 
-  '@sentry/nextjs@10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(next@14.2.35(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.112.2(postcss@8.5.28))':
+  '@sentry/nextjs@10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(next@14.2.35(@opentelemetry/api@1.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.112.2(postcss@8.5.28))':
     dependencies:
       '@opentelemetry/api': 1.10.0
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.63.3)
@@ -4199,15 +4202,15 @@ snapshots:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
 
-  '@typescript-eslint/eslint-plugin@8.63.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/eslint-plugin@8.63.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       '@typescript-eslint/scope-manager': 8.63.0
-      '@typescript-eslint/type-utils': 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/type-utils': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.63.0
-      eslint: 9.39.4(jiti@1.21.7)
+      eslint: 9.39.4(jiti@2.7.0)
       ignore: 7.0.5
       natural-compare: 1.4.0
       ts-api-utils: 2.5.0(typescript@5.9.3)
@@ -4215,14 +4218,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.63.0
       '@typescript-eslint/types': 8.63.0
       '@typescript-eslint/typescript-estree': 8.63.0(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.63.0
       debug: 4.4.3
-      eslint: 9.39.4(jiti@1.21.7)
+      eslint: 9.39.4(jiti@2.7.0)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -4245,13 +4248,13 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
-  '@typescript-eslint/type-utils@8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/type-utils@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/types': 8.63.0
       '@typescript-eslint/typescript-estree': 8.63.0(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       debug: 4.4.3
-      eslint: 9.39.4(jiti@1.21.7)
+      eslint: 9.39.4(jiti@2.7.0)
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -4274,13 +4277,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/utils@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
-      '@eslint-community/eslint-utils': 4.9.1(eslint@9.39.4(jiti@1.21.7))
+      '@eslint-community/eslint-utils': 4.9.1(eslint@9.39.4(jiti@2.7.0))
       '@typescript-eslint/scope-manager': 8.63.0
       '@typescript-eslint/types': 8.63.0
       '@typescript-eslint/typescript-estree': 8.63.0(typescript@5.9.3)
-      eslint: 9.39.4(jiti@1.21.7)
+      eslint: 9.39.4(jiti@2.7.0)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -4738,9 +4741,9 @@ snapshots:
 
   escape-string-regexp@4.0.0: {}
 
-  eslint-config-prettier@9.1.2(eslint@9.39.4(jiti@1.21.7)):
+  eslint-config-prettier@9.1.2(eslint@9.39.4(jiti@2.7.0)):
     dependencies:
-      eslint: 9.39.4(jiti@1.21.7)
+      eslint: 9.39.4(jiti@2.7.0)
 
   eslint-scope@8.4.0:
     dependencies:
@@ -5930,13 +5933,13 @@ snapshots:
       media-typer: 1.1.1
       mime-types: 3.0.2
 
-  typescript-eslint@8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3):
+  typescript-eslint@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.63.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
-      '@typescript-eslint/parser': 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/eslint-plugin': 8.63.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       '@typescript-eslint/typescript-estree': 8.63.0(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.63.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
-      eslint: 9.39.4(jiti@1.21.7)
+      '@typescript-eslint/utils': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      eslint: 9.39.4(jiti@2.7.0)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color

@@ -35,6 +35,10 @@ under `infra/` — one copy per droplet, not per app.
 `SUPABASE_SERVICE_ROLE_KEY`: `/api/health` returns 503 if it's present, so
 the deploy rolls back (`scripts/check-env.ts` also fails the build on it).
 
+`SENTRY_DSN` is optional: server-side error reporting to Sentry (errors only,
+no source-map upload). Create a Next.js project named `<slug>` in the `bcns`
+Sentry org (Settings → Client Keys for the DSN). Unset = Sentry off.
+
 **`EXPECTED_CLIENT_ID` is required, and the middleware fails closed.** The
 operator copies it by hand from `clients.id` in the platform project —
 `scripts/new-app.sh` does not set it. With `NEXT_PUBLIC_SUPABASE_URL` set and
