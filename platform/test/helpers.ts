@@ -145,6 +145,8 @@ export const RPC_ARGS: Record<string, { args: Record<string, unknown>; expect: '
   connect_source: { args: { p_source: 'shopify', p_kind: 'shopify_admin', p_secret: '', p_config: {}, p_interval: '1 hour', p_backfill_depth: '13 months' }, expect: 'BCNS3' },
   // A read: one boolean about the caller's own tenant, no shop or client argument to aim elsewhere.
   shopify_shop_mismatch: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
+  // A read: one boolean about the caller's own tenant (owner only); no tenant argument to aim elsewhere.
+  source_in_use: { args: { p_source: 'meta', p_id: 'act_0' }, expect: 'none' },
   // A read: one boolean (another client holds this shop live), never which client.
   shopify_shop_in_use: { args: { p_shop: 'rpc-scoped.myshopify.com' }, expect: 'none' },
   // 'upload' is not disconnectable, so it fails validation before any write and the probe never

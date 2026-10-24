@@ -25,7 +25,7 @@ Object.assign(process.env, {
 const react = createRequire(import.meta.url)("react");
 react.cache ??= (fn) => fn;
 const { NextRequest } = await import("next/server");
-const { MAX_PICK_COOKIE, bindOrPick, pickGET, pickPOST } = await import("../lib/oauth-connect.ts");
+const { MAX_PICK_COOKIE, bindOrPick, pickGET, pickPOST, writeError } = await import("../lib/oauth-connect.ts");
 const { getConfig } = await import("../lib/env.ts");
 
 const OPTIONS = {
@@ -136,6 +136,30 @@ test("bindOrPick: a write error is connect-failed and the rpc message (which can
     console.warn = warn;
   }
   assert.doesNotMatch(logged.join("\n"), /TOKEN_monday/);
+});
+
+for (const src of ["meta", "monday"]) {
+  test(`${src} bindOrPick: BCNS6 source_in_use redirects to source-in-use, any other write error stays connect-failed`, async () => {
+    const opts = handoff(src, [OPTIONS[src][0]]);
+    const inUse = await bindOrPick(src, fakeSession({ code: "BCNS6", message: "source_in_use" }).session, getConfig(), opts);
+    assert.equal(inUse.status, 303);
+    assert.equal(inUse.headers.get("location"), `${HUB}/?error=source-in-use&source=${src}`);
+    assert.match(inUse.headers.get("set-cookie") ?? "", new RegExp(`${src}_oauth_state=;`));
+    const other = await bindOrPick(src, fakeSession({ code: "BCNS2", message: "owner_only" }).session, getConfig(), opts);
+    assert.equal(other.headers.get("location"), `${HUB}/?error=connect-failed`);
+  });
+}
+
+test("writeError: only BCNS6 maps to source-in-use, naming the source", () => {
+  assert.equal(writeError("meta", { code: "BCNS6" }), "source-in-use&source=meta");
+  assert.equal(writeError("quickbooks", { code: "BCNS6" }), "source-in-use&source=quickbooks");
+  for (const e of [null, {}, { code: "P0001" }, { code: "bcns6" }]) assert.equal(writeError("meta", e), "connect-failed");
+});
+
+test("pickPOST: the write error goes through writeError (the write itself needs a live owner session)", () => {
+  const src = readFileSync(new URL("../lib/oauth-connect.ts", import.meta.url), "utf8");
+  const pick = src.slice(src.indexOf("export async function pickPOST"));
+  assert.match(pick, /failRedirect\(hub, source, "pick", "write_failed", error\.code \?\? "rpc", writeError\(source, error\)\)/);
 });
 
 for (const src of ["meta", "monday"]) {

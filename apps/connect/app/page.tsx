@@ -17,6 +17,7 @@ import {
   composeSources,
   disconnectedNote,
   googleSiblingConnected,
+  inUseNoun,
   shopifyControl,
   egressLine,
   formatBytes,
@@ -50,6 +51,8 @@ type SearchParams = {
   connected?: string;
   disconnected?: string;
   shop?: string;
+  /** Which source a `source-in-use` error is about. */
+  source?: string;
   /** List state, all plain links: ?view=cards|rows, ?type=<kind slug>, ?status=attention. */
   view?: string;
   type?: string;
@@ -215,15 +218,17 @@ export default async function SourcesPage({
               ? "That does not look like a valid Shopify store. Open bcns Connect from your Shopify admin to connect."
               : searchParams.error === "connect-failed"
                 ? "The connection could not be completed. Start again, or use Request connection."
-                : searchParams.error === "shop-in-use"
-                  ? "This Shopify store is already connected to another bcns account. Sign in as that account's owner, then open bcns Connect from Shopify again."
-                  : searchParams.error === "connect-expired"
-                    ? "Your Shopify connection timed out before sign-in finished (it is held for 15 minutes), so nothing was saved."
-                    : searchParams.error === "shop-mismatch"
-                      ? "This bcns account is already connected to a different Shopify store. Open Sources, Shopify, then Disconnect, wait a few minutes for the old store's data to be removed, then install again."
-                      : searchParams.error === "disconnect-failed"
-                        ? "That source could not be disconnected. Nothing was changed. Try again."
-                        : "Something went wrong. Try again."}
+                : searchParams.error === "source-in-use"
+                  ? `This ${inUseNoun(searchParams.source)} is already connected to another bcns account. Sign in as that account's owner to manage it.`
+                  : searchParams.error === "shop-in-use"
+                    ? "This Shopify store is already connected to another bcns account. Sign in as that account's owner, then open bcns Connect from Shopify again."
+                    : searchParams.error === "connect-expired"
+                      ? "Your Shopify connection timed out before sign-in finished (it is held for 15 minutes), so nothing was saved."
+                      : searchParams.error === "shop-mismatch"
+                        ? "This bcns account is already connected to a different Shopify store. Open Sources, Shopify, then Disconnect, wait a few minutes for the old store's data to be removed, then install again."
+                        : searchParams.error === "disconnect-failed"
+                          ? "That source could not be disconnected. Nothing was changed. Try again."
+                          : "Something went wrong. Try again."}
           {searchParams.error === "connect-expired" ? (
             restartUrl ? (
               <>
