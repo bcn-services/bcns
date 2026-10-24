@@ -49,7 +49,7 @@ MCP_RATE_LIMIT_PER_MIN=60
 
 `MCP_RATE_LIMIT_PER_MIN` is optional and defaults to 60.
 
-`SENTRY_DSN` is optional: set it to report unhandled errors to Sentry (errors only, no tracing). Unset = Sentry off.
+`SENTRY_DSN` is optional: set it to report errors caught at the request boundary to Sentry (errors only, no tracing; requests, headers and breadcrumbs are never sent). Unset = Sentry off.
 
 ## Deployed layout
 
