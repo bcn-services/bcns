@@ -35,7 +35,7 @@ const renderSignupPage = (SignupPage, searchParams) =>
 
 const { signupTarget, notifySignupConfirmed, signupNotice, SIGNUP_SENT_PATH } = await import("../lib/signup.ts");
 const { BCNS_EMAIL } = await import("../lib/request-connection.ts");
-const { FINISH_PATH, PENDING_COOKIE, sealPending, INSTALL_CLIENT_ID } = await import("../lib/shopify-oauth.ts");
+const { FINISH_PATH, PENDING_COOKIE, sealPending, INSTALL_CLIENT_ID, SHOPIFY_SCOPES } = await import("../lib/shopify-oauth.ts");
 
 const HUB = "https://connect.bcn-services.com";
 const PROJECT_REF = "abcdefghijklmnopqrst";
@@ -180,7 +180,7 @@ test("finish: a signed-in PENDING session is refused like signed-out (to /login,
     return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
   };
   const { GET } = await import("../app/api/oauth/shopify/finish/route.ts");
-  const sealed = sealPending({ clientId: INSTALL_CLIENT_ID, shop: "acme.myshopify.com", accessToken: "shpat_x", refreshToken: "shprt_y", expiresAt: "2026-09-21T01:00:00.000Z", storeHandle: null }, "shpss_finish");
+  const sealed = sealPending({ clientId: INSTALL_CLIENT_ID, shop: "acme.myshopify.com", code: "shpcode_x", storeHandle: null }, "shpss_finish");
   const finish = (claims) => {
     const request = new NextRequest(`${HUB}${FINISH_PATH}`, { headers: { host: "connect.bcn-services.com", cookie: `${PENDING_COOKIE}=${sealed}; ${sessionCookie(claims)}` } });
     return inRequest(request, () => GET(request));
@@ -194,6 +194,59 @@ test("finish: a signed-in PENDING session is refused like signed-out (to /login,
   // Contrast: a real owner session passes currentMembership() and reaches the next gate.
   const owner = await finish({ client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc", client_role: "owner" });
   assert.notEqual(owner.headers.get("location"), `${HUB}/login?next=${encodeURIComponent(FINISH_PATH)}`);
+});
+
+// The 2026-10-24 fix, end to end through the route: Shopify's code is redeemed (a new
+// grant, which retires the stored refresh token of whoever holds the shop) only after a
+// signed-in owner and both shop checks pass, and the write carries that fresh token.
+test("finish: a shop another client holds is refused before any token exchange; a clean shop is exchanged once, then written", async () => {
+  Object.assign(process.env, {
+    NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+    SHOPIFY_CLIENT_ID: "cid",
+    SHOPIFY_CLIENT_SECRET: "shpss_finish",
+    OAUTH_APPROVED_SOURCES: "shopify",
+    HUB_BASE_URL: HUB,
+  });
+  const OWNER_CLIENT = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+  const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  const run = async (inUse) => {
+    const calls = [];
+    globalThis.fetch = async (input, init) => {
+      const url = String(input?.url ?? input);
+      const body = init?.body ?? (input instanceof Request ? await input.clone().text() : undefined);
+      calls.push({ url, body: typeof body === "string" ? body : "" });
+      if (url.includes("/auth/v1/user")) return json(USER);
+      if (url.endsWith("/rpc/shopify_shop_in_use")) return json(inUse);
+      if (url.endsWith("/rpc/shopify_shop_mismatch")) return json(false);
+      if (url.endsWith("/admin/oauth/access_token")) return json({ access_token: "shpat_fresh", refresh_token: "shprt_fresh", expires_in: 3600, scope: SHOPIFY_SCOPES.join(",") });
+      if (url.endsWith("/rpc/connect_source")) return json(null);
+      return json({ data: { webhookSubscriptionCreate: { userErrors: [] } } });
+    };
+    const { GET } = await import("../app/api/oauth/shopify/finish/route.ts");
+    const sealed = sealPending({ clientId: OWNER_CLIENT, shop: "acme.myshopify.com", code: "shpcode_x", storeHandle: null }, "shpss_finish");
+    const request = new NextRequest(`${HUB}${FINISH_PATH}`, { headers: { host: "connect.bcn-services.com", cookie: `${PENDING_COOKIE}=${sealed}; ${sessionCookie({ client_id: OWNER_CLIENT, client_role: "owner" })}` } });
+    const response = await inRequest(request, () => GET(request));
+    const at = (suffix) => calls.findIndex((c) => c.url.endsWith(suffix));
+    return { response, calls, at };
+  };
+
+  const held = await run(true);
+  assert.equal(held.response.headers.get("location"), `${HUB}/?error=shop-in-use`);
+  assert.equal(held.at("/admin/oauth/access_token"), -1, "no exchange: the holder's refresh token stays alive");
+  assert.equal(held.at("/rpc/connect_source"), -1);
+
+  const clean = await run(false);
+  assert.equal(clean.response.headers.get("location"), `${HUB}/?connected=shopify`);
+  const exchanges = clean.calls.filter((c) => c.url.endsWith("/admin/oauth/access_token"));
+  assert.equal(exchanges.length, 1, "exactly one exchange");
+  assert.match(exchanges[0].body, /"code":"shpcode_x"/);
+  assert.ok(clean.at("/rpc/shopify_shop_in_use") < clean.at("/rpc/shopify_shop_mismatch"));
+  assert.ok(clean.at("/rpc/shopify_shop_mismatch") < clean.at("/admin/oauth/access_token"), "both checks before the exchange");
+  assert.ok(clean.at("/admin/oauth/access_token") < clean.at("/rpc/connect_source"));
+  const write = JSON.parse(clean.calls[clean.at("/rpc/connect_source")].body);
+  assert.equal(write.p_secret, "shpat_fresh");
+  assert.equal(write.p_refresh_secret, "shprt_fresh");
 });
 
 /* ------------------------------- Shopify App Store installs never see Pay */

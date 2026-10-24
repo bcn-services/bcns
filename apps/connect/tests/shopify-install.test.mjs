@@ -16,6 +16,8 @@ import {
   INSTALL_TIMESTAMP_MAX_AGE_MS,
   finishErrorCode,
   STATE_TTL_MS,
+  exchange,
+  exchangeDiagnostic,
   hasActiveSubscription,
   isFreshInstallTimestamp,
   managedPricingGate,
@@ -28,6 +30,7 @@ import {
   planSelectionUrl,
   registerUninstallWebhook,
   sealPending,
+  shopChecks,
   signState,
   storeHandleFromHost,
   subscriptionOutcome,
@@ -86,11 +89,11 @@ const installQuery = (secret = SECRET, timestamp = String(nowSec())) =>
 const TOKEN = {
   clientId: CLIENT,
   shop: SHOP,
-  accessToken: "shpat_x",
-  refreshToken: "shprt_y",
-  expiresAt: "2026-09-21T01:00:00.000Z",
+  code: "shpcode_x",
   storeHandle: null,
 };
+/** What /finish exchanged TOKEN.code for: the gate is handed it, never the pending. */
+const ACCESS = "shpat_x";
 
 /* ------------------------------------------------------- the sealed hand-off */
 
@@ -115,9 +118,15 @@ test("pending refuses expiry, wrong key, tampering and garbage", () => {
   for (const bad of [null, "", "abc", "x".repeat(80)]) assert.equal(openPending(bad, SECRET, CLIENT).ok, false);
 });
 
-test("the sealed cookie does not carry the token in the clear", () => {
+test("the sealed cookie does not carry the code in the clear", () => {
   const sealed = sealPending(TOKEN, SECRET);
-  assert.doesNotMatch(Buffer.from(sealed, "base64url").toString("latin1"), /shpat_x|shprt_y/);
+  assert.doesNotMatch(Buffer.from(sealed, "base64url").toString("latin1"), /shpcode_x/);
+});
+
+test("a hand-off with no code (sealed by a deploy that exchanged at /callback) reads as expired", () => {
+  const legacy = { clientId: CLIENT, shop: SHOP, accessToken: "shpat_x", refreshToken: "shprt_y", expiresAt: "2026-09-21T01:00:00.000Z", storeHandle: null };
+  assert.equal(openPending(sealPending(legacy, SECRET, 1_000), SECRET, CLIENT, 1_000).reason, "expired");
+  assert.equal(openPending(sealPending({ ...TOKEN, code: "" }, SECRET, 1_000), SECRET, CLIENT, 1_000).reason, "expired");
 });
 
 /* --------------------------------------------------------------- middleware */
@@ -246,36 +255,35 @@ test("start: the state cookie's maxAge equals STATE_TTL_MS in seconds, not a sec
 
 /* ----------------------------------------------------------------- /callback */
 
-/** A callback that only ever exchanges a code — no subscription check runs here any more (moved to /finish). */
-function tokenExchangeOnly(accessToken = "shpat_x", refreshToken = "shprt_y") {
+/**
+ * The callback calls nothing: the exchange is a new grant and retires the shop's
+ * stored refresh token, so it waits for /finish's signed-in owner (2026-10-24).
+ */
+function noNetwork() {
   let calls = 0;
   const fetchImpl = async (url) => {
     calls++;
-    if (!String(url).includes("/oauth/access_token")) throw new Error(`unexpected fetch: ${url}`);
-    return new Response(
-      JSON.stringify({ access_token: accessToken, scope: GRANTED_SCOPE, expires_in: 3600, refresh_token: refreshToken }),
-      { status: 200 }
-    );
+    throw new Error(`unexpected fetch: ${url}`);
   };
   fetchImpl.callCount = () => calls;
   return fetchImpl;
 }
 
-test("callback: an install-initiated handshake exchanges, seals storeHandle from host, and hands off to /finish without a session or a subscription check", async () => {
+test("callback: an install-initiated handshake seals the unspent code and storeHandle, and hands off to /finish with no session and no network call", async () => {
   const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
   const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
   const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, host: INSTALL_HOST, timestamp: "1700000000" }), SECRET);
   const realFetch = globalThis.fetch;
-  const fetchImpl = tokenExchangeOnly();
+  const fetchImpl = noNetwork();
   globalThis.fetch = fetchImpl;
   try {
     const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
     assert.equal(res.headers.get("location"), `${HUB}${FINISH_PATH}`);
-    assert.equal(fetchImpl.callCount(), 1, "callback must make exactly one fetch: the token exchange, never a subscription check");
+    assert.equal(fetchImpl.callCount(), 0, "callback must never call Shopify's token endpoint");
     const opened = openPending(res.cookies.get(PENDING_COOKIE)?.value, SECRET, OTHER);
     assert.ok(opened.ok);
-    assert.equal(opened.pending.accessToken, "shpat_x");
-    assert.equal(opened.pending.refreshToken, "shprt_y");
+    assert.equal(opened.pending.code, "C");
+    assert.equal("accessToken" in opened.pending, false);
     assert.equal(opened.pending.shop, SHOP);
     assert.equal(opened.pending.storeHandle, STORE_HANDLE, "storeHandle decoded from host and sealed for /finish");
   } finally {
@@ -289,7 +297,7 @@ test("callback: a missing or malformed host seals storeHandle as null, never thr
   // No `host` param at all.
   const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
   const realFetch = globalThis.fetch;
-  globalThis.fetch = tokenExchangeOnly();
+  globalThis.fetch = noNetwork();
   let res;
   try {
     res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
@@ -307,7 +315,7 @@ test("callback: the bridge app (SB, SHOPIFY_ALT_*) hands off to /finish byte-for
   const state = signState({ shop: ALT_SHOP, clientId: INSTALL_CLIENT_ID }, ALT_SECRET);
   const query = signQuery(new URLSearchParams({ code: "C", shop: ALT_SHOP, state, timestamp: "1700000000" }), ALT_SECRET);
   const realFetch = globalThis.fetch;
-  const fetchImpl = tokenExchangeOnly("shpat_bridge", "shprt_bridge");
+  const fetchImpl = noNetwork();
   globalThis.fetch = fetchImpl;
   let res;
   try {
@@ -315,16 +323,15 @@ test("callback: the bridge app (SB, SHOPIFY_ALT_*) hands off to /finish byte-for
   } finally {
     globalThis.fetch = realFetch;
   }
-  assert.equal(fetchImpl.callCount(), 1, "bridge path must never query for a subscription");
+  assert.equal(fetchImpl.callCount(), 0, "bridge path calls nothing at /callback either");
   assert.equal(res.headers.get("location"), `${HUB}${FINISH_PATH}`);
-  // Sealed under the DEFAULT app's secret regardless of which app issued the token (callback/route.ts step 7).
+  // Sealed under the DEFAULT app's secret regardless of which app issued the code (callback/route.ts step 6).
   const opened = openPending(res.cookies.get(PENDING_COOKIE)?.value, SECRET, OTHER);
   assert.ok(opened.ok);
   assert.equal(opened.pending.app, ALT_APP);
   assert.equal(opened.pending.clientId, "");
   assert.equal(opened.pending.shop, ALT_SHOP);
-  assert.equal(opened.pending.accessToken, "shpat_bridge");
-  assert.equal(opened.pending.refreshToken, "shprt_bridge");
+  assert.equal(opened.pending.code, "C");
   const stateCookie = res.cookies.get("shopify_oauth_state");
   assert.ok(stateCookie && stateCookie.value === "", "state cookie cleared");
   const pendingCookie = res.cookies.get(PENDING_COOKIE);
@@ -444,52 +451,33 @@ test("finish route wiring: the uninstall webhook is registered after the write, 
   assert.doesNotMatch(block, /fail\(|accessToken\}|refreshToken/);
 });
 
-test("callback: a network failure during exchange redirects generically, deletes the state cookie, and logs only the error name and shop", async () => {
-  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
-  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
-  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => {
-    throw new DOMException("The operation timed out.", "TimeoutError");
-  };
-  const { logged, restore } = captureWarn();
-  let res;
-  try {
-    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
-  } finally {
-    restore();
-    globalThis.fetch = realFetch;
-  }
-  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
-  const cookie = res.cookies.get("shopify_oauth_state");
-  assert.ok(cookie, "expected the state cookie to still be present in the response, cleared");
-  assert.equal(cookie.value, "", "deleted cookie must carry no value");
-  assert.ok(cookie.expires && new Date(cookie.expires).getTime() <= Date.now(), "deleted cookie must be expired, not just absent maxAge");
-  const lines = logged.join("\n");
-  assert.match(lines, /\[connect\] shopify callback rejected \(exchange_network_error:TimeoutError\)/);
-  assert.match(lines, new RegExp(`shop=${SHOP}`));
-  assert.doesNotMatch(lines, /\.ts:\d+|node_modules|at exchange|at GET/, "no stack trace");
-  assert.doesNotMatch(lines, /code=C|state=|timestamp=1700000000/, "no request params");
+test("exchange: one uncached POST to the shop's token endpoint with the code and expiring=1; the token on success", async () => {
+  let url, init;
+  const result = await exchange(SHOP, "cid", SECRET, "C", async (u, i) => {
+    [url, init] = [u, i];
+    return new Response(JSON.stringify({ access_token: ACCESS, scope: GRANTED_SCOPE, expires_in: 3600, refresh_token: "shprt_y" }), { status: 200 });
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual([result.token.accessToken, result.token.refreshToken, result.token.expiresIn], [ACCESS, "shprt_y", 3600]);
+  assert.equal(url, `https://${SHOP}/admin/oauth/access_token`);
+  assert.equal(init.method, "POST");
+  assert.equal(init.cache, "no-store");
+  assert.deepEqual(JSON.parse(init.body), { client_id: "cid", client_secret: SECRET, code: "C", expiring: "1" });
 });
 
-test("callback: a non-2xx exchange response logs only the bare numeric HTTP status, never the response body", async () => {
-  const { GET } = await import("../app/api/oauth/shopify/callback/route.ts");
-  const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
-  const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, timestamp: "1700000000" }), SECRET);
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ error: "invalid_request", error_description: "bad code" }), { status: 401 });
-  const { logged, restore } = captureWarn();
-  let res;
-  try {
-    res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
-  } finally {
-    restore();
-    globalThis.fetch = realFetch;
-  }
-  assert.equal(res.headers.get("location"), `${HUB}/?error=connect-failed`);
-  const lines = logged.join("\n");
-  assert.match(lines, /\[connect\] shopify callback rejected \(exchange_http_error:401\)/);
-  assert.doesNotMatch(lines, /invalid_request|bad code/, "no response body in the log");
+test("exchange: a network failure is network_error with the error name only; a non-2xx is the bare status, never the body", async () => {
+  const timedOut = await exchange(SHOP, "cid", SECRET, "C", async () => {
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  });
+  assert.deepEqual(timedOut, { ok: false, reason: "network_error", detail: "TimeoutError" });
+  assert.equal(exchangeDiagnostic(timedOut), ":TimeoutError");
+
+  const refused = await exchange(SHOP, "cid", SECRET, "C", async () =>
+    new Response(JSON.stringify({ error: "invalid_request", error_description: "bad code" }), { status: 401 }));
+  assert.equal(exchangeDiagnostic(refused), ":401");
+  assert.doesNotMatch(JSON.stringify(refused), /invalid_request|bad code/);
+  // Every other reason logs with no suffix: missing-scope names are provider text.
+  assert.equal(exchangeDiagnostic({ ok: false, reason: "missing_scopes", detail: "read_orders" }), "");
 });
 
 /* ------------------------------------------------------------------- /finish */
@@ -527,7 +515,7 @@ test("callback: the public app sets the non-secret shop companion cookie, the br
   const state = signState({ shop: SHOP, clientId: INSTALL_CLIENT_ID }, SECRET);
   const query = signQuery(new URLSearchParams({ code: "C", shop: SHOP, state, host: INSTALL_HOST, timestamp: "1700000000" }), SECRET);
   const realFetch = globalThis.fetch;
-  globalThis.fetch = tokenExchangeOnly();
+  globalThis.fetch = noNetwork();
   try {
     const res = await GET(new NextRequest(`${HUB}/api/oauth/shopify/callback?${query}`, { headers: { cookie: `shopify_oauth_state=${state}` } }));
     assert.equal(res.cookies.get("shopify_last_shop")?.value, SHOP);
@@ -557,7 +545,7 @@ function fakeFail() {
   return fail;
 }
 
-/** The gate's one RPC (api.shopify_shop_mismatch), answered from a fixed result. */
+/** shopChecks' RPCs (and the gate's paid-through store), every one answered from a fixed result. */
 function fakeApi(result = { data: false, error: null }) {
   const calls = [];
   return { calls, rpc: async (fn, args) => (calls.push([fn, args]), result) };
@@ -582,10 +570,10 @@ const INSTALL_PENDING = { ...TOKEN, clientId: INSTALL_CLIENT_ID };
 
 // Whether the tenant already has THIS shop cannot change the answer (rule 1.2.2 —
 // a reinstall, or an existing client whose subscription lapsed, must see the plan
-// page); the one database question the gate asks is whether it has a DIFFERENT one.
+// page). Whether it has a DIFFERENT one is shopChecks', before the exchange.
 test("managedPricingRedirect: install-initiated, no active subscription -> redirect to the plan page, pending cookie deleted, fetch called once", async () => {
   const fetchImpl = subscriptionFetch(false);
-  const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  const result = await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
   assert.equal(result.status, 307);
   // INSTALL_PENDING inherits TOKEN.storeHandle (null), so planSelectionUrl falls back to the shop URL.
   assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK);
@@ -595,7 +583,7 @@ test("managedPricingRedirect: install-initiated, no active subscription -> redir
 
 test("managedPricingRedirect: install-initiated, active subscription -> null (write), and the subscription WAS checked", async () => {
   const fetchImpl = subscriptionFetch(true);
-  const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+  const result = await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
   assert.equal(result, null);
   assert.equal(fetchImpl.callCount(), 1);
 });
@@ -605,62 +593,81 @@ test("managedPricingRedirect: install-initiated, active subscription -> null (wr
 test("managedPricingRedirect: an unset plan handle fails only when the plan page is needed; an active subscription still writes", async () => {
   const active = subscriptionFetch(true);
   const okFail = fakeFail();
-  assert.equal(await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: undefined, fail: okFail, fetchImpl: active }), null);
+  assert.equal(await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: undefined, fail: okFail, fetchImpl: active }), null);
   assert.deepEqual(okFail.codes, []);
   assert.equal(active.callCount(), 1);
 
   const none = subscriptionFetch(false);
   const fail = fakeFail();
-  const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: undefined, fail, fetchImpl: none });
+  const result = await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: undefined, fail, fetchImpl: none });
   assert.equal(result.headers.get("location"), `${HUB}/?error=connect-failed`);
   assert.deepEqual(fail.codes, ["plan_handle_unconfigured"]);
   assert.equal(none.callCount(), 1);
 });
 
-// A tenant bound to shop X installing from shop Y must be refused BEFORE it can
-// approve a charge: no subscription call, no plan page. data.attach_source's
-// BCNS7 stays the authority; this is the same answer, asked early.
-test("managedPricingRedirect: a tenant bound to a different shop is refused with shop-mismatch before any fetch or plan redirect", async () => {
-  for (const active of [false, true]) {
-    const fetchImpl = subscriptionFetch(active);
-    const fail = fakeFail();
-    const api = fakeApi({ data: true, error: null });
-    const result = await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
-    assert.equal(result.headers.get("location"), `${HUB}/?error=shop-mismatch`);
-    assert.deepEqual(fail.codes, ["shop_mismatch"]);
-    assert.equal(fetchImpl.callCount(), 0);
-    assert.deepEqual(api.calls, [["shopify_shop_mismatch", { p_shop: SHOP }]]);
-  }
+/* ---------------------------------------------------------------- shopChecks */
+
+// Both refusals data.attach_source would make at the write (BCNS6, BCNS7), asked
+// BEFORE /finish exchanges: after, the new grant has already retired the holder's
+// refresh token. attach_source stays the authority; this is its answer, early.
+test("shopChecks: a shop another client holds live is shop-in-use, and the mismatch is not even asked", async () => {
+  const fail = fakeFail();
+  const api = fakeApi({ data: true, error: null });
+  const result = await shopChecks(api, SHOP, fail);
+  assert.equal(result.headers.get("location"), `${HUB}/?error=shop-in-use`);
+  assert.deepEqual(fail.codes, ["shop_in_use"]);
+  assert.deepEqual(api.calls, [["shopify_shop_in_use", { p_shop: SHOP }]]);
 });
 
-test("managedPricingRedirect: a failed or non-boolean mismatch read is the generic error page -- never the plan page, never the write", async () => {
+test("shopChecks: a tenant bound to a different shop is shop-mismatch, asked after in-use", async () => {
+  const fail = fakeFail();
+  const calls = [];
+  const api = { rpc: async (fn, args) => (calls.push([fn, args]), { data: fn === "shopify_shop_mismatch", error: null }) };
+  const result = await shopChecks(api, SHOP, fail);
+  assert.equal(result.headers.get("location"), `${HUB}/?error=shop-mismatch`);
+  assert.deepEqual(fail.codes, ["shop_mismatch"]);
+  assert.deepEqual(calls, [["shopify_shop_in_use", { p_shop: SHOP }], ["shopify_shop_mismatch", { p_shop: SHOP }]]);
+});
+
+test("shopChecks: both false (a new shop, or this tenant's own) passes", async () => {
+  const fail = fakeFail();
+  const api = fakeApi({ data: false, error: null });
+  assert.equal(await shopChecks(api, SHOP, fail), null);
+  assert.deepEqual(fail.codes, []);
+  assert.deepEqual(api.calls.map(([fn]) => fn), ["shopify_shop_in_use", "shopify_shop_mismatch"]);
+});
+
+test("shopChecks: a failed or non-boolean read of either RPC is the generic error page, never a pass", async () => {
   const reads = {
     "rpc error": { data: null, error: { code: "PGRST202" } },
     "error with stale data": { data: false, error: { code: "57014" } },
     "null data": { data: null, error: null },
     "non-boolean data": { data: "false", error: null },
   };
-  for (const [name, read] of Object.entries(reads)) {
-    for (const active of [false, true]) {
-      const fetchImpl = subscriptionFetch(active);
+  for (const failing of ["shopify_shop_in_use", "shopify_shop_mismatch"]) {
+    for (const [name, read] of Object.entries(reads)) {
       const fail = fakeFail();
-      const result = await managedPricingRedirect({ api: fakeApi(read), pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
-      assert.equal(result?.headers.get("location"), `${HUB}/?error=connect-failed`, name);
-      assert.deepEqual(fail.codes, ["shop_check"], name);
-      assert.equal(fetchImpl.callCount(), 0, name);
+      const api = { rpc: async (fn) => (fn === failing ? read : { data: false, error: null }) };
+      const result = await shopChecks(api, SHOP, fail);
+      assert.equal(result?.headers.get("location"), `${HUB}/?error=connect-failed`, `${failing}: ${name}`);
+      assert.deepEqual(fail.codes, ["shop_check"], `${failing}: ${name}`);
     }
   }
 });
 
-test("managedPricingRedirect: the same shop (no mismatch) proceeds to the subscription check", async () => {
-  const fetchImpl = subscriptionFetch(true);
-  const api = fakeApi({ data: false, error: null });
-  assert.equal(await managedPricingRedirect({ api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl }), null);
-  assert.equal(api.calls.length, 1);
-  assert.equal(fetchImpl.callCount(), 1);
+test("managedPricingRedirect: asks no shop RPC (that is shopChecks', before the exchange) and checks with the token it is handed", async () => {
+  let sentToken;
+  const fetchImpl = async (_url, init) => {
+    sentToken = init.headers["X-Shopify-Access-Token"];
+    return new Response(JSON.stringify({ data: { currentAppInstallation: { activeSubscriptions: [{ status: "ACTIVE" }] } } }), { status: 200 });
+  };
+  const api = fakeApi({ data: true, error: null });
+  assert.equal(await managedPricingRedirect({ accessToken: "shpat_fresh", api, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl }), null);
+  assert.deepEqual(api.calls, []);
+  assert.equal(sentToken, "shpat_fresh");
 });
 
-// /callback's new grant has already killed an existing client's stored refresh
+// /finish's new grant has already killed an existing client's stored refresh
 // token, so one blip must not throw the fresh token away. Retried once, only for
 // failures that say nothing about the subscription, and still fail-closed.
 function sequenceFetch(...steps) {
@@ -685,12 +692,12 @@ const TRANSIENT = {
 test("managedPricingRedirect: a transient check failure is retried once -- then active writes (2 fetches), twice transient is the plan page (2 fetches)", async () => {
   for (const [name, transient] of Object.entries(TRANSIENT)) {
     const recovers = sequenceFetch(transient(), { status: 200, body: ACTIVE_BODY });
-    assert.equal(await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: recovers }), null, name);
+    assert.equal(await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: recovers }), null, name);
     assert.equal(recovers.callCount(), 2, name);
 
     const stays = sequenceFetch(transient(), transient(), { status: 200, body: ACTIVE_BODY });
     const fail = fakeFail();
-    const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl: stays });
+    const result = await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl: stays });
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
     assert.deepEqual(fail.codes, [], name);
     assert.equal(stays.callCount(), 2, `${name}: exactly one retry`);
@@ -706,7 +713,7 @@ test("managedPricingRedirect: a definitive answer is never retried -- none_activ
   for (const [name, first] of Object.entries(definitive)) {
     // A retry would find ACTIVE and write: the count AND the outcome both catch one.
     const fetchImpl = sequenceFetch(first, { status: 200, body: ACTIVE_BODY });
-    const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
+    const result = await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl });
     assert.equal(result?.headers.get("location"), PLAN_URL_FALLBACK, name);
     assert.equal(fetchImpl.callCount(), 1, name);
   }
@@ -715,7 +722,7 @@ test("managedPricingRedirect: a definitive answer is never retried -- none_activ
 test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the gate entirely -- no fetch, no rpc", async () => {
   const bridgeFetch = subscriptionFetch(false);
   const skippedApi = fakeApi({ data: true, error: null });
-  const bridgeResult = await managedPricingRedirect({
+  const bridgeResult = await managedPricingRedirect({ accessToken: ACCESS,
     api: skippedApi,
     pending: { ...INSTALL_PENDING, app: ALT_APP },
     appHandle: APP_HANDLE,
@@ -726,7 +733,7 @@ test("managedPricingRedirect: the bridge app and a tenant-bound pending skip the
   assert.equal(bridgeFetch.callCount(), 0);
 
   const hubFetch = subscriptionFetch(false);
-  const hubResult = await managedPricingRedirect({
+  const hubResult = await managedPricingRedirect({ accessToken: ACCESS,
     api: skippedApi,
     pending: { ...TOKEN, clientId: CLIENT },
     appHandle: APP_HANDLE,
@@ -774,7 +781,7 @@ function gateFetch(adminSteps, partnerStep, shopStep = SHOP_ID_OK) {
   return fetchImpl;
 }
 const gate = (fetchImpl, over = {}) =>
-  managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl, partner: PARTNER, now: NOW, ...over });
+  managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl, partner: PARTNER, now: NOW, ...over });
 
 /** Runs `fn` with console.info/warn captured; returns [result, lines]. */
 async function withLogs(fn) {
@@ -979,7 +986,7 @@ test("managedPricingRedirect: the shop id and the Partner API are asked only aft
 
 test("managedPricingRedirect: neither token, nor Shopify's or fetch's message text, reaches a log line, the response, or the other host", async () => {
   const LEAK = "leaky-message-text";
-  const tokens = `${LEAK} ${PARTNER.token} ${INSTALL_PENDING.accessToken}`;
+  const tokens = `${LEAK} ${PARTNER.token} ${ACCESS}`;
   const cases = {
     paid: [PAID],
     "partner graphql error": [{ status: 200, body: { errors: [{ message: tokens }] } }],
@@ -994,7 +1001,7 @@ test("managedPricingRedirect: neither token, nor Shopify's or fetch's message te
     const [result, lines] = await withLogs(() => gate(fetchImpl));
     const seen = [...lines, result?.headers.get("location") ?? "", result?.headers.get("set-cookie") ?? ""].join("\n");
     assert.equal(lines.length, 1, name);
-    for (const secret of [PARTNER.token, INSTALL_PENDING.accessToken, INSTALL_PENDING.refreshToken, LEAK]) {
+    for (const secret of [PARTNER.token, ACCESS, INSTALL_PENDING.code, LEAK]) {
       assert.ok(!seen.includes(secret), `${name}: ${secret} leaked`);
     }
     // The partner token goes to partners.shopify.com only; the merchant token to the shop only.
@@ -1002,7 +1009,7 @@ test("managedPricingRedirect: neither token, nor Shopify's or fetch's message te
       const sent = JSON.stringify([call.url, call.init]);
       const host = new URL(call.url).host;
       assert.equal(sent.includes(PARTNER.token), host === "partners.shopify.com", `${name}: partner token vs ${host}`);
-      assert.equal(sent.includes(INSTALL_PENDING.accessToken), host === SHOP, `${name}: merchant token vs ${host}`);
+      assert.equal(sent.includes(ACCESS), host === SHOP, `${name}: merchant token vs ${host}`);
     }
   }
 });
@@ -1066,14 +1073,14 @@ test("managedPricingRedirect: every non-ACTIVE outcome of the real subscription 
   };
   for (const [name, fetchImpl] of Object.entries(cases)) {
     const fail = fakeFail();
-    const result = await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
+    const result = await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail, fetchImpl });
     assert.equal(result?.status, 307, name);
     assert.equal(result.headers.get("location"), PLAN_URL_FALLBACK, name);
     assert.deepEqual(fail.codes, [], `${name}: a check failure is the plan page, not the generic error page`);
   }
   // One ACTIVE among others writes.
   assert.equal(
-    await managedPricingRedirect({ api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: rawFetch(200, subs("CANCELLED", "ACTIVE")) }),
+    await managedPricingRedirect({ accessToken: ACCESS, api: NO_MISMATCH, pending: INSTALL_PENDING, appHandle: APP_HANDLE, fail: fakeFail(), fetchImpl: rawFetch(200, subs("CANCELLED", "ACTIVE")) }),
     null
   );
 });
@@ -1095,9 +1102,24 @@ test("finish route wiring: subscription gate runs before the connect_source writ
   assert.ok(read("../middleware.ts").includes("api/webhooks/"), "middleware matcher must leave /api/webhooks/ (Shopify sends no cookie) unauthenticated");
 });
 
+// The 2026-10-24 fix is this order: the code is exchanged (a new grant, which retires
+// the holder's stored refresh token) only after a signed-in owner and both shop checks.
+test("finish route wiring: owner, pending, shop checks, THEN the exchange, then the gate and the write", async () => {
+  const { readFileSync } = await import("node:fs");
+  const route = readFileSync(new URL("../app/api/oauth/shopify/finish/route.ts", import.meta.url), "utf8");
+  const order = ['requireOwner("/")', "openPending(", "shopChecks(", "exchange(pending.shop", "managedPricingRedirect({", 'rpc("connect_source"'];
+  const at = order.map((needle) => route.indexOf(needle));
+  for (let i = 0; i < order.length; i++) assert.ok(at[i] > 0 && (i === 0 || at[i] > at[i - 1]), `${order[i]} out of order`);
+  assert.equal(route.split("exchange(pending.shop").length - 1, 1, "one exchange per finish");
+  assert.match(route, /shopifyAppFor\(config, pending\.shop\)/, "the app that issued the code redeems it");
+  assert.match(route, /if \(app !== pending\.app\) return fail\("app_changed"\)/, "a changed app pair never redeems the code");
+  assert.match(route, /"http_error" \|\| exchanged\.reason === "network_error" \? expired\(reason\) : fail\(reason\)/, "only a spent/stale code or a blip is the start-again page");
+  assert.doesNotMatch(route, /pending\.accessToken|pending\.refreshToken/);
+});
+
 /* ------------------------------- paid period stored for the worker (P9, 20261002000100) */
 
-/** fakeApi with a per-function answer: the mismatch read, and the paid-through store. */
+/** fakeApi with a per-function answer: false for any read, `store` for the paid-through store. */
 function storeApi(store) {
   const calls = [];
   return {
@@ -1111,12 +1133,11 @@ function storeApi(store) {
   };
 }
 
-test("managedPricingRedirect: a reinstall inside a paid period stores the Partner end date for the worker -- once, after the mismatch read", async () => {
+test("managedPricingRedirect: a reinstall inside a paid period stores the Partner end date for the worker -- once, its only rpc", async () => {
   const api = storeApi({ data: null, error: null });
   const [result, lines] = await withLogs(() => gate(gateFetch([{ status: 200, body: NONE_BODY }], PAID), { api }));
   assert.equal(result, null);
   assert.deepEqual(api.calls, [
-    ["shopify_shop_mismatch", { p_shop: SHOP }],
     ["record_shopify_paid_through", { p_shop: SHOP, p_until: "2026-10-25T16:29:00.000Z" }],
   ]);
   assert.deepEqual(lines, [`[connect] shopify finish paid through 2026-10-25T16:29:00.000Z shop=${SHOP}`]);
