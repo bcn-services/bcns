@@ -957,6 +957,7 @@ test('e2e: methods other than the routed ones on /mcp and the OAuth paths are 40
     }
     for (const path of ['/authorize', '/token', '/register']) for (const method of ['PUT', 'DELETE', 'OPTIONS', 'HEAD']) assert.equal((await t.req(path, { method })).status, 404)
     assert.equal((await t.req('/api/health')).status, 200)
+    assert.equal((await t.req('/api/health', { method: 'HEAD' })).status, 200)
   } finally {
     await t.close()
   }

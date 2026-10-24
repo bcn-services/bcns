@@ -66,7 +66,10 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
     const path = (req.url ?? '').split('?')[0]
 
     // deploy-app.yml's health check curls exactly this path. Unauthenticated by design.
-    if (req.method === 'GET' && path === '/api/health') return json(res, 200, { ok: true })
+    // HEAD too: UptimeRobot's free plan probes with HEAD only.
+    if ((req.method === 'GET' || req.method === 'HEAD') && path === '/api/health') {
+      return json(res, 200, { ok: true })
+    }
 
     // Unauthenticated by design: this is how a connector gets a token in the first place.
     try {
