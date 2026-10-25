@@ -438,6 +438,15 @@ describe('worker', () => {
     expect(claimed.some(x => x.client_id === c)).toBe(true)
   })
 
+  it('claim_skips_expired_token', async () => {
+    const c = await mkClient([{ source: 'monday' }])
+    await sql(`update data.source_tokens set expires_at = now() - interval '1 minute' where client_id = $1`, [c])
+    await due(c)
+    expect((await claim(mkTick())).some(x => x.client_id === c)).toBe(false)
+    await sql(`update data.source_tokens set expires_at = now() + interval '1 hour' where client_id = $1`, [c])
+    expect((await claim(mkTick())).some(x => x.client_id === c)).toBe(true)
+  })
+
   it('token_refresh_once', async () => {
     const c = await mkClient([{ source: 'meet', config: { folder_id: 'f1', oauth_client_id: 'cid' } }])
     await sql(`update data.source_tokens set expires_at = now() + interval '5 minutes', refresh_secret = 'refresh',

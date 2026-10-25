@@ -299,6 +299,17 @@ describe('token refresh auth failure is surfaced', () => {
     expect(h.last_error).toContain(DEAD)
   })
 
+  it('a 404 from the token endpoint (app uninstalled) is auth_failed with status_detail and last_error', async () => {
+    const c = await shopifyClient('active', '0 seconds')
+    await refresh(tokenFetch(() => json({}, 404)))
+
+    const t = (await sql<{ status: string; status_detail: string | null }>(
+      `select status, status_detail from data.source_tokens where client_id = $1 and source = 'shopify'`, [c])).rows[0]
+    expect(t.status).toBe('auth_failed')
+    expect(t.status_detail).toContain('404')
+    expect(await lastError(c)).toContain('404')
+  })
+
   it('a successful refresh of an auth_failed row clears last_error', async () => {
     const c = await shopifyClient('auth_failed', '2 hours')
     await sql(`update data.connector_schedule set last_error = $2, last_error_at = now() where client_id = $1`, [c, DEAD])
