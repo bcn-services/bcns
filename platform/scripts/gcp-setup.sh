@@ -21,6 +21,8 @@
 #   - Step 6c (Google Meet/Drive, bcns-owned OAuth client) is opt-in the same way: it needs
 #     GOOGLE_CLIENT_ID exported (the client id from the bcns Google Cloud project's External
 #     OAuth client) and skips with a message otherwise. Safe to run the script before 6c.
+#   - Step 6d (Meta token refresh) is opt-in the same way: it needs META_CLIENT_ID exported
+#     (the Meta app id) and skips with a message otherwise. Safe to run the script before 6d.
 #
 # Never does:
 #   - Runs no gcloud command before you answer y. The `describe` existence checks also run
@@ -345,6 +347,47 @@ if ask; then
       --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor >/dev/null
     note 'if the update below fails with permission denied, the new grant is still propagating: wait a minute and re-run 6c.'
     "${update_google[@]}"
+  fi
+fi
+
+# ---------------------------------------------------------------- 6d. Meta (opt-in)
+# Same shape as 6b. The worker re-exchanges the ~60-day Meta user token (fb_exchange_token) inside
+# its 14-day refresh window, which needs the same Meta app id/secret the hub uses. Not in
+# SECRET_ENV / step 6 for the same reason as 6b. Skipping this step is safe until a Meta token is
+# within 14 days of expiry; the 7-day expiry email goes out either way.
+step '6d. Meta (opt-in) — app secret + job env'
+META_SECRET=META_CLIENT_SECRET
+meta_env="META_CLIENT_ID=${META_CLIENT_ID:-<export META_CLIENT_ID>}"
+update_meta=(gcloud run jobs update "$JOB" --project "$PROJECT" --region "$REGION"
+  --update-env-vars "$meta_env" --update-secrets "${META_SECRET}=${META_SECRET}:latest")
+show gcloud secrets create "$META_SECRET" --project "$PROJECT" --replication-policy automatic --data-file=-
+show gcloud secrets add-iam-policy-binding "$META_SECRET" --project "$PROJECT" \
+  --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor
+show "${update_meta[@]}"
+note 'needs META_CLIENT_ID exported (the Meta app id, digits), and step 6 already done.'
+note 'the secret is created first, so the update never references a missing secret. The value is typed'
+note 'at a hidden prompt, never echoed; an existing secret is kept. --update-* merges, other vars stay.'
+if ask; then
+  if [[ ! "${META_CLIENT_ID:-}" =~ ^[0-9]+$ ]]; then
+    echo '  skipped: export META_CLIENT_ID (digits only), then re-run this step.' >&2
+  elif ! exists gcloud run jobs describe "$JOB" --project "$PROJECT" --region "$REGION"; then
+    echo "  skipped: ${JOB} does not exist yet — run step 6 first, then re-run this step." >&2
+  else
+    if exists gcloud secrets describe "$META_SECRET" --project "$PROJECT"; then
+      note "$META_SECRET already exists — keeping it."
+    else
+      printf '  value for %s (hidden): ' "$META_SECRET"
+      read -rs value || { printf '\n'; echo "  no input for $META_SECRET — aborting before a half-set secret." >&2; exit 1; }
+      printf '\n'
+      [[ -n "$value" ]] || { echo "  empty value for $META_SECRET — aborting." >&2; exit 1; }
+      printf '%s' "$value" |
+        gcloud secrets create "$META_SECRET" --project "$PROJECT" --replication-policy automatic --data-file=-
+      unset value
+    fi
+    gcloud secrets add-iam-policy-binding "$META_SECRET" --project "$PROJECT" \
+      --member "serviceAccount:${RUNTIME}" --role roles/secretmanager.secretAccessor >/dev/null
+    note 'if the update below fails with permission denied, the new grant is still propagating: wait a minute and re-run 6d.'
+    "${update_meta[@]}"
   fi
 fi
 

@@ -20,10 +20,15 @@ import { baseUrl as quickbooksBaseUrl } from './connectors/quickbooks.js'
  * probeAuthFailed's, so a genuinely revoked token is not retried every tick.
  */
 export async function refreshTokens(t: Tick): Promise<number> {
+  // Each connector's own lead (default 10 minutes); refreshOne re-checks it under the row lock.
+  const refreshable = Object.values(connectors).filter(c => c.refreshToken)
   const due = await sql<{ client_id: string; source: Source }>(
-    `select client_id, source from data.source_tokens
-     where (status = 'active' or (status = 'auth_failed' and updated_at < now() - interval '1 hour'))
-       and expires_at is not null and expires_at < now() + interval '10 minutes'`)
+    `select t.client_id, t.source from data.source_tokens t
+     join unnest($1::text[], $2::interval[]) l(source, lead) on l.source = t.source::text
+     where (t.status = 'active' or (t.status = 'auth_failed' and t.updated_at < now() - interval '1 hour'))
+       and t.expires_at is not null and t.expires_at < now() + l.lead
+       and (t.expires_at < now() + interval '10 minutes' or t.updated_at < now() - interval '1 hour')`,
+    [refreshable.map(c => c.source), refreshable.map(c => c.refreshLead ?? '10 minutes')])
   let n = 0
   for (const row of due.rows) {
     const conn = connectors[row.source]

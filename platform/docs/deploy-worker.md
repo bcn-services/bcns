@@ -109,6 +109,28 @@ bash scripts/gcp-setup.sh      # n to every step except 6c
 6c uses `--update-env-vars` / `--update-secrets` (merges), skips with a stderr message if the job is missing
 or the export is unset/invalid, and is safe to re-run. Run it before the first hub Google connection.
 
+## Meta token refresh (opt-in, step 6d)
+
+Same shape and reasons as 6b. The hub's Meta token is a ~60-day long-lived user token. Inside the last
+14 days the worker re-exchanges it (`fb_exchange_token`, no user interaction) and keeps the new token
+only if its expiry moved out by more than a day; a dead token (190) ends `auth_failed` like any source.
+Without these vars the refresh logs `token_refresh_failed` and retries hourly, and the 7-day
+"reconnect before it runs out" client_break email is the only safety net.
+
+| Var | Kind | Where |
+|---|---|---|
+| `META_CLIENT_ID` | plain env | exported before step 6d (the Meta app id, same as the hub's) |
+| `META_CLIENT_SECRET` | Secret Manager | typed at step 6d's hidden prompt; created once, existing secret kept, accessor bound to the runtime SA |
+
+```
+export META_CLIENT_ID=<Meta app id>
+bash scripts/gcp-setup.sh      # n to every step except 6d
+```
+
+6d uses `--update-env-vars` / `--update-secrets` (merges), skips with a stderr message if the job is
+missing or the export is not digits, and is safe to re-run. Run it before the first Meta token enters
+its 14-day window.
+
 ## Afterwards
 
 - Rotate a secret: `gcloud secrets versions add <name> --data-file=-` (the job reads `:latest`).

@@ -461,9 +461,9 @@ export async function refreshOne(ctx: RunContext, conn: Connector): Promise<stri
   try {
     return await tx(async c => {
       const got = await c.query<{ secret: string; status: string }>(
-        `select secret, status from data.source_tokens where client_id = $1 and source = $2 and expires_at < now() + interval '10 minutes'
+        `select secret, status from data.source_tokens where client_id = $1 and source = $2 and expires_at < now() + $3::interval
            and status <> 'revoked'
-         for update skip locked`, [ctx.clientId, ctx.source])
+         for update skip locked`, [ctx.clientId, ctx.source, conn.refreshLead ?? '10 minutes'])
       if (!got.rows.length) return null
       st.wasFailed = got.rows[0].status === 'auth_failed'
 
@@ -481,6 +481,12 @@ export async function refreshOne(ctx: RunContext, conn: Connector): Promise<stri
           await c.query(`update data.connector_schedule set last_error = $3, last_error_at = now() where client_id = $1 and source = $2`,
             [ctx.clientId, ctx.source, detail])
           ctx.log('token_refresh_auth_failed', { error: detail })
+        } else {
+          // Transient or config (e.g. missing app credentials): the worker log says why. A long-lead
+          // connector stays inside its window for days, so bump updated_at to push the retry out an
+          // hour (refreshTokens); short-lived ones stay due and retry every tick.
+          ctx.log('token_refresh_failed', { error: redact(e instanceof Error ? e.message : String(e)) })
+          if (conn.refreshLead) await c.query(`update data.source_tokens set updated_at = now() where client_id = $1 and source = $2`, [ctx.clientId, ctx.source])
         }
         return null
       }
