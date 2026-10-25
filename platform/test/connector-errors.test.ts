@@ -68,6 +68,13 @@ describe('classify — a plain 401 is auth for every source', () => {
   })
 })
 
+describe('classify — shopify 404', () => {
+  it('an Admin-API 404 stays an ordinary error: only the token endpoint 404 means uninstalled', () => {
+    expect(classify(new SourceError('shopify', 'HTTP 404', 404, {}))).toBe('error')
+    expect(classify(new SourceError('shopify', 'HTTP 404', 404, { errors: 'Not Found' }))).toBe('error')
+  })
+})
+
 describe('classify — shopify 403', () => {
   it("treats 403 as auth: the Admin API's rejection for a non-expiring token", () => {
     expect(classify(new SourceError('shopify', 'HTTP 403', 403, { errors: 'Invalid API key or access token' }))).toBe('auth')

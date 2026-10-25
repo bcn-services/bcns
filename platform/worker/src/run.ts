@@ -128,6 +128,7 @@ export async function claim(t: Tick): Promise<ScheduleRow[]> {
          and s.next_run_at <= now()
          and (s.lease_until is null or s.lease_until < now())
          and coalesce(tk.status, 'active') = 'active'
+         and (tk.expires_at is null or tk.expires_at > now())
          and ((hashtext(s.client_id::text) % $3) + $3) % $3 = $4
        order by (s.backfill_cursor is not null), s.next_run_at
        limit $1

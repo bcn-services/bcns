@@ -29,7 +29,7 @@ interface ScheduleRow {
   config: { app?: string; shop?: string } | null
 }
 
-type Guard = { action: 'delete'; clientId: string } | { action: 'escalate'; reason: string }
+type Guard = { action: 'delete'; clientId: string } | { action: 'escalate'; reason: string } | { action: 'nothing' }
 
 /**
  * Resolves shop -> client and decides delete-vs-escalate. Runs inside processOne's transaction and
@@ -44,7 +44,9 @@ async function resolveGuard(db: Db, row: PendingRow): Promise<Guard> {
     [row.shop]
   )
   const n = matches.rowCount ?? 0
-  if (n !== 1) return { action: 'escalate', reason: n === 0 ? 'no client matches this shop' : `${n} clients match this shop` }
+  // No schedule row at all (disabled and revoked ones still match above): nothing of this shop's to delete.
+  if (n === 0) return { action: 'nothing' }
+  if (n !== 1) return { action: 'escalate', reason: `${n} clients match this shop` }
 
   const { client_id: clientId, config } = matches.rows[0]
   if (config?.app === 'bcns-data') {
@@ -124,6 +126,11 @@ async function processOne(row: PendingRow): Promise<boolean> {
     const guard = await resolveGuard(c, row)
     if (guard.action === 'escalate') {
       await escalate(c, row.id, row.shop, guard.reason)
+      return true
+    }
+
+    if (guard.action === 'nothing') {
+      await c.query(`update data.privacy_requests set status = 'done', processed_at = now(), error = 'operator: no client matches shop; nothing to delete' where id = $1`, [row.id])
       return true
     }
 

@@ -228,6 +228,9 @@ export const shopify: Connector = {
       }),
     })
     const b: Json = await r.json().catch(() => ({}))
+    // 404 from the token endpoint = app uninstalled / shop gone: a dead connection, not a retry.
+    // Reported as 401 here only, so classify() stays blind to Admin-API 404s (a missing resource).
+    if (r.status === 404) throw new SourceError('shopify', 'HTTP 404: app uninstalled or shop not found', 401, b)
     if (!r.ok || b.error) throw new SourceError('shopify', String(b.error_description ?? b.error ?? `HTTP ${r.status}`), r.status, b)
     // Shopify rotates the refresh token on every refresh: the one we just used is
     // spent, and the new one must replace it or the NEXT refresh fails.
