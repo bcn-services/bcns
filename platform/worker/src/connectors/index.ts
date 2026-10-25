@@ -102,6 +102,12 @@ export interface Connector {
    * Google does not: drive/meet return two fields and keep the stored one.
    */
   refreshToken?(ctx: RunContext): Promise<{ secret: string; expiresAt: Date; refreshSecret?: string }>
+  /**
+   * How long before `expires_at` a row becomes due for refreshToken (a Postgres interval). Default
+   * 10 minutes, right for hour-lived access tokens; a ~60-day token (meta) wants days of retry room.
+   * A connector that sets it also gets the 7-day expiry warning in health.ts if refresh keeps failing.
+   */
+  refreshLead?: string
   normalize(ctx: RunContext, rows: RawRow[]): CanonicalWrites
   /**
    * Write-back executors for data.source_commands, keyed by `kind`. Run by worker/src/commands.ts with the

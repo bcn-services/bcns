@@ -1,7 +1,7 @@
 // §5.5 health, §5.6 alerts + Resend delivery, §5.6 pooled-egress watch.
 import { envNum, envStr, sql } from './db.js'
 import type { Tick } from './db.js'
-import { fullListEntities } from './connectors/index.js'
+import { connectors, fullListEntities } from './connectors/index.js'
 
 /** A delete of revoked sources' rows, then one upsert statement; `is distinct from` keeps status_since stable across ticks (§5.5). */
 export async function computeHealth(_t: Tick): Promise<number> {
@@ -87,7 +87,7 @@ export async function alerts(t: Tick): Promise<number> {
      where e.month = date_trunc('month', now() at time zone c.timezone)::date
        and e.bytes >= c.egress_quota_bytes
      on conflict (dedupe_key) do nothing`)
-  const breaks = await raiseClientBreaks(t)
+  const breaks = await raiseClientBreaks(t) + await raiseExpiryWarnings()
   await sendPending(t)
   return (raised.rowCount ?? 0) + breaks
 }
@@ -152,6 +152,29 @@ async function raiseClientBreaks(t: Tick): Promise<number> {
     raised += r.rowCount ?? 0
   }
   return raised
+}
+
+const EXPIRY_WARN_DAYS = 7
+
+/**
+ * Long-lived tokens (no refresh path, or a refreshLead window) still active inside their last 7 days:
+ * refresh has had its 14-day window and failed or does not exist, so email the owner before the data
+ * stops. One client_break row per token expiry (the key carries expires_at, so a refreshed token
+ * re-arms it); short-lived access tokens (shopify, google, quickbooks) refresh hourly and are excluded.
+ */
+export async function raiseExpiryWarnings(): Promise<number> {
+  const sources = Object.values(connectors).filter(c => !c.refreshToken || c.refreshLead).map(c => c.source)
+  const r = await sql(
+    `insert into data.notifications (client_id, kind, dedupe_key, payload)
+     select t.client_id, 'client_break',
+            'token_expiring:' || t.client_id || ':' || t.source || ':' || extract(epoch from t.expires_at)::bigint,
+            jsonb_build_object('source', t.source::text, 'status', 'expiring', 'status_since', t.expires_at)
+     from data.source_tokens t join data.clients c on c.id = t.client_id and c.status = 'active'
+     where t.status = 'active' and t.source::text = any($1::text[])
+       and t.expires_at > now() and t.expires_at < now() + make_interval(days => $2)
+     on conflict (dedupe_key) do nothing`,
+    [sources, EXPIRY_WARN_DAYS])
+  return r.rowCount ?? 0
 }
 
 // ------------------------------------------------------------ weekly digest
@@ -293,6 +316,15 @@ export async function ownerEmails(clientId: string): Promise<string[]> {
 export function breakEmail(kind: BreakNotice['kind'], source: string, status: string, statusSince: Date): { subject: string; text: string } {
   const label = labelOf(source)
   const since = statusSince.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })
+  // 'expiring' (raiseExpiryWarnings): statusSince is the instant the connection runs out. Name the UTC
+  // day before it so the date is never a day late for a US owner.
+  if (status === 'expiring') {
+    const by = new Date(statusSince.getTime() - 864e5).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })
+    return {
+      subject: `Action needed: reconnect ${label} by ${by}`,
+      text: `Hi,\n\nYour ${label} connection runs out soon. After that the ${label} information in your bcns Connect will stop updating.\n\nReconnect by ${by} to keep it going.\n\nReconnect ${label}: ${HUB_URL}\n\nThe bcns team\n`,
+    }
+  }
   const problem = status === 'auth_failed'
     ? `We can't reach your ${label} account right now, so the information in your bcns Connect has stopped updating.`
     : `The ${label} information in your bcns Connect hasn't updated since ${since}.`

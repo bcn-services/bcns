@@ -1,9 +1,10 @@
-// §4.3 Meta Ads — Graph API v21.0, Business Manager system-user token. Meta
-// issues these with a 60-day expiry OR never-expiring, the admin's choice at
-// creation time -- this connector does not know which. It does not read or
-// refresh an expiry; ctx.token.secret is sent as-is on every call, and a
-// token that has expired surfaces as a 401 here, which SourceError below
-// turns into auth_failed for the operator to reconnect.
+// §4.3 Meta Ads — Graph API v21.0. The hub issues a long-lived USER token (~60 days,
+// kind `meta_system_user` is a misnomer; apps/connect/lib/meta-oauth.ts). refreshToken
+// below re-exchanges it via fb_exchange_token inside the refreshLead window; Meta's docs
+// say only that an unexpired token can be exchanged, not that the clock resets, so a
+// response that does not push expires_at out is refused and the row left alone
+// (health.ts then warns the owner 7 days ahead). An expired token surfaces as a 190 ->
+// SourceError -> auth_failed for the owner to reconnect.
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import {
@@ -11,6 +12,7 @@ import {
   type RawRow, type RecordRow, type RunContext,
   SourceError, reason, minor, sleep,
 } from './index.js'
+import { envStr } from '../db.js'
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 const WINDOW_DAYS = 31
@@ -131,6 +133,31 @@ export const meta: Connector = {
   },
   configSchema,
   tokenKind: 'meta_system_user',
+  refreshLead: '14 days',
+
+  /** Same META_CLIENT_ID/META_CLIENT_SECRET as the hub (apps/connect); the secret rides a POST body, never a URL. */
+  async refreshToken(ctx): Promise<{ secret: string; expiresAt: Date }> {
+    const id = envStr('META_CLIENT_ID'), secret = envStr('META_CLIENT_SECRET')
+    if (!id || !secret) throw new Error('META_CLIENT_ID and META_CLIENT_SECRET are required to refresh a Meta token')
+    const r = await ctx.fetch(`${GRAPH}/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: id, client_secret: secret, fb_exchange_token: ctx.token.secret }).toString(),
+    })
+    const b: Json = await r.json().catch(() => ({}))
+    if (b?.error) throw new SourceError('meta', reason(b, r.status), r.status, b)
+    if (!r.ok) throw new SourceError('meta', `HTTP ${r.status}`, r.status, b)
+    const expiresIn = Number(b.expires_in)
+    if (typeof b.access_token !== 'string' || !b.access_token || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new SourceError('meta', 'refresh response carried no access_token or expires_in', r.status, {})
+    }
+    const expiresAt = new Date(Date.now() + expiresIn * 1000)
+    // ponytail: 1 day of proof the exchange moved the clock; otherwise keep the old token and let the 7-day warning fire.
+    if (ctx.token.expires_at && expiresAt.getTime() < ctx.token.expires_at.getTime() + 864e5) {
+      throw new SourceError('meta', 'refresh did not extend the token expiry', r.status, {})
+    }
+    return { secret: b.access_token, expiresAt }
+  },
 
   async *incremental(ctx: RunContext): AsyncGenerator<Page> {
     await accountMeta(ctx)
