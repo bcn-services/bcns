@@ -20,7 +20,6 @@ import {
 } from './oauth.js'
 import { handleMcpPost } from './mcp.js'
 import { captureException, initSentry } from './sentry.js'
-import { sentryTest } from './sentry-test.js'
 
 initSentry()
 
@@ -73,11 +72,6 @@ export function createMcpHttpServer(env: SupabaseEnv, limit = limitFromEnv()) {
     // HEAD too: UptimeRobot's free plan probes with HEAD only.
     if ((req.method === 'GET' || req.method === 'HEAD') && path === '/api/health') {
       return json(res, 200, { ok: true })
-    }
-
-    // TEMPORARY (removed in the follow-up PR): token-gated Sentry scrub probe.
-    if (req.method === 'POST' && path === '/api/sentry-test') {
-      return sentryTest(req) ? json(res, 200, { sent: true }) : json(res, 404, { error: 'not_found' })
     }
 
     // Unauthenticated by design: this is how a connector gets a token in the first place.
