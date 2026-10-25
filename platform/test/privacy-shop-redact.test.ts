@@ -148,7 +148,7 @@ describe('shopRedact', () => {
     expect(await rawCount(other, 'shopify')).toBe(1)
   })
 
-  it('escalates an unknown shop: needs_operator, nothing deleted', async () => {
+  it('an unknown shop (no schedule row ever) is done, not escalated: nothing to delete, no notification', async () => {
     const shop = shopFor(randomUUID())
     const id = await queueRequest(shop)
 
@@ -156,9 +156,9 @@ describe('shopRedact', () => {
     expect(n).toBe(1) // "processed" = handled, not necessarily deleted
 
     const row = await statusOf(id)
-    expect(row.status).toBe('needs_operator')
-    expect(row.error).toMatch(/no client matches/)
-    expect(await notificationFor(shop)).toBeDefined()
+    expect(row.status).toBe('done')
+    expect(row.error).toMatch(/nothing to delete/)
+    expect(await notificationFor(shop)).toBeUndefined()
   })
 
   it('escalates an ambiguous shop (two clients share it): needs_operator, nothing deleted', async () => {
