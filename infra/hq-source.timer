@@ -1,0 +1,12 @@
+# Sources new businesses from Places. Weekdays only; Persistent catches a run
+# missed while the droplet was down.
+[Unit]
+Description=HQ source job, weekdays 11:00 UTC
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 11:00:00 UTC
+Persistent=true
+Unit=hq-job@source.service
+
+[Install]
+WantedBy=timers.target
