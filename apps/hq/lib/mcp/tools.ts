@@ -67,7 +67,7 @@ function tool<S extends ZodRawShape>(def: {
 // ---- contact stripping --------------------------------------------------------------------
 
 // next_contact_at is a date, not a contact detail: only name/person/info keys and bare "contact(s)" go.
-const CONTACT_KEY = /phone|e-?mail|mobile|fax|^tel$|^contacts?$|contact_(name|person|info|detail)/i;
+const CONTACT_KEY = /phone|e-?mail|mobile|fax|^tel$|^contacts?$|contact_(name|person|info|detail)|owner_name|person_name|decision_maker/i;
 const EMAIL_IN_TEXT = /[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[A-Za-z]{2,}/g;
 // ponytail: 10-digit NANP (optional +1, parens, space/dot/dash) or +country-code runs; the lookbehind keeps dates,
 // timestamps and ids intact. Other local formats (e.g. 8-digit numbers without +) pass — extend if one shows up.

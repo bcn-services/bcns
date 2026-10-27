@@ -377,6 +377,11 @@ test("search_leads strips contacts, filters by name/stage and escapes wildcard i
   await assert.rejects(call(fake, "search_leads", { limit: 51 }));
 });
 
+test("stripContacts: person-name keys (owner_name, decision_maker) are dropped too", () => {
+  const out = stripContacts({ name: "Acme Plumbing", research: { owner_name: "X", decision_maker: "Y", fit_score: 7 } });
+  assert.deepEqual(out, { name: "Acme Plumbing", research: { fit_score: 7 } });
+});
+
 test("stripContacts: phone-number-looking text is blanked, dates / timestamps / ids / scores are not", () => {
   const out = stripContacts({
     a: "call (555) 010-0199 or 555.010.0198 or 555-010-0197 or +1 555 010 0196 or 5550100195 today",
