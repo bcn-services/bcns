@@ -1,4 +1,5 @@
 import { Board, type Section } from "@/components/Board";
+import { TodayNate } from "@/components/TodayNate";
 import { getSession } from "@/lib/session";
 
 // Headings per handle, from the variant-g prototype (?as=nate|brandon). Rows arrive with later items.
@@ -20,6 +21,7 @@ const HEADINGS: Record<"nate" | "brandon", { title: string; hot?: boolean; sub?:
 export default async function TodayPage() {
   const { profile } = await getSession();
   const handle = profile?.handle ?? "nate";
+  if (handle === "nate") return <TodayNate />;
   const name = handle.charAt(0).toUpperCase() + handle.slice(1);
   const sections: Section[] = HEADINGS[handle].map((h, i) => ({ id: `s${i}`, rows: [], ...h }));
   return (

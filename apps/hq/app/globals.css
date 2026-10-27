@@ -765,3 +765,57 @@ dd {
     gap: 4px 12px;
   }
 }
+/* work + proposals (item 4) */
+.diff.prop {
+  font-size: 13px;
+}
+.diff.prop tbody tr {
+  cursor: default;
+}
+.diff.prop tbody tr:hover {
+  background: #f7f8fc;
+}
+.diff.prop tbody tr.f {
+  background: var(--tint);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.note.err {
+  color: var(--bad);
+}
+.r2.bad {
+  color: var(--bad);
+}
+.wtabs {
+  margin: 12px 0 8px;
+}
+.wtabs a.chip {
+  text-decoration: none;
+}
+.filters,
+.newtask {
+  margin: 8px 0 14px;
+}
+.newtask input[name="title"] {
+  flex: 1;
+  min-width: 160px;
+}
+.newtask input,
+.filters select,
+.tform input,
+.addrow input,
+.sec form input {
+  border: 1px solid #cdd1d9;
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 8px;
+}
+.addrow {
+  padding: 8px 14px;
+}
+.addrow input {
+  flex: 1;
+}
+.sec form.acts input[name="body"],
+.sec form.acts input[name="url"] {
+  flex: 1;
+}
