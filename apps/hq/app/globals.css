@@ -765,73 +765,6 @@ dd {
     gap: 4px 12px;
   }
 }
-
-/* numbers + clients (item 6) */
-.lpad > h2 {
-  margin: 28px 0 8px;
-  font-size: 15px;
-}
-.tw {
-  overflow-x: auto;
-}
-.tbl {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.tbl th,
-.tbl td {
-  padding: 7px 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--line2);
-  white-space: nowrap;
-}
-.tbl th {
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--mute);
-  font-weight: 600;
-}
-.tbl .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.dl {
-  margin-left: 4px;
-  font-size: 11px;
-}
-.dl.up {
-  color: var(--ok);
-}
-.dl.dn {
-  color: var(--bad);
-}
-.mblk {
-  padding: 10px 12px;
-  margin-bottom: 12px;
-}
-.mhead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.inl {
-  display: inline;
-  margin-left: auto;
-}
-.eform {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-  max-width: 420px;
-}
-.eform label {
-  display: grid;
-  gap: 3px;
-  font-size: 12px;
-  color: var(--mute);
 /* work + proposals (item 4) */
 .diff.prop {
   font-size: 13px;
@@ -885,6 +818,7 @@ dd {
 .sec form.acts input[name="body"],
 .sec form.acts input[name="url"] {
   flex: 1;
+}
 
 /* leads grid (item 3) */
 .card:has(> table.grid) {
@@ -963,4 +897,72 @@ table.grid td select {
   background: var(--badbg);
   color: var(--bad);
   font-size: 13px;
+}
+
+/* numbers + clients (item 6) */
+.lpad > h2 {
+  margin: 28px 0 8px;
+  font-size: 15px;
+}
+.tw {
+  overflow-x: auto;
+}
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tbl th,
+.tbl td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line2);
+  white-space: nowrap;
+}
+.tbl th {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mute);
+  font-weight: 600;
+}
+.tbl .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dl {
+  margin-left: 4px;
+  font-size: 11px;
+}
+.dl.up {
+  color: var(--ok);
+}
+.dl.dn {
+  color: var(--bad);
+}
+.mblk {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.mhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.inl {
+  display: inline;
+  margin-left: auto;
+}
+.eform {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  max-width: 420px;
+}
+.eform label {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--mute);
 }
