@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/sentry-scrub.test.mjs",
+    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/keys.test.mjs tests/sentry-scrub.test.mjs",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {

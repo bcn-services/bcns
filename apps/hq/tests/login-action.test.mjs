@@ -15,6 +15,8 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "http://hq-test.invalid";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-key";
 
 const { signInWithPassword } = await import("../app/login/actions.ts");
+const { POST: signOut } = await import("../app/signout/route.ts");
+const { NextRequest } = await import("next/server");
 const { requestAsyncStorage } = await import("next/dist/client/components/request-async-storage.external.js");
 
 const USER = { id: "11111111-1111-1111-1111-111111111111", aud: "authenticated", role: "authenticated", email: "staff@example.test" };
@@ -94,4 +96,22 @@ test("signInWithPassword: Supabase env unset -> /login?error=unconfigured", asyn
   } finally {
     process.env.NEXT_PUBLIC_SUPABASE_URL = url;
   }
+});
+
+test("POST /signout: Supabase logout fails (5xx) -> still 303 /login with every sb-* cookie expired", async () => {
+  const cookie = "sb-hq-test-auth-token=base64-" + Buffer.from(JSON.stringify(TOKEN)).toString("base64url");
+  globalThis.fetch = async () => new Response("{}", { status: 500, headers: { "content-type": "application/json" } });
+  const request = new NextRequest("http://localhost:3105/signout", { method: "POST", headers: { cookie: `${cookie}; other=keep` } });
+  const jar = new Map(request.cookies.getAll().map((c) => [c.name, c.value]));
+  const cookies = {
+    getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+    get: (name) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
+    set: (name, value) => void jar.set(name, value),
+  };
+  const res = await requestAsyncStorage.run({ cookies, mutableCookies: cookies, headers: new Headers() }, () => signOut(request));
+  assert.equal(res.status, 303);
+  assert.equal(new URL(res.headers.get("location")).pathname, "/login");
+  const set = res.headers.getSetCookie();
+  assert.equal(set.length, 1, "only the sb-* cookie is touched");
+  assert.match(set[0], /^sb-hq-test-auth-token=; Path=\/; Max-Age=0/);
 });

@@ -17,7 +17,7 @@ const runtime = { react: req("next/dist/compiled/react"), "react-dom": req("next
 
 test("named imports from react and react-dom exist in Next's compiled React", () => {
   const missing = [];
-  for (const dir of ["app", "lib"]) {
+  for (const dir of ["app", "lib", "components"]) {
     for (const f of readdirSync(`${root}${dir}`, { recursive: true }).filter((n) => /\.tsx?$/.test(n))) {
       const src = readFileSync(`${root}${dir}/${f}`, "utf8");
       // ponytail: named imports only; add `import * as` handling if one appears.

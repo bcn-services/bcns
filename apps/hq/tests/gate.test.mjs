@@ -56,8 +56,8 @@ test("isPublic: the set is exact — near-misses and sub-paths are not public", 
   }
 });
 
-test("matcher excludes _next/static, _next/image and favicon.ico only", () => {
-  assert.deepEqual(config.matcher, ["/((?!_next/static|_next/image|favicon.ico).*)"]);
+test("matcher is TENANT_MATCHER: excludes api/health$, _next/static, _next/image and favicon.ico only", () => {
+  assert.deepEqual(config.matcher, ["/((?!api/health$|_next/static|_next/image|favicon.ico).*)"]);
 });
 
 test("public path passes without touching Supabase", async () => {
@@ -90,6 +90,24 @@ test("session with a profiles row -> next", async () => {
   const res = await middleware(req("/leads", { cookie: COOKIE }));
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("x-middleware-next"), "1");
+});
+
+test("a refreshed session survives the deny redirect (rotated refresh token is not dropped)", async () => {
+  const expired = Buffer.from(
+    JSON.stringify({ access_token: "a.b.c", refresh_token: "r1", token_type: "bearer", expires_in: 3600, expires_at: 1, user: USER }),
+  ).toString("base64url");
+  fakeSupabase({ profile: null });
+  const base = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).includes("/auth/v1/token")) return base(url, init);
+    const fresh = { access_token: "d.e.f", refresh_token: "r2", token_type: "bearer", expires_in: 3600, expires_at: 4102444800, user: USER };
+    return new Response(JSON.stringify(fresh), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const res = await middleware(req("/leads", { cookie: `sb-hq-test-auth-token=base64-${expired}` }));
+  assert.equal(res.status, 307);
+  const set = res.headers.getSetCookie().find((c) => c.startsWith("sb-hq-test-auth-token="));
+  assert.ok(set, "refreshed session cookie is on the redirect");
+  assert.equal(JSON.parse(Buffer.from(set.split(";")[0].split("=base64-")[1], "base64url")).refresh_token, "r2");
 });
 
 test("an invalid session (auth rejects the token) -> 307", async () => {

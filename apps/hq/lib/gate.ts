@@ -16,21 +16,26 @@ export function isPublic(pathname: string): boolean {
   return (PUBLIC_PATHS as readonly string[]).includes(pathname) || pathname.startsWith(PUBLIC_PREFIX);
 }
 
-/** Returns the response to continue with (session cookies refreshed), or null to deny. */
-export type Check = (request: NextRequest) => Promise<NextResponse | null>;
+/**
+ * `ok` admits `response` (session cookies refreshed). Not ok denies, but `response` still carries
+ * the cookies Supabase set (a rotated refresh token) so the redirect can keep them. null = nothing to carry.
+ */
+export type Check = (request: NextRequest) => Promise<{ ok: boolean; response: NextResponse } | null>;
 
 export async function gate(request: NextRequest, check: Check): Promise<NextResponse> {
   if (isPublic(request.nextUrl.pathname)) return NextResponse.next();
-  let pass: NextResponse | null = null;
+  let result: Awaited<ReturnType<Check>> = null;
   try {
-    pass = await check(request);
+    result = await check(request);
   } catch {
-    pass = null; // Supabase unreachable or misconfigured: deny, never admit.
+    result = null; // Supabase unreachable or misconfigured: deny, never admit.
   }
-  if (pass) return pass;
+  if (result?.ok) return result.response;
   const to = request.nextUrl.clone();
   to.pathname = LOGIN_PATH;
   to.search = "";
   // 307 replays the method; a non-GET/HEAD (a server-action POST) is sent to /login as a GET with 303.
-  return NextResponse.redirect(to, request.method === "GET" || request.method === "HEAD" ? 307 : 303);
+  const deny = NextResponse.redirect(to, request.method === "GET" || request.method === "HEAD" ? 307 : 303);
+  result?.response.headers.getSetCookie().forEach((c) => deny.headers.append("set-cookie", c));
+  return deny;
 }

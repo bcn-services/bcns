@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ownsKeys } from "@/lib/keys";
 import { Detail } from "./Detail";
 
 export interface Row {
@@ -47,8 +48,7 @@ export function Board(props: {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (ownsKeys(e.target as HTMLElement | null)) return;
       const { rows, current, onOpen, onLeave, onOutcome } = handlers.current;
       const i = current ? rows.indexOf(current) : -1;
       if (e.key === "j" || e.key === "k") {
