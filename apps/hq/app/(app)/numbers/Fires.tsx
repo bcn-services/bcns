@@ -19,7 +19,7 @@ export function Fires({
   const live = useRef({ fires, sel, create });
   live.current = { fires, sel, create };
 
-  const busy = useRef(new Set<string>());
+  const busy = useRef<Record<string, boolean>>({});
 
   const make = (f: Fire) =>
     oncePerKey(busy.current, f.key, async () => {

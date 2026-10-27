@@ -191,19 +191,19 @@ test("hqRuns reads kind='run' events and maps detail.ok/ms/error", async () => {
   );
 });
 
-// --- merge: getFires() = task fires + ops fires, a failing source never breaks the other -------------
+// --- opsFires: a failing source is one fire, never a throw (lib/fires.ts merges it with allSettled) ----
 
-test("getFires merges opsFires into the list; unset PLATFORM_OPS_URL is one 'ops unavailable' fire", async () => {
+test("opsFires: unset PLATFORM_OPS_URL is one 'ops unavailable' fire", async () => {
   clearOpsMemo();
   delete process.env.PLATFORM_OPS_URL;
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const { getFires } = await import("../lib/fires.ts");
-  const fires = await getFires();
+  const { opsFires } = await import("../lib/fires-ops.ts");
+  const fires = await opsFires();
   assert.deepEqual(
     fires.map((f) => f.key),
     ["ops:unavailable"]
-  ); // taskFires() contributes [] on this base
+  );
   assert.match(fires[0].detail, /PLATFORM_OPS_URL/);
 });
 

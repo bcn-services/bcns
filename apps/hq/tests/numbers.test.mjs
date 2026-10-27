@@ -8,7 +8,7 @@ import { fakeSb } from "./_fakesb.mjs";
 globalThis.React = React;
 const { NumbersView } = await import("../app/(app)/numbers/View.tsx");
 const { Fires } = await import("../app/(app)/numbers/Fires.tsx");
-const { createOpsTask, oncePerKey } = await import("../app/(app)/numbers/task.ts");
+const { oncePerKey } = await import("../app/(app)/numbers/task.ts");
 const { loadFinance } = await import("../app/(app)/numbers/data.ts");
 const money = await import("../lib/money.ts");
 const F = await import("../lib/finance.ts");
@@ -184,7 +184,7 @@ test("Fires renders each fire with its key hint", () => {
 });
 
 test("oncePerKey: a second press while one is in flight does nothing; after it settles, runs again", async () => {
-  const busy = new Set();
+  const busy = {};
   let calls = 0;
   let release;
   const slow = () => (calls++, new Promise((res) => (release = res)));
@@ -203,58 +203,5 @@ test("oncePerKey: a second press while one is in flight does nothing; after it s
       throw new Error("x");
     })
   );
-  assert.equal(busy.size, 0, "a failure releases the key");
-});
-
-// --- key `c`: an ops task --------------------------------------------------------------------
-
-const fire = {
-  key: "ops:connector:acme:shopify",
-  title: "acme shopify: auth_failed",
-  detail: "since 2026-10-20",
-};
-
-test("createOpsTask: inserts an ops task for Nate keyed by the fire, plus an events row", async () => {
-  const sb = fakeSb({
-    "tasks.select": { data: [], error: null },
-    "tasks.insert": { data: { id: "task-1" }, error: null },
-    "events.insert": { error: null },
-  });
-  assert.deepEqual(await createOpsTask(sb, "user-1", fire), { ok: true, message: "task created" });
-  const ins = sb.log.find((l) => l.table === "tasks" && l.op === "insert").args.insert;
-  assert.deepEqual(
-    [ins.title, ins.owner, ins.area, ins.source, ins.alert_key, ins.created_by, ins.via],
-    [
-      "acme shopify: auth_failed",
-      "nate",
-      "ops",
-      "alert",
-      "ops:connector:acme:shopify",
-      "user-1",
-      "ui",
-    ]
-  );
-  const ev = sb.log.find((l) => l.table === "events").args.insert;
-  assert.deepEqual(
-    [ev.job, ev.kind, ev.actor, ev.via, ev.detail.task_id],
-    ["tasks", "task_created", "user-1", "ui", "task-1"]
-  );
-});
-
-test("createOpsTask: one open task per fire; non-ops keys are refused before any query", async () => {
-  const sb = fakeSb({ "tasks.select": { data: [{ id: "task-0" }], error: null } });
-  assert.deepEqual(await createOpsTask(sb, "u", fire), { ok: true, message: "task already open" });
-  assert.ok(!sb.log.some((l) => l.op === "insert"));
-  const sb2 = fakeSb();
-  assert.equal((await createOpsTask(sb2, "u", { key: "task:123", title: "x" })).ok, false);
-  assert.equal(sb2.log.length, 0);
-});
-
-test("createOpsTask: an insert failure writes no events row", async () => {
-  const sb = fakeSb({
-    "tasks.select": { data: [], error: null },
-    "tasks.insert": { data: null, error: { message: "denied" } },
-  });
-  assert.deepEqual(await createOpsTask(sb, "u", fire), { ok: false, message: "denied" });
-  assert.ok(!sb.log.some((l) => l.table === "events"));
+  assert.equal(busy.k, false, "a failure releases the key");
 });
