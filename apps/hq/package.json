@@ -1,0 +1,31 @@
+{
+  "name": "@bcn-services/hq",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "tsx scripts/check-env.ts && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/keys.test.mjs tests/redirect-origin.test.mjs tests/sentry-scrub.test.mjs",
+    "clean": "rm -rf .next .turbo node_modules"
+  },
+  "dependencies": {
+    "@sentry/nextjs": "10.76.2",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@bcn-services/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^9.15.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.6.3"
+  }
+}
