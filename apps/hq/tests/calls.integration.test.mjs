@@ -83,7 +83,12 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
   const { error: vErr } = await sb.auth.verifyOtp({ token_hash: link.hashed_token, type: link.verification_type ?? "magiclink" });
   assert.equal(vErr, null, "session minted");
   // the local stack's token iat can land a beat ahead of PostgREST's clock ("JWT issued at future"); wait it out
-  await new Promise((r) => setTimeout(r, 1500));
+  // (a fixed sleep flaked once under a full-gate run: poll until PostgREST accepts the token)
+  for (let i = 0; i < 40; i++) {
+    const { error } = await sb.from("profiles").select("id").limit(1);
+    if (!error || !/issued at future/i.test(error.message)) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 
   // Today sees both, best fit first (RLS as the user)
   const before = await loadBrandonToday(sb, "brandon", { all: true });
