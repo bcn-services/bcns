@@ -8,18 +8,20 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/keys.test.mjs tests/redirect-origin.test.mjs tests/sentry-scrub.test.mjs tests/work.test.mjs tests/proposals.test.mjs tests/seed-gtm.test.mjs tests/work-ui.test.mjs tests/leads.test.mjs tests/leads-ics.test.mjs tests/today-brandon.test.mjs tests/calls.integration.test.mjs tests/finance.test.mjs tests/money.test.mjs tests/ops.test.mjs tests/clients.test.mjs tests/numbers.test.mjs",
+    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/keys.test.mjs tests/redirect-origin.test.mjs tests/sentry-scrub.test.mjs tests/work.test.mjs tests/proposals.test.mjs tests/seed-gtm.test.mjs tests/work-ui.test.mjs tests/leads.test.mjs tests/leads-ics.test.mjs tests/today-brandon.test.mjs tests/calls.integration.test.mjs tests/oauth.test.mjs tests/mcp-limit.test.mjs tests/mcp-tools.test.mjs tests/mcp-routes.test.mjs tests/finance.test.mjs tests/money.test.mjs tests/ops.test.mjs tests/clients.test.mjs tests/numbers.test.mjs",
     "seed-gtm": "tsx scripts/seed-gtm.ts",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@sentry/nextjs": "10.76.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "next": "14.2.35",
     "postgres": "^3.4.7",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@bcn-services/config": "workspace:*",
