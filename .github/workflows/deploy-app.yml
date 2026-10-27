@@ -6,14 +6,14 @@ name: deploy-app
 # app here is shared-platform mode. Build → rsync standalone → activate + health-check
 # with rollback, unchanged from the SB pipeline.
 #
-# push: every matching push deploys all of sb, connect and mcp (the matrix is fixed;
+# push: every matching push deploys all of sb, connect, mcp and hq (the matrix is fixed;
 #   the paths filter below only decides whether the workflow runs, not which legs).
 # workflow_dispatch: pass the slug to redeploy one app on demand.
 
 on:
   push:
     branches: [main]
-    paths: [apps/sb/**, apps/connect/**, apps/mcp/**, packages/**, package.json, pnpm-lock.yaml, .github/workflows/deploy-app.yml]
+    paths: [apps/sb/**, apps/connect/**, apps/mcp/**, apps/hq/**, packages/**, package.json, pnpm-lock.yaml, .github/workflows/deploy-app.yml]
   workflow_dispatch:
     inputs:
       slug:
@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         # dispatch → the one slug; push → every deployable app.
-        slug: ${{ inputs.slug && fromJSON(format('["{0}"]', inputs.slug)) || fromJSON('["sb","connect","mcp"]') }}
+        slug: ${{ inputs.slug && fromJSON(format('["{0}"]', inputs.slug)) || fromJSON('["sb","connect","mcp","hq"]') }}
     env:
       SLUG: ${{ matrix.slug }}
       # Next writes its own release root; the mcp service gets one from `pnpm deploy`.
@@ -73,6 +73,8 @@ jobs:
           # bcns-app@.service runs `node server.js` in /srv/<slug>/current (unit is shared with
           # l2detailz, unchanged). Shim at the release root; Next's server.js chdirs to its own dir.
           printf "require('./apps/%s/server.js');\n" "$SLUG" > "$app/.next/standalone/server.js"
+          # hq's systemd timers run `node jobs/run.mjs` from the release root.
+          if [ "$SLUG" = hq ]; then cp -r "$app/jobs" "$app/.next/standalone/jobs"; fi
       - name: Build (Node service)
         if: matrix.slug == 'mcp'
         # apps/mcp is a plain node:http process, not a Next app, so there is no standalone
@@ -100,6 +102,10 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_deploy "$SLUG@$HOST" "
             set -e
+            # hq jobs are not a pnpm workspace member; install their deps into this release before the flip.
+            if [ -d /srv/$SLUG/releases/$GITHUB_SHA/jobs ]; then
+              (cd /srv/$SLUG/releases/$GITHUB_SHA/jobs && npm install --omit=dev --no-package-lock)
+            fi
             prev=\$(readlink /srv/$SLUG/current || true)
             ln -sfn /srv/$SLUG/releases/$GITHUB_SHA /srv/$SLUG/current
             sudo systemctl restart bcns-app@$SLUG
