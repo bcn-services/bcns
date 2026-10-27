@@ -1,0 +1,130 @@
+{
+  "tracks": [
+    {
+      "area": "warm",
+      "name": "Warm contacts",
+      "steps": [
+        {
+          "title": "Make the warm discovery calls (first 5)",
+          "owner": "nate",
+          "status": "doing",
+          "due": "2026-10-31"
+        },
+        {
+          "title": "Add Brandon's own warm contacts",
+          "owner": "brandon",
+          "status": "todo",
+          "due": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "area": "cousin-pilot",
+      "name": "Cousin pilot",
+      "steps": [
+        {
+          "title": "Pick the pilot terms",
+          "owner": "nate",
+          "status": "doing",
+          "due": "2026-10-27"
+        },
+        {
+          "title": "Record the voiceover and the demo on the phone",
+          "owner": "nate",
+          "status": "todo",
+          "due": "2026-10-29"
+        },
+        {
+          "title": "Walk the cousin through the demo and the pilot",
+          "owner": "brandon",
+          "status": "todo",
+          "due": "2026-10-28"
+        }
+      ]
+    },
+    {
+      "area": "interviews",
+      "name": "Interviews",
+      "steps": [
+        {
+          "title": "Interview questions",
+          "owner": "claude",
+          "status": "done",
+          "due": "2026-10-22"
+        },
+        {
+          "title": "Run the first interviews",
+          "owner": "brandon",
+          "status": "waiting",
+          "due": "2026-10-30",
+          "waiting_on": "2 owners to confirm times"
+        }
+      ]
+    },
+    {
+      "area": "associations",
+      "name": "Associations",
+      "steps": [
+        {
+          "title": "Write \"AI for small businesses 101\"",
+          "owner": "claude",
+          "status": "doing",
+          "due": "2026-10-30"
+        },
+        {
+          "title": "Send association notes and follow up",
+          "owner": "brandon",
+          "status": "todo",
+          "due": "2026-10-29"
+        }
+      ]
+    },
+    {
+      "area": "linkedin",
+      "name": "LinkedIn",
+      "steps": [
+        {
+          "title": "LinkedIn: topics and posting cadence",
+          "owner": "claude",
+          "status": "done",
+          "due": "2026-10-20"
+        }
+      ]
+    },
+    {
+      "area": "cold-calling",
+      "name": "Cold calling",
+      "steps": [
+        {
+          "title": "Two cold-call script variants",
+          "owner": "claude",
+          "status": "done",
+          "due": "2026-10-21"
+        }
+      ]
+    },
+    {
+      "area": "demos",
+      "name": "2-min demos",
+      "steps": [
+        { "title": "Make the 2-min demo video template", "owner": "nate", "status": "todo" }
+      ]
+    },
+    {
+      "area": "seo-ads",
+      "name": "SEO + Meta ads (later)",
+      "steps": [
+        {
+          "title": "Revisit SEO and Meta ads once calls and warm contacts are running",
+          "owner": "nate",
+          "status": "todo"
+        }
+      ]
+    }
+  ],
+  "lists": {
+    "warm": [],
+    "interviews": [],
+    "associations": []
+  }
+}

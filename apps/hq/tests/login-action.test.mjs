@@ -156,5 +156,7 @@ test("POST /signout: Supabase logout fails (5xx) -> still 303 /login with every 
   assert.equal(new URL(res.headers.get("location"), "http://localhost").pathname, "/login");
   const set = res.headers.getSetCookie();
   assert.equal(set.length, 1, "only the sb-* cookie is touched");
-  assert.match(set[0], /^sb-hq-test-auth-token=; Path=\/; Max-Age=0/);
+  assert.match(set[0], /^sb-hq-test-auth-token=; Path=\/;/);
+  assert.match(set[0], /Max-Age=0/);
+  assert.match(set[0], /Expires=Thu, 01 Jan 1970/); // item-3: Next re-serializes and drops Max-Age alone
 });
