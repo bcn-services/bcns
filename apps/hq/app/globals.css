@@ -818,6 +818,7 @@ dd {
 .sec form.acts input[name="body"],
 .sec form.acts input[name="url"] {
   flex: 1;
+}
 
 /* leads grid (item 3) */
 .card:has(> table.grid) {
