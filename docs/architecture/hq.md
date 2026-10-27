@@ -79,7 +79,7 @@ Details: `apps/hq/supabase/README.md`.
 ### 3. Platform database: `hq_ops_ro` (project `cnsxbglhredokjbvudfd`)
 
 ```bash
-supabase link --workdir platform --project-ref cnsxbglhredokjbvudfd   # only if platform/supabase/.temp is missing in this checkout
+supabase link --workdir platform --project-ref cnsxbglhredokjbvudfd   # only if platform/supabase/.temp/project-ref is missing in this checkout (a bare .temp/ dir is not linked)
 supabase db push --workdir platform --dry-run      # expect 20261027000100_hq_ops_ro.sql (plus anything else genuinely unapplied: read it)
 supabase db push --workdir platform
 ```
@@ -198,7 +198,7 @@ Without the CLI or token `qualify` still runs, scoring by code signals alone.
 
 ### 7. Deploy workflow edit, then merge (first deploy)
 
-`.github/workflows/deploy-app.yml` is outside the HQ run's scope, so this is your edit. Make it on a branch off `feat/hq` (or directly before merging) and commit it with the merge:
+`.github/workflows/deploy-app.yml` is outside the HQ run's scope, so this is your edit. Commit the edit on `feat/hq` before this step's merge:
 
 ```diff
 -    paths: [apps/sb/**, apps/connect/**, apps/mcp/**, packages/**, package.json, pnpm-lock.yaml, .github/workflows/deploy-app.yml]
@@ -227,7 +227,8 @@ In step "Activate, health-check, prune", inside the `ssh ... "` script, immediat
 Then ship. `rsync --delete` replaces each release, so `npm install` reruns on every deploy by design.
 
 ```bash
-GITHUB_TOKEN= gh pr ready <n> -R bcn-services/bcns        # <n> = the feat/hq -> main draft PR (number not known when this was written)
+GITHUB_TOKEN= gh pr list -R bcn-services/bcns --head feat/hq --state open   # <n> = the feat/hq -> main draft PR; if none: gh pr create --base main --head feat/hq --draft
+GITHUB_TOKEN= gh pr ready <n> -R bcn-services/bcns
 GITHUB_TOKEN= gh pr merge <n> -R bcn-services/bcns --squash   # or --merge to keep the item commits
 ```
 
