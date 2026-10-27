@@ -16,11 +16,23 @@ const { middleware, config } = await import("../middleware.ts");
 const { PUBLIC_PATHS, PUBLIC_PREFIX, isPublic } = await import("../lib/gate.ts");
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
-const USER = { id: "11111111-1111-1111-1111-111111111111", aud: "authenticated", role: "authenticated", email: "staff@example.test" };
+const USER = {
+  id: "11111111-1111-1111-1111-111111111111",
+  aud: "authenticated",
+  role: "authenticated",
+  email: "staff@example.test",
+};
 
 // cookie name is sb-<first host label>-auth-token; value is "base64-" + base64url(session JSON)
 const session = Buffer.from(
-  JSON.stringify({ access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 3600, expires_at: 4102444800, user: USER }),
+  JSON.stringify({
+    access_token: "a.b.c",
+    refresh_token: "r",
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: 4102444800,
+    user: USER,
+  })
 ).toString("base64url");
 const COOKIE = `sb-hq-test-auth-token=base64-${session}`;
 
@@ -31,10 +43,22 @@ function fakeSupabase({ user = USER, profile = { id: USER.id }, down = false } =
     const u = String(url);
     calls.push(u);
     if (down) throw new TypeError("fetch failed");
-    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-    if (u.includes("/auth/v1/user")) return user ? json(200, user) : json(401, { message: "bad jwt" });
+    const json = (status, body) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+    if (u.includes("/auth/v1/user"))
+      return user ? json(200, user) : json(401, { message: "bad jwt" });
     if (u.includes("/rest/v1/profiles")) {
-      return profile ? json(200, profile) : json(406, { code: "PGRST116", message: "The result contains 0 rows", details: null, hint: null });
+      return profile
+        ? json(200, profile)
+        : json(406, {
+            code: "PGRST116",
+            message: "The result contains 0 rows",
+            details: null,
+            hint: null,
+          });
     }
     throw new Error("unexpected fetch " + u);
   };
@@ -45,13 +69,29 @@ const req = (path, { cookie, method = "GET" } = {}) =>
   new NextRequest(`http://localhost:3105${path}`, { method, headers: cookie ? { cookie } : {} });
 
 test("PUBLIC_PATHS is exactly /login /signout /api/health /mcp /authorize /token /register, plus the /.well-known/ prefix", () => {
-  assert.deepEqual([...PUBLIC_PATHS], ["/login", "/signout", "/api/health", "/mcp", "/authorize", "/token", "/register"]);
+  assert.deepEqual(
+    [...PUBLIC_PATHS],
+    ["/login", "/signout", "/api/health", "/mcp", "/authorize", "/token", "/register"]
+  );
   assert.equal(PUBLIC_PREFIX, "/.well-known/");
 });
 
 test("isPublic: the set is exact — near-misses and sub-paths are not public", () => {
-  for (const p of [...PUBLIC_PATHS, "/.well-known/oauth-authorization-server", "/.well-known/x/y"]) assert.ok(isPublic(p), p);
-  for (const p of ["/", "/leads", "/loginx", "/login/x", "/api", "/api/health/x", "/api/healthz", "/mcp/x", "/.well-known", "/x/.well-known/y", "/signout/"]) {
+  for (const p of [...PUBLIC_PATHS, "/.well-known/oauth-authorization-server", "/.well-known/x/y"])
+    assert.ok(isPublic(p), p);
+  for (const p of [
+    "/",
+    "/leads",
+    "/loginx",
+    "/login/x",
+    "/api",
+    "/api/health/x",
+    "/api/healthz",
+    "/mcp/x",
+    "/.well-known",
+    "/x/.well-known/y",
+    "/signout/",
+  ]) {
     assert.ok(!isPublic(p), p);
   }
 });
@@ -82,7 +122,10 @@ test("session WITHOUT a profiles row -> 307 to /login (signups never grant acces
   const res = await middleware(req("/leads", { cookie: COOKIE }));
   assert.equal(res.status, 307);
   assert.equal(new URL(res.headers.get("location")).pathname, "/login");
-  assert.ok(calls.some((u) => u.includes("/rest/v1/profiles")), "the profiles table was consulted");
+  assert.ok(
+    calls.some((u) => u.includes("/rest/v1/profiles")),
+    "the profiles table was consulted"
+  );
 });
 
 test("session with a profiles row -> next", async () => {
@@ -94,20 +137,42 @@ test("session with a profiles row -> next", async () => {
 
 test("a refreshed session survives the deny redirect (rotated refresh token is not dropped)", async () => {
   const expired = Buffer.from(
-    JSON.stringify({ access_token: "a.b.c", refresh_token: "r1", token_type: "bearer", expires_in: 3600, expires_at: 1, user: USER }),
+    JSON.stringify({
+      access_token: "a.b.c",
+      refresh_token: "r1",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: 1,
+      user: USER,
+    })
   ).toString("base64url");
   fakeSupabase({ profile: null });
   const base = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     if (!String(url).includes("/auth/v1/token")) return base(url, init);
-    const fresh = { access_token: "d.e.f", refresh_token: "r2", token_type: "bearer", expires_in: 3600, expires_at: 4102444800, user: USER };
-    return new Response(JSON.stringify(fresh), { status: 200, headers: { "content-type": "application/json" } });
+    const fresh = {
+      access_token: "d.e.f",
+      refresh_token: "r2",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: 4102444800,
+      user: USER,
+    };
+    return new Response(JSON.stringify(fresh), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   };
-  const res = await middleware(req("/leads", { cookie: `sb-hq-test-auth-token=base64-${expired}` }));
+  const res = await middleware(
+    req("/leads", { cookie: `sb-hq-test-auth-token=base64-${expired}` })
+  );
   assert.equal(res.status, 307);
   const set = res.headers.getSetCookie().find((c) => c.startsWith("sb-hq-test-auth-token="));
   assert.ok(set, "refreshed session cookie is on the redirect");
-  assert.equal(JSON.parse(Buffer.from(set.split(";")[0].split("=base64-")[1], "base64url")).refresh_token, "r2");
+  assert.equal(
+    JSON.parse(Buffer.from(set.split(";")[0].split("=base64-")[1], "base64url")).refresh_token,
+    "r2"
+  );
 });
 
 test("an invalid session (auth rejects the token) -> 307", async () => {
@@ -137,5 +202,6 @@ test("no Supabase env at all fails closed", async () => {
 });
 
 test("cookies are host-only: no domain option in the Supabase client setup", () => {
-  for (const f of ["../middleware.ts", "../lib/supabase.ts"]) assert.doesNotMatch(read(f), /domain\s*:/i, f);
+  for (const f of ["../middleware.ts", "../lib/supabase.ts"])
+    assert.doesNotMatch(read(f), /domain\s*:/i, f);
 });

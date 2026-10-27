@@ -10,4 +10,8 @@ const nextConfig = {
 };
 
 // Errors only, no source-map upload (needs SENTRY_AUTH_TOKEN; not set in CI).
-export default withSentryConfig(nextConfig, { silent: true, telemetry: false, sourcemaps: { disable: true } });
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  telemetry: false,
+  sourcemaps: { disable: true },
+});

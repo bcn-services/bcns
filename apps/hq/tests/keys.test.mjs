@@ -15,7 +15,8 @@ const el = (tagName, { within = [], isContentEditable = false } = {}) => ({
 test("ownsKeys: inputs, contentEditable, links, buttons (and their children), summaries own their keys", () => {
   for (const t of ["INPUT", "TEXTAREA", "SELECT"]) assert.ok(ownsKeys(el(t)), t);
   assert.ok(ownsKeys(el("DIV", { isContentEditable: true })));
-  for (const s of ["a", "button", "[role=button]", "summary"]) assert.ok(ownsKeys(el("SPAN", { within: [s] })), s);
+  for (const s of ["a", "button", "[role=button]", "summary"])
+    assert.ok(ownsKeys(el("SPAN", { within: [s] })), s);
 });
 
 test("ownsKeys: body, rows and the detail pane do not; null does not", () => {

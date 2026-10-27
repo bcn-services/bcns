@@ -21,7 +21,11 @@ const check: Check = async (request) => {
   });
   const { data } = await supabase.auth.getUser();
   if (!data.user) return { ok: false, response };
-  const { data: row } = await supabase.from("profiles").select("id").eq("id", data.user.id).maybeSingle();
+  const { data: row } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", data.user.id)
+    .maybeSingle();
   return { ok: !!row, response };
 };
 

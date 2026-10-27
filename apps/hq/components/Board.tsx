@@ -84,7 +84,9 @@ export function Board(props: {
               <section className="sx" key={s.id}>
                 <div className="sh">
                   <h2>{s.title}</h2>
-                  <span className={`cnt${s.hot && s.rows.length ? " hot" : ""}`}>{s.rows.length}</span>
+                  <span className={`cnt${s.hot && s.rows.length ? " hot" : ""}`}>
+                    {s.rows.length}
+                  </span>
                   {s.sub ? <span className="sub">{s.sub}</span> : null}
                 </div>
                 <div className="card">

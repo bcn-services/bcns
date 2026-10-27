@@ -9,6 +9,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   to.search = "";
   const res = NextResponse.redirect(to, 303);
   // signOut() returns before clearing anything when Supabase is unreachable or 5xx: expire the session ourselves.
-  request.cookies.getAll().filter((c) => c.name.startsWith("sb-")).forEach((c) => res.cookies.set(c.name, "", { path: "/", maxAge: 0 }));
+  request.cookies
+    .getAll()
+    .filter((c) => c.name.startsWith("sb-"))
+    .forEach((c) => res.cookies.set(c.name, "", { path: "/", maxAge: 0 }));
   return res;
 }

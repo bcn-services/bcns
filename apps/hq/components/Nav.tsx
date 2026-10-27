@@ -18,7 +18,12 @@ export function Nav() {
       {LINKS.map(([href, label]) => {
         const on = href === "/" ? path === "/" : path.startsWith(href);
         return (
-          <Link key={href} href={href} className={`nv${on ? " on" : ""}`} aria-current={on ? "page" : undefined}>
+          <Link
+            key={href}
+            href={href}
+            className={`nv${on ? " on" : ""}`}
+            aria-current={on ? "page" : undefined}
+          >
             {label}
           </Link>
         );
