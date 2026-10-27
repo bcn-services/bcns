@@ -1,8 +1,8 @@
 /** ops.test.mjs — fire rules (pure), the unavailable fire, and getFires() merging them with task fires. */
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 
-const { opsFiresFrom, hqRuns } = await import("../lib/ops.ts");
+const { opsFiresFrom, hqRuns, opsSnapshot, clearOpsMemo } = await import("../lib/ops.ts");
 
 const NOW = new Date("2026-10-27T12:00:00Z");
 const hours = (h) => new Date(NOW.getTime() - h * 3600_000).toISOString();
@@ -104,6 +104,55 @@ test("a rejected platform query makes exactly one 'ops unavailable' fire", () =>
   assert.match(fires[0].detail, /health, runs/);
 });
 
+// --- the platform being slow or down must cost one bounded wait, not one per query per render ------
+
+test("opsSnapshot: a query that never resolves settles at the deadline as one 'ops unavailable' fire", async () => {
+  clearOpsMemo();
+  const t0 = Date.now();
+  const snap = await opsSnapshot({ deadlineMs: 40, load: () => new Promise(() => {}) });
+  assert.ok(Date.now() - t0 < 2000, "settled at the deadline, not after the queries");
+  assert.deepEqual(snap.failed, ["timeout"]);
+  const fires = opsFiresFrom(snap, [], NOW);
+  assert.deepEqual(
+    fires.map((f) => f.key),
+    ["ops:unavailable"]
+  );
+  assert.match(fires[0].detail, /timeout/);
+  clearOpsMemo();
+});
+
+test("opsSnapshot: shared for 60s, failures included, then loaded again", async () => {
+  clearOpsMemo();
+  mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  try {
+    let loads = 0;
+    const load = async () => (loads++, { ...empty, failed: ["health"] });
+    const [a, b] = await Promise.all([opsSnapshot({ load }), opsSnapshot({ load })]); // page + getFires
+    assert.equal(loads, 1);
+    assert.equal(a, b);
+    mock.timers.tick(59_000);
+    await opsSnapshot({ load });
+    assert.equal(loads, 1, "still memoised, even though it failed");
+    mock.timers.tick(2_000);
+    await opsSnapshot({ load });
+    assert.equal(loads, 2, "memo expired after 60s");
+  } finally {
+    mock.timers.reset();
+    clearOpsMemo();
+  }
+});
+
+test("opsSnapshot: a loader that throws is a failure, not a thrown render", async () => {
+  clearOpsMemo();
+  const snap = await opsSnapshot({
+    load: async () => {
+      throw new Error("boom");
+    },
+  });
+  assert.deepEqual(snap.failed, ["query"]);
+  clearOpsMemo();
+});
+
 test("hqRuns reads kind='run' events and maps detail.ok/ms/error", async () => {
   const seen = {};
   const build = (result) => {
@@ -145,6 +194,7 @@ test("hqRuns reads kind='run' events and maps detail.ok/ms/error", async () => {
 // --- merge: getFires() = task fires + ops fires, a failing source never breaks the other -------------
 
 test("getFires merges opsFires into the list; unset PLATFORM_OPS_URL is one 'ops unavailable' fire", async () => {
+  clearOpsMemo();
   delete process.env.PLATFORM_OPS_URL;
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -158,6 +208,7 @@ test("getFires merges opsFires into the list; unset PLATFORM_OPS_URL is one 'ops
 });
 
 test("opsFires: an unreachable platform database is reported as unavailable, not thrown", async () => {
+  clearOpsMemo(); // the previous test memoised the unset-URL failure
   process.env.PLATFORM_OPS_URL = "postgresql://hq_ops_ro:none@127.0.0.1:1/postgres?sslmode=disable"; // nothing listens on port 1
   const { opsFires } = await import("../lib/fires-ops.ts");
   const fires = await opsFires();

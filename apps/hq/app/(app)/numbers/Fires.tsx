@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ownsKeys } from "@/lib/keys";
 import type { Fire } from "@/lib/fires";
 import type { ActionResult } from "./actions";
+import { oncePerKey } from "./task";
 
 /** Fires list: j/k move, `c` makes an ops task for the focused fire. */
 export function Fires({
@@ -18,15 +19,18 @@ export function Fires({
   const live = useRef({ fires, sel, create });
   live.current = { fires, sel, create };
 
-  async function make(f: Fire) {
-    setMsg((m) => ({ ...m, [f.key]: "creating…" }));
-    try {
-      const r = await live.current.create({ key: f.key, title: f.title, detail: f.detail });
-      setMsg((m) => ({ ...m, [f.key]: r.message }));
-    } catch {
-      setMsg((m) => ({ ...m, [f.key]: "failed" }));
-    }
-  }
+  const busy = useRef(new Set<string>());
+
+  const make = (f: Fire) =>
+    oncePerKey(busy.current, f.key, async () => {
+      setMsg((m) => ({ ...m, [f.key]: "creating…" }));
+      try {
+        const r = await live.current.create({ key: f.key, title: f.title, detail: f.detail });
+        setMsg((m) => ({ ...m, [f.key]: r.message }));
+      } catch {
+        setMsg((m) => ({ ...m, [f.key]: "failed" }));
+      }
+    });
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -40,7 +44,7 @@ export function Fires({
         setSel(fires[n]?.key ?? null);
       } else if (e.key === "c" && i >= 0) {
         const f = fires[i];
-        if (f) void make(f);
+        if (f && !e.repeat) void make(f); // holding `c` repeats keydown
       } else return;
       e.preventDefault();
     }

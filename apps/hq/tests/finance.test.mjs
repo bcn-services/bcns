@@ -134,33 +134,84 @@ test("monthly view without snapshots: every month is live", () => {
   assert.equal(octCold.deltas.signed, 1);
 });
 
+const win = { from: "2026-08-31", now }; // window starts before September; "now" is Wed 2026-10-07
+
 test("freezeMonth inserts once, refuses a month already frozen (23505), and validates input", async () => {
   const seen = [];
-  const ok = await F.freezeMonth(async (row) => (seen.push(row), null), "2026-10-01", live);
+  const ok = await F.freezeMonth(async (row) => (seen.push(row), null), "2026-09-01", live, win);
   assert.deepEqual(ok, { ok: true });
-  assert.equal(seen[0].month, "2026-10-01");
-  assert.ok(seen[0].data.rows.every((r) => r.period === "2026-10-01"));
+  assert.equal(seen[0].month, "2026-09-01");
+  assert.ok(seen[0].data.rows.every((r) => r.period === "2026-09-01"));
   assert.equal(seen[0].data.assumptions.arpuCents, 10500);
 
   const dup = await F.freezeMonth(
     async () => ({ code: "23505", message: "duplicate key" }),
     "2026-09-01",
-    live
+    live,
+    win
   );
   assert.deepEqual(dup, { ok: false, reason: "already frozen" });
 
-  assert.deepEqual(await F.freezeMonth(async () => null, "2026-10-15", live), {
+  assert.deepEqual(await F.freezeMonth(async () => null, "2026-09-15", live, win), {
     ok: false,
     reason: "bad month",
   });
-  assert.deepEqual(await F.freezeMonth(async () => null, "2025-01-01", live), {
-    ok: false,
-    reason: "no data for that month",
-  });
+  assert.deepEqual(
+    await F.freezeMonth(async () => null, "2025-01-01", live, { ...win, from: "2024-01-01" }),
+    {
+      ok: false,
+      reason: "no data for that month",
+    }
+  );
   const other = await F.freezeMonth(
     async () => ({ code: "42501", message: "denied" }),
-    "2026-10-01",
-    live
+    "2026-09-01",
+    live,
+    win
   );
   assert.deepEqual(other, { ok: false, reason: "denied" });
+});
+
+test("freezeMonth refuses the current month, a future month, and a month the window only partly loaded", async () => {
+  const never = async () => assert.fail("must not insert");
+  const refused = { ok: false, reason: "month not finished or only partly loaded" };
+  // October is the current month (live has October rows): its weeks are still arriving
+  assert.deepEqual(await F.freezeMonth(never, "2026-10-01", live, win), refused);
+  assert.deepEqual(await F.freezeMonth(never, "2026-11-01", live, win), refused);
+  // window starts 2026-09-07, so September (the 1st) is partly there
+  assert.deepEqual(
+    await F.freezeMonth(never, "2026-09-01", live, { from: "2026-09-07", now }),
+    refused
+  );
+  // the 1st can fall inside a week that is not over: Sun 2026-11-01 New York is still the week of Oct 26
+  const sunday = new Date("2026-11-01T17:00:00Z");
+  assert.deepEqual(
+    await F.freezeMonth(never, "2026-10-01", live, { from: win.from, now: sunday }),
+    refused
+  );
+  assert.deepEqual(
+    await F.freezeMonth(async () => null, "2026-10-01", live, {
+      from: win.from,
+      now: new Date("2026-11-02T17:00:00Z"), // Monday: October's last week is over
+    }),
+    { ok: true }
+  );
+});
+
+test("freezable: complete past months inside the window only", () => {
+  assert.equal(F.freezable("2026-09-01", "2026-08-31", now), true);
+  assert.equal(F.freezable("2026-10-01", "2026-08-31", now), false); // current
+  assert.equal(F.freezable("2026-09-01", "2026-09-07", now), false); // partly loaded
+  assert.equal(F.freezable("2026-09-01", "2026-09-01", now), true); // window starts on the 1st
+  const v = F.monthlyView(live, [], win);
+  assert.deepEqual(
+    v.map((m) => [m.month, m.freezable]),
+    [
+      ["2026-10-01", false],
+      ["2026-09-01", true],
+    ]
+  );
+  const frozenSep = F.monthlyView(live, [{ month: "2026-09-01", data: { rows: [] } }], win);
+  assert.equal(frozenSep[1].freezable, false); // already frozen
+  assert.ok(F.monthlyView(live, []).every((m) => !m.freezable)); // no window, no Freeze
 });

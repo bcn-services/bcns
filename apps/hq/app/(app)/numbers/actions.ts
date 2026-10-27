@@ -8,7 +8,7 @@ import { createOpsTask, type Result } from "./task";
 
 export type ActionResult = Result;
 
-/** Freeze one month into finance_snapshots. Insert only: an existing row refuses (RLS has no update). */
+/** Freeze one month into finance_snapshots. Insert only: an existing row refuses (23505), and 0030 revokes UPDATE from authenticated. */
 export async function freezeMonthAction(formData: FormData): Promise<void> {
   const month = String(formData.get("month") ?? "");
   const sb = createSupabaseServer();
@@ -16,11 +16,13 @@ export async function freezeMonthAction(formData: FormData): Promise<void> {
   const { data } = await sb.auth.getUser();
   if (!data.user) return;
   // The rows are recomputed here from the database, never taken from the browser.
-  const { live } = await loadFinance(sb);
+  const now = new Date();
+  const { live, from } = await loadFinance(sb, now);
   const r = await freezeMonth(
     async (row) => (await sb.from("finance_snapshots").insert(row)).error,
     month,
-    live
+    live,
+    { from, now }
   );
   if (!r.ok) console.error(`[numbers] freeze ${month} refused: ${r.reason}`);
   else

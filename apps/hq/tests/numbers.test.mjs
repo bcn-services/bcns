@@ -8,7 +8,7 @@ import { fakeSb } from "./_fakesb.mjs";
 globalThis.React = React;
 const { NumbersView } = await import("../app/(app)/numbers/View.tsx");
 const { Fires } = await import("../app/(app)/numbers/Fires.tsx");
-const { createOpsTask } = await import("../app/(app)/numbers/task.ts");
+const { createOpsTask, oncePerKey } = await import("../app/(app)/numbers/task.ts");
 const { loadFinance } = await import("../app/(app)/numbers/data.ts");
 const money = await import("../lib/money.ts");
 const F = await import("../lib/finance.ts");
@@ -45,11 +45,16 @@ test("every vendor and the platform down: the page still renders, saying unavail
 });
 
 const fx = {
-  calls: [{ week: "2026-10-05", calls: 50, reached: 10, consults: 2 }],
+  calls: [
+    { week: "2026-10-05", calls: 50, reached: 10, consults: 2 },
+    { week: "2026-09-14", calls: 30, reached: 6, consults: 0 },
+  ],
+  // The stage-time columns 0030 stamps; the lead's current stage (and any later write) is irrelevant.
   biz: [
-    { stage: "consult_done", updated_at: "2026-10-06T15:00:00Z" },
-    { stage: "won", updated_at: "2026-10-06T15:00:00Z" },
-    { stage: "onboarded", updated_at: "2026-10-01T15:00:00Z" },
+    { consult_done_at: "2026-10-06T15:00:00Z", won_at: null }, // pilot this week
+    { consult_done_at: "2026-10-06T15:00:00Z", won_at: "2026-10-06T16:00:00Z" }, // pilot + signed this week
+    { consult_done_at: "2026-09-01T15:00:00Z", won_at: "2026-10-01T15:00:00Z" }, // signed last week, pilot long ago
+    { consult_done_at: "2025-01-01T15:00:00Z", won_at: null }, // before the loaded window: not counted
   ],
   inputs: [
     {
@@ -72,13 +77,16 @@ const loaderSb = (f) =>
     "finance_snapshots.select": { data: f.snaps, error: null },
   });
 
-test("loadFinance: stage counts bucketed by New York week, live weekly + unfrozen current month", async () => {
+test("loadFinance: pilots by consult_done_at, signed by won_at, each in its New York week", async () => {
   const fin = await loadFinance(loaderSb(fx), new Date("2026-10-07T16:00:00Z"));
   const w = fin.weekly.find((r) => r.channel === "cold" && r.period === "2026-10-05");
-  assert.deepEqual([w.calls, w.pilots, w.signed, w.spendCents], [50, 1, 1, 20000]); // the 10-01 onboarded is last week's
+  assert.deepEqual([w.calls, w.pilots, w.signed, w.spendCents], [50, 2, 1, 20000]); // the 10-01 signing is last week's
   assert.equal(w.cacCents, 25000);
+  const last = fin.weekly.find((r) => r.channel === "cold" && r.period === "2026-09-28");
+  assert.equal(last.signed, 1);
   assert.deepEqual(fin.months[0].month, "2026-10-01");
   assert.equal(fin.months[0].frozen, false);
+  assert.equal(fin.from, "2026-03-30"); // 27 weeks before the current one
 });
 
 test("loadFinance surfaces a query error", async () => {
@@ -86,10 +94,11 @@ test("loadFinance surfaces a query error", async () => {
   await assert.rejects(loadFinance(sb), /denied/);
 });
 
-test("the page shows the weekly numbers, the unfrozen month with a Freeze button, and a frozen month without one", async () => {
-  const fin = await loadFinance(loaderSb(fx), new Date("2026-10-07T16:00:00Z"));
-  const frozen = { month: "2026-09-01", data: { rows: [] } };
-  const fin2 = { ...fin, months: F.monthlyView(fin.live, [frozen]) };
+test("the page offers Freeze on a finished unfrozen month only: not the current month, not a frozen one", async () => {
+  const now = new Date("2026-10-07T16:00:00Z");
+  const fin = await loadFinance(loaderSb(fx), now);
+  const frozen = { month: "2026-08-01", data: { rows: [] } };
+  const fin2 = { ...fin, months: F.monthlyView(fin.live, [frozen], { from: fin.from, now }) };
   const html = render({
     finance: fin2,
     ops: emptyOps,
@@ -101,10 +110,11 @@ test("the page shows the weekly numbers, the unfrozen month with a Freeze button
   });
   assert.match(html, /\$250/); // CAC
   assert.match(html, /6\.7x/); // LTV:CAC
-  assert.match(html, /Freeze 2026-10/);
-  assert.match(html, /live, not frozen/);
-  assert.match(html, /name="month" value="2026-10-01"/);
-  assert.doesNotMatch(html, /Freeze 2026-09/);
+  assert.match(html, /Freeze 2026-09/);
+  assert.match(html, /name="month" value="2026-09-01"/);
+  assert.match(html, /live, not frozen/); // October
+  assert.doesNotMatch(html, /Freeze 2026-10/); // current month
+  assert.doesNotMatch(html, /Freeze 2026-08/); // already frozen
 });
 
 test("ops section: connector grid, failed HQ runs, tickets, and the Instinct/Sentry links", () => {
@@ -171,6 +181,29 @@ test("Fires renders each fire with its key hint", () => {
     ),
     /No fires/
   );
+});
+
+test("oncePerKey: a second press while one is in flight does nothing; after it settles, runs again", async () => {
+  const busy = new Set();
+  let calls = 0;
+  let release;
+  const slow = () => (calls++, new Promise((res) => (release = res)));
+  const a = oncePerKey(busy, "ops:job:digest", slow);
+  await oncePerKey(busy, "ops:job:digest", slow); // held key / double click
+  assert.equal(calls, 1);
+  const other = oncePerKey(busy, "ops:job:other", async () => calls++); // another fire is independent
+  await other;
+  assert.equal(calls, 2);
+  release();
+  await a;
+  await oncePerKey(busy, "ops:job:digest", async () => calls++);
+  assert.equal(calls, 3);
+  await assert.rejects(
+    oncePerKey(busy, "k", async () => {
+      throw new Error("x");
+    })
+  );
+  assert.equal(busy.size, 0, "a failure releases the key");
 });
 
 // --- key `c`: an ops task --------------------------------------------------------------------

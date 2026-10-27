@@ -105,7 +105,7 @@ function Monthly({
             <span className={`chip ${m.frozen ? "ok" : "warn"}`}>
               {m.frozen ? "frozen" : "live, not frozen"}
             </span>
-            {!m.frozen && freeze ? (
+            {m.freezable && freeze ? (
               <form action={freeze} className="inl">
                 <input type="hidden" name="month" value={m.month} />
                 <button type="submit" className="btn sm">

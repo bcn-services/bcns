@@ -65,10 +65,17 @@ function db(): postgres.Sql | null {
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v));
 
-export async function opsSnapshot(): Promise<OpsSnapshot> {
-  const empty: OpsSnapshot = { health: [], runs: [], tickets: [], clients: [], failed: [] };
+const noData = (failed: string[]): OpsSnapshot => ({
+  health: [],
+  runs: [],
+  tickets: [],
+  clients: [],
+  failed,
+});
+
+async function loadSnapshot(): Promise<OpsSnapshot> {
   const q = db();
-  if (!q) return { ...empty, failed: ["config"] };
+  if (!q) return noData(["config"]);
   const names = ["health", "runs", "tickets", "clients"] as const;
   const res = await Promise.allSettled([
     q`select slug, source, status, status_since, last_run_at, last_success_at, has_error
@@ -122,6 +129,37 @@ export async function opsSnapshot(): Promise<OpsSnapshot> {
     })),
     failed,
   };
+}
+
+const DEADLINE_MS = 5000; // one deadline for the whole snapshot, not per query
+const MEMO_MS = 60_000;
+let memo: { at: number; snap: Promise<OpsSnapshot> } | undefined;
+export const clearOpsMemo = () => {
+  memo = undefined;
+};
+
+/**
+ * The platform snapshot: at most `deadlineMs` (a timeout is the same "ops unavailable" failure as a
+ * refused connection), and memoised for 60 s, failures included, so a dead platform costs one wait a
+ * minute and the page and getFires() (both call this) share it. `load` is injectable for tests.
+ */
+export function opsSnapshot({
+  deadlineMs = DEADLINE_MS,
+  load = loadSnapshot,
+} = {}): Promise<OpsSnapshot> {
+  if (memo && Date.now() - memo.at < MEMO_MS) return memo.snap;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<OpsSnapshot>((res) => {
+    timer = setTimeout(() => res(noData(["timeout"])), deadlineMs);
+  });
+  const snap = Promise.race([
+    Promise.resolve()
+      .then(load)
+      .catch(() => noData(["query"])),
+    late,
+  ]).finally(() => clearTimeout(timer));
+  memo = { at: Date.now(), snap };
+  return snap;
 }
 
 /** HQ job runs since `sinceIso`, newest first. Throws on a query error. */

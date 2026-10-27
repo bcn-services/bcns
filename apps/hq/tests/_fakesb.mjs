@@ -18,7 +18,7 @@ export function fakeSb(results = {}) {
         return q;
       };
     }
-    for (const m of ["eq", "neq", "limit", "single", "is", "gte", "order", "in"]) {
+    for (const m of ["eq", "neq", "limit", "single", "is", "gte", "order", "in", "or"]) {
       q[m] = (...a) => {
         (q.args[m] ??= []).push(a);
         return q;

@@ -9,8 +9,11 @@
 --
 -- PASSWORD IS NOT IN THIS FILE. Nate sets it by hand after the push:
 --   alter role hq_ops_ro password '<generated>';
--- and puts it in HQ's env as PLATFORM_OPS_URL
---   (postgresql://hq_ops_ro:<pw>@<host>:5432/postgres?sslmode=require, shape only).
+-- and puts it in HQ's env as PLATFORM_OPS_URL (shapes only, never values):
+--   direct, IPv6 only:  postgresql://hq_ops_ro:<pw>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+--   session pooler, IPv4 (a host without IPv6 needs this; the user carries the project ref, else
+--   "Tenant or user not found"):
+--                       postgresql://hq_ops_ro.<ref>:<pw>@<pooler-host>:5432/postgres?sslmode=require
 -- Until then the role has no password and cannot log in over the network.
 
 -- Role: login, no inheritance, no bypassrls, 3 connections (HQ opens max 2), 5 s statements.

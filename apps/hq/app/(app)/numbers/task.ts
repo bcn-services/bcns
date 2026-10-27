@@ -3,6 +3,21 @@ import type { createSupabaseServer } from "@/lib/supabase";
 type Sb = NonNullable<ReturnType<typeof createSupabaseServer>>;
 export type Result = { ok: true; message: string } | { ok: false; message: string };
 
+/** Runs `fn` unless one for `key` is already in flight: a held key or a double click is a no-op. */
+export async function oncePerKey(
+  busy: Set<string>,
+  key: string,
+  fn: () => Promise<void>
+): Promise<void> {
+  if (busy.has(key)) return;
+  busy.add(key);
+  try {
+    await fn();
+  } finally {
+    busy.delete(key);
+  }
+}
+
 /**
  * An ops task for Nate from a fire (key `c`): one open task per fire key, plus an `events` row.
  * TODO(item 4): replace with createOpsTask from lib/tasks.ts; this is the thin local stand-in.

@@ -1,7 +1,8 @@
 import { getConfig } from "@/lib/env";
 import { getFires } from "@/lib/fires";
 import { mercurySummary, stripeSummary } from "@/lib/money";
-import { hqRuns, opsSnapshot, type RunEvent } from "@/lib/ops";
+import { recentRuns } from "@/lib/fires-ops";
+import { opsSnapshot } from "@/lib/ops";
 import { createSupabaseServer } from "@/lib/supabase";
 import { createTaskFromFire, freezeMonthAction } from "./actions";
 import { loadFinance } from "./data";
@@ -19,9 +20,7 @@ export default async function NumbersPage() {
     stripeSummary(),
     mercurySummary(),
     getFires(),
-    sb
-      ? hqRuns(sb, new Date(Date.now() - 24 * 3600_000).toISOString()).catch(() => [] as RunEvent[])
-      : [],
+    recentRuns(),
   ]);
   return (
     <NumbersView

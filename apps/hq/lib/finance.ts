@@ -227,15 +227,21 @@ export interface Snapshot {
 export interface MonthView {
   month: string;
   frozen: boolean;
+  /** Complete, fully loaded and not frozen yet: the page offers Freeze. */
+  freezable: boolean;
   rows: WithDeltas[];
 }
 
 /**
  * Months newest first: every snapshot month as frozen (its stored rows), plus each live month not
  * frozen yet (the current one included) computed from `live`. Deltas are against the month before,
- * frozen or live.
+ * frozen or live. `win` (first loaded week + clock) decides which live months can be frozen.
  */
-export function monthlyView(live: Row[], snaps: Snapshot[]): MonthView[] {
+export function monthlyView(
+  live: Row[],
+  snaps: Snapshot[],
+  win?: { from: string; now: Date }
+): MonthView[] {
   const frozen = new Map(snaps.map((s) => [s.month, s.data.rows]));
   const months = [...new Set([...frozen.keys(), ...live.map((r) => r.period)])].sort().reverse();
   const rowsOf = (m: string) => frozen.get(m) ?? live.filter((r) => r.period === m);
@@ -248,13 +254,25 @@ export function monthlyView(live: Row[], snaps: Snapshot[]): MonthView[] {
   return months.map((m) => ({
     month: m,
     frozen: frozen.has(m),
+    freezable: !frozen.has(m) && !!win && freezable(m, win.from, win.now),
     rows: withDeltas(rowsOf(m), prev),
   }));
 }
 
 /**
+ * Whether a month may be frozen: complete and fully loaded. Weeks belong to the month of their
+ * Monday, so a month is complete once the current week's Monday is in a later month (this also holds
+ * back the month whose last week is still running), and it is fully loaded when it starts at or after
+ * `from`, the first loaded week (an older month is only partly there).
+ */
+export function freezable(month: string, from: string, now: Date): boolean {
+  return month < monthOf(nyWeek(now)) && month >= from;
+}
+
+/**
  * Freeze one month: insert once, never overwrite. `insert` is the database write, returning the
  * Postgres error code on failure; a primary-key conflict (23505) means it is already frozen.
+ * `win` = the loaded window's first week and the clock: an incomplete or partly loaded month refuses.
  */
 export async function freezeMonth(
   insert: (row: {
@@ -262,9 +280,12 @@ export async function freezeMonth(
     data: { rows: Row[]; assumptions: typeof ASSUMPTIONS };
   }) => Promise<{ code?: string; message?: string } | null>,
   month: string,
-  live: Row[]
+  live: Row[],
+  win: { from: string; now: Date }
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!/^\d{4}-\d{2}-01$/.test(month)) return { ok: false, reason: "bad month" };
+  if (!freezable(month, win.from, win.now))
+    return { ok: false, reason: "month not finished or only partly loaded" };
   const rows = live.filter((r) => r.period === month);
   if (!rows.length) return { ok: false, reason: "no data for that month" };
   const err = await insert({ month, data: { rows, assumptions: ASSUMPTIONS } });
