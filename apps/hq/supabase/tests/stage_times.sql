@@ -1,4 +1,4 @@
--- 0030 checks: stage moves stamp consult_done_at / won_at once and never clear them; frozen months
+-- 0030 checks: stage moves stamp consult_done_at / won_at once; moving back clears them; frozen months
 -- cannot be rewritten by a signed-in user. Rolls back; safe to re-run on the local stack.
 --   psql 'postgresql://postgres:postgres@127.0.0.1:55322/postgres' -v ON_ERROR_STOP=1 -f apps/hq/supabase/tests/stage_times.sql
 -- Prints "stage_times.sql: PASS".
@@ -26,10 +26,18 @@ begin
   assert (select won_at is not null and consult_done_at = t1 from businesses where name = 'hq6 Stage Test Plumbing'), 'won stamps won_at, keeps consult_done_at';
   select won_at into t2 from businesses where name = 'hq6 Stage Test Plumbing';
 
-  perform pg_sleep(0.01);
+  -- now() is fixed inside a transaction, so pin both to a past instant: a re-stamp would show
+  update businesses set consult_done_at = '2020-02-02', won_at = '2020-03-03' where name = 'hq6 Stage Test Plumbing';
   update businesses set stage = 'onboarded' where name = 'hq6 Stage Test Plumbing';
   update businesses set stage = 'lost' where name = 'hq6 Stage Test Plumbing';
-  assert (select consult_done_at = t1 and won_at = t2 from businesses where name = 'hq6 Stage Test Plumbing'), 'later moves keep both times, never clear them';
+  assert (select consult_done_at = '2020-02-02' and won_at = '2020-03-03' from businesses where name = 'hq6 Stage Test Plumbing'), 'won -> onboarded -> lost keeps both times (no re-stamp, no clear)';
+
+  -- a mistaken won moved back: won_at clears; before consult also clears consult_done_at
+  update businesses set stage = 'quoted' where name = 'hq6 Stage Test Plumbing';
+  assert (select won_at is null and consult_done_at = '2020-02-02' from businesses where name = 'hq6 Stage Test Plumbing'), 'won -> quoted clears won_at only';
+  update businesses set stage = 'won' where name = 'hq6 Stage Test Plumbing';
+  update businesses set stage = 'sourced' where name = 'hq6 Stage Test Plumbing';
+  assert (select won_at is null and consult_done_at is null from businesses where name = 'hq6 Stage Test Plumbing'), 'won -> sourced clears both';
 
   -- a straight insert at a late stage is stamped too
   insert into businesses (name, stage) values ('hq6 Stage Test HVAC', 'won');

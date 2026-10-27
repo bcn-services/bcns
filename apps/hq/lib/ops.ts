@@ -155,7 +155,12 @@ export function opsSnapshot({
   const snap = Promise.race([
     Promise.resolve()
       .then(load)
-      .catch(() => noData(["query"])),
+      .catch((e) => {
+        // postgres() throws synchronously on a malformed URL (e.g. a raw % or # in the password).
+        // Messages checked: URIError "URI malformed", TypeError "Invalid URL"; neither echoes the URL.
+        console.error("[ops] snapshot load failed:", e instanceof Error ? e.message : "error");
+        return noData(["query"]);
+      }),
     late,
   ]).finally(() => clearTimeout(timer));
   memo = { at: Date.now(), snap };
