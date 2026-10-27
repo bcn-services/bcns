@@ -28,13 +28,29 @@ export function LeadBoard(props: {
     return t instanceof HTMLTextAreaElement && id === row.key ? t.value : "";
   }
 
+  // a thrown action (network, 5xx) becomes the message bar, not Next's error page
+  function act(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, onOk?: () => void) {
+    start(async () => {
+      try {
+        const r = await fn();
+        setMsg(r.ok ? "" : r.error);
+        if (r.ok) onOk?.();
+      } catch {
+        setMsg("Could not reach the server. Check the lead before trying again.");
+      }
+    });
+  }
+
   function log(row: Row, n: number, consultLocal?: string) {
     const note = noteFor(row);
-    start(async () => {
-      const r = await logOutcome(row.key, n, { consultLocal, note });
-      setMsg(r.ok ? "" : r.error);
-      if (r.ok) setConsult(null);
-    });
+    act(
+      () => logOutcome(row.key, n, { consultLocal, note }),
+      () => {
+        setConsult(null);
+        const t = document.getElementById("note");
+        if (t instanceof HTMLTextAreaElement) t.value = ""; // the note went into the call
+      }
+    );
   }
 
   return (
@@ -56,10 +72,7 @@ export function LeadBoard(props: {
         }
         if (key === "a" && row.assigned) {
           const to = row.assigned === "brandon" ? "nate" : "brandon";
-          start(async () => {
-            const r = await reassign(row.key, to);
-            setMsg(r.ok ? "" : r.error);
-          });
+          act(() => reassign(row.key, to));
           return true;
         }
         return false;

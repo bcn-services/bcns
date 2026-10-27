@@ -47,7 +47,7 @@ after(() => {
         delete from auth.users where email = '${email}';`);
 });
 
-test("logCall as a signed-in HQ user writes one calls row + one events row (ui) and moves the stage", { skip: !reachable }, async () => {
+test("logCall as a signed-in HQ user writes one calls row + one events row (ui) and moves the stage", { skip: !reachable }, async (t) => {
   const env = Object.fromEntries(
     execFileSync("supabase", ["status", "--workdir", APP_DIR, "-o", "env"], { encoding: "utf8" })
       .split("\n")
@@ -70,8 +70,12 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
   const link = await gl.json();
   userId = link.id ?? link.user?.id;
   assert.ok(userId && link.hashed_token);
-  const taken = psql(`select count(*) from profiles where handle = 'brandon'`);
-  assert.equal(taken, "0", "another brandon profile already exists on the shared local stack; re-run when it is gone");
+  if (psql(`select count(*) from profiles where handle = 'brandon'`) !== "0") {
+    // handle is unique and the shared local stack may hold another item's brandon: skip, don't fail
+    console.log("calls.integration: SKIPPED - a 'brandon' profile already exists on the shared local stack");
+    t.skip("another brandon profile exists");
+    return;
+  }
   psql(`insert into profiles (id, email, handle, role) values ('${userId}', '${email}', 'brandon', 'staff')`);
 
   const A = `${tag}-alpha`;
@@ -106,6 +110,10 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
   assert.equal(psql(`select stage from businesses where id = '${ida}'`), "attempted");
   const dow = psql(`select extract(isodow from next_contact_at at time zone 'America/New_York') from businesses where id = '${ida}'`);
   assert.ok(Number(dow) >= 1 && Number(dow) <= 5, `follow-up lands on a weekday (isodow ${dow})`);
+  // a retry of the same call a moment later (same stage, so the stage CAS alone would let it through) is refused
+  await assert.rejects(() => logCall(sb, actor, "ui", { businessId: ida, outcome: 2 }), /already logged/);
+  assert.equal(psql(`select count(*) from calls where business_id = '${ida}'`), "1");
+  assert.equal(psql(`select count(*) from events where detail->>'business_id' = '${ida}'`), "1");
   // the other lead is untouched
   assert.equal(psql(`select count(*) from calls where business_id = '${idb}'`), "0");
   assert.equal(psql(`select stage from businesses where id = '${idb}'`), "call_due");
@@ -119,9 +127,11 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
   assert.equal(psql(`select count(*) from calls where business_id = '${idb}'`), "1");
   assert.equal(psql(`select count(*) from events where detail->>'business_id' = '${idb}'`), "1");
 
-  // Today now shows A under follow-ups and B under consults
+  // Today: A is a follow-up only once due, B is under consults
   const afterT = await loadBrandonToday(sb, "brandon", { all: true });
-  assert.ok(afterT.followups.some((l) => l.name === A));
+  assert.ok(!afterT.followups.some((l) => l.name === A), "attempted lead is not due for two business days");
+  psql(`update businesses set next_contact_at = now() - interval '1 hour' where id = '${ida}'`);
+  assert.ok((await loadBrandonToday(sb, "brandon", { all: true })).followups.some((l) => l.name === A), "due once its date passes");
   assert.ok(afterT.consults.some((l) => l.name === B));
   assert.ok(!afterT.calls.some((l) => l.name.startsWith(tag)));
   assert.ok(afterT.allTime >= 2);

@@ -166,6 +166,7 @@ export function Board(props: {
                                   value=""
                                   onChange={(e) => {
                                     const n = Number(e.target.value);
+                                    e.target.blur(); // so j/k and 1-4 keep working
                                     if (n) onOutcome(n as 1 | 2 | 3 | 4, r);
                                   }}
                                 >

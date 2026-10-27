@@ -73,7 +73,8 @@ export async function saveLead(form: FormData): Promise<void> {
   const assigned = form.get("assigned_to");
   const stage = form.get("stage");
   const waiting = form.get("waiting_on");
-  if (assigned) patch.assigned_to = String(assigned) as Handle;
+  // like stage, only a change counts: a save must not undo a reassign made since the page loaded
+  if (assigned && assigned !== form.get("assigned_was")) patch.assigned_to = String(assigned) as Handle;
   // the select always shows the current stage; only a change is a move (a lead sitting in a refused late stage stays put)
   if (stage && stage !== form.get("stage_was")) patch.stage = String(stage);
   if (waiting !== null) patch.waiting_on = String(waiting).trim() || null;

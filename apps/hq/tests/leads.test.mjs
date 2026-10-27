@@ -10,7 +10,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 const ACTOR = { id: "22222222-2222-4222-8222-222222222222", handle: "brandon" };
 
 // Records every table call; `business` is what the lead read returns; update/insert resolve ok.
-function fakeSb({ business, failCall = false } = {}) {
+function fakeSb({ business, failCall = false, recentCall = false, failEvents = false } = {}) {
   const ops = [];
   const sb = {
     from(table) {
@@ -19,11 +19,18 @@ function fakeSb({ business, failCall = false } = {}) {
       const b = {
         select: () => b,
         eq: (c, v) => (op.filters.push([c, v]), b),
+        gte: (c, v) => (op.filters.push([c, ">=", v]), b),
+        limit: () => b,
         update: (v) => ((op.kind = "update"), (op.values = v), b),
         insert: (v) => ((op.kind = "insert"), (op.values = v), b),
         maybeSingle: async () => ({ data: table === "businesses" ? business : null, error: null }),
         single: async () => (failCall ? { data: null, error: { message: "boom" } } : { data: { id: "call-1" }, error: null }),
-        then: (res, rej) => Promise.resolve({ data: op.kind === "update" ? [{ id: ID }] : [], error: null }).then(res, rej),
+        then: (res, rej) =>
+          Promise.resolve(
+            table === "events" && failEvents
+              ? { data: null, error: { message: "events down" } }
+              : { data: op.kind === "update" ? [{ id: ID }] : table === "calls" && op.kind === "select" && recentCall ? [{ id: "call-0" }] : [], error: null }
+          ).then(res, rej),
       };
       return b;
     },
@@ -60,8 +67,7 @@ test("nextBusinessDay skips weekends on the New York calendar", () => {
   assert.equal(day("2026-10-24T01:30:00Z", 2), "2026-10-27");
   // 03:00 UTC Monday is still Sunday night in New York: Sun -> Tue
   assert.equal(day("2026-10-26T03:00:00Z", 2), "2026-10-27");
-  const t = nextBusinessDay(new Date("2026-10-23T15:00:00Z"));
-  assert.ok([0, 1].includes(0) && t.getUTCDay() === 2);
+  assert.equal(nextBusinessDay(new Date("2026-10-23T15:00:00Z")).getUTCDay(), 2); // default n=2
 });
 
 test("weekStartET is the New York Monday", () => {
@@ -165,4 +171,28 @@ test("logCall refuses a lead that is not loggable, writes nothing, and undoes th
   assert.equal(bad.ops.filter((o) => o.table === "events").length, 0);
   await assert.rejects(() => logCall(fakeSb().sb, ACTOR, "ui", { businessId: "nope", outcome: 1 }), /bad lead id/);
   await assert.rejects(() => logCall(fakeSb().sb, ACTOR, "ui", { businessId: ID, outcome: 9 }), /unknown outcome/);
+});
+
+test("logCall dedupe: a retry within a minute for the same actor and lead writes nothing", async () => {
+  const { sb, ops } = fakeSb({ business: { id: ID, stage: "reached", next_contact_at: null, consult_at: null }, recentCall: true });
+  const now = new Date("2026-10-23T15:00:00Z");
+  await assert.rejects(() => logCall(sb, ACTOR, "ui", { businessId: ID, outcome: 1, now }), /already logged/);
+  assert.equal(ops.filter((o) => o.kind !== "select").length, 0, "no move, no call, no event");
+  const q = ops.find((o) => o.table === "calls");
+  assert.deepEqual(q.filters, [["business_id", ID], ["actor", ACTOR.id], ["at", ">=", "2026-10-23T14:59:00.000Z"]]);
+});
+
+test("logCall: a failed events insert after the call is written does not fail the call", async () => {
+  const { sb, ops } = fakeSb({ business: { id: ID, stage: "call_due", next_contact_at: null, consult_at: null }, failEvents: true });
+  const real = console.error;
+  const seen = [];
+  console.error = (...a) => seen.push(a.join(" "));
+  try {
+    const r = await logCall(sb, ACTOR, "ui", { businessId: ID, outcome: 1 });
+    assert.equal(r.stage, "reached");
+  } finally {
+    console.error = real;
+  }
+  assert.equal(ops.filter((o) => o.table === "calls" && o.kind === "insert").length, 1);
+  assert.ok(seen.some((m) => m.includes("events insert failed")));
 });

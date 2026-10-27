@@ -80,7 +80,8 @@ export function LeadBody({ lead: l, x }: { lead: Lead; x: Extras | undefined }) 
         <h3>Note (n)</h3>
         <form action={addNote}>
           <input type="hidden" name="id" value={l.id} />
-          <textarea id="note" name="body" rows={3} placeholder="Note, saved with the outcome if you press 1-4. Esc leaves the field." />
+          {/* keyed on what it just saved: a new note or call remounts it empty */}
+          <textarea key={(x?.notes.length ?? 0) + (x?.calls.length ?? 0)} id="note" name="body" rows={3} placeholder="Note, saved with the outcome if you press 1-4. Esc leaves the field." />
           <div className="acts" style={{ marginTop: 8 }}>
             <button className="btn" type="submit">
               Add note
@@ -94,6 +95,7 @@ export function LeadBody({ lead: l, x }: { lead: Lead; x: Extras | undefined }) 
         <form action={saveLead} className="acts">
           <input type="hidden" name="id" value={l.id} />
           <input type="hidden" name="stage_was" value={l.stage} />
+          <input type="hidden" name="assigned_was" value={l.assigned_to} />
           <select name="stage" defaultValue={l.stage} aria-label="Stage">
             {stages.map((s) => (
               <option key={s} value={s}>

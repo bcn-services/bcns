@@ -117,14 +117,6 @@ export function fmtET(iso: string | null | undefined, time = false): string {
   }).format(d);
 }
 
-/** Value for <input type=datetime-local> (New York wall clock). */
-export function toEtLocal(iso: string): string {
-  const p = etParts(new Date(iso));
-  const z = (n: number) => String(n).padStart(2, "0");
-  return `${p.y}-${z(p.mo)}-${z(p.d)}T${z(p.h)}:${z(p.mi)}`;
-}
-
-// ---- research ---------------------------------------------------------------
 export interface Research {
   fit_score?: number;
   reason?: string;
@@ -157,12 +149,6 @@ function must<T extends { error: { message: string } | null }>(res: T): T {
   return res;
 }
 
-async function actorOf(sb: Sb, a: Actor | string): Promise<Actor> {
-  if (typeof a !== "string") return a;
-  const { data } = await sb.from("profiles").select("handle").eq("id", a).maybeSingle();
-  return { id: a, handle: (data as { handle: Handle | null } | null)?.handle ?? null };
-}
-
 async function logEvent(
   sb: Sb,
   actor: Actor,
@@ -171,12 +157,20 @@ async function logEvent(
   businessId: string,
   detail: Record<string, unknown>
 ) {
-  must(
-    await sb
-      .from("events")
-      .insert({ job: "hq", kind, actor: actor.id, via, detail: { business_id: businessId, ...detail } })
-  );
+  // the write it records already happened: a lost audit row is logged, not reported as a failed action
+  // (a retry would then double-write)
+  try {
+    must(
+      await sb
+        .from("events")
+        .insert({ job: "hq", kind, actor: actor.id, via, detail: { business_id: businessId, ...detail } })
+    );
+  } catch (e) {
+    console.error("events insert failed", kind, businessId, e instanceof Error ? e.message : e);
+  }
 }
+
+const DEDUPE_MS = 60_000;
 
 export interface LogCallInput {
   businessId: string;
@@ -189,14 +183,13 @@ export interface LogCallInput {
 }
 
 /** One call = one `calls` row + one `events` row, and the lead moves. */
-export async function logCall(sb: Sb, actorIn: Actor | string, via: Via, input: LogCallInput) {
+export async function logCall(sb: Sb, actor: Actor, via: Via, input: LogCallInput) {
   const o =
     typeof input.outcome === "number"
       ? OUTCOMES[input.outcome]
       : Object.values(OUTCOMES).find((x) => x.outcome === input.outcome);
   if (!o) throw new Error("unknown outcome");
   if (!isUuid(input.businessId)) throw new Error("bad lead id");
-  const actor = await actorOf(sb, actorIn);
   const now = input.now ?? new Date();
   const note = input.note?.trim().slice(0, 2000) || null;
 
@@ -208,6 +201,18 @@ export async function logCall(sb: Sb, actorIn: Actor | string, via: Via, input: 
   const cur = b as { stage: string; next_contact_at: string | null; consult_at: string | null } | null;
   if (!cur) throw new Error("lead not found");
   if (!canLog(cur.stage)) throw new Error(`cannot log a call on a ${cur.stage} lead`);
+  // The stage CAS below can't catch a same-stage move (reached -> reached), so a retry after a commit the
+  // client never saw would log twice. Same actor, same lead, within a minute = the same call.
+  const recent = must(
+    await sb
+      .from("calls")
+      .select("id")
+      .eq("business_id", input.businessId)
+      .eq("actor", actor.id)
+      .gte("at", new Date(now.getTime() - DEDUPE_MS).toISOString())
+      .limit(1)
+  );
+  if (recent.data?.length) throw new Error("already logged a call on this lead a moment ago");
 
   const patch: Record<string, unknown> = { stage: o.stage, updated_at: now.toISOString() };
   let consultIso: string | null = null;
@@ -252,7 +257,7 @@ export async function logCall(sb: Sb, actorIn: Actor | string, via: Via, input: 
       .eq("id", input.businessId);
     throw new Error(call.error.message);
   }
-  // ponytail: three PostgREST writes, no transaction — a failed event insert leaves call+move in place
+  // ponytail: three PostgREST writes, no transaction — an undone move is best-effort; ceiling is an rpc
   await logEvent(sb, actor, via, "call_logged", input.businessId, {
     call_id: (call.data as { id: string }).id,
     outcome: o.outcome,
@@ -279,7 +284,7 @@ const PATCH_KEYS = ["assigned_to", "waiting_on", "deal_value_cents", "stage"];
 
 export async function updateLead(
   sb: Sb,
-  actorIn: Actor | string,
+  actor: Actor,
   via: Via,
   input: { id: string; patch: LeadPatch; env?: Record<string, string | undefined> }
 ) {
@@ -299,7 +304,6 @@ export async function updateLead(
     if ((LATE_STAGES as readonly string[]).includes(patch.stage) && !lateStagesOn(input.env))
       throw new Error(`moves to ${patch.stage} are off (HQ_LATE_STAGES)`);
   }
-  const actor = await actorOf(sb, actorIn);
   const { data: before } = await sb.from("businesses").select(keys.join(",")).eq("id", id).maybeSingle();
   if (!before) throw new Error("lead not found");
   const done = must(
@@ -315,14 +319,13 @@ export async function updateLead(
 
 export async function addLeadNote(
   sb: Sb,
-  actorIn: Actor | string,
+  actor: Actor,
   via: Via,
   input: { businessId: string; body: string }
 ) {
   const body = input.body.trim().slice(0, 5000);
   if (!body) throw new Error("note is empty");
   if (!isUuid(input.businessId)) throw new Error("bad lead id");
-  const actor = await actorOf(sb, actorIn);
   const n = await sb
     .from("notes")
     .insert({ business_id: input.businessId, body, actor: actor.id, via })
@@ -377,19 +380,23 @@ export interface Extras {
   links: LinkRow[];
 }
 
-/** Call history, notes and links for a page of leads: three queries, grouped by lead. */
+const CHUNK = 100;
+
+/** Call history, notes and links for a page of leads: three queries per 100 leads, grouped by lead. */
 export async function loadExtras(sb: Sb, ids: string[]): Promise<Map<string, Extras>> {
   const out = new Map<string, Extras>(ids.map((i) => [i, { calls: [], notes: [], links: [] }]));
-  if (!ids.length) return out;
-  const [c, n, l] = await Promise.all([
-    sb.from("calls").select("business_id, by, at, outcome, note").in("business_id", ids).order("at", { ascending: false }),
-    sb.from("notes").select("business_id, body, created_at").in("business_id", ids).order("created_at", { ascending: false }),
-    sb.from("links").select("business_id, label, url").in("business_id", ids).order("created_at", { ascending: false }),
-  ]);
-  // untyped client: the selects above are the shapes
-  for (const r of (must(c).data ?? []) as CallRow[]) out.get(r.business_id)?.calls.push(r);
-  for (const r of (must(n).data ?? []) as NoteRow[]) out.get(r.business_id)?.notes.push(r);
-  for (const r of (must(l).data ?? []) as LinkRow[]) out.get(r.business_id)?.links.push(r);
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const part = ids.slice(i, i + CHUNK); // keeps the .in() URL short and the rows under PostgREST's cap
+    const [c, n, l] = await Promise.all([
+      sb.from("calls").select("business_id, by, at, outcome, note").in("business_id", part).order("at", { ascending: false }),
+      sb.from("notes").select("business_id, body, created_at").in("business_id", part).order("created_at", { ascending: false }),
+      sb.from("links").select("business_id, label, url").in("business_id", part).order("created_at", { ascending: false }),
+    ]);
+    // untyped client: the selects above are the shapes
+    for (const r of (must(c).data ?? []) as CallRow[]) out.get(r.business_id)?.calls.push(r);
+    for (const r of (must(n).data ?? []) as NoteRow[]) out.get(r.business_id)?.notes.push(r);
+    for (const r of (must(l).data ?? []) as LinkRow[]) out.get(r.business_id)?.links.push(r);
+  }
   return out;
 }
 
@@ -412,6 +419,15 @@ export interface BrandonToday {
   allTime: number;
 }
 export const CALLS_LIMIT = 5;
+export const FOLLOWUPS_LIMIT = 50;
+
+/** First instant of tomorrow in New York: follow-ups due before this are due today or overdue. */
+export function startOfTomorrowET(now: Date): Date {
+  const { y, mo, d } = etParts(now);
+  const t = new Date(Date.UTC(y, mo - 1, d + 1));
+  const z = (n: number) => String(n).padStart(2, "0");
+  return etLocalToDate(`${t.getUTCFullYear()}-${z(t.getUTCMonth() + 1)}-${z(t.getUTCDate())}T00:00`) ?? t;
+}
 
 /** Everything Today(Brandon) shows, as the signed-in user (RLS applies). */
 export async function loadBrandonToday(
@@ -424,7 +440,13 @@ export async function loadBrandonToday(
   const [calls, total, follow, consults, tasks, week, allTime] = await Promise.all([
     opts.all ? callsQ : callsQ.limit(CALLS_LIMIT),
     sb.from("businesses").select("id", { count: "exact", head: true }).eq("assigned_to", me).is("suppressed_at", null).eq("stage", "call_due"),
-    mine().in("stage", ["attempted", "reached"]).order("next_contact_at", { ascending: true, nullsFirst: true }).order("name"),
+    // due today or overdue, plus undated (imported rows have no next_contact_at); the rest wait for their day
+    mine()
+      .in("stage", ["attempted", "reached"])
+      .or(`next_contact_at.is.null,next_contact_at.lt.${startOfTomorrowET(opts.now ?? new Date()).toISOString()}`)
+      .order("next_contact_at", { ascending: true, nullsFirst: true })
+      .order("name")
+      .limit(FOLLOWUPS_LIMIT),
     mine().eq("stage", "consult_scheduled").order("consult_at", { ascending: true, nullsFirst: false }),
     sb.from("tasks").select("id, title, body, area, status, due, waiting_on").eq("owner", me).neq("status", "done").order("due", { ascending: true, nullsFirst: false }),
     sb.from("call_weeks").select("calls, reached, consults").eq("by", me).eq("week", weekStartET(opts.now ?? new Date())).maybeSingle(),

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { loadBrandonToday, leadRow, CALLS_LIMIT } = await import("../lib/leads.ts");
+const { loadBrandonToday, loadExtras, leadRow, CALLS_LIMIT, FOLLOWUPS_LIMIT, startOfTomorrowET } = await import("../lib/leads.ts");
 
 // Tiny in-memory PostgREST: just the filters loadBrandonToday uses.
 function memSb(tables) {
@@ -20,6 +20,12 @@ function memSb(tables) {
         neq: (c, v) => ((rows = rows.filter((r) => r[c] !== v)), b),
         is: (c, v) => ((rows = rows.filter((r) => (r[c] ?? null) === v)), b),
         in: (c, vs) => ((rows = rows.filter((r) => vs.includes(r[c]))), b),
+        // only the shape loadBrandonToday sends: "col.is.null,col.lt.<iso>"
+        or: (expr) => {
+          const [, col, iso] = expr.match(/^(\w+)\.is\.null,\1\.lt\.(.+)$/);
+          rows = rows.filter((r) => r[col] == null || r[col] < iso);
+          return b;
+        },
         order: (c, { ascending = true, nullsFirst = false } = {}) => (keys.push([c, ascending, nullsFirst]), b),
         limit: (n) => ((lim = n), b),
         maybeSingle: () => ((one = true), b),
@@ -51,8 +57,10 @@ const tables = () => ({
     biz("hq3 due unscored"),
     biz("hq3 due nates", { fit_score: 99, assigned_to: "nate" }),
     biz("hq3 due hidden", { fit_score: 98, suppressed_at: "2026-10-01T00:00:00Z" }),
-    biz("hq3 late", { stage: "attempted", next_contact_at: "2026-10-30T13:00:00Z" }),
-    biz("hq3 early", { stage: "reached", next_contact_at: "2026-10-29T13:00:00Z" }),
+    biz("hq3 later", { stage: "attempted", next_contact_at: "2026-10-30T13:00:00Z" }), // not due yet
+    biz("hq3 tomorrow", { stage: "reached", next_contact_at: "2026-10-29T13:00:00Z" }), // not due yet
+    biz("hq3 overdue", { stage: "attempted", next_contact_at: "2026-10-26T13:00:00Z" }),
+    biz("hq3 today", { stage: "reached", next_contact_at: "2026-10-28T13:00:00Z" }),
     biz("hq3 nodate", { stage: "attempted" }),
     biz("hq3 consult b", { stage: "consult_scheduled", consult_at: "2026-11-02T15:00:00Z" }),
     biz("hq3 consult a", { stage: "consult_scheduled", consult_at: "2026-10-30T15:00:00Z" }),
@@ -84,9 +92,9 @@ test("show all lifts the limit; unscored sorts last", async () => {
   assert.equal(t.calls.at(-1).name, "hq3 due unscored");
 });
 
-test("Follow-ups: attempted + reached, undated first then soonest; Consults by date; lost and others excluded", async () => {
+test("Follow-ups: attempted + reached that are undated or due by end of today ET, oldest first; Consults by date; lost excluded", async () => {
   const t = await loadBrandonToday(memSb(tables()), "brandon", { now: NOW });
-  assert.deepEqual(t.followups.map((l) => l.name), ["hq3 nodate", "hq3 early", "hq3 late"]);
+  assert.deepEqual(t.followups.map((l) => l.name), ["hq3 nodate", "hq3 overdue", "hq3 today"]);
   assert.deepEqual(t.consults.map((l) => l.name), ["hq3 consult a", "hq3 consult b"]);
 });
 
@@ -115,4 +123,36 @@ test("leadRow: call/follow/consult/grid shape, canLog by stage, fit rounded", ()
   assert.equal(grid.canLog, false);
   assert.equal(grid.right, undefined);
   assert.ok(Array.isArray(grid.cells) && grid.cells.every((c) => typeof c === "string"));
+});
+
+test("startOfTomorrowET: midnight New York, DST aware", () => {
+  assert.equal(startOfTomorrowET(new Date("2026-10-28T15:00:00Z")).toISOString(), "2026-10-29T04:00:00.000Z"); // EDT
+  assert.equal(startOfTomorrowET(new Date("2026-10-29T03:30:00Z")).toISOString(), "2026-10-29T04:00:00.000Z"); // still the 28th in NY
+  assert.equal(startOfTomorrowET(new Date("2026-11-02T15:00:00Z")).toISOString(), "2026-11-03T05:00:00.000Z"); // EST
+});
+
+test("Follow-ups are capped", async () => {
+  const many = [...Array(FOLLOWUPS_LIMIT + 20)].map((_, i) => biz(`hq3 f${String(i).padStart(3, "0")}`, { stage: "attempted" }));
+  const t = await loadBrandonToday(memSb({ businesses: many, tasks: [], call_weeks: [], calls: [] }), "brandon", { now: NOW });
+  assert.equal(t.followups.length, FOLLOWUPS_LIMIT);
+});
+
+test("loadExtras never sends more than 100 ids in one request, and still groups every lead", async () => {
+  const seen = [];
+  const sb = {
+    from: (table) => {
+      const b = {
+        select: () => b,
+        order: () => b,
+        in: (_c, ids) => (seen.push([table, ids.length]), (b.ids = ids), b),
+        then: (res) => res({ data: table === "calls" ? b.ids.map((id) => ({ business_id: id, by: "brandon", at: "2026-10-27T00:00:00Z", outcome: "reached", note: null })) : [], error: null }),
+      };
+      return b;
+    },
+  };
+  const ids = [...Array(250)].map((_, i) => `id${i}`);
+  const m = await loadExtras(sb, ids);
+  assert.ok(seen.length >= 9 && seen.every(([, n]) => n <= 100), JSON.stringify(seen));
+  assert.equal(m.size, 250);
+  assert.ok(ids.every((id) => m.get(id).calls.length === 1));
 });
