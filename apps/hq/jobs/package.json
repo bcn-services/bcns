@@ -1,0 +1,11 @@
+{
+  "name": "@bcn-services/hq-jobs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "postgres": "^3.4.7"
+  }
+}

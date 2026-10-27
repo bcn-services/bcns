@@ -1,0 +1,11 @@
+# Qualifies sourced businesses and tops promotion up to the daily call quota.
+# Hourly at :15 from 08:00 to 20:00 UTC.
+[Unit]
+Description=HQ qualify job, hourly 08-20 UTC
+
+[Timer]
+OnCalendar=*-*-* 08..20:15:00 UTC
+Unit=hq-job@qualify.service
+
+[Install]
+WantedBy=timers.target

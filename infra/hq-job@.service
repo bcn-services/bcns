@@ -1,0 +1,31 @@
+# One HQ job per run: systemctl start hq-job@source (or @qualify). %i is the
+# job name passed to apps/hq/jobs/run.mjs. Fired by hq-source.timer and
+# hq-qualify.timer, so there is deliberately no [Install] section here.
+# Secrets (DATABASE_URL, GOOGLE_PLACES_API_KEY, CLAUDE_CODE_OAUTH_TOKEN) live in
+# /srv/hq/jobs.env, mode 0600, owned by hq.
+[Unit]
+Description=HQ job: %i
+After=network-online.target
+Wants=network-online.target
+# No release deployed yet means nothing to run.
+ConditionPathExists=/srv/hq/current
+
+[Service]
+Type=oneshot
+User=hq
+Group=hq
+WorkingDirectory=/srv/hq/current
+EnvironmentFile=/srv/hq/jobs.env
+# The claude CLI keeps its config under HOME; ProtectHome hides the real one.
+Environment=HOME=/srv/hq/claude-home
+ExecStart=/usr/bin/node jobs/run.mjs %i
+# run.mjs stops taking new work at 22 min; this is the hard stop.
+TimeoutStartSec=25min
+MemoryMax=384M
+CPUQuota=50%
+# Hardening: read-only OS, private /tmp, no privilege escalation.
+ProtectSystem=strict
+ReadWritePaths=/srv/hq
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true

@@ -163,6 +163,55 @@ cdv=$(render sb 3101 sb.bcn-services.com /etc/ssl/custom)
 case "$cdv" in *'ssl_certificate     /etc/ssl/custom/fullchain.pem;'*) ok "cert-dir mode uses <dir>/fullchain.pem" ;; *) bad "cert-dir path wrong" ;; esac
 case "$(cat "$here/onboard-client.sh")" in *'certbot certonly --webroot'*) ok "certbot runs webroot HTTP-01 (no nginx plugin rewriting vhosts)" ;; *) bad "certbot invocation not webroot" ;; esac
 
+echo "hq job units"
+
+# systemd-analyze is not on every dev machine, so parse strictly instead: every
+# non-blank non-comment line must be [Section] or Key=Value, in an allowed
+# section, and the keys that carry the contract must have the exact values.
+unitcheck() { # file allowed-sections...
+  local f="$1"; shift
+  local allowed=" $* " sec="" line n=0 badlines=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*) continue ;; esac
+    if [[ "$line" =~ ^\[([A-Za-z]+)\]$ ]]; then
+      sec="${BASH_REMATCH[1]}"
+      case "$allowed" in *" $sec "*) ;; *) badlines=$((badlines + 1)) ;; esac
+    elif [[ "$line" =~ ^[A-Za-z]+=[^[:space:]].*$ ]] && [ -n "$sec" ]; then
+      n=$((n + 1))
+    else
+      badlines=$((badlines + 1))
+    fi
+  done < "$f"
+  [ "$badlines" -eq 0 ] && [ "$n" -gt 0 ]
+}
+unitval() { grep -E "^$2=" "$1" | head -1 | cut -d= -f2-; }
+
+svc="$here/hq-job@.service"; src="$here/hq-source.timer"; qul="$here/hq-qualify.timer"
+unitcheck "$svc" Unit Service && ok "hq-job@.service parses as Unit/Service" || bad "hq-job@.service has a malformed line or section"
+unitcheck "$src" Unit Timer Install && ok "hq-source.timer parses" || bad "hq-source.timer has a malformed line or section"
+unitcheck "$qul" Unit Timer Install && ok "hq-qualify.timer parses" || bad "hq-qualify.timer has a malformed line or section"
+check "hq-job@: oneshot" "$(unitval "$svc" Type)" "oneshot"
+check "hq-job@: runs as hq" "$(unitval "$svc" User)/$(unitval "$svc" Group)" "hq/hq"
+check "hq-job@: env file" "$(unitval "$svc" EnvironmentFile)" "/srv/hq/jobs.env"
+check "hq-job@: HOME for the claude CLI" "$(unitval "$svc" Environment)" "HOME=/srv/hq/claude-home"
+check "hq-job@: ExecStart passes the instance name" "$(unitval "$svc" ExecStart)" "/usr/bin/node jobs/run.mjs %i"
+check "hq-job@: memory and cpu caps" "$(unitval "$svc" MemoryMax)/$(unitval "$svc" CPUQuota)" "384M/50%"
+check "hq-job@: start timeout outlasts the 22 min process budget" "$(unitval "$svc" TimeoutStartSec)" "25min"
+check "hq-job@: hardening matches bcns-app@" \
+  "$(unitval "$svc" ProtectSystem) $(unitval "$svc" ReadWritePaths) $(unitval "$svc" PrivateTmp) $(unitval "$svc" NoNewPrivileges) $(unitval "$svc" ProtectHome)" \
+  "strict /srv/hq true true true"
+check "hq-job@: template has no [Install] (timers start it)" "$(grep -c '^\[Install\]' "$svc" | tr -d ' ')" "0"
+check "hq-source.timer: Mon-Fri 11:00 UTC" "$(unitval "$src" OnCalendar)" "Mon..Fri *-*-* 11:00:00 UTC"
+check "hq-source.timer: persistent, starts hq-job@source" "$(unitval "$src" Persistent) $(unitval "$src" Unit)" "true hq-job@source.service"
+check "hq-qualify.timer: hourly 08-20 UTC" "$(unitval "$qul" OnCalendar)" "*-*-* 08..20:15:00 UTC"
+check "hq-qualify.timer: starts hq-job@qualify" "$(unitval "$qul" Unit)" "hq-job@qualify.service"
+check "both timers install into timers.target" "$(unitval "$src" WantedBy) $(unitval "$qul" WantedBy)" "timers.target timers.target"
+# The parser must actually reject junk, or the three checks above prove nothing.
+printf '[Service]\nthis is not a key value line\n' > "$work/badunit"
+unitcheck "$work/badunit" Unit Service && bad "unit parser accepted a malformed line" || ok "unit parser rejects a malformed line"
+printf '[Bogus]\nA=b\n' > "$work/badsec"
+unitcheck "$work/badsec" Unit Service && bad "unit parser accepted an unknown section" || ok "unit parser rejects an unknown section"
+
 echo "syntax"
 for f in "$here"/*.sh; do
   bash -n "$f" 2>/dev/null && ok "$(basename "$f") parses" || bad "$(basename "$f") syntax error"
