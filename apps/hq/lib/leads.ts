@@ -68,7 +68,7 @@ function etParts(d: Date) {
 }
 
 /** `from` plus n business days (Sat/Sun skipped) on the New York calendar, at 08:00-09:00 ET. */
-export function nextBusinessDay(from: Date, n = 2): Date {
+export function nextBusinessDay(from: Date, n = 1): Date {
   const { y, mo, d } = etParts(from);
   const cur = new Date(Date.UTC(y, mo - 1, d, 13));
   for (let left = n; left > 0; ) {

@@ -67,7 +67,7 @@ test("nextBusinessDay skips weekends on the New York calendar", () => {
   assert.equal(day("2026-10-24T01:30:00Z", 2), "2026-10-27");
   // 03:00 UTC Monday is still Sunday night in New York: Sun -> Tue
   assert.equal(day("2026-10-26T03:00:00Z", 2), "2026-10-27");
-  assert.equal(nextBusinessDay(new Date("2026-10-23T15:00:00Z")).getUTCDay(), 2); // default n=2
+  assert.equal(nextBusinessDay(new Date("2026-10-23T15:00:00Z")).getUTCDay(), 1); // default n=1: Fri -> Mon
 });
 
 test("weekStartET is the New York Monday", () => {
@@ -120,7 +120,7 @@ test("parseResearch: real object, double-encoded string, junk", () => {
   assert.deepEqual(parseResearch(null), {});
 });
 
-test("logCall: one calls row, one events row (via ui), the stage moves; attempted gets +2 business days", async () => {
+test("logCall: one calls row, one events row (via ui), the stage moves; attempted gets the next business day", async () => {
   const { sb, ops } = fakeSb({ business: { id: ID, stage: "call_due", next_contact_at: null, consult_at: null } });
   const now = new Date("2026-10-23T15:00:00Z"); // Friday
   const r = await logCall(sb, ACTOR, "ui", { businessId: ID, outcome: 2, note: " voicemail ", now });
@@ -136,7 +136,7 @@ test("logCall: one calls row, one events row (via ui), the stage moves; attempte
   assert.equal(inserts[1].values.detail.business_id, ID);
   const upd = ops.find((o) => o.kind === "update");
   assert.equal(upd.values.stage, "attempted");
-  assert.equal(upd.values.next_contact_at.slice(0, 10), "2026-10-27"); // Tuesday
+  assert.equal(upd.values.next_contact_at.slice(0, 10), "2026-10-26"); // Monday
   assert.deepEqual(upd.filters, [["id", ID], ["stage", "call_due"]]); // compare-and-set on the stage read
 });
 

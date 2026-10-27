@@ -99,7 +99,7 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
   const mine = before.calls.filter((l) => l.name.startsWith(tag)).map((l) => l.name);
   assert.deepEqual(mine, [A, B]);
 
-  // outcome 2 (no answer): attempted + a follow-up two business days out
+  // outcome 2 (no answer): attempted + a follow-up next business day
   const actor = { id: userId, handle: "brandon" };
   const r = await logCall(sb, actor, "ui", { businessId: ida, outcome: 2, note: "left a voicemail" });
   assert.equal(r.stage, "attempted");
@@ -134,7 +134,7 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
 
   // Today: A is a follow-up only once due, B is under consults
   const afterT = await loadBrandonToday(sb, "brandon", { all: true });
-  assert.ok(!afterT.followups.some((l) => l.name === A), "attempted lead is not due for two business days");
+  assert.ok(!afterT.followups.some((l) => l.name === A), "attempted lead is not due until the next business day");
   psql(`update businesses set next_contact_at = now() - interval '1 hour' where id = '${ida}'`);
   assert.ok((await loadBrandonToday(sb, "brandon", { all: true })).followups.some((l) => l.name === A), "due once its date passes");
   assert.ok(afterT.consults.some((l) => l.name === B));
