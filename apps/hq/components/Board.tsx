@@ -48,7 +48,7 @@ export function Board(props: {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (ownsKeys(e.target as HTMLElement | null)) return;
+      if (ownsKeys(e.target as HTMLElement | null, e.key)) return;
       const { rows, current, onOpen, onLeave, onOutcome } = handlers.current;
       const i = current ? rows.indexOf(current) : -1;
       if (e.key === "j" || e.key === "k") {

@@ -153,7 +153,7 @@ test("POST /signout: Supabase logout fails (5xx) -> still 303 /login with every 
     () => signOut(request)
   );
   assert.equal(res.status, 303);
-  assert.equal(new URL(res.headers.get("location")).pathname, "/login");
+  assert.equal(new URL(res.headers.get("location"), "http://localhost").pathname, "/login");
   const set = res.headers.getSetCookie();
   assert.equal(set.length, 1, "only the sb-* cookie is touched");
   assert.match(set[0], /^sb-hq-test-auth-token=; Path=\/; Max-Age=0/);

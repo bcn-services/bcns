@@ -12,7 +12,7 @@ test("gate: a check that THROWS is denied (307 /login), never admitted", async (
     throw new Error("boom");
   });
   assert.equal(res.status, 307);
-  assert.equal(new URL(res.headers.get("location")).pathname, "/login");
+  assert.equal(new URL(res.headers.get("location"), "http://localhost").pathname, "/login");
 });
 
 test("gate: a check returning null is denied; a response is passed through; public paths skip the check", async () => {

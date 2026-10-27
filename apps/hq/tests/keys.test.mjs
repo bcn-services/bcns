@@ -12,15 +12,26 @@ const el = (tagName, { within = [], isContentEditable = false } = {}) => ({
   closest: (sel) => (sel.split(",").some((s) => within.includes(s)) ? {} : null),
 });
 
-test("ownsKeys: inputs, contentEditable, links, buttons (and their children), summaries own their keys", () => {
-  for (const t of ["INPUT", "TEXTAREA", "SELECT"]) assert.ok(ownsKeys(el(t)), t);
-  assert.ok(ownsKeys(el("DIV", { isContentEditable: true })));
-  for (const s of ["a", "button", "[role=button]", "summary"])
-    assert.ok(ownsKeys(el("SPAN", { within: [s] })), s);
+test("ownsKeys: typing targets own every key", () => {
+  for (const key of ["j", "Enter", "Escape", "1"]) {
+    for (const t of ["INPUT", "TEXTAREA", "SELECT"]) assert.ok(ownsKeys(el(t), key), `${t} ${key}`);
+    assert.ok(ownsKeys(el("DIV", { isContentEditable: true }), key), `contentEditable ${key}`);
+  }
 });
 
-test("ownsKeys: body, rows and the detail pane do not; null does not", () => {
-  assert.equal(ownsKeys(el("BODY")), false);
-  assert.equal(ownsKeys(el("DIV")), false);
-  assert.equal(ownsKeys(null), false);
+test("ownsKeys: a link/button (or a child of one) owns Enter and Space only; j/k/Esc/1-4 still reach Board", () => {
+  for (const s of ["a", "button", "[role=button]", "summary"]) {
+    for (const key of ["Enter", " "])
+      assert.ok(ownsKeys(el("SPAN", { within: [s] }), key), `${s} ${key}`);
+    for (const key of ["j", "k", "Escape", "1", "4"])
+      assert.equal(ownsKeys(el("SPAN", { within: [s] }), key), false, `${s} ${key}`);
+  }
+});
+
+test("ownsKeys: body, rows and the detail pane own nothing; null does not", () => {
+  for (const key of ["Enter", "j", " "]) {
+    assert.equal(ownsKeys(el("BODY"), key), false);
+    assert.equal(ownsKeys(el("DIV"), key), false);
+    assert.equal(ownsKeys(null, key), false);
+  }
 });

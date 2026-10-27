@@ -113,15 +113,15 @@ test("no session -> 307 to /login", async () => {
   fakeSupabase();
   const res = await middleware(req("/?x=1"));
   assert.equal(res.status, 307);
-  assert.equal(new URL(res.headers.get("location")).pathname, "/login");
-  assert.equal(new URL(res.headers.get("location")).search, "");
+  assert.equal(new URL(res.headers.get("location"), "http://localhost").pathname, "/login");
+  assert.equal(new URL(res.headers.get("location"), "http://localhost").search, "");
 });
 
 test("session WITHOUT a profiles row -> 307 to /login (signups never grant access)", async () => {
   const calls = fakeSupabase({ profile: null });
   const res = await middleware(req("/leads", { cookie: COOKIE }));
   assert.equal(res.status, 307);
-  assert.equal(new URL(res.headers.get("location")).pathname, "/login");
+  assert.equal(new URL(res.headers.get("location"), "http://localhost").pathname, "/login");
   assert.ok(
     calls.some((u) => u.includes("/rest/v1/profiles")),
     "the profiles table was consulted"
