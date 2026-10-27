@@ -26,7 +26,7 @@ const config = getConfig();
 if (config.supabaseUrl && config.hasServiceRoleKey) {
   console.error(
     "check-env: SUPABASE_SERVICE_ROLE_KEY must not be set (it bypasses RLS for every client " +
-      "on the shared platform). Remove it and rebuild."
+      "on the shared platform). Remove it and rebuild.",
   );
   process.exit(1);
 }
