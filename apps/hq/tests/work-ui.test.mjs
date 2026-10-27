@@ -25,6 +25,14 @@ test("Today (Nate): a/r decide, c on a fire creates the ops task but not from a 
   assert.match(s, /createTaskFromFire\(f\.key, f\.title\)/);
 });
 
+test("Lead rows: p / q create a Claude pitch / quote task via createTaskFromLead", () => {
+  const b = src("components/TodayBrandonBoard.tsx");
+  assert.match(b, /import \{ createTaskFromLead \} from "@\/app\/\(app\)\/work\/actions"/);
+  assert.match(b, /\(key === "p" \|\| key === "q"\) && row\.canLog !== undefined/);
+  assert.match(b, /createTaskFromLead\(row\.key, key === "p" \? "pitch" : "quote"\)/);
+  assert.match(b, /<b className="k">p<\/b> pitch/);
+});
+
 test("a stale decide result is rendered as stale, not as success", () => {
   assert.match(src("components/ProposalDecide.tsx"), /r === "stale" \? "stale/);
 });

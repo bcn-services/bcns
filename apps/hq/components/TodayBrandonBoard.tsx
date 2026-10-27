@@ -2,11 +2,13 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { logOutcome, reassign } from "@/app/(app)/leads/actions";
+import { createTaskFromLead } from "@/app/(app)/work/actions";
 import { Board, type Row, type Section } from "./Board";
 
 /**
  * Board + Brandon's keys for lead rows (Today and the Leads grid share it): 1/2/4 log straight away,
- * 3 asks for the consult time first, n focuses the note box, a flips the owner. Errors from the
+ * 3 asks for the consult time first, n focuses the note box, a flips the owner, p / q hand the lead
+ * to Claude as a pitch / quote task. Errors from the
  * actions show in a bar above the key hints; the page re-renders itself after each action.
  */
 export function LeadBoard(props: {
@@ -75,6 +77,10 @@ export function LeadBoard(props: {
           act(() => reassign(row.key, to));
           return true;
         }
+        if ((key === "p" || key === "q") && row.canLog !== undefined) {
+          act(() => createTaskFromLead(row.key, key === "p" ? "pitch" : "quote"));
+          return true;
+        }
         return false;
       }}
       hints={
@@ -84,6 +90,9 @@ export function LeadBoard(props: {
           </span>
           <span>
             <b className="k">a</b> reassign
+          </span>
+          <span>
+            <b className="k">p</b> pitch · <b className="k">q</b> quote → Claude
           </span>
         </>
       }
