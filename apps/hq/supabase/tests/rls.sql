@@ -54,6 +54,10 @@ begin
     assert n = 0, 'anon read ' || t;
   end loop;
 end $$;
+do $$ begin
+  assert not has_function_privilege('anon', 'public.decide_proposal(uuid,boolean)', 'execute'), 'anon can execute decide_proposal';
+  assert not has_function_privilege('anon', 'public.is_hq()', 'execute'), 'anon can execute is_hq';
+end $$;
 reset role;
 
 -- ---- signed in, no profiles row: nothing ------------------------------------
