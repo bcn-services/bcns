@@ -16,7 +16,7 @@ import {
   LISTS,
   LIST_STATUSES,
   assertOwner,
-  createTask,
+  buildTaskRow,
   statusPatch,
   type ListName,
   type ListStatus,
@@ -84,20 +84,21 @@ export async function seedGtm(
   if (seeded.error) throw new Error(`tasks: ${seeded.error.message}`);
   if (seeded.data?.length)
     throw new Error("refusing: tasks with source='tracker' already exist (already seeded)");
-  for (const t of tasks) await createTask(sb, actor, "job", t);
+  // one insert = one atomic statement: a failure leaves no tracker rows, so the refusal above can't wedge a rerun
+  const now = new Date();
+  const ins = await sb.from("tasks").insert(tasks.map((t) => buildTaskRow(actor, "job", t, now)));
+  if (ins.error) throw new Error(`tasks insert: ${ins.error.message}`);
   if (items.length) {
     const r = await sb.from("list_items").insert(items);
     if (r.error) throw new Error(`list_items: ${r.error.message}`);
   }
-  const e = await sb
-    .from("events")
-    .insert({
-      job: "hq",
-      kind: "seed.gtm",
-      detail: { tasks: tasks.length, items: items.length },
-      actor,
-      via: "job",
-    });
+  const e = await sb.from("events").insert({
+    job: "hq",
+    kind: "seed.gtm",
+    detail: { tasks: tasks.length, items: items.length },
+    actor,
+    via: "job",
+  });
   if (e.error) throw new Error(`events: ${e.error.message}`);
   log(`inserted ${tasks.length} tasks and ${items.length} list items`);
   return { tasks: tasks.length, items: items.length };

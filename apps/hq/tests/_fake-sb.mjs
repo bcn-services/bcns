@@ -27,7 +27,8 @@ export function fakeSb(initial = {}, { failOn = {} } = {}) {
       then: (res, rej) => Promise.resolve(exec()).then(res, rej),
     };
     function exec() {
-      if (failOn[table]) return { data: null, error: { message: failOn[table] } };
+      const fail = failOn[`${table}:${q.op}`] ?? failOn[table]; // "tasks:insert" fails one op only
+      if (fail) return { data: null, error: { message: fail } };
       let out;
       if (q.op === "insert") {
         out = (Array.isArray(q.payload) ? q.payload : [q.payload]).map((p) => ({

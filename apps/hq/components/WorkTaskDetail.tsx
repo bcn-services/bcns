@@ -79,10 +79,13 @@ export function WorkTaskDetail({
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
+            // status follows waiting_on only when the waiting text itself changed
             const status =
               (s(f, "status") as Status) !== task.status
                 ? (s(f, "status") as Status)
-                : (waitingStatus(waiting, task.status) ?? task.status);
+                : waiting.trim() !== (task.waiting_on ?? "").trim()
+                  ? (waitingStatus(waiting, task.status) ?? task.status)
+                  : task.status;
             return updateTaskAction(task.id, {
               status,
               owner: s(f, "owner") as (typeof OWNERS)[number],

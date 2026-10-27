@@ -21,14 +21,17 @@ export async function TodayNate() {
       .order("display_name"),
   ]);
   const open = tasks.filter((t) => t.status !== "done");
-  const mine = open.filter((t) => t.owner === "nate").sort(byDue);
   const taken = new Set(open.map((t) => t.alert_key).filter(Boolean));
+  // proposals have their own Approve section; a fire whose alert already has an open task shows as that task
+  const shown = fires.filter((f) => !f.key.startsWith("proposal:") && !taken.has(f.key));
+  // a task already listed as a fire (key task:<id>) is not repeated under Your tasks
+  const asFire = new Set(shown.map((f) => f.key));
+  const mine = open.filter((t) => t.owner === "nate" && !asFire.has(`task:${t.id}`)).sort(byDue);
   return (
     <TodayNateBoard
       today={isoDay(new Date())}
       proposals={proposals}
-      // proposals have their own Approve section; a fire whose alert already has an open task shows as that task
-      fires={fires.filter((f) => !f.key.startsWith("proposal:") && !taken.has(f.key))}
+      fires={shown}
       waiting={open.filter((t) => t.waiting_on?.trim().toLowerCase() === "nate").sort(byDue)}
       mine={mine}
       clients={(clients.data ?? []) as TodayClient[]}

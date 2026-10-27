@@ -98,7 +98,7 @@ function assertDay(d: unknown): string {
   return d;
 }
 
-/** done sets done_at; any other status clears it. */
+/** done sets done_at; any other status clears it (updateTask keeps done_at when already done). */
 export function statusPatch(
   status: unknown,
   now: Date
@@ -219,13 +219,8 @@ export interface NewTask {
   waitingOn?: string | null;
 }
 
-export async function createTask(
-  sb: Sb,
-  actor: string,
-  via: Via,
-  t: NewTask,
-  now: Date = new Date()
-): Promise<Task> {
+/** Validated tasks row for a NewTask (shared by createTask and the one-insert seeder). */
+export function buildTaskRow(actor: string, via: Via, t: NewTask, now: Date = new Date()) {
   const title = t.title?.trim();
   if (!title) throw new Error("title required");
   if (t.area && !AREAS.includes(t.area as Area)) throw new Error(`unknown area ${t.area}`);
@@ -245,6 +240,18 @@ export async function createTask(
     created_by: actor,
     via,
   };
+  return row;
+}
+
+export async function createTask(
+  sb: Sb,
+  actor: string,
+  via: Via,
+  t: NewTask,
+  now: Date = new Date()
+): Promise<Task> {
+  const row = buildTaskRow(actor, via, t, now);
+  const title = row.title;
   const task = must<Task>(await sb.from("tasks").insert(row).select().single(), "tasks insert");
   await logEvent(sb, actor, via, "task.created", {
     task_id: task.id,
@@ -264,6 +271,14 @@ export async function updateTask(
   now: Date = new Date()
 ): Promise<Task> {
   const set = buildTaskPatch(patch, now);
+  if (set.status === "done") {
+    // done_at marks the move INTO done: saving or pressing d on an already-done task keeps it
+    const cur = must<{ status: string } | null>(
+      await sb.from("tasks").select("status").eq("id", id).maybeSingle(),
+      "tasks read"
+    );
+    if (cur?.status === "done") delete set.done_at;
+  }
   const task = must<Task>(
     await sb.from("tasks").update(set).eq("id", id).select().single(),
     "tasks update"

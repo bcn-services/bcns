@@ -134,7 +134,7 @@ function asUser(body) {
   const r = psql(`
 begin;
 insert into auth.users (id, email) values ('${UID}', 'hq4-test@example.invalid');
-insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'hq4-test@example.invalid', 'hq4', 'nate', 'admin');
+insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'hq4-test@example.invalid', 'hq4', null, 'admin');
 insert into businesses (id, name, stage) values ('${BIZ}', 'hq4-Test Roofing', 'qualified');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"${UID}"}';
@@ -196,7 +196,7 @@ select stage from businesses where id = '${BIZ}';`);
     const again = psql(`
 begin;
 insert into auth.users (id, email) values ('${UID}', 'hq4-test@example.invalid');
-insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'x', 'hq4', 'nate', 'admin');
+insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'x', 'hq4', null, 'admin');
 insert into businesses (id, name) values ('${BIZ}', 'hq4-Test Roofing');
 insert into proposals (id, kind, target_id, field, old, new, status, created_by) values ('66666666-6666-4666-8666-666666666666', 'lead_stage', '${BIZ}', 'stage', '"qualified"', '"won"', 'approved', '${UID}');
 set local role authenticated;
@@ -212,7 +212,7 @@ test("integration: authenticated cannot UPDATE proposals directly", { skip: !up 
   const r = psql(`
 begin;
 insert into auth.users (id, email) values ('${UID}', 'hq4-test@example.invalid');
-insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'x', 'hq4', 'nate', 'admin');
+insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'x', 'hq4', null, 'admin');
 insert into businesses (id, name) values ('${BIZ}', 'hq4-Test Roofing');
 insert into proposals (id, kind, target_id, field, old, new, status, created_by) values ('77777777-7777-4777-8777-777777777777', 'lead_stage', '${BIZ}', 'stage', '"qualified"', '"won"', 'pending', '${UID}');
 set local role authenticated;

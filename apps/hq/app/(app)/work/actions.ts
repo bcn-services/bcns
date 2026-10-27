@@ -51,7 +51,9 @@ async function run(
 }
 
 export async function createTaskAction(t: NewTask): Promise<ActionResult> {
-  return run(async (c) => (await createTask(c.sb, c.actor, "ui", t)).id);
+  // source 'lead'/'alert' and alert_key are set only by createTaskFromLead / createTaskFromFire
+  const manual: NewTask = { ...t, source: "manual", alertKey: null };
+  return run(async (c) => (await createTask(c.sb, c.actor, "ui", manual)).id);
 }
 
 export async function updateTaskAction(id: string, patch: TaskPatch): Promise<ActionResult> {

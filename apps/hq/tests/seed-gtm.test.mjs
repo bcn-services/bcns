@@ -66,6 +66,28 @@ test("--apply inserts tracker tasks + one event, then refuses a second run", asy
   assert.equal(sb.db.tasks.length, before);
 });
 
+test("--apply inserts every task in ONE insert; a failed insert leaves nothing and a rerun works", async () => {
+  const sb = fakeSb();
+  let taskInserts = 0;
+  const from = sb.from;
+  sb.from = (t) => {
+    const q = from(t);
+    const ins = q.insert;
+    q.insert = (p) => {
+      if (t === "tasks") taskInserts++;
+      return ins(p);
+    };
+    return q;
+  };
+  const r = await seedGtm(sb, ACTOR, seed, () => {});
+  assert.equal(taskInserts, 1);
+  assert.equal(sb.db.tasks.length, r.tasks);
+  const bad = fakeSb({}, { failOn: { "tasks:insert": "boom" } });
+  await assert.rejects(() => seedGtm(bad, ACTOR, seed, () => {}), /boom/);
+  assert.equal(bad.db.tasks.length, 0);
+  assert.equal(bad.db.events ?? undefined, undefined);
+});
+
 test("planSeed rejects an unknown owner, track, list or status", () => {
   const bad = (patch) => () => planSeed({ tracks: [], lists: {}, ...patch });
   assert.throws(

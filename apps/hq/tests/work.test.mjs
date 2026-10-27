@@ -288,3 +288,28 @@ test("no delete path anywhere in the work code", () => {
   );
   for (const f of files) assert.doesNotMatch(readFileSync(f, "utf8"), /\.delete\(/, f);
 });
+
+test("updateTask: done_at marks the move INTO done; re-saving a done task keeps it", async () => {
+  const sb = fakeSb({
+    tasks: [
+      { id: "t1", status: "done", done_at: "2026-10-01T00:00:00.000Z" },
+      { id: "t2", status: "doing", done_at: null },
+    ],
+  });
+  await T.updateTask(sb, ACTOR, "ui", "t1", { status: "done" }, NOW);
+  assert.equal(sb.db.tasks[0].done_at, "2026-10-01T00:00:00.000Z");
+  await T.updateTask(sb, ACTOR, "ui", "t2", { status: "done" }, NOW);
+  assert.equal(sb.db.tasks[1].done_at, "2026-10-27T15:00:00.000Z");
+  await T.updateTask(sb, ACTOR, "ui", "t1", { status: "todo" }, NOW);
+  assert.equal(sb.db.tasks[0].done_at, null);
+});
+
+test("UI guards: manual-only create action, waiting_on-driven status, no fire repeated in Your tasks", () => {
+  const read = (p) => readFileSync(fileURLToPath(new URL("../" + p, import.meta.url)), "utf8");
+  assert.match(read("app/(app)/work/actions.ts"), /source: "manual", alertKey: null/);
+  assert.match(
+    read("components/WorkTaskDetail.tsx"),
+    /waiting\.trim\(\) !== \(task\.waiting_on \?\? ""\)\.trim\(\)/
+  );
+  assert.match(read("components/TodayNate.tsx"), /!asFire\.has\(`task:\$\{t\.id\}`\)/);
+});
