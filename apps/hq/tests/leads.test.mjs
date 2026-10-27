@@ -29,7 +29,7 @@ function fakeSb({ business, failCall = false, recentCall = false, failEvents = f
           Promise.resolve(
             table === "events" && failEvents
               ? { data: null, error: { message: "events down" } }
-              : { data: op.kind === "update" ? [{ id: ID }] : table === "calls" && op.kind === "select" && recentCall ? [{ id: "call-0" }] : [], error: null }
+              : { data: op.kind === "update" ? [{ id: ID }] : table === "calls" && op.kind === "select" && recentCall && op.filters.some(([c, v]) => c === "outcome" && v === recentCall) ? [{ id: "call-0" }] : [], error: null }
           ).then(res, rej),
       };
       return b;
@@ -174,12 +174,17 @@ test("logCall refuses a lead that is not loggable, writes nothing, and undoes th
 });
 
 test("logCall dedupe: a retry within a minute for the same actor and lead writes nothing", async () => {
-  const { sb, ops } = fakeSb({ business: { id: ID, stage: "reached", next_contact_at: null, consult_at: null }, recentCall: true });
+  const { sb, ops } = fakeSb({ business: { id: ID, stage: "reached", next_contact_at: null, consult_at: null }, recentCall: "reached" });
   const now = new Date("2026-10-23T15:00:00Z");
   await assert.rejects(() => logCall(sb, ACTOR, "ui", { businessId: ID, outcome: 1, now }), /already logged/);
   assert.equal(ops.filter((o) => o.kind !== "select").length, 0, "no move, no call, no event");
   const q = ops.find((o) => o.table === "calls");
-  assert.deepEqual(q.filters, [["business_id", ID], ["actor", ACTOR.id], ["at", ">=", "2026-10-23T14:59:00.000Z"]]);
+  assert.deepEqual(q.filters, [["business_id", ID], ["actor", ACTOR.id], ["outcome", "reached"], ["at", ">=", "2026-10-23T14:59:00.000Z"]]);
+  // a correction or redial (different outcome) within the minute goes through
+  const other = fakeSb({ business: { id: ID, stage: "reached", next_contact_at: null, consult_at: null }, recentCall: "reached" });
+  const r = await logCall(other.sb, ACTOR, "ui", { businessId: ID, outcome: 2, now });
+  assert.equal(r.stage, "attempted");
+  assert.equal(other.ops.filter((o) => o.table === "calls" && o.kind === "insert").length, 1);
 });
 
 test("logCall: a failed events insert after the call is written does not fail the call", async () => {

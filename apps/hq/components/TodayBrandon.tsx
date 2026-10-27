@@ -28,7 +28,13 @@ export async function TodayBrandon({ all = false }: { all?: boolean }) {
         ? { more: all ? { href: "/", label: "show fewer" } : { href: "/?all=1", label: `show all ${t.callsTotal}` } }
         : {}),
     },
-    { id: "follow", title: "Follow-ups", hot: true, rows: rows(t.followups, "follow") },
+    {
+      id: "follow",
+      title: "Follow-ups",
+      hot: true,
+      ...(t.followupsTotal > t.followups.length ? { sub: `${t.followups.length} of ${t.followupsTotal} due` } : {}),
+      rows: rows(t.followups, "follow"),
+    },
     { id: "consults", title: "Consults", rows: rows(t.consults, "consult") },
     {
       id: "tasks",

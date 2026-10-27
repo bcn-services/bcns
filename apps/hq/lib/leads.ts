@@ -202,13 +202,15 @@ export async function logCall(sb: Sb, actor: Actor, via: Via, input: LogCallInpu
   if (!cur) throw new Error("lead not found");
   if (!canLog(cur.stage)) throw new Error(`cannot log a call on a ${cur.stage} lead`);
   // The stage CAS below can't catch a same-stage move (reached -> reached), so a retry after a commit the
-  // client never saw would log twice. Same actor, same lead, within a minute = the same call.
+  // client never saw would log twice. Same actor, lead and outcome within a minute = the same call (a
+  // correction or a redial has a different outcome and goes through).
   const recent = must(
     await sb
       .from("calls")
       .select("id")
       .eq("business_id", input.businessId)
       .eq("actor", actor.id)
+      .eq("outcome", o.outcome)
       .gte("at", new Date(now.getTime() - DEDUPE_MS).toISOString())
       .limit(1)
   );
@@ -413,6 +415,7 @@ export interface BrandonToday {
   calls: Lead[];
   callsTotal: number;
   followups: Lead[];
+  followupsTotal: number;
   consults: Lead[];
   tasks: TaskRow[];
   week: { calls: number; reached: number; consults: number };
@@ -437,16 +440,18 @@ export async function loadBrandonToday(
 ): Promise<BrandonToday> {
   const mine = () => sb.from("businesses").select(LEAD_COLS).eq("assigned_to", me).is("suppressed_at", null);
   const callsQ = mine().eq("stage", "call_due").order("fit_score", { ascending: false, nullsFirst: false }).order("name");
-  const [calls, total, follow, consults, tasks, week, allTime] = await Promise.all([
+  // due today or overdue, plus undated (imported rows have no next_contact_at); the rest wait for their day
+  const due = `next_contact_at.is.null,next_contact_at.lt.${startOfTomorrowET(opts.now ?? new Date()).toISOString()}`;
+  const [calls, total, follow, followCount, consults, tasks, week, allTime] = await Promise.all([
     opts.all ? callsQ : callsQ.limit(CALLS_LIMIT),
     sb.from("businesses").select("id", { count: "exact", head: true }).eq("assigned_to", me).is("suppressed_at", null).eq("stage", "call_due"),
-    // due today or overdue, plus undated (imported rows have no next_contact_at); the rest wait for their day
     mine()
       .in("stage", ["attempted", "reached"])
-      .or(`next_contact_at.is.null,next_contact_at.lt.${startOfTomorrowET(opts.now ?? new Date()).toISOString()}`)
+      .or(due)
       .order("next_contact_at", { ascending: true, nullsFirst: true })
       .order("name")
       .limit(FOLLOWUPS_LIMIT),
+    sb.from("businesses").select("id", { count: "exact", head: true }).eq("assigned_to", me).is("suppressed_at", null).in("stage", ["attempted", "reached"]).or(due),
     mine().eq("stage", "consult_scheduled").order("consult_at", { ascending: true, nullsFirst: false }),
     sb.from("tasks").select("id, title, body, area, status, due, waiting_on").eq("owner", me).neq("status", "done").order("due", { ascending: true, nullsFirst: false }),
     sb.from("call_weeks").select("calls, reached, consults").eq("by", me).eq("week", weekStartET(opts.now ?? new Date())).maybeSingle(),
@@ -458,6 +463,7 @@ export async function loadBrandonToday(
     calls: (must(calls).data ?? []) as Lead[],
     callsTotal: must(total).count ?? 0,
     followups: (must(follow).data ?? []) as Lead[],
+    followupsTotal: must(followCount).count ?? 0,
     consults: (must(consults).data ?? []) as Lead[],
     tasks: (must(tasks).data ?? []) as TaskRow[],
     week: { calls: Number(w?.calls ?? 0), reached: Number(w?.reached ?? 0), consults: Number(w?.consults ?? 0) },

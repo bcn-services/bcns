@@ -114,6 +114,11 @@ test("logCall as a signed-in HQ user writes one calls row + one events row (ui) 
   await assert.rejects(() => logCall(sb, actor, "ui", { businessId: ida, outcome: 2 }), /already logged/);
   assert.equal(psql(`select count(*) from calls where business_id = '${ida}'`), "1");
   assert.equal(psql(`select count(*) from events where detail->>'business_id' = '${ida}'`), "1");
+  // ...but a redial with a different outcome inside the minute is a new call
+  await logCall(sb, actor, "ui", { businessId: ida, outcome: 1 });
+  assert.equal(psql(`select count(*) from calls where business_id = '${ida}'`), "2");
+  assert.equal(psql(`select count(*) from events where detail->>'business_id' = '${ida}'`), "2");
+  assert.equal(psql(`select stage from businesses where id = '${ida}'`), "reached");
   // the other lead is untouched
   assert.equal(psql(`select count(*) from calls where business_id = '${idb}'`), "0");
   assert.equal(psql(`select stage from businesses where id = '${idb}'`), "call_due");

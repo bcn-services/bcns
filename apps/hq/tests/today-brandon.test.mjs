@@ -134,7 +134,9 @@ test("startOfTomorrowET: midnight New York, DST aware", () => {
 test("Follow-ups are capped", async () => {
   const many = [...Array(FOLLOWUPS_LIMIT + 20)].map((_, i) => biz(`hq3 f${String(i).padStart(3, "0")}`, { stage: "attempted" }));
   const t = await loadBrandonToday(memSb({ businesses: many, tasks: [], call_weeks: [], calls: [] }), "brandon", { now: NOW });
+  assert.equal(FOLLOWUPS_LIMIT, 50);
   assert.equal(t.followups.length, FOLLOWUPS_LIMIT);
+  assert.equal(t.followupsTotal, FOLLOWUPS_LIMIT + 20); // the head count is not limited
 });
 
 test("loadExtras never sends more than 100 ids in one request, and still groups every lead", async () => {
