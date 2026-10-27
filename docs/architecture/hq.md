@@ -227,9 +227,9 @@ In step "Activate, health-check, prune", inside the `ssh ... "` script, immediat
 Then ship. `rsync --delete` replaces each release, so `npm install` reruns on every deploy by design.
 
 ```bash
-GITHUB_TOKEN= gh pr list -R bcn-services/bcns --head feat/hq --state open   # <n> = the feat/hq -> main draft PR; if none: gh pr create --base main --head feat/hq --draft
-GITHUB_TOKEN= gh pr ready <n> -R bcn-services/bcns
-GITHUB_TOKEN= gh pr merge <n> -R bcn-services/bcns --squash   # or --merge to keep the item commits
+# the feat/hq -> main draft PR is #178
+GITHUB_TOKEN= gh pr ready 178 -R bcn-services/bcns
+GITHUB_TOKEN= gh pr merge 178 -R bcn-services/bcns --squash   # or --merge to keep the item commits
 ```
 
 The merge touches `pnpm-lock.yaml` and `packages/**`, so expect **sb, connect and mcp to redeploy and restart too**, plus hq. Watch it: `GITHUB_TOKEN= gh run watch -R bcn-services/bcns`. If only hq needs a redeploy later: `GITHUB_TOKEN= gh workflow run deploy-app.yml -f slug=hq -R bcn-services/bcns`.
