@@ -580,6 +580,44 @@ test("refresh: GoTrue 400/403 is invalid_grant and drops the pair; anything else
   }
 });
 
+test("refresh: membership is re-checked with the NEW session; revoked = invalid_grant and the pair is dropped", async () => {
+  let revoked = false;
+  const t = boot({ member: async (jwt) => (t.members.push(jwt), revoked ? null : NATE) });
+  const j = await connect(t);
+  revoked = true;
+  const res = await t.oauth.token(refreshReq(j.refresh_token));
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, "invalid_grant");
+  assert.equal(t.members.length, 2, "once at sign-in, once after the refresh");
+  assert.equal(t.oauth.resolve(j.access_token), null);
+  assert.equal(t.state.access.size, 0);
+  assert.equal(t.state.refresh.size, 0);
+});
+
+test("refresh: a failing membership lookup is a 503 that keeps the pair, pointed at GoTrue's rotated token", async () => {
+  let down = false;
+  const t = boot({
+    member: async () => {
+      if (down) throw new Error("db down");
+      return NATE;
+    },
+  });
+  const j = await connect(t);
+  down = true;
+  const res = await t.oauth.token(refreshReq(j.refresh_token));
+  assert.equal(res.status, 503);
+  assert.equal((await res.json()).error, "temporarily_unavailable");
+  assert.ok(t.oauth.resolve(j.access_token), "the pair is kept");
+  down = false;
+  const again = await t.oauth.token(refreshReq(j.refresh_token));
+  assert.equal(again.status, 200);
+  assert.deepEqual(
+    t.refreshes,
+    ["sb-refresh-1", "sb-refresh-2"],
+    "the retry used the rotated token"
+  );
+});
+
 test("refresh: the unknown-IP and global budgets answer 503 before GoTrue is called", async () => {
   const t = boot({ allowUnknownIpRefresh: () => false });
   const j = await connect(t);

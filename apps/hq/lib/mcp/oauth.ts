@@ -598,11 +598,24 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
         drop(opaque); // GoTrue says the underlying refresh token is dead
         return tokenError("invalid_grant");
       }
+      // Membership can be revoked after sign-in: no profiles row now means no new pair.
+      let member: Member | null;
+      try {
+        member = await deps.member(result.session.access_token);
+      } catch {
+        // GoTrue already rotated its refresh token, so keep the pair but point it at the new one for the retry.
+        rec.sbRefresh = result.session.refresh_token;
+        return unavailable();
+      }
+      if (!member) {
+        drop(opaque);
+        return tokenError("invalid_grant");
+      }
       // ponytail: the old pair is dropped at once. If this response is lost, the retry with the old
       // refresh token is invalid_grant (reconnect). Keep it 10 s (GoTrue's reuse window) if that bites.
       drop(opaque);
       markKnown(ip);
-      return json(200, issue(result.session, rec.member), NO_STORE);
+      return json(200, issue(result.session, member), NO_STORE);
     }
 
     if (grant !== "authorization_code")

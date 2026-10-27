@@ -202,6 +202,34 @@ test("propose_lead_stage inserts a pending proposal with old = the current stage
   assert.equal(fake.db.businesses[0].stage, "qualified", "the stage itself did not move");
 });
 
+test("update_task: waiting_on alone moves the task to waiting, clearing it returns it to todo, done is left alone", async () => {
+  const fake = seed();
+  const set = await call(fake, "update_task", { id: T_NATE, waiting_on: "brandon" });
+  assert.equal(set.task.status, "waiting");
+  const cleared = await call(fake, "update_task", { id: T_NATE, waiting_on: null });
+  assert.equal(cleared.task.status, "todo");
+  const doing = await call(fake, "update_task", { id: T_NATE, status: "doing" });
+  const keep = await call(fake, "update_task", { id: T_NATE, waiting_on: "" });
+  assert.equal(
+    keep.task.status,
+    doing.task.status,
+    "clearing on a task that is not waiting changes no status"
+  );
+  const explicit = await call(fake, "update_task", {
+    id: T_NATE,
+    status: "doing",
+    waiting_on: "x",
+  });
+  assert.equal(explicit.task.status, "doing", "an explicit status wins");
+  fake.db.tasks.find((t) => t.id === T_CLAUDE).status = "done";
+  const done = await call(fake, "update_task", { id: T_CLAUDE, waiting_on: "x" });
+  assert.equal(done.task.status, "done", "a done task is not reopened");
+  await assert.rejects(
+    call(fake, "update_task", { id: "33333333-3333-4333-8333-333333333399", waiting_on: "x" }),
+    /task not found/
+  );
+});
+
 test("propose_lead_stage refuses the same stage, an unknown stage, a missing lead and (flag off) late stages", async () => {
   const fake = seed();
   await assert.rejects(
@@ -347,6 +375,33 @@ test("search_leads strips contacts, filters by name/stage and escapes wildcard i
   assert.ok(ilike.length >= 2);
   await call(fake, "search_leads", { name: "100%_(x),y" }); // must not throw or inject filter syntax
   await assert.rejects(call(fake, "search_leads", { limit: 51 }));
+});
+
+test("stripContacts: phone-number-looking text is blanked, dates / timestamps / ids / scores are not", () => {
+  const out = stripContacts({
+    a: "call (555) 010-0199 or 555.010.0198 or 555-010-0197 or +1 555 010 0196 or 5550100195 today",
+    b: "intl +44 20 7946 0958 ok",
+    keep: [
+      "2026-10-05",
+      "2026-10-05 14:30:00",
+      "2026-10-05T14:30:00+00:00",
+      "7 of 10",
+      "$1,234,567",
+    ],
+    id: "22222222-2222-4222-8222-222222222222",
+    next_contact_at: "2026-10-05",
+  });
+  assert.equal(out.a, "call [removed] or [removed] or [removed] or [removed] or [removed] today");
+  assert.equal(out.b, "intl [removed] ok");
+  assert.deepEqual(out.keep, [
+    "2026-10-05",
+    "2026-10-05 14:30:00",
+    "2026-10-05T14:30:00+00:00",
+    "7 of 10",
+    "$1,234,567",
+  ]);
+  assert.equal(out.id, "22222222-2222-4222-8222-222222222222");
+  assert.equal(out.next_contact_at, "2026-10-05");
 });
 
 test("stripContacts: any depth, arrays, email addresses inside text", () => {

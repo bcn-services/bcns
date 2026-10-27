@@ -47,11 +47,12 @@ export function clientForJwt(jwt: string): SupabaseClient {
 export async function memberFor(accessToken: string): Promise<Member | null> {
   const sub = jwtSub(accessToken);
   if (!sub) return null;
-  const { data } = await clientForJwt(accessToken)
+  const { data, error } = await clientForJwt(accessToken)
     .from("profiles")
     .select("id, handle")
     .eq("id", sub)
     .maybeSingle();
+  if (error) throw new Error(`profiles read: ${error.message}`); // an outage is not "no membership"
   const row = data as { id: string; handle: string | null } | null;
   if (!row) return null;
   return {

@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createOAuth, newState, realRandomBytes, supabaseSessionDeps } from "../lib/mcp/oauth.ts";
 import { createRateLimiter } from "../lib/mcp/limit.ts";
+import { memberFor } from "../lib/mcp/auth.ts";
 import * as mcp from "../app/mcp/route.ts";
 import * as authorize from "../app/authorize/route.ts";
 import * as token from "../app/token/route.ts";
@@ -324,4 +325,29 @@ test("/mcp: bad JSON is 400, an oversized body is 413, and the per-token rate li
   assert.equal((await mcp.POST(raw("{}"))).status !== 429, true);
   const limited = await mcp.POST(raw("{}"));
   assert.equal(limited.status, 429);
+});
+
+test("memberFor: a Supabase error throws (sign-in answers 503); only a clean empty result is 'no membership'", async () => {
+  const env = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+  const saved = [...env.map((k) => process.env[k]), globalThis.fetch];
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "http://sb.invalid";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+  const answer = (status, body) => async () =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  try {
+    globalThis.fetch = answer(500, { message: "boom" });
+    await assert.rejects(memberFor(SB_JWT), /profiles read/);
+    globalThis.fetch = answer(200, null);
+    assert.equal(await memberFor(SB_JWT), null);
+    globalThis.fetch = answer(200, { id: "user-1", handle: "nate" });
+    assert.deepEqual(await memberFor(SB_JWT), { id: "user-1", handle: "nate" });
+  } finally {
+    env.forEach((k, i) =>
+      saved[i] === undefined ? delete process.env[k] : (process.env[k] = saved[i])
+    );
+    globalThis.fetch = saved[env.length];
+  }
 });

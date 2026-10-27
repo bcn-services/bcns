@@ -9,6 +9,7 @@ import { z, type ZodRawShape } from "zod";
 import {
   addLeadNote,
   ALL_STAGES,
+  LATE_STAGES,
   lateStagesOn,
   loadExtras,
   parseResearch,
@@ -28,6 +29,8 @@ import {
   propose,
   STATUSES,
   updateTask,
+  waitingStatus,
+  type Status,
   type Task,
 } from "../tasks";
 
@@ -66,10 +69,15 @@ function tool<S extends ZodRawShape>(def: {
 // next_contact_at is a date, not a contact detail: only name/person/info keys and bare "contact(s)" go.
 const CONTACT_KEY = /phone|e-?mail|mobile|fax|^tel$|^contacts?$|contact_(name|person|info|detail)/i;
 const EMAIL_IN_TEXT = /[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[A-Za-z]{2,}/g;
+// ponytail: 10-digit NANP (optional +1, parens, space/dot/dash) or +country-code runs; the lookbehind keeps dates,
+// timestamps and ids intact. Other local formats (e.g. 8-digit numbers without +) pass — extend if one shows up.
+const PHONE_IN_TEXT =
+  /(?<![\w.+-])(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?![\w-])|(?<![\w.])\+\d[\d\s().-]{8,}\d/g;
 
-/** Drops every phone/email-ish key at any depth (research included) and blanks email addresses in text. */
+/** Drops every phone/email-ish key at any depth (research included) and blanks email addresses and phone numbers in text. */
 export function stripContacts(v: unknown): unknown {
-  if (typeof v === "string") return v.replace(EMAIL_IN_TEXT, "[removed]");
+  if (typeof v === "string")
+    return v.replace(EMAIL_IN_TEXT, "[removed]").replace(PHONE_IN_TEXT, "[removed]");
   if (Array.isArray(v)) return v.map(stripContacts);
   if (v && typeof v === "object")
     return Object.fromEntries(
@@ -188,19 +196,22 @@ export const TOOLS: ToolDef[] = [
       due: day.nullable().optional(),
     },
     async run({ sb, actor }, a) {
-      if (a.status === "done") {
-        // The done-refusal: read the CURRENT owner first. Claude closes only its own tasks.
-        const cur = read<{ owner: string | null } | null>(
-          await sb.from("tasks").select("owner").eq("id", a.id).maybeSingle(),
+      const { id, ...patch } = a;
+      // Read the CURRENT row when the owner gates a close, or when waiting_on alone must pick the status (as the UI does).
+      const byWaiting = a.status === undefined && a.waiting_on !== undefined;
+      if (a.status === "done" || byWaiting) {
+        const cur = read<{ owner: string | null; status: Status } | null>(
+          await sb.from("tasks").select("owner, status").eq("id", id).maybeSingle(),
           "task"
         );
         if (!cur) throw new ToolError("task not found");
-        if (cur.owner !== "claude")
+        // The done-refusal: Claude closes only its own tasks.
+        if (a.status === "done" && cur.owner !== "claude")
           throw new ToolError(
             `refused: this task is owned by ${cur.owner ?? "nobody"}, only claude's tasks can be marked done through MCP`
           );
+        if (byWaiting) patch.status = waitingStatus(a.waiting_on ?? "", cur.status);
       }
-      const { id, ...patch } = a;
       return { task: await updateTask(sb, actor.id, "mcp", id, patch) };
     },
   }),
@@ -409,7 +420,7 @@ export const TOOLS: ToolDef[] = [
       );
       if (!cur) throw new ToolError("lead not found");
       if (cur.stage === a.stage) throw new ToolError(`lead is already in stage ${a.stage}`);
-      if (["quoting", "won", "replied"].includes(a.stage) && !lateStagesOn())
+      if ((LATE_STAGES as readonly string[]).includes(a.stage) && !lateStagesOn())
         throw new ToolError(`moves to ${a.stage} are off (HQ_LATE_STAGES)`);
       const p = await propose(sb, actor.id, "mcp", {
         kind: "lead_stage",
