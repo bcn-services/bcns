@@ -19,6 +19,9 @@ export interface AppConfig {
   platformOpsUrl?: string;
   stripeKey?: string;
   mercuryKey?: string;
+  /** Optional dashboard links shown on Numbers (links only, no API calls). */
+  instinctUrl?: string;
+  sentryUrl?: string;
   /**
    * True when a service-role key is in the shell env or a loaded .env file —
    * presence only, never the value. HQ is an anon-key app; scripts/check-env.ts
@@ -35,6 +38,8 @@ export function getConfig(): AppConfig {
     platformOpsUrl: readEnv("PLATFORM_OPS_URL"),
     stripeKey: readEnv("STRIPE_KEY"),
     mercuryKey: readEnv("MERCURY_KEY"),
+    instinctUrl: readEnv("INSTINCT_URL"),
+    sentryUrl: readEnv("SENTRY_URL"),
     hasServiceRoleKey: Boolean(readEnv("SUPABASE_SERVICE_ROLE_KEY")),
   };
 }

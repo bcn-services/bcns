@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/keys.test.mjs tests/redirect-origin.test.mjs tests/sentry-scrub.test.mjs",
+    "test": "tsx --test tests/gate.test.mjs tests/gate-catch.test.mjs tests/login-action.test.mjs tests/health.test.mjs tests/check-env.test.mjs tests/react-hooks.test.mjs tests/keys.test.mjs tests/redirect-origin.test.mjs tests/sentry-scrub.test.mjs tests/finance.test.mjs tests/money.test.mjs tests/ops.test.mjs tests/clients.test.mjs tests/numbers.test.mjs",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
@@ -16,6 +16,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "next": "14.2.35",
+    "postgres": "^3.4.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
