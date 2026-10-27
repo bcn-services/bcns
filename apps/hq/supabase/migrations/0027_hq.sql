@@ -75,7 +75,7 @@ end $$;
 alter table businesses
   add column fit_score numeric generated always as (public.hq_fit_score(research)) stored;
 
-create index businesses_stage_fit_idx on businesses (stage, fit_score desc);
+create index businesses_stage_fit_idx on businesses (stage, fit_score desc nulls last);
 
 -- 0018: "nothing in this schema can clear suppressed_at". HQ now has an UPDATE
 -- policy on businesses, so keep that promise for signed-in users: once set, it
@@ -188,7 +188,7 @@ create table list_items (
 --               (old null = no value yet).
 create table proposals (
   id         uuid default gen_random_uuid() primary key,
-  kind       text check (kind in ('lead_stage', 'finance')),
+  kind       text not null check (kind in ('lead_stage', 'finance')),
   target_id  text not null,
   field      text not null,
   old        jsonb,
@@ -260,7 +260,8 @@ end $$;
 create policy hq_select on profiles  for select to authenticated using (public.is_hq());
 create policy hq_select on proposals for select to authenticated using (public.is_hq());
 create policy hq_insert on proposals for insert to authenticated
-  with check (public.is_hq() and status = 'pending' and created_by = auth.uid());
+  with check (public.is_hq() and status = 'pending' and created_by = auth.uid()
+              and decided_by is null and decided_at is null);
 -- no update/delete policy on proposals; also no UPDATE/DELETE privilege, so an
 -- attempt errors instead of silently matching zero rows.
 revoke update, delete on proposals from authenticated;
@@ -296,17 +297,19 @@ begin
     if v is null then raise exception 'proposal has no new value'; end if;
     if p.kind = 'lead_stage' then
       if p.field <> 'stage' then raise exception 'unsupported field %', p.field; end if;
-      select to_jsonb(stage) into cur from businesses where id = p.target_id::uuid;
+      select to_jsonb(stage) into cur from businesses where id = p.target_id::uuid for update;
       if not found or cur is distinct from p.old then
         result := 'stale';
       else
         update businesses set stage = v, updated_at = now() where id = p.target_id::uuid;
         result := 'approved';
       end if;
-    else
+    elsif p.kind = 'finance' then
       wk  := p.target_id::date;
       ch  := split_part(p.field, '/', 1);
       col := split_part(p.field, '/', 2);
+      -- the row may not exist yet, so FOR UPDATE can't serialize first writes: lock the key
+      perform pg_advisory_xact_lock(hashtext('finance_inputs:' || wk || ':' || ch));
       select case col when 'spend_cents' then to_jsonb(spend_cents) when 'hours' then to_jsonb(hours)
                       when 'leads' then to_jsonb(leads) when 'pilots' then to_jsonb(pilots)
                       when 'signed' then to_jsonb(signed) end
@@ -329,6 +332,8 @@ begin
           signed      = case col when 'signed'      then excluded.signed      else finance_inputs.signed      end;
         result := 'approved';
       end if;
+    else
+      raise exception 'unknown kind %', p.kind;
     end if;
   end if;
 
@@ -356,5 +361,9 @@ revoke truncate, references, trigger, delete on all tables in schema public from
 alter default privileges in schema public revoke all on tables    from anon;
 alter default privileges in schema public revoke all on sequences from anon;
 alter default privileges in schema public revoke all on functions from anon;
+-- EXECUTE on new functions comes from PUBLIC, not anon: later migrations must
+-- `grant execute on function ... to authenticated` explicitly for what HQ users call.
+-- (hq_fit_score stays PUBLIC-executable on purpose: the generated column calls it as the writer, and revoking it breaks authenticated inserts/updates on businesses.)
+alter default privileges in schema public revoke execute on functions from public;
 
 commit;

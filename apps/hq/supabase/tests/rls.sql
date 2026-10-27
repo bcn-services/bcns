@@ -42,6 +42,13 @@ do $$ begin
 end $$;
 
 -- ---- anon: nothing ----------------------------------------------------------
+-- the lock-down itself (fails if 0027's revokes / security_invoker are reverted)
+do $$ begin
+  assert not has_table_privilege('anon', 'public.businesses', 'select'), 'anon has SELECT on businesses';
+  assert not has_table_privilege('anon', 'public.selectable_businesses', 'select'), 'anon has SELECT on selectable_businesses';
+  assert (select 'security_invoker=true' = any (reloptions) from pg_class where oid = 'public.selectable_businesses'::regclass),
+    'selectable_businesses is not security_invoker';
+end $$;
 set local role anon;
 do $$
 declare n int; t text;
@@ -92,9 +99,9 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 do $$
 declare n int; t text; t1 uuid;
 begin
-  assert (select count(*) from businesses) = 7, 'profile user reads businesses';
-  assert (select count(*) from selectable_businesses) = 6, 'view hides suppressed';
-  assert (select count(*) from profiles) = 1, 'profile user reads profiles';
+  assert (select count(*) from businesses where id::text like '00000000-0000-0000-0000-00000000b%') = 7, 'profile user reads businesses';
+  assert (select count(*) from selectable_businesses where id::text like '00000000-0000-0000-0000-00000000b%') = 6, 'view hides suppressed';
+  assert (select count(*) from profiles where id = '00000000-0000-0000-0000-0000000000a1') = 1, 'profile user reads profiles';
   -- tables with no policy stay closed even to HQ users (0 rows, or no grant at all)
   foreach t in array array['mailboxes', 'alerts', 'email_threads', 'search_grid'] loop
     begin
@@ -102,6 +109,11 @@ begin
     exception when insufficient_privilege then n := 0; end;
     assert n = 0, t || ' readable';
   end loop;
+
+  -- generated fit_score works for a signed-in writer (hq_fit_score is not executable by PUBLIC)
+  insert into businesses (name, research) values ('Signed In Test Roofing', to_jsonb('{"fit_score": 4}'::text));
+  update businesses set research = '{"fit_score": 5}'::jsonb where name = 'Signed In Test Roofing';
+  assert (select fit_score from businesses where name = 'Signed In Test Roofing') = 5, 'authenticated write computes fit_score';
 
   -- tasks: insert/update ok, delete matches 0 rows
   insert into tasks (title, owner) values ('write seed', 'nate') returning id into t1;
