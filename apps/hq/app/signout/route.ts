@@ -10,6 +10,6 @@ export async function POST(request: NextRequest): Promise<Response> {
   request.cookies
     .getAll()
     .filter((c) => c.name.startsWith("sb-"))
-    .forEach((c) => res.cookies.set(c.name, "", { path: "/", maxAge: 0 }));
+    .forEach((c) => res.cookies.set(c.name, "", { path: "/", maxAge: 0, expires: new Date(0) }));
   return res;
 }
