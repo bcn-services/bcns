@@ -10,6 +10,10 @@ Two scheduled jobs feed the call queue. Plain Node 22 ESM, run by systemd on the
 
 Env (in `/srv/hq/jobs.env` on the droplet): `DATABASE_URL` (HQ pooler), `GOOGLE_PLACES_API_KEY`, `BCNS_PLACES_MONTHLY_CAP` (default 950), `SOURCE_CELLS_PER_RUN`, `QUALIFY_BUDGET_MS`, `CALL_TASKS_PER_DAY` (default 50), `CLAUDE_CODE_OAUTH_TOKEN` (optional).
 
+Deploy: `jobs/` is not a pnpm workspace member and a Next standalone root does not expose `postgres`, so the release needs `cd /srv/hq/current/jobs && npm install --omit=dev --no-package-lock` (item 8 wires this into deploy next to its `cp -r` line).
+
+Paid fee: the budget counts only HQ's own `places_call` events. In the cutover month set `BCNS_PLACES_MONTHLY_CAP` to 950 minus the Places calls bcns-internal already made that month (or start HQ source on the 1st). Google bills any overage past the free tier.
+
 Run one locally against the local HQ stack:
 
     cd apps/hq/jobs && npm install --no-save --no-package-lock

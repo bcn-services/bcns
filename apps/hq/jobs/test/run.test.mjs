@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, symlinkSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { GRID } from "../lib/grid.mjs";
 import { main, jobDeps, JOBS, PROCESS_BUDGET_MS } from "../run.mjs";
 
 const RUN = fileURLToPath(new URL("../run.mjs", import.meta.url));
@@ -147,4 +151,127 @@ test("jobDeps reads env for each job", async () => {
   assert.deepEqual(await s.loadCells(), [{ c: 1 }]);
   assert.deepEqual(calls, [["upsert", true]]);
   assert.deepEqual(JOBS, ["source", "qualify"]);
+});
+
+// --- env numbers: an explicit value wins, junk fails the run ---------------
+
+const MONDAY = Date.UTC(2026, 9, 19, 12);
+
+// Real source.mjs / qualify.mjs through main(); only the db and the network edges are fake.
+function e2e(name, env, job = {}) {
+  const events = [];
+  const calls = { places: 0, promote: [] };
+  const sql = Object.assign(async () => [{ used: 0 }], { end: async () => {} });
+  const db = {
+    logEvent: async (_s, j, kind, detail) => events.push({ job: j, kind, detail }),
+    upsertCells: async () => [],
+    allCells: async () =>
+      GRID.slice(0, 1).map((c) => ({ ...c, exhausted_at: null, last_run_at: null })),
+    saveCell: async () => {},
+    businessByPlaceId: async () => [],
+    insertBusinesses: async () => [],
+    sourcedBacklog: async () => [],
+    updateBusiness: async () => [],
+    promotedToday: async () => [{ count: 0 }],
+    promoteQualified: async (_s, { limit }) => {
+      calls.promote.push(limit);
+      return [];
+    },
+  };
+  const places = {
+    search: async () => {
+      calls.places++;
+      return { results: [] };
+    },
+  };
+  return {
+    events,
+    calls,
+    go: () =>
+      main({
+        argv: [name],
+        env: { DATABASE_URL: "unused", GOOGLE_PLACES_API_KEY: "k", ...env },
+        deps: {
+          sql,
+          db,
+          job: { places, fetchPage: async () => "", claude: null, clock: () => MONDAY, ...job },
+        },
+      }),
+  };
+}
+
+test("BCNS_PLACES_MONTHLY_CAP=0 is a real cap: source makes no Places call (unset still searches)", async () => {
+  const zero = e2e("source", { BCNS_PLACES_MONTHLY_CAP: "0" });
+  assert.equal(await zero.go(), 0);
+  assert.equal(zero.calls.places, 0);
+  assert.ok(
+    zero.events.some((e) => e.kind === "skipped" && /budget exhausted/.test(e.detail.reason))
+  );
+
+  const unset = e2e("source", {});
+  assert.equal(await unset.go(), 0);
+  assert.ok(unset.calls.places >= 1, "control: default cap 950 lets the search through");
+});
+
+test("CALL_TASKS_PER_DAY=0 promotes nothing (unset asks for 50)", async () => {
+  const zero = e2e("qualify", { CALL_TASKS_PER_DAY: "0" });
+  assert.equal(await zero.go(), 0);
+  assert.deepEqual(zero.calls.promote, []);
+
+  const unset = e2e("qualify", {});
+  await unset.go();
+  assert.deepEqual(unset.calls.promote, [50]);
+
+  const empty = e2e("qualify", { CALL_TASKS_PER_DAY: "  " });
+  await empty.go();
+  assert.deepEqual(empty.calls.promote, [50]);
+});
+
+test("a non-numeric or negative env number fails the run (exit 1) and says which variable in the run row", async () => {
+  const cases = [
+    ["source", "BCNS_PLACES_MONTHLY_CAP", "lots"],
+    ["source", "SOURCE_CELLS_PER_RUN", "2x"],
+    ["qualify", "CALL_TASKS_PER_DAY", "fifty"],
+    ["qualify", "CALL_TASKS_PER_DAY", "-1"],
+    ["qualify", "QUALIFY_BUDGET_MS", "NaN"],
+  ];
+  for (const [name, key, value] of cases) {
+    const t = e2e(name, { [key]: value });
+    assert.equal(await t.go(), 1, `${key}=${value}`);
+    const row = t.events.find((e) => e.kind === "run");
+    assert.equal(row.detail.ok, false);
+    assert.match(row.detail.error, new RegExp(`${key} must be a non-negative number`));
+    assert.equal(t.calls.places, 0);
+    assert.deepEqual(t.calls.promote, []);
+  }
+});
+
+test("jobDeps passes explicit zeros through and drops unset values", async () => {
+  const q = await jobDeps("qualify", {
+    env: { CALL_TASKS_PER_DAY: "0", QUALIFY_BUDGET_MS: "0" },
+    sql: {},
+    db: {},
+  });
+  assert.equal(q.callTasksPerDay, 0);
+  assert.equal(q.budgetMs, 0);
+  const u = await jobDeps("qualify", { env: { CALL_TASKS_PER_DAY: "" }, sql: {}, db: {} });
+  assert.equal(u.callTasksPerDay, undefined);
+});
+
+// --- CLI entry through a symlinked release dir -----------------------------
+
+test("run.mjs reached through a symlinked dir (/srv/hq/current style) still runs main: bogus exits 2", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "hq7-link-"));
+  try {
+    const link = join(tmp, "current");
+    symlinkSync(dirname(RUN), link);
+    const r = spawnSync(process.execPath, [join(link, "run.mjs"), "bogus"], {
+      encoding: "utf8",
+      env: {},
+    });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /usage/);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });

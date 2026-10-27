@@ -8,7 +8,8 @@
 // `postgres` is imported only once the job name is valid and no db is injected,
 // so `run.mjs bogus` needs nothing installed.
 
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export const JOBS = ["source", "qualify"];
 
@@ -16,7 +17,17 @@ export const JOBS = ["source", "qualify"];
 // stops taking on new work, leaving room for the last row and the db close.
 export const PROCESS_BUDGET_MS = 22 * 60 * 1000;
 
-const num = (v) => (v ? Number(v) || undefined : undefined);
+// Unset or empty -> undefined (the job's own default). An explicit value, "0"
+// included, wins; junk throws so the run fails loudly instead of defaulting
+// (a mistyped BCNS_PLACES_MONTHLY_CAP must not silently become 950).
+const num = (env, key) => {
+  const v = env[key];
+  if (v === undefined || String(v).trim() === "") return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0)
+    throw new Error(`${key} must be a non-negative number, got "${v}"`);
+  return n;
+};
 
 // What each job is handed, built from env alone.
 export async function jobDeps(name, { env, sql, db }) {
@@ -29,14 +40,14 @@ export async function jobDeps(name, { env, sql, db }) {
     ]);
     return {
       places: createPlaces({ apiKey: env.GOOGLE_PLACES_API_KEY }),
-      readBudget: createReadBudget({ sql, cap: num(env.BCNS_PLACES_MONTHLY_CAP) }),
+      readBudget: createReadBudget({ sql, cap: num(env, "BCNS_PLACES_MONTHLY_CAP") }),
       // The grid lives in code; the table only tracks run state.
       loadCells: async () => {
         await db.upsertCells(sql, GRID);
         return db.allCells(sql);
       },
       saveCell: (cell) => db.saveCell(sql, cell),
-      cellsPerRun: num(env.SOURCE_CELLS_PER_RUN),
+      cellsPerRun: num(env, "SOURCE_CELLS_PER_RUN"),
     };
   }
   const [{ createFetchPage }, { claudeClient }] = await Promise.all([
@@ -47,8 +58,8 @@ export async function jobDeps(name, { env, sql, db }) {
     fetchPage: createFetchPage(),
     // Absent CLI or token just means code-only scoring (qualify handles it).
     claude: claudeClient(),
-    callTasksPerDay: num(env.CALL_TASKS_PER_DAY),
-    budgetMs: num(env.QUALIFY_BUDGET_MS),
+    callTasksPerDay: num(env, "CALL_TASKS_PER_DAY"),
+    budgetMs: num(env, "QUALIFY_BUDGET_MS"),
   };
 }
 
@@ -99,6 +110,16 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
   return code;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await main();
-}
+// Real paths on both sides: /srv/hq/current is a symlink to a release dir, and
+// comparing the unresolved argv path to the resolved module URL silently did nothing.
+const isCli = (() => {
+  try {
+    return (
+      !!process.argv[1] &&
+      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+})();
+if (isCli) process.exitCode = await main();
