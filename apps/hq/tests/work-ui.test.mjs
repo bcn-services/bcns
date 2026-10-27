@@ -46,9 +46,10 @@ test("actions: every exported server action re-checks the session; lib/tasks.ts 
   }
 });
 
-test("Today page: the nate branch renders TodayNate; brandon branch is untouched Board", () => {
+test("Today page: brandon renders TodayBrandon, everyone else TodayNate", () => {
   const p = src("app/(app)/page.tsx");
-  assert.match(p, /if \(handle === "nate"\) return <TodayNate \/>/);
+  assert.match(p, /handle === "brandon"\) return <TodayBrandon/);
+  assert.match(p, /return <TodayNate \/>/);
 });
 
 test("fires-tasks seam: ops tasks due within 7 days + pending proposals; fires.ts / fires-ops.ts untouched by item 4", () => {
