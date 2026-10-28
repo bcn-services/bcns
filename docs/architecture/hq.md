@@ -639,16 +639,6 @@ create policy jobs_update on tasks for update to hq_jobs using (true) with check
 
 Check: `select has_table_privilege('hq_jobs','tasks','insert') as ins, has_table_privilege('hq_jobs','tasks','delete') as del_should_be_false;` is `true, false`.
 
-Rekey the open tasks the old fire button made (`ops:ticket:<id>`), or the job opens a duplicate `ticket:platform:<id>` beside each. Run it after step 28 (the old code keeps making `ops:ticket:` keys until A deploys) and before the timer is enabled in step 29, after a count (the id starts at character 12, after the 11-character prefix `ops:ticket:`):
-
-```sql
-select count(*) from tasks where alert_key like 'ops:ticket:%' and status <> 'done';
-update tasks set alert_key = 'ticket:platform:' || substr(alert_key, 12)
-  where alert_key like 'ops:ticket:%' and status <> 'done';
-```
-
-Done tasks keep their old key; a later fire for those ticket ids makes a fresh task, which is the pre-sync behaviour.
-
 ### 28. Merge the HQ PRs A then B — pending
 
 A touches `apps/hq/**`, so the merge redeploys sb, connect, mcp and hq (step 18). B is stacked on A (its base is `ticket-sync-job`), so after A merges, retarget B to `main` and confirm before merging it, otherwise B merges into the dead branch and never reaches `main`. Always `--merge`, never squash:
@@ -660,6 +650,19 @@ GITHUB_TOKEN= gh pr view <B> --json baseRefName -R bcn-services/bcns     # must 
 GITHUB_TOKEN= gh pr ready <B> -R bcn-services/bcns && GITHUB_TOKEN= gh pr merge <B> --merge -R bcn-services/bcns
 curl -s https://hq.bcn-services.com/api/health     # {"ok":true,"app":"hq"}
 ```
+
+Rekey the open tasks the old fire button made (`ops:ticket:<id>`), or the job opens a duplicate `ticket:platform:<id>` beside each. Run this in the HQ SQL Editor after A is deployed (the old code keeps making `ops:ticket:` keys until then) and **before the first `systemctl start hq-job@tickets` in step 29**, since that manual start creates the duplicates as well as the timer. The id starts at character 12, after the 11-character prefix `ops:ticket:`. The `not exists` guard skips a row whose `ticket:platform:<id>` task is already open, which the unique index `tasks_alert_key_open_idx` would otherwise reject:
+
+```sql
+select count(*) from tasks where alert_key like 'ops:ticket:%' and status <> 'done';
+update tasks set alert_key = 'ticket:platform:' || substr(alert_key, 12)
+  where alert_key like 'ops:ticket:%' and status <> 'done'
+    and not exists (select 1 from tasks t2
+      where t2.alert_key = 'ticket:platform:' || substr(tasks.alert_key, 12) and t2.status <> 'done');
+select count(*) from tasks where alert_key like 'ops:ticket:%' and status <> 'done';   -- rows the guard skipped
+```
+
+Mark any task the last query still counts done by hand (its ticket already has an open `ticket:platform:` task). Done tasks keep their old key; a later fire for those ticket ids makes a fresh task, which is the pre-sync behaviour.
 
 ### 29. Droplet: the `tickets` timer — pending
 
