@@ -534,6 +534,7 @@ test("propose_client files a pending kind=client proposal with via=mcp and the l
     [p.kind, p.target_id, p.field, p.status, p.via, p.created_by, p.reason],
     ["client", "acme-demo", "monthly_rate_cents", "pending", "mcp", ACTOR.id, "raised at renewal"]
   );
+  assert.equal("old" in p, false, "the insert sends no old: proposals_server_fields sets it");
   assert.equal(fake.db.clients[0].monthly_rate_cents, 10000, "nothing was applied");
   assert.equal(
     writes(fake).filter((o) => o.table === "clients").length,

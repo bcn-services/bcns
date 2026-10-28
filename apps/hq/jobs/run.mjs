@@ -102,7 +102,10 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
   let code = ok ? 0 : 1;
   try {
     if (!db || !sql) throw new Error("no database to record the run in");
-    await db.logEvent(sql, name, "run", { ok, ms: Date.now() - startedAt, error });
+    // uptime fires every 5 min (288/day) and every check is already a uptime_checks row; a success
+    // event would push source/qualify runs out of hqRuns' newest-200 window. A failed run still logs.
+    if (name !== "uptime" || !ok)
+      await db.logEvent(sql, name, "run", { ok, ms: Date.now() - startedAt, error });
   } catch (err) {
     console.error(`could not write the run event: ${String(err?.message ?? err)}`);
     code = 1;

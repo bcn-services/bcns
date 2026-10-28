@@ -80,18 +80,24 @@ test("a database failure fails the run (the dead app is data, a dead db is not)"
   await assert.rejects(run({ sql, fetch: async () => res(200) }), /db down/);
 });
 
-test("run.mjs knows the uptime job and records the run", async () => {
+test("run.mjs: a successful uptime run writes no run event, a failed one does", async () => {
   const events = [];
   const sql = Object.assign(async () => [], { end: async () => {} });
   const db = { logEvent: async (_s, job, kind, detail) => events.push({ job, kind, detail }) };
-  const code = await main({
-    argv: ["uptime"],
-    env: {},
-    deps: { sql, db, load: async () => ({ run: async () => ({ checked: 5 }) }) },
-  });
-  assert.equal(code, 0);
-  assert.equal(events[0].job, "uptime");
-  assert.equal(events[0].kind, "run");
+  const go = (run) =>
+    main({ argv: ["uptime"], env: {}, deps: { sql, db, load: async () => ({ run }) } });
+  assert.equal(await go(async () => ({ checked: 5 })), 0);
+  assert.equal(events.length, 0); // 288 a day would crowd source/qualify out of hqRuns(200)
+  assert.equal(
+    await go(async () => {
+      throw new Error("db down");
+    }),
+    1
+  );
+  assert.deepEqual(
+    events.map((e) => [e.job, e.kind, e.detail.ok, e.detail.error]),
+    [["uptime", "run", false, "db down"]]
+  );
 });
 
 test("infra/hq-uptime.timer fires hq-job@uptime.service every 5 minutes", () => {

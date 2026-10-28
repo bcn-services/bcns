@@ -58,11 +58,14 @@ export const listMrr = (cards: ClientCard[]) =>
   cards.reduce((t, c) => t + (c.billing_source === "none" ? 0 : (c.monthly_rate_cents ?? 0)), 0);
 
 const matchedBy = (c: ClientCard) =>
-  c.mercury_customer_id ? "Mercury customer" : c.aliases?.length ? "alias" : "no match key set";
+  c.mercury_customer_id
+    ? "matched by Mercury customer"
+    : c.aliases?.length
+      ? "matched by alias"
+      : "no match key set";
 
 function Money({ c, month }: { c: ClientCard; month: string }) {
   const pay = c.derived.payment;
-  const paid = c.billing.lastPaid;
   const status = {
     paid: ["Paid", "received"],
     unpaid: ["—", "not found"],
@@ -86,14 +89,13 @@ function Money({ c, month }: { c: ClientCard; month: string }) {
           </div>
         </div>
         <div>
-          <div className="big">{paid ? usd(paid.amountCents) : "—"}</div>
-          <div className="muted">{paid ? `last paid ${day(paid.at)}` : "no payment found"}</div>
+          <div className="big">{c.lifetime ? usd(c.lifetime.cents) : "—"}</div>
+          <div className="muted">lifetime{c.lifetime?.est ? " (est.)" : ""}</div>
         </div>
       </div>
       <div className="muted foot">
         {c.billing_source ?? "mercury"} · next invoice{" "}
-        {c.billing.invoice?.nextDue ? day(c.billing.invoice.nextDue) : "—"} · matched by{" "}
-        {matchedBy(c)}
+        {c.billing.invoice?.nextDue ? day(c.billing.invoice.nextDue) : "—"} · {matchedBy(c)}
       </div>
       {c.billing.note ? <div className="muted foot">{c.billing.note}</div> : null}
     </div>
@@ -107,7 +109,7 @@ function Work({ c, action }: { c: ClientCard; action: Act }) {
   return (
     <div className="card tl">
       <h2>Work</h2>
-      <div className="strong">{c.stage ?? "No stage set"}</div>
+      <div className="strong">{c.stage ?? "Stage not set"}</div>
       <div className="bar">
         <i style={{ width: `${w.total ? (w.done / w.total) * 100 : 0}%` }} />
       </div>
@@ -187,7 +189,15 @@ function Files({ c }: { c: ClientCard }) {
   );
 }
 
-function EditForm({ c, action, onDone }: { c: ClientCard; action: Act; onDone: () => void }) {
+export function EditForm({
+  c,
+  action,
+  onDone,
+}: {
+  c: ClientCard;
+  action: Act;
+  onDone: () => void;
+}) {
   const [err, setErr] = useState("");
   return (
     <form
@@ -224,8 +234,8 @@ function EditForm({ c, action, onDone }: { c: ClientCard; action: Act; onDone: (
         />
       </label>
       <label>
-        Aliases (payer names, comma or line separated)
-        <textarea name="aliases" rows={2} defaultValue={(c.aliases ?? []).join(", ")} />
+        Aliases (payer names, one per line)
+        <textarea name="aliases" rows={2} defaultValue={(c.aliases ?? []).join("\n")} />
       </label>
       <label>
         Repo URL

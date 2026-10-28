@@ -34,7 +34,13 @@ export interface OpsInput {
   failed: string[];
 }
 export interface HealthInput {
-  client: { slug: string; billing_source: string | null; monthly_rate_cents: number | null };
+  client: {
+    slug: string;
+    billing_source: string | null;
+    monthly_rate_cents: number | null;
+    mercury_customer_id?: string | null;
+    aliases?: string[] | null;
+  };
   /** uptime_status rows by target; null when the view could not be read. */
   uptime: Map<string, UptimeRow> | null;
   ops: OpsInput;
@@ -122,7 +128,10 @@ export function deriveHealth(input: HealthInput): Derived {
     if (!billing.mercury) payment = "unknown";
     else payment = billing.lastPaid && billing.lastPaid.at.slice(0, 7) >= month ? "paid" : "unpaid";
   }
-  if (payment === "unpaid") issues.push({ dot: "a", text: "no payment this month" });
+  // no match key (no customer id, no alias) means "unpaid" may just be "unmatched": say which
+  const keyless = !client.mercury_customer_id && !client.aliases?.length;
+  if (payment === "unpaid")
+    issues.push({ dot: "a", text: keyless ? "no Mercury match key set" : "no payment this month" });
   if (payment === "unknown")
     issues.push({ dot: "a", text: "payment unverifiable (Mercury unreachable)" });
   const overdue = billing.invoice?.overdue ?? 0;

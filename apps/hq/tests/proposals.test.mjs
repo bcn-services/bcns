@@ -329,6 +329,8 @@ test("client proposals: proposeClient files a pending kind=client row; the list 
     reason: "renewal",
   });
   const row = fake.db.proposals.find((p) => p.id === r.id);
+  assert.equal("old" in row, false); // the insert sends none; proposals_server_fields (0034) reads the live column
+  row.old = 11000; // ...which is what the trigger writes
   assert.deepEqual(
     [row.kind, row.target_id, row.field, row.old, row.new, row.status, row.via],
     ["client", "sb", "monthly_rate_cents", 11000, 12000, "pending", "mcp"]
@@ -410,6 +412,12 @@ test("integration: the database refuses a client proposal outside the whitelist 
     ["billing_source", '"cash"'],
     ["repo_url", '"http://x.test"'],
     ["notes", "null"],
+    ["launch_date", '"2026-02-31"'], // matches the date shape but is not a day: approve would raise forever
+    ["launch_date", '"2026-13-01"'],
+    ["aliases", '[1, {"a": 2}]'], // elements must be strings
+    ["aliases", '[""]'],
+    ["aliases", `["${"x".repeat(101)}"]`], // 1-100 chars each
+    ["aliases", '["ok", null]'],
   ]) {
     const r = asClientAdmin(`
 insert into proposals (kind, target_id, field, new, status, created_by)
@@ -423,13 +431,14 @@ insert into proposals (kind, target_id, field, new, status, created_by) values
   ('client', '${CSLUG}', 'monthly_rate_cents', '12000', 'pending', '${UID}'),
   ('client', '${CSLUG}', 'billing_source', '"stripe"', 'pending', '${UID}'),
   ('client', '${CSLUG}', 'mercury_customer_id', '"cus_1-A"', 'pending', '${UID}'),
-  ('client', '${CSLUG}', 'aliases', '["A"]', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'aliases', '["A","SUPPLY BROTHERS, LLC","${"y".repeat(100)}"]', 'pending', '${UID}'),
   ('client', '${CSLUG}', 'repo_url', '"https://github.com/x/y"', 'pending', '${UID}'),
   ('client', '${CSLUG}', 'launch_date', '"2026-10-01"', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'launch_date', '"2028-02-29"', 'pending', '${UID}'), -- a real leap day
   ('client', '${CSLUG}', 'notes', '"ok"', 'pending', '${UID}');
 select count(*) from proposals;`);
   assert.equal(good.status, 0, good.stderr);
-  assert.equal(lines(good).slice(-1)[0], "7");
+  assert.equal(lines(good).slice(-1)[0], "8");
 });
 
 test("integration: staff cannot decide a client proposal or edit clients; only an admin can", { skip: !has0034 }, () => {
@@ -451,6 +460,21 @@ select public.decide_proposal((select id from proposals where field = 'notes'), 
     ).slice(-1)[0];
   assert.equal(edit("staff"), "0"); // RLS hides the row from the update
   assert.equal(edit("admin"), "1");
+});
+
+test("integration: only an admin can insert a client (staff cannot seed a rate or aliases that feed MRR)", { skip: !has0034 }, () => {
+  const ins = (role) =>
+    asClientAdmin(
+      `insert into clients (slug, display_name, monthly_rate_cents, aliases) values ('hq34-new', 'new', 99900, array['X']);
+select count(*) from clients where slug = 'hq34-new';`,
+      role
+    );
+  const staff = ins("staff");
+  assert.notEqual(staff.status, 0);
+  assert.match(staff.stderr, /row-level security/);
+  const admin = ins("admin");
+  assert.equal(admin.status, 0, admin.stderr);
+  assert.equal(lines(admin).slice(-1)[0], "1");
 });
 
 test("integration: uptime_checks is readable by HQ staff and writable by no API role", { skip: !has0034 }, () => {

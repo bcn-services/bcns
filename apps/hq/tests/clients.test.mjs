@@ -11,10 +11,10 @@ globalThis.React = React; // tsx compiles JSX classic here
 React.cache ??= (f) => f;
 const { planUpdate } = await import("../app/(app)/clients/update.ts");
 const { applyClientUpdate } = await import("../app/(app)/clients/apply.ts");
-const { ClientsView, ClientDetail, groupCards, listMrr } =
+const { ClientsView, ClientDetail, EditForm, groupCards, listMrr } =
   await import("../app/(app)/clients/View.tsx");
 const { deriveHealth, UPTIME_STALE_MS } = await import("../lib/clients/health.ts");
-const { CLIENT_SELECT, buildCards, deriveFor, workSummary } =
+const { CLIENT_SELECT, buildCards, deriveFor, lifetime, workSummary } =
   await import("../lib/clients/load.ts");
 const { CLIENT_FIELDS, checkField } = await import("../lib/clients/fields.ts");
 const { clientBilling, mercurySummary, clearMoneyMemo } = await import("../lib/money.ts");
@@ -54,7 +54,12 @@ const paidBilling = clientBilling(
   ]
 );
 const input = (over = {}) => ({
-  client: { slug: "sb", billing_source: "mercury", monthly_rate_cents: 11000 },
+  client: {
+    slug: "sb",
+    billing_source: "mercury",
+    monthly_rate_cents: 11000,
+    aliases: ["SAUNA BOY INC"],
+  },
   uptime: new Map([["sb", upRow("sb")]]),
   ops: { health: [conn("shopify", "ok")], failed: [] },
   billing: paidBilling,
@@ -143,6 +148,14 @@ test("amber: no payment this month, Mercury unreachable, overdue invoice", () =>
   assert.match(d.why, /Mercury unreachable/);
   d = deriveHealth(input({ billing: { ...paidBilling, invoice: { nextDue: null, overdue: 2 } } }));
   assert.deepEqual([d.health, d.why], ["amber", "2 invoices overdue"]);
+  // no match key at all: the line blames the missing key, not the payment; a key restores "no payment"
+  const keyless = { slug: "sb", billing_source: "mercury", monthly_rate_cents: 11000 };
+  d = deriveHealth(input({ client: keyless, billing: unpaid }));
+  assert.deepEqual([d.health, d.payment, d.why], ["amber", "unpaid", "no Mercury match key set"]);
+  d = deriveHealth(
+    input({ client: { ...keyless, mercury_customer_id: "cus_1" }, billing: unpaid })
+  );
+  assert.equal(d.why, "no payment this month");
   // a payment last month does not count this month
   const old = clientBilling({ display_name: "x", billing_note: null, aliases: ["P"] }, [
     { at: "2026-09-28T00:00:00Z", amountCents: 1, counterparty: "P", status: "sent" },
@@ -234,7 +247,7 @@ test("planUpdate: dollars become cents, only changed fields, blank clears, alias
   const r = planUpdate(cur, {
     monthly_rate: "125.50",
     billing_source: "mercury",
-    aliases: "SAUNA BOY INC, Sauna Boy LLC\nSB",
+    aliases: "SAUNA BOY INC\r\nSauna Boy LLC\n\nSB",
     notes: " renewed ",
     repo_url: "",
   });
@@ -490,6 +503,90 @@ test("ClientDetail: dot + h1 + Edit, Health why-line, App / Money / Work / Files
     })
   );
   assert.doesNotMatch(member, />Edit</); // Edit is admin-only
+});
+
+test("aliases round-trip: the Edit form shows one alias per line and a comma name saves back unchanged", () => {
+  const aliases = ["SUPPLY BROTHERS, LLC", "SB"];
+  const c = buildCards([base({ aliases })], sources(), [], [], NOW)[0];
+  const html = renderToStaticMarkup(
+    React.createElement(EditForm, { c, action: noop, onDone() {} })
+  );
+  assert.match(html, /Aliases \(payer names, one per line\)/);
+  const shown = /<textarea name="aliases"[^>]*>([^<]*)<\/textarea>/.exec(html)[1];
+  assert.equal(shown.replace(/^\n/, ""), "SUPPLY BROTHERS, LLC\nSB"); // React adds a leading newline to a textarea
+  const form = { aliases: shown.replace(/^\n/, "").replaceAll("\n", "\r\n") }; // browsers post CRLF
+  assert.deepEqual(planUpdate({ aliases }, form).changes, []); // not split at the comma, no rewrite
+  assert.deepEqual(planUpdate({ aliases: [] }, form).patch, { aliases });
+});
+
+test("Money tile third stat is '$N lifetime' (proto), not 'last payment'", () => {
+  const sb = cards.find((c) => c.slug === "sb");
+  const html = renderToStaticMarkup(
+    React.createElement(ClientDetail, {
+      c: { ...sb, lifetime: { cents: 330000, est: false } },
+      admin: true,
+      month: "Oct",
+      editAction: noop,
+      taskAction: noop,
+    })
+  );
+  assert.match(html, /\$3,300<\/div><div class="muted">lifetime<\/div>/);
+  assert.doesNotMatch(html, /last paid|no payment found/);
+  assert.match(html, /matched by alias/);
+  assert.doesNotMatch(html, /matched by matched|matched by no match/);
+  const est = renderToStaticMarkup(
+    React.createElement(ClientDetail, {
+      c: { ...sb, lifetime: { cents: 330000, est: true }, aliases: [], mercury_customer_id: null },
+      admin: true,
+      month: "Oct",
+      editAction: noop,
+      taskAction: noop,
+    })
+  );
+  assert.match(est, /lifetime \(est\.\)/);
+  assert.match(est, /· no match key set/);
+});
+
+test("lifetime: paid Mercury invoices when readable, else rate x whole months since launch (est.)", () => {
+  const inv = (customer, customerId, status, amountCents) => ({
+    number: "1",
+    status,
+    amountCents,
+    dueDate: "2026-09-01",
+    customer,
+    customerId,
+  });
+  const c = base({ launch_date: "2026-01-15", aliases: ["SAUNA BOY INC"] });
+  // alias match, Paid only, other customers ignored
+  const invoices = [
+    inv("SAUNA BOY INC", "c1", "Paid", 11000),
+    inv("sauna boy inc", "c1", "Paid", 11000),
+    inv("SAUNA BOY INC", "c1", "Unpaid", 11000),
+    inv("OTHER LLC", "c2", "Paid", 99999),
+  ];
+  assert.deepEqual(lifetime(c, invoices, NOW), { cents: 22000, est: false });
+  // a customer id, when set, is the key (alias matches stop counting)
+  assert.deepEqual(lifetime({ ...c, mercury_customer_id: "c2" }, invoices, NOW), {
+    cents: 99999,
+    est: false,
+  });
+  // invoicing off or no paid match: 9 whole months Jan 15 -> Oct 27 = 9 x $110
+  assert.deepEqual(lifetime(c, unavailable, NOW), { cents: 99000, est: true });
+  assert.deepEqual(lifetime(c, [], NOW), { cents: 99000, est: true });
+  // churned clients stop accruing; day-of-month counts (Jan 15 -> Feb 14 is 0 months)
+  assert.deepEqual(lifetime({ ...c, churn_date: "2026-04-20" }, unavailable, NOW), {
+    cents: 33000,
+    est: true,
+  });
+  assert.equal(lifetime({ ...c, launch_date: "2026-10-01" }, unavailable, NOW), null);
+  // nothing to estimate from
+  for (const over of [
+    { launch_date: null },
+    { monthly_rate_cents: null },
+    { billing_source: "none" },
+  ])
+    assert.equal(lifetime({ ...c, ...over }, unavailable, NOW), null, JSON.stringify(over));
+  assert.equal(cards.find((x) => x.slug === "wwc").lifetime, null);
 });
 
 test("workSummary: done/open counts and the soonest open task", () => {

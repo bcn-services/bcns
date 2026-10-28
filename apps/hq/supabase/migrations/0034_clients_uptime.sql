@@ -10,10 +10,10 @@
 --   * proposals.kind gains 'client': target_id = clients.slug, field = one of the Clients Edit
 --     whitelist (lib/clients/fields.ts), old/new = jsonb. The shape check below keeps a bad value
 --     from ever being filed; decide_proposal applies it (admin only, compare-and-set on old).
---   * clients: editing is an admin act (was is_hq(): any profiles row). The Edit form action also
---     checks is_admin(); this is the second wall.
+--   * clients: editing and inserting are admin acts (were is_hq(): any profiles row). The Edit form
+--     action also checks is_admin(); this is the second wall.
 -- Deploy safety: new table/view/function arms only; the kind check is loosened, the clients update
--- policy is tightened (the live release's Edit form for non-admins stops working, by design).
+-- policies are tightened (the live release's Edit form for non-admins stops working, by design).
 -- ---------------------------------------------------------------------------
 
 begin;
@@ -55,9 +55,13 @@ alter table proposals add constraint proposals_client_shape check (
       when 'monthly_rate_cents' then jsonb_typeof(new) = 'number' and (new #>> '{}') ~ '^[0-9]{1,10}$'
       when 'billing_source'     then new in ('"mercury"'::jsonb, '"stripe"'::jsonb, '"none"'::jsonb)
       when 'mercury_customer_id' then jsonb_typeof(new) = 'string' and (new #>> '{}') ~ '^[A-Za-z0-9_-]{1,100}$'
+      -- every element a string of 1-100 chars (like checkField); `.type()` first so a number or object is caught
       when 'aliases'            then jsonb_typeof(new) = 'array' and jsonb_array_length(new) <= 20
+                                     and not jsonb_path_exists(new, '$[*] ? (@.type() != "string" || !(@ like_regex "^.{1,100}$"))')
       when 'repo_url'           then jsonb_typeof(new) = 'string' and (new #>> '{}') ~ '^https://[^[:space:]]+$' and length(new #>> '{}') <= 300
+      -- `@?` swallows the parse error and returns NULL, which a CHECK passes: coalesce to false so "2026-02-31" is refused
       when 'launch_date'        then jsonb_typeof(new) = 'string' and (new #>> '{}') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                                     and coalesce(new @? '$.datetime("yyyy-mm-dd")', false)
       when 'notes'              then jsonb_typeof(new) = 'string' and length(new #>> '{}') <= 2000
       else false
     end
@@ -211,5 +215,8 @@ grant execute on function public.decide_proposal(uuid, boolean) to authenticated
 drop policy hq_update on clients;
 create policy hq_update on clients for update to authenticated
   using (public.is_admin()) with check (public.is_admin());
+-- insert too: a staff PostgREST insert could otherwise seed a client with a rate and aliases that feed MRR
+drop policy hq_insert on clients;
+create policy hq_insert on clients for insert to authenticated with check (public.is_admin());
 
 commit;

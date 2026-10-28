@@ -1,8 +1,8 @@
 /**
  * propose.ts — files a pending `client` proposal (the MCP tool propose_client). Same row shape as
  * lib/tasks.ts propose(); written here because that function's PROPOSAL_KINDS list is another lane's
- * file. `old` and `via` are advisory: proposals_server_fields (0034) overwrites both from the live
- * column and the X-HQ-Via header. Deciding is decide_proposal(), a human click, never here.
+ * file. `old` and `via` are set by proposals_server_fields (0034) from the live column and the
+ * X-HQ-Via header; the read below is only the no-op guard. Deciding is decide_proposal(), a human click.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkField, isSlug, sameValue, type ClientField } from "./fields";
@@ -30,7 +30,6 @@ export async function proposeClient(
       kind: "client",
       target_id: p.slug,
       field,
-      old,
       new: c.value,
       reason: p.reason?.trim() || null,
       status: "pending",

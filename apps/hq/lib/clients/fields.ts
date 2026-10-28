@@ -119,7 +119,7 @@ export function fromForm(
       al === ""
         ? []
         : al
-            .split(/[,\n]/)
+            .split("\n") // one per line: Mercury payer names carry commas ("SUPPLY BROTHERS, LLC")
             .map((a) => a.trim())
             .filter(Boolean);
   return out;

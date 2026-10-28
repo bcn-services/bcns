@@ -81,6 +81,45 @@ export function deriveFor(
 export const appUrl = (slug: string) =>
   APPS[slug] ? `https://${APPS[slug].uptime}.bcn-services.com` : null;
 
+// ---- the Money tile's lifetime stat -------------------------------------------------------------
+
+/**
+ * What the client has paid us in total. A readable Mercury invoice list wins: the sum of this client's
+ * Paid invoices (same customer-id-then-alias match clientBilling uses). Otherwise monthly_rate x whole months
+ * from launch_date to churn_date or today, flagged `est`. Null when neither exists.
+ * ponytail: the estimate assumes the full rate was paid every month (no discounts, gaps or one-offs), and
+ * invoices exist only with MERCURY_INVOICING=1; upgrade when Mercury transactions are stored past their
+ * 120-day window.
+ */
+export function lifetime(
+  c: ClientBase,
+  invoices: MercuryInvoice[] | Unavailable,
+  now: Date = new Date()
+): { cents: number; est: boolean } | null {
+  if (!isUnavailable(invoices)) {
+    const norm = (v: string) => v.trim().toLowerCase();
+    const mine = invoices.filter(
+      (i) =>
+        i.status === "Paid" &&
+        (c.mercury_customer_id
+          ? i.customerId === c.mercury_customer_id
+          : !!i.customer && !!c.aliases?.some((a) => norm(a) === norm(i.customer)))
+    );
+    if (mine.length) return { cents: mine.reduce((t, i) => t + i.amountCents, 0), est: false };
+  }
+  const rate = c.monthly_rate_cents ?? 0;
+  const from = c.launch_date ? new Date(`${c.launch_date}T00:00:00Z`) : null;
+  if (!from || Number.isNaN(from.getTime()) || rate <= 0 || c.billing_source === "none")
+    return null;
+  const churn = c.churn_date ? new Date(`${c.churn_date}T00:00:00Z`) : null;
+  const to = churn && churn < now ? churn : now;
+  const months =
+    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 +
+    (to.getUTCMonth() - from.getUTCMonth()) -
+    (to.getUTCDate() < from.getUTCDate() ? 1 : 0);
+  return months > 0 ? { cents: rate * months, est: true } : null;
+}
+
 // ---- the Work tile ------------------------------------------------------------------------------
 
 export interface TaskBrief {
@@ -121,6 +160,7 @@ export interface ClientCard extends ClientBase {
   links: { label: string | null; url: string }[];
   work: WorkSummary;
   appUrl: string | null;
+  lifetime: { cents: number; est: boolean } | null;
 }
 
 /** One card per client, in the order given. Pure. */
@@ -137,5 +177,6 @@ export function buildCards(
     links: links.filter((l) => l.client_slug === c.slug).map(({ label, url }) => ({ label, url })),
     work: workSummary(tasks.filter((t) => t.client_slug === c.slug)),
     appUrl: appUrl(c.slug),
+    lifetime: lifetime(c, s.invoices, now),
   }));
 }
