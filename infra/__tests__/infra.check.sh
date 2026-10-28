@@ -234,6 +234,7 @@ check "hq-uptime.timer: starts hq-uptime.service" "$(unitval "$upt" Unit)" "hq-u
 usv="$here/hq-uptime.service"
 unitcheck "$usv" Unit Service && ok "hq-uptime.service parses as Unit/Service" || bad "hq-uptime.service has a malformed line or section"
 check "hq-uptime.service: oneshot, DynamicUser, env file" "$(unitval "$usv" Type) $(unitval "$usv" DynamicUser) $(unitval "$usv" EnvironmentFile)" "oneshot yes /srv/hq/jobs.env"
+check "hq-uptime.service: hq group so it can enter /srv/hq (750)" "$(unitval "$usv" SupplementaryGroups)" "hq"
 check "hq-uptime.service: no LoadCredential, no os paths" "$(grep -cE '^(LoadCredential|ReadWritePaths|ReadOnlyPaths|SupplementaryGroups)=' "$usv" | tr -d ' ')" "0"
 check "hq-uptime.service: runs the uptime job, short timeout" "$(unitval "$usv" ExecStart) $(unitval "$usv" TimeoutStartSec)" "/usr/bin/node jobs/run.mjs uptime 2min"
 check "hq-uptime.service: hardening matches hq-job@" "$(unitval "$usv" ProtectSystem) $(unitval "$usv" PrivateTmp) $(unitval "$usv" NoNewPrivileges) $(unitval "$usv" ProtectHome)" "strict true true true"
