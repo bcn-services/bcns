@@ -295,3 +295,79 @@ export async function freezeMonth(
     reason: err.code === "23505" ? "already frozen" : (err.message ?? "insert failed"),
   };
 }
+
+// --- Numbers tabs: weekly totals, goals, unit economics ----------------------------------------
+
+/** Weekly goals the Sales funnel tiles measure against. ponytail: constants until Nate wants them editable. */
+export const GOALS = {
+  calls: 60,
+  reached: 20,
+  consults: 3,
+  pilots: 2,
+  signed: 1,
+  mrrCents: 100000,
+} as const;
+
+/** Unit-economics inputs that are not in the database. Change here, nowhere else. */
+export const UNIT = { expectedMonths: 18, infraCents: 2100, windowWeeks: 13 } as const;
+
+type Summed = "calls" | "reached" | "consults" | "pilots" | "signed" | "spendCents" | "hours";
+
+/** `weeks` (Mondays, oldest first) -> the sum of `key` over every channel in each week. */
+export function weekTotals(rows: Row[], weeks: string[], key: Summed): number[] {
+  return weeks.map((w) => rows.filter((r) => r.period === w).reduce((s, r) => s + r[key], 0));
+}
+
+export interface UnitNow {
+  cacCents: number | null;
+  ltvCents: number;
+  ratio: number | null;
+  marginPct: number;
+  paybackMonths: number | null;
+  /** The trailing-window inputs the numbers came from. */
+  spendCents: number;
+  newClients: number;
+  avgRateCents: number;
+}
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+function unitAt(rows: Row[], end: string, avgRateCents: number): UnitNow {
+  const start = addDays(end, -7 * (UNIT.windowWeeks - 1));
+  const win = rows.filter((r) => r.period >= start && r.period <= end);
+  const sum = (k: Summed) => win.reduce((s, r) => s + r[k], 0);
+  const spend = sum("spendCents") + sum("hours") * ASSUMPTIONS.hourCents; // same CAC definition as derive()
+  const signed = sum("signed");
+  const margin =
+    avgRateCents > 0 ? Math.max(0, (avgRateCents - UNIT.infraCents) / avgRateCents) : 0;
+  const cac = div(spend, signed);
+  const perMonth = avgRateCents * margin;
+  const ltv = Math.round(perMonth * UNIT.expectedMonths);
+  return {
+    cacCents: cac,
+    ltvCents: ltv,
+    ratio: cac ? round1(ltv / cac) : null,
+    marginPct: Math.round(margin * 100),
+    paybackMonths: cac && perMonth > 0 ? round1(cac / perMonth) : null,
+    spendCents: spend,
+    newClients: signed,
+    avgRateCents,
+  };
+}
+
+/** CAC, LTV, LTV:CAC, margin and payback over the trailing 90 days, as of each of `weeks` (Mondays,
+ *  oldest first); the last is `now`. Series use 0 where a value is undefined (no signing yet).
+ *  ponytail: the average rate is today's, so the LTV line is flat; upgrade when rates have history. */
+export function unitEconomics(rows: Row[], weeks: string[], avgRateCents: number) {
+  const by = weeks.map((w) => unitAt(rows, w, avgRateCents));
+  const col = (f: (u: UnitNow) => number | null) => by.map((u) => f(u) ?? 0);
+  return {
+    now: by[by.length - 1] ?? unitAt(rows, nyWeek(new Date()), avgRateCents),
+    series: {
+      cac: col((u) => u.cacCents),
+      ltv: col((u) => u.ltvCents),
+      ratio: col((u) => u.ratio),
+      margin: col((u) => u.marginPct),
+      payback: col((u) => u.paybackMonths),
+    },
+  };
+}
