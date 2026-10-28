@@ -268,6 +268,8 @@ If a fire exits 1 with no run row, check `cd /srv/hq/current/jobs && ls node_mod
 
 claude.ai -> Settings -> Connectors -> Add custom connector -> name `bcns HQ`, URL `https://hq.bcn-services.com/mcp`. Sign in with your HQ email and password when it redirects to `/authorize`. The os skill `/hq` drives it (`~/os/skills/hq/SKILL.md`).
 
+**Claude Code.** No separate setup: claude.ai connectors load into Claude Code on the same account. After connecting in claude.ai, `claude mcp list` shows `claude.ai bcns HQ - Connected`, and the 12 tools appear as `mcp__claude_ai_bcns_HQ__*` (verified 2026-10-28: `today`, `list_tasks`, `create_task`, `update_task`). Signed out shows `! Needs authentication`; in Claude Code run `/mcp`, pick `claude.ai bcns HQ`, Authenticate, sign in at `/authorize`. Do not also add a user-scope `claude mcp add ... hq`: it is a second, redundant sign-in for the same server.
+
 ### 10. Seed the GTM tracks (once)
 
 Dry run first, no environment needed; it prints the tasks and list items it would insert:
