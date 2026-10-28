@@ -173,7 +173,8 @@ test("push rejected as non-fast-forward (origin moved): same cleanup, and a late
   const h = rig(r, { writes: demo });
   const out = await h.go();
   assert.equal(out.status, "failed");
-  assert.match(out.error, /^Command failed: git .* push$/);
+  // Round 2: the row now carries git's own first stderr line instead of the bare "Command failed: git ... push".
+  assert.match(out.error, /^git push failed: ! \[rejected\]\s+\S+ -> \S+ \(fetch first\)$/);
   assert.equal(gitIn(r.d, "rev-list", "--count", "@{u}..HEAD").trim(), "0");
   assert.equal(gitIn(r.d, "status", "--porcelain", "--ignored"), "");
   // Nate refreshes the clone by hand; the next run publishes only its own file.

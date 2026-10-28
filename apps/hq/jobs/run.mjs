@@ -98,6 +98,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
     for (const k of Object.keys(jobDeps_)) if (jobDeps_[k] === undefined) delete jobDeps_[k];
     out = await mod.run({ sql, db, deadline: startedAt + PROCESS_BUDGET_MS, ...jobDeps_ });
     console.log(JSON.stringify(out));
+    if (out?.tamper) throw new Error(out.error); // the job already failed its row; log the run ok:false
     ok = true;
   } catch (err) {
     error = String(err?.message ?? err);
@@ -108,7 +109,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
   // An idle tick ({claimed:0}) logs nothing: the deliverable timer fires every
   // minute and ops reads only the newest 200 run events, so idle rows would push
   // real job failures out of that window within hours.
-  const idle = ok && out?.claimed === 0;
+  const idle = ok && out?.claimed === 0 && !out.recovered?.length; // a recovered stale row is news
   try {
     if (!db || !sql) throw new Error("no database to record the run in");
     if (!idle) await db.logEvent(sql, name, "run", { ok, ms: Date.now() - startedAt, error });

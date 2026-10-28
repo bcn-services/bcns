@@ -13,9 +13,11 @@
 // The os clone is job-owned: only this job writes it. A dirty clone at the start
 // of a run with no other row running is a killed run's leftovers and is
 // discarded; a `running` row older than 30 min is marked failed ("stale run").
-// The unit's .git is writable, so .git/config, .git/info/ and the .git/hooks
-// listing are hashed before and after Claude runs; any change fails the row and
-// NO further git command runs (the tree and a lock marker are left for Nate).
+// The unit's .git is writable, so .git/config, .git/info/, .git/commondir and the
+// .git/hooks listing are hashed before and after Claude runs; any change fails
+// the row and NO further git command runs (the tree and a lock marker are left
+// for Nate). Every git call also pins GIT_DIR and GIT_COMMON_DIR, so a planted
+// .git/commondir cannot redirect git's config read.
 //
 // ponytail: the os clone is private to HQ and read-only except clients/ and
 // .git, so it is not pulled here. A non-fast-forward push fails the row;
@@ -37,6 +39,7 @@ const exec = promisify(execFile);
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const TOOLS = "Read,Glob,Grep,Write,Edit";
 export const CLAUDE_TIMEOUT_MS = 18 * 60 * 1000; // inside the unit's 25 min, after run.mjs's 22 min process budget
+const PUSH_TIMEOUT_MS = 120_000; // a stalled push must fail here, not at the unit's 25 min SIGKILL
 const SKILL = { pitch: "skills/demo/SKILL.md", quote: "skills/quote/SKILL.md" };
 const PROMPT_DATA_MAX = 12_000;
 
@@ -75,10 +78,12 @@ export function parsePorcelain(z) {
   return paths;
 }
 
-export const underSlug = (p, slug) => p.startsWith(`clients/${slug}/`) && !p.split("/").includes("..");
+// No ".." or ".git" segment, and no trailing "/" (git lists a nested repo as `dir/`).
+export const underSlug = (p, slug) =>
+  p.startsWith(`clients/${slug}/`) && !p.endsWith("/") && !p.split("/").some((s) => s === ".." || s.toLowerCase() === ".git");
 
-// sha256 over .git/config, every file under .git/info/ (path + bytes) and the
-// .git/hooks listing. Unreadable -> throws, which callers treat as "changed".
+// sha256 over .git/config, .git/commondir (absent hashes too), every file under
+// .git/info/ (path + bytes) and the .git/hooks listing. Unreadable -> throws, which callers treat as "changed".
 export async function gitMeta(gitDir) {
   const h = createHash("sha256");
   const walk = async (dir) => {
@@ -90,6 +95,7 @@ export async function gitMeta(gitDir) {
     }
   };
   h.update(await readFile(join(gitDir, "config")));
+  h.update("commondir\0").update(await readFile(join(gitDir, "commondir")).catch(() => "-"));
   await walk(join(gitDir, "info"));
   h.update((await readdir(join(gitDir, "hooks")).catch(() => [])).sort().join("\0"));
   return h.digest("hex");
@@ -105,25 +111,35 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
     "ssh", "-i", join(env.CREDENTIALS_DIRECTORY ?? "", "os-deploy-key"),
     "-o", "IdentitiesOnly=yes", "-o", "UserKnownHostsFile=/srv/hq/jobs-state/known_hosts",
     "-o", "StrictHostKeyChecking=yes",
+    "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
   ].join(" ");
+  const gitDir = join(osDir, ".git");
   const genv = {
     PATH: env.PATH ?? "/usr/bin:/bin", HOME: env.HOME, GIT_SSH_COMMAND: ssh,
     GIT_TERMINAL_PROMPT: "0", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+    // Pinned: .git/commondir would otherwise move git's config read to a directory Claude can write.
+    // The work tree is the cwd (-C osDir) once GIT_DIR is set; core.worktree lives in the hashed config.
+    GIT_DIR: gitDir, GIT_COMMON_DIR: gitDir,
   };
-  const git = async (...args) => (await run("git", [...base, ...args], { env: genv, maxBuffer: 4 * 1024 * 1024 })).stdout;
+  const go = async (opts, args) =>
+    (await run("git", [...base, ...args], { env: genv, maxBuffer: 4 * 1024 * 1024, ...opts })).stdout;
+  const git = (...args) => go({}, args);
   return {
     // --ignored=matching: ignored files outside clients/<slug>/ count too.
     changed: async () => parsePorcelain(await git("status", "--porcelain", "-z", "--untracked-files=all", "--ignored=matching")),
-    // The clone is job-owned, so wiping it back to HEAD (ignored files included) is safe.
+    // A commit a killed run left unpushed counts as dirty too (it would ride out with the next row).
+    ahead: () => git("rev-list", "--count", "@{u}..HEAD").then((n) => Number(n) > 0, () => false),
+    // The clone is job-owned, so wiping it back to the upstream (ignored files and nested repos
+    // included: -ff) is safe. No upstream (a bare test clone) -> plain HEAD.
     discard: async () => {
-      await git("reset", "--hard", "-q");
-      await git("clean", "-fdxq");
+      await git("reset", "--hard", "-q", "@{u}").catch(() => git("reset", "--hard", "-q"));
+      await git("clean", "-ffdxq");
     },
     // Throws while the lock marker from an earlier tamper is still there.
     meta: async () => {
       if (existsSync(marker))
-        throw new Error(`git metadata changed in an earlier run; inspect the clone, then delete ${marker}`);
-      return gitMeta(join(osDir, ".git"));
+        throw Object.assign(new Error(`git metadata changed in an earlier run; inspect the clone, then delete ${marker}`), { tamper: true });
+      return gitMeta(gitDir);
     },
     lock: () => writeFile(marker, `${new Date().toISOString()}\n`),
     publish: async ({ slug, kind }) => {
@@ -131,11 +147,13 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
       await git("-c", "user.name=bcns-hq", "-c", "user.email=hq@bcn-services.com",
         "commit", "-m", `hq: ${kind === "pitch" ? "demo" : "quote"} for ${slug}`);
       try {
-        await git("push");
+        await go({ timeout: PUSH_TIMEOUT_MS }, ["push"]);
       } catch (err) {
         // Drop the unpushed commit so it cannot ride out with the next run.
         await git("reset", "--hard", "-q", "@{u}").catch(() => {});
-        throw err;
+        // First line of git's stderr (past the "To <url>" banner) only: no env, no token, no argv.
+        const why = String(err?.stderr ?? "").split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("To "))?.slice(0, 200);
+        throw why ? new Error(`git push failed: ${why}`) : err;
       }
     },
   };
@@ -144,9 +162,12 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
 // deps: claudeFor(handle) -> {ask}, git {changed, discard, publish}, osDir.
 // All default from env in run.mjs jobDeps.
 export async function run({ sql, db, claudeFor, git, osDir }) {
-  await db.failStaleDeliverables(sql);
+  const stale = (await db.failStaleDeliverables(sql)).map((r) => r.id);
+  if (stale.length) console.error(`deliverable: marked stale run failed: ${stale.join(", ")}`);
+  // A tick that recovered a stale row is not idle: run.mjs logs a run event for it.
+  const idle = (o) => (stale.length ? { ...o, recovered: stale } : o);
   const [row] = await db.claimDeliverable(sql);
-  if (!row) return { claimed: 0 };
+  if (!row) return idle({ claimed: 0 });
 
   const finish = (status, paths, error) =>
     db.finishDeliverable(sql, row.id, { status, paths, error: error ? String(error).slice(0, 500) : null });
@@ -163,11 +184,11 @@ export async function run({ sql, db, claudeFor, git, osDir }) {
     if (!HANDLES.includes(p?.handle)) return await fail("unknown requester"); // before any spawn
 
     const meta0 = await git.meta(); // before any git command; throws if an earlier run left the lock
-    if ((await git.changed()).length) {
+    if ((await git.changed()).length || (await git.ahead())) {
       // Dirty and another row still `running` (not yet stale): leave this one queued.
       if ((await db.otherRunning(sql, row.id)).length) {
         await db.requeueDeliverable(sql, row.id);
-        return { claimed: 0, busy: true };
+        return idle({ claimed: 0, busy: true });
       }
       await git.discard(); // a killed run's leftovers
     }
@@ -185,7 +206,7 @@ export async function run({ sql, db, claudeFor, git, osDir }) {
     if (!(await git.meta().then((m) => m === meta0, () => false))) {
       dirty = false;
       await git.lock().catch(() => {});
-      return await fail("git metadata changed");
+      return { ...(await fail("git metadata changed")), tamper: true }; // run.mjs logs ok:false
     }
     if (askErr) throw askErr;
 
@@ -205,7 +226,8 @@ export async function run({ sql, db, claudeFor, git, osDir }) {
   } catch (err) {
     // Short message only: never the env, never a token (claude.mjs messages carry neither).
     if (dirty) await git?.discard().catch(() => {});
-    return await fail(String(err?.message ?? err).split("\n")[0]).catch(() => ({ claimed: 1, id: row.id, status: "failed" }));
+    const failed = await fail(String(err?.message ?? err).split("\n")[0]).catch(() => ({ claimed: 1, id: row.id, status: "failed" }));
+    return err?.tamper ? { ...failed, tamper: true } : failed; // the earlier-tamper lock marker
   }
 }
 

@@ -294,3 +294,19 @@ test("a pass that did work, or a failing job, is still logged (claimed:1, claime
   await main(q.args("qualify"));
   assert.equal(q.events.length, 1);
 });
+
+test("a tick that recovered a stale row is logged (not idle); a job-flagged tamper logs ok:false and exits 1", async () => {
+  const rec = setup({ run: async () => ({ claimed: 0, recovered: ["s1"] }) });
+  assert.equal(await main(rec.args("deliverable")), 0);
+  assert.equal(rec.events.length, 1);
+  assert.equal(rec.events[0].detail.ok, true);
+
+  const t = setup({ run: async () => ({ claimed: 1, id: "r1", status: "failed", error: "git metadata changed", tamper: true }) });
+  assert.equal(await main(t.args("deliverable")), 1);
+  assert.equal(t.events.length, 1);
+  assert.equal(t.events[0].detail.ok, false);
+  assert.equal(t.events[0].detail.error, "git metadata changed");
+
+  const plain = setup({ run: async () => ({ claimed: 1, id: "r1", status: "failed", error: "bad slug" }) });
+  assert.equal(await main(plain.args("deliverable")), 0, "an ordinary failed row is still ok:true");
+});

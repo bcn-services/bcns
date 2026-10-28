@@ -14,9 +14,9 @@
 # every instance start (243/CREDENTIALS), source and qualify included.
 #
 # The os clone at /srv/hq/os is JOB-OWNED: only hq-job@deliverable writes it. A dirty clone
-# at the start of a run, with no other row running, is a killed run's leftovers and is
-# discarded (hard reset to HEAD, then clean -fdx). If a run changed .git/config, .git/info/
-# or the .git/hooks listing, the job runs no more git, fails the row and writes
+# at the start of a run (or a commit ahead of its upstream), with no other row running, is a
+# killed run's leftovers and is discarded (hard reset to the upstream, then clean -ffdx).
+# If a run changed .git/config, .git/info/, .git/commondir or the .git/hooks listing, the job runs no more git, fails the row and writes
 # /srv/hq/jobs-state/git-meta-changed; every later run refuses until Nate inspects the clone
 # and deletes that file.
 #
