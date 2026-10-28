@@ -354,3 +354,102 @@ test("createOpsTask: the loser of a race (23505 on the open-alert index) gets th
     /denied/
   );
 });
+
+// ---- v2: client_slug / track_id, unassigned, tracks and the board ------------------------
+
+const TR = await import("../lib/tracks.ts");
+const TRACK_A = "44444444-4444-4444-8444-444444444441";
+
+test("createTask / updateTask accept client_slug and track_id (and an unassigned owner)", async () => {
+  const sb = fakeSb();
+  const t = await T.createTask(
+    sb,
+    ACTOR,
+    "ui",
+    { title: "Send invoice", owner: null, clientSlug: "acme-demo", trackId: TRACK_A },
+    NOW
+  );
+  assert.deepEqual([t.owner, t.client_slug, t.track_id], [null, "acme-demo", TRACK_A]);
+  const u = await T.updateTask(
+    sb,
+    ACTOR,
+    "ui",
+    t.id,
+    { owner: "brandon", client_slug: null, track_id: null },
+    NOW
+  );
+  assert.deepEqual([u.owner, u.client_slug, u.track_id], ["brandon", null, null]);
+  await T.updateTask(sb, ACTOR, "ui", t.id, { owner: null, client_slug: "other" }, NOW);
+  assert.deepEqual([sb.db.tasks[0].owner, sb.db.tasks[0].client_slug], [null, "other"]);
+  await assert.rejects(() => T.createTask(sb, ACTOR, "ui", { title: "x", owner: "nate", clientSlug: "Not A Slug" }), /client_slug/);
+  await assert.rejects(() => T.createTask(sb, ACTOR, "ui", { title: "x", owner: "nate", trackId: "nope" }), /track_id/);
+  assert.throws(() => T.buildTaskPatch({ track_id: "nope" }, NOW), /track_id/);
+  // the UI create action passes both through
+  const actions = readFileSync(fileURLToPath(new URL("../app/(app)/work/actions.ts", import.meta.url)), "utf8");
+  assert.match(actions, /\.\.\.t, source: "manual"/);
+});
+
+test("workGroups: Unassigned first, then nate / brandon / claude; empty groups are left out", () => {
+  const mk = (id, owner, status = "todo", due = null) => ({ id, owner, status, due, created_at: "x" });
+  const g = T.workGroups([mk("a", "claude"), mk("b", null), mk("c", "nate", "todo", "2026-10-30"), mk("d", "nate", "doing")]);
+  assert.deepEqual(g.map((x) => [x.key, x.label, x.tasks.map((t) => t.id)]), [
+    ["unassigned", "Unassigned", ["b"]],
+    ["nate", "Nate", ["d", "c"]],
+    ["claude", "Claude", ["a"]],
+  ]);
+});
+
+test("humanDay: today, a weekday within 6 days, else month + day", () => {
+  assert.equal(T.humanDay("2026-10-27", "2026-10-27"), "today");
+  assert.equal(T.humanDay("2026-10-28", "2026-10-27"), "Wed");
+  assert.equal(T.humanDay("2026-11-02", "2026-10-27"), "Mon");
+  assert.equal(T.humanDay("2026-11-03", "2026-10-27"), "Nov 3");
+  assert.equal(T.humanDay("2026-10-24", "2026-10-27"), "Oct 24"); // overdue shows the date
+});
+
+test("board: Done column = tracks with done_at in the last 7 days; steps ride their track, open first", () => {
+  const day = 86_400_000;
+  const ago = (d) => new Date(NOW.getTime() - d * day).toISOString();
+  const track = (id, column, done_at = null) => ({ id, name: id, column, done_at });
+  const tracks = [
+    track("now1", "now"),
+    track("next1", "next"),
+    track("wait1", "wait"),
+    track("fresh", "done", ago(6.5)),
+    track("stale", "done", ago(7.5)),
+    track("nodate", "done"),
+  ];
+  const tasks = [
+    { id: "s1", track_id: "now1", status: "done" },
+    { id: "s2", track_id: "now1", status: "todo" },
+    { id: "s3", track_id: null, status: "todo" },
+  ];
+  const b = TR.buildBoard(tracks, tasks, NOW);
+  assert.deepEqual(Object.keys(b), ["now", "next", "wait", "done"]);
+  assert.deepEqual(b.done.map((c) => c.track.id), ["fresh"]);
+  assert.deepEqual(b.now[0].steps.map((s) => s.id), ["s2", "s1"]);
+  assert.deepEqual([b.next.length, b.wait.length], [1, 1]);
+});
+
+test("tracks: create / move / update write the row and an events row; done stamps done_at, leaving clears it; no delete", async () => {
+  const sb = fakeSb();
+  const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Pilot ", area: "client" }, NOW);
+  assert.deepEqual([t.name, t.column, t.done_at], ["Pilot", "next", null]);
+  const done = await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", NOW);
+  assert.equal(done.done_at, "2026-10-27T15:00:00.000Z");
+  const later = new Date("2026-11-01T00:00:00Z"); // done -> done keeps done_at and writes no second event
+  assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", later)).done_at, "2026-10-27T15:00:00.000Z");
+  assert.equal(sb.db.events.filter((e) => e.kind === "track.moved").length, 1);
+  assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "now", NOW)).done_at, null);
+  assert.equal((await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot 2", client_slug: "acme-demo" })).client_slug, "acme-demo");
+  assert.deepEqual(sb.db.events.map((e) => [e.kind, e.via]), [
+    ["track.created", "mcp"],
+    ["track.moved", "ui"],
+    ["track.moved", "ui"],
+    ["track.updated", "ui"],
+  ]);
+  await assert.rejects(() => TR.moveTrack(sb, ACTOR, "ui", t.id, "later"), /column/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: " " }), /name/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "x", area: "bogus" }), /area/);
+  await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
+});
