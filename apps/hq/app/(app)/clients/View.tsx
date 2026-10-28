@@ -1,73 +1,252 @@
-import type { ReactNode } from "react";
-import { Board, type Row, type Section } from "@/components/Board";
-import type { ClientBilling } from "@/lib/money";
+"use client";
 
-export interface ClientRow {
-  slug: string;
-  display_name: string;
-  kind: string | null;
-  stage: string | null;
-  health: string | null;
-  owner: string | null;
-  channel: string | null;
-  billing_note: string | null;
-  repo_url: string | null;
-  monthly_rate_cents: number | null;
-  links: { label: string | null; url: string }[];
-  billing: ClientBilling;
-}
+import { useState } from "react";
+import { DOT, type Dot } from "@/lib/clients/health";
+import { BILLING_SOURCES } from "@/lib/clients/fields";
+import type { ClientCard } from "@/lib/clients/load";
+import { OWNERS } from "@/lib/tasks";
+import type { ActionResult } from "./actions";
+
+type Act = (fd: FormData) => Promise<ActionResult>;
+type Filter = "all" | Dot;
 
 const usd = (c: number) => `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const day = (iso: string) =>
+  new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+const https = (u: string) => u.startsWith("https://"); // never render a javascript: or http: href
+const host = (u: string) => {
+  try {
+    return new URL(u).hostname.replace(/^www\./, "");
+  } catch {
+    return u;
+  }
+};
 
-/** One-line billing status for the list. */
-export function billingLabel(b: ClientBilling): string {
-  if (!b.mercury) return b.note ? `note: ${b.note.slice(0, 40)}` : "billing unavailable";
-  if (b.invoice?.overdue) return `${b.invoice.overdue} overdue`;
-  if (b.lastPaid) return `paid ${b.lastPaid.at.slice(0, 10)} ${usd(b.lastPaid.amountCents)}`;
-  return "no payment found";
-}
-
-const SECTIONS: { id: string; title: string; hot?: boolean }[] = [
-  { id: "red", title: "Red", hot: true },
-  { id: "amber", title: "Amber", hot: true },
-  { id: "green", title: "Green" },
-  { id: "none", title: "No health set" },
+export const GROUPS: { dot: Dot; name: string }[] = [
+  { dot: "r", name: "Down / needs attention" },
+  { dot: "a", name: "Watch" },
+  { dot: "g", name: "Healthy" },
+];
+const FILTERS: [Filter, string][] = [
+  ["all", "All"],
+  ["r", "Down"],
+  ["a", "Watch"],
+  ["g", "Healthy"],
 ];
 
-function Edit({ c, action }: { c: ClientRow; action?: (fd: FormData) => Promise<void> }) {
+/** The list the left panel draws: red, amber, green; filtered by the health chips and the search box. */
+export function groupCards(cards: ClientCard[], filter: Filter, q: string) {
+  const needle = q.trim().toLowerCase();
+  return GROUPS.filter((g) => filter === "all" || filter === g.dot)
+    .map((g) => ({
+      ...g,
+      cards: cards.filter(
+        (c) =>
+          DOT[c.derived.health] === g.dot &&
+          (!needle || c.display_name.toLowerCase().includes(needle))
+      ),
+    }))
+    .filter((g) => g.cards.length);
+}
+
+/** Contracted MRR of the list: clients billed through Mercury or Stripe (billing_source none = not billed here). */
+export const listMrr = (cards: ClientCard[]) =>
+  cards.reduce((t, c) => t + (c.billing_source === "none" ? 0 : (c.monthly_rate_cents ?? 0)), 0);
+
+const matchedBy = (c: ClientCard) =>
+  c.mercury_customer_id ? "Mercury customer" : c.aliases?.length ? "alias" : "no match key set";
+
+function Money({ c, month }: { c: ClientCard; month: string }) {
+  const pay = c.derived.payment;
+  const paid = c.billing.lastPaid;
+  const status = {
+    paid: ["Paid", "received"],
+    unpaid: ["—", "not found"],
+    unknown: ["?", "unverifiable"],
+    "n/a": ["n/a", "not billed here"],
+  }[pay];
   return (
-    <form action={action} className="eform">
+    <div className="card tl">
+      <h2>Money</h2>
+      <div className="mstats">
+        <div>
+          <div className="big">
+            {c.monthly_rate_cents == null ? "—" : usd(c.monthly_rate_cents)}
+          </div>
+          <div className="muted">per month</div>
+        </div>
+        <div>
+          <div className="big">{status[0]}</div>
+          <div className="muted">
+            {month} payment {status[1]}
+          </div>
+        </div>
+        <div>
+          <div className="big">{paid ? usd(paid.amountCents) : "—"}</div>
+          <div className="muted">{paid ? `last paid ${day(paid.at)}` : "no payment found"}</div>
+        </div>
+      </div>
+      <div className="muted foot">
+        {c.billing_source ?? "mercury"} · next invoice{" "}
+        {c.billing.invoice?.nextDue ? day(c.billing.invoice.nextDue) : "—"} · matched by{" "}
+        {matchedBy(c)}
+      </div>
+      {c.billing.note ? <div className="muted foot">{c.billing.note}</div> : null}
+    </div>
+  );
+}
+
+function Work({ c, action }: { c: ClientCard; action: Act }) {
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState("");
+  const w = c.work;
+  return (
+    <div className="card tl">
+      <h2>Work</h2>
+      <div className="strong">{c.stage ?? "No stage set"}</div>
+      <div className="bar">
+        <i style={{ width: `${w.total ? (w.done / w.total) * 100 : 0}%` }} />
+      </div>
+      <div className="muted">
+        {w.total
+          ? `${w.done} of ${w.total} · next: ${w.next ?? "nothing open"} · ${w.open} open task${w.open === 1 ? "" : "s"}`
+          : "No tasks yet"}
+      </div>
+      <div className="act">
+        {open ? (
+          <form
+            className="inline"
+            action={async (fd) => {
+              const r = await action(fd);
+              if (r.ok) {
+                setOpen(false);
+                setErr("");
+              } else setErr(r.error);
+            }}
+          >
+            <input type="hidden" name="slug" value={c.slug} />
+            <input
+              name="title"
+              placeholder="What needs doing"
+              required
+              maxLength={200}
+              aria-label="Task title"
+              autoFocus
+            />
+            <select name="owner" defaultValue="nate" aria-label="Owner">
+              {OWNERS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+            <button className="btn pri" type="submit">
+              Add
+            </button>
+            <button className="btn" type="button" onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+            {err ? <span className="bad">{err}</span> : null}
+          </form>
+        ) : (
+          <button className="btn" type="button" onClick={() => setOpen(true)}>
+            + Task for this client
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Files({ c }: { c: ClientCard }) {
+  const rows = [
+    ...c.links
+      .filter((l) => https(l.url))
+      .map((l) => ({ name: l.label || host(l.url), url: l.url })),
+    ...(c.repo_url && https(c.repo_url) ? [{ name: "Repo", url: c.repo_url }] : []),
+    ...(c.appUrl ? [{ name: "Their app", url: c.appUrl }] : []),
+  ];
+  return (
+    <div className="card tl">
+      <h2>Files + links</h2>
+      {rows.length ? (
+        rows.map((r) => (
+          <div className="src" key={r.url}>
+            <b>{r.name}</b>
+            <a className="btn" href={r.url} target="_blank" rel="noopener noreferrer">
+              Open ↗
+            </a>
+          </div>
+        ))
+      ) : (
+        <div className="muted">No links yet.</div>
+      )}
+    </div>
+  );
+}
+
+function EditForm({ c, action, onDone }: { c: ClientCard; action: Act; onDone: () => void }) {
+  const [err, setErr] = useState("");
+  return (
+    <form
+      className="card tl edit"
+      action={async (fd) => {
+        const r = await action(fd);
+        if (r.ok) onDone();
+        else setErr(r.error);
+      }}
+    >
       <input type="hidden" name="slug" value={c.slug} />
       <label>
-        Health
-        <select name="health" defaultValue={c.health ?? ""}>
-          <option value="">not set</option>
-          <option value="green">green</option>
-          <option value="amber">amber</option>
-          <option value="red">red</option>
+        Monthly rate ($)
+        <input
+          name="monthly_rate"
+          inputMode="decimal"
+          defaultValue={c.monthly_rate_cents == null ? "" : String(c.monthly_rate_cents / 100)}
+        />
+      </label>
+      <label>
+        Billing source
+        <select name="billing_source" defaultValue={c.billing_source ?? "mercury"}>
+          {BILLING_SOURCES.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
         </select>
       </label>
       <label>
-        Stage
-        <input name="stage" defaultValue={c.stage ?? ""} maxLength={60} />
-      </label>
-      <label>
-        Owner
-        <input name="owner" defaultValue={c.owner ?? ""} maxLength={60} />
-      </label>
-      <label>
-        Billing note
-        <textarea
-          name="billing_note"
-          defaultValue={c.billing_note ?? ""}
-          maxLength={500}
-          rows={3}
+        Mercury customer id
+        <input
+          name="mercury_customer_id"
+          defaultValue={c.mercury_customer_id ?? ""}
+          maxLength={100}
         />
       </label>
-      <div className="acts">
-        <button type="submit" className="btn pri sm">
+      <label>
+        Aliases (payer names, comma or line separated)
+        <textarea name="aliases" rows={2} defaultValue={(c.aliases ?? []).join(", ")} />
+      </label>
+      <label>
+        Repo URL
+        <input name="repo_url" defaultValue={c.repo_url ?? ""} maxLength={300} />
+      </label>
+      <label>
+        Launch date
+        <input name="launch_date" type="date" defaultValue={c.launch_date ?? ""} />
+      </label>
+      <label>
+        Notes
+        <textarea name="notes" rows={3} defaultValue={c.notes ?? ""} maxLength={2000} />
+      </label>
+      <div className="act">
+        <button className="btn pri" type="submit">
           Save
         </button>
+        <button className="btn" type="button" onClick={onDone}>
+          Cancel
+        </button>
+        {err ? <span className="bad">{err}</span> : null}
       </div>
     </form>
   );
@@ -75,106 +254,155 @@ function Edit({ c, action }: { c: ClientRow; action?: (fd: FormData) => Promise<
 
 export function ClientDetail({
   c,
-  action,
-  invoicing,
+  admin,
+  month,
+  editAction,
+  taskAction,
 }: {
-  c: ClientRow;
-  action?: (fd: FormData) => Promise<void>;
-  invoicing: boolean;
+  c: ClientCard;
+  admin: boolean;
+  month: string;
+  editAction: Act;
+  taskAction: Act;
 }) {
-  const b = c.billing;
+  const [editing, setEditing] = useState(false);
+  const dot = DOT[c.derived.health];
   return (
-    <>
-      <dl>
-        <dt>Billing</dt>
-        <dd>{billingLabel(b)}</dd>
-        {c.monthly_rate_cents ? (
-          <>
-            <dt>Monthly rate</dt>
-            <dd>{usd(c.monthly_rate_cents)}</dd>
-          </>
+    <div className="det">
+      <div className="muted">
+        client{c.monthly_rate_cents != null ? ` · ${usd(c.monthly_rate_cents)}/mo` : ""}
+      </div>
+      <div className="dh">
+        <span className={`dot ${dot}`} aria-hidden />
+        <h1>{c.display_name}</h1>
+        {admin && !editing ? (
+          <button className="btn" type="button" onClick={() => setEditing(true)}>
+            Edit
+          </button>
         ) : null}
-        {b.invoice ? (
-          <>
-            <dt>Next invoice due</dt>
-            <dd>{b.invoice.nextDue ?? "none open"}</dd>
-          </>
-        ) : invoicing ? (
-          <>
-            <dt>Invoices</dt>
-            <dd>unavailable</dd>
-          </>
-        ) : null}
-        {b.note ? (
-          <>
-            <dt>Note</dt>
-            <dd>{b.note}</dd>
-          </>
-        ) : null}
-      </dl>
-      {c.repo_url || c.links.length ? (
-        <p className="acts">
-          {c.repo_url ? (
-            <a className="lnkb" href={c.repo_url} target="_blank" rel="noreferrer">
-              Repo
+      </div>
+      <div className="why">Health: {c.derived.why}</div>
+      {editing ? <EditForm c={c} action={editAction} onDone={() => setEditing(false)} /> : null}
+      <div className="grid2">
+        <div className="card tl">
+          <h2>App + connectors</h2>
+          {c.derived.sources.length ? (
+            c.derived.sources.map((s) => (
+              <div className="src" key={s.name}>
+                <span className={`dot ${s.dot}`} aria-hidden />
+                <b>{s.name}</b>
+                <span className="muted">{s.note}</span>
+              </div>
+            ))
+          ) : (
+            <div className="muted">Nothing connected yet.</div>
+          )}
+          <div className="act">
+            <a
+              className="btn"
+              href="https://connect.bcn-services.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in Connect ↗
             </a>
-          ) : null}
-          {c.links.map((l) => (
-            <a key={l.url} className="lnkb" href={l.url} target="_blank" rel="noreferrer">
-              {l.label || l.url}
-            </a>
-          ))}
-        </p>
-      ) : null}
-      <Edit c={c} action={action} />
-    </>
+          </div>
+        </div>
+        <Money c={c} month={month} />
+        <Work c={c} action={taskAction} />
+        <Files c={c} />
+      </div>
+    </div>
   );
 }
 
 export function ClientsView({
-  clients,
-  mercuryUnavailable,
-  invoicing,
-  action,
+  cards,
+  admin,
+  month,
+  editAction,
+  taskAction,
 }: {
-  clients: ClientRow[];
-  /** Mercury could not be read: billing falls back to the note. */
-  mercuryUnavailable: boolean;
-  invoicing: boolean;
-  action?: (fd: FormData) => Promise<void>;
+  cards: ClientCard[];
+  admin: boolean;
+  month: string;
+  editAction: Act;
+  taskAction: Act;
 }) {
-  const sections: Section[] = SECTIONS.map((s) => ({
-    id: s.id,
-    title: s.title,
-    hot: s.hot,
-    rows: clients
-      .filter((c) => (c.health ?? "none") === s.id)
-      .map((c): Row => ({
-        key: c.slug,
-        title: c.display_name,
-        meta: [c.kind, c.stage, c.owner, c.channel].filter(Boolean).join(" · "),
-        right: billingLabel(c.billing),
-      })),
-  }));
-  const details: Record<string, ReactNode> = Object.fromEntries(
-    clients.map((c) => [
-      c.slug,
-      <ClientDetail key={c.slug} c={c} action={action} invoicing={invoicing} />,
-    ])
-  );
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const groups = groupCards(cards, filter, q);
+  const [sel, setSel] = useState<string | null>(null);
+  const shown = cards.find((c) => c.slug === sel) ?? groups[0]?.cards[0] ?? cards[0];
   return (
-    <Board
-      head={
-        <>
+    <div className="cx">
+      <div className="cx-list">
+        <div className="cx-head">
           <h1>Clients</h1>
-          {mercuryUnavailable ? (
-            <p className="note">Mercury unavailable: billing shows notes only.</p>
-          ) : null}
-        </>
-      }
-      sections={sections}
-      details={details}
-      emptyText="No clients."
-    />
+          <p className="sub">
+            {cards.length} · MRR {usd(listMrr(cards))}
+          </p>
+          <input
+            className="srch"
+            placeholder="Search clients"
+            aria-label="Search clients"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <div className="hf">
+            {FILTERS.map(([k, n]) => (
+              <button
+                key={k}
+                type="button"
+                className={`btn${k === filter ? " on" : ""}`}
+                onClick={() => setFilter(k)}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+        {groups.map((g) => (
+          <div key={g.dot}>
+            <div className="gh">
+              <span className={`dot ${g.dot}`} aria-hidden />
+              {g.name}
+              <span className="muted">{g.cards.length}</span>
+            </div>
+            {g.cards.map((c) => (
+              <button
+                key={c.slug}
+                type="button"
+                className={`cl${c.slug === shown?.slug ? " f" : ""}`}
+                onClick={() => setSel(c.slug)}
+              >
+                <span className="cl-main">
+                  <span className="cl-name">{c.display_name}</span>
+                  <span className="muted rt">{c.derived.why}</span>
+                </span>
+                <span className="muted">
+                  {c.monthly_rate_cents == null ? "" : usd(c.monthly_rate_cents)}
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
+        {!groups.length ? (
+          <p className="muted cx-empty">{cards.length ? "No clients match." : "No clients yet."}</p>
+        ) : null}
+      </div>
+      {shown ? (
+        <ClientDetail
+          key={shown.slug}
+          c={shown}
+          admin={admin}
+          month={month}
+          editAction={editAction}
+          taskAction={taskAction}
+        />
+      ) : (
+        <div className="det muted">No clients yet.</div>
+      )}
+    </div>
   );
 }

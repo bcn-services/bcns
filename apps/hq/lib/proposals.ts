@@ -6,8 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface ProposalView {
   id: string;
-  kind: "lead_stage" | "finance";
-  target: string; // business name (lead_stage) or "week of <date>" (finance)
+  kind: "lead_stage" | "finance" | "client";
+  target: string; // business name (lead_stage), "week of <date>" (finance) or "client <slug>"
   field: string;
   old: string;
   next: string;
@@ -23,6 +23,7 @@ export interface ProposalView {
 export function fmtValue(field: string, v: unknown): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "number" && field.endsWith("/spend_cents")) return `$${(v / 100).toFixed(2)}`;
+  if (typeof v === "number" && field === "monthly_rate_cents") return `$${(v / 100).toFixed(2)}/mo`;
   return typeof v === "string" ? v : JSON.stringify(v);
 }
 
@@ -91,7 +92,11 @@ export async function listPendingProposals(
     id: p.id,
     kind: p.kind,
     target:
-      p.kind === "finance" ? `week of ${p.target_id}` : (names.get(p.target_id) ?? p.target_id),
+      p.kind === "finance"
+        ? `week of ${p.target_id}`
+        : p.kind === "client"
+          ? `client ${p.target_id}`
+          : (names.get(p.target_id) ?? p.target_id),
     field: p.field,
     old: fmtValue(p.field, p.old),
     next: fmtValue(p.field, p.new),
