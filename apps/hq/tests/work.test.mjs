@@ -460,6 +460,23 @@ test("board: Done column = tracks with done_at in the last 7 days; steps ride th
   assert.deepEqual([b.next.length, b.wait.length], [1, 1]);
 });
 
+test("buildBoard: open orphan tasks form one Unassigned card, last in Now; none or only done -> no card", () => {
+  const tracks = [{ id: "now1", name: "now1", column: "now", done_at: null }];
+  const open = [
+    { id: "o1", track_id: "now1", status: "todo" },
+    { id: "o2", track_id: null, status: "doing" },
+    { id: "o3", track_id: null, status: "waiting" },
+    { id: "o4", track_id: null, status: "done" },
+  ];
+  const b = TR.buildBoard(tracks, open, NOW);
+  assert.deepEqual(b.now.map((c) => c.track.id), ["now1", TR.UNASSIGNED_ID]);
+  assert.equal(b.now[1].track.name, "Unassigned");
+  assert.deepEqual(b.now[1].steps.map((s) => s.id), ["o2", "o3"]);
+  for (const c of ["next", "wait", "done"]) assert.equal(b[c].length, 0);
+  const none = TR.buildBoard(tracks, [open[0], open[3]], NOW);
+  assert.deepEqual(none.now.map((c) => c.track.id), ["now1"]);
+});
+
 test("tracks: create / move / update write the row and an events row; done stamps done_at, leaving clears it; no delete", async () => {
   const sb = fakeSb();
   const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Pilot ", area: "client" }, NOW);
