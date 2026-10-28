@@ -390,7 +390,14 @@ curl -4 -s -H "Authorization: Bearer $MERCURY_KEY" https://api.mercury.com/api/v
 unset MERCURY_KEY
 ```
 
-If it returns 403 (no paid plan), skip the ids and put the payer name exactly as it appears on the client's incoming Mercury transactions into `aliases` through the Edit form (one per line). Without invoicing, payments match only that transaction counterparty name; with `MERCURY_INVOICING=1` the customer id matches invoices. Then:
+If it returns 403 (no paid plan), skip the ids and put the payer name exactly as it appears on the client's incoming Mercury transactions into `aliases` through the Edit form (one per line). Without invoicing, payments match only that transaction counterparty name; with `MERCURY_INVOICING=1` the customer id matches invoices. Free route (default), no customer id:
+
+```sql
+update clients set billing_source='mercury', monthly_rate_cents=10000 where slug='technology-associates';
+update clients set billing_source='mercury', monthly_rate_cents=11000 where slug='sb';
+```
+
+Paid plan only (`MERCURY_INVOICING=1`), instead of the two lines above:
 
 ```sql
 update clients set billing_source='mercury', mercury_customer_id='<TA id from Mercury /ar/customers>', monthly_rate_cents=10000 where slug='technology-associates';
