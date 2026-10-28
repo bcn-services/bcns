@@ -9,9 +9,8 @@ globalThis.React = React;
 const { NumbersView } = await import("../app/(app)/numbers/View.tsx");
 const { Fires } = await import("../app/(app)/numbers/Fires.tsx");
 const { oncePerKey } = await import("../app/(app)/numbers/task.ts");
-const { loadFinance } = await import("../app/(app)/numbers/data.ts");
+const { loadFinance, loadClients, parseTab } = await import("../app/(app)/numbers/data.ts");
 const money = await import("../lib/money.ts");
-const F = await import("../lib/finance.ts");
 
 const saved = { fetch: globalThis.fetch, env: { ...process.env } };
 afterEach(() => {
@@ -22,26 +21,170 @@ afterEach(() => {
 const render = (props) => renderToStaticMarkup(React.createElement(NumbersView, props));
 const emptyOps = { health: [], runs: [], tickets: [], clients: [], failed: [] };
 
-test("every vendor and the platform down: the page still renders, saying unavailable", async () => {
+const NOW = new Date("2026-10-27T12:00:00Z");
+
+test("every vendor and the platform down: every tab still renders, saying unavailable", async () => {
   process.env.STRIPE_KEY = "rk_test_not_real";
   process.env.MERCURY_KEY = "secret-token:test-not-real";
+  process.env.MERCURY_INVOICING = "1";
   globalThis.fetch = async () => {
     throw new Error("offline");
   };
   money.clearMoneyMemo();
-  const html = render({
-    finance: null,
-    ops: { ...emptyOps, failed: ["config"] },
-    runs: [],
+  const moneyProps = {
     stripe: await money.stripeSummary(),
     mercury: await money.mercurySummary(),
-    firesSlot: null,
+    invoices: await money.mercuryInvoices(),
+    invoicing: true,
+  };
+  const m = render({ tab: "money", money: moneyProps, clients: null, now: NOW });
+  assert.match(m, /Stripe unavailable/);
+  assert.match(m, /Mercury unavailable/);
+  assert.match(m, /Clients unavailable/);
+  const sales = render({ tab: "sales", finance: null, now: NOW });
+  assert.match(sales, /Finance unavailable/);
+  assert.match(
+    render({ tab: "unit", finance: null, clients: null, now: NOW }),
+    /Unit economics unavailable/
+  );
+  const ops = render({
+    tab: "ops",
+    ops: { ops: { ...emptyOps, failed: ["config"] }, runs: [], firesSlot: null },
+    now: NOW,
   });
-  assert.match(html, /Stripe <b>unavailable<\/b>/);
-  assert.match(html, /Mercury <b>unavailable<\/b>/);
-  assert.match(html, /Finance unavailable/);
-  assert.match(html, /Ops unavailable/);
-  assert.match(html, /id="ops"/);
+  assert.match(ops, /Ops unavailable/);
+  assert.match(ops, /id="ops"/);
+  // no props at all (env-less): each tab says unavailable instead of crashing
+  for (const tab of ["money", "sales", "ops", "unit"])
+    assert.match(render({ tab, now: NOW }), /unavailable/i);
+});
+
+const clients = [
+  {
+    slug: "sb",
+    display_name: "Sauna Boy",
+    billing_note: null,
+    monthly_rate_cents: 11000,
+    billing_source: "mercury",
+    churn_date: null,
+    launch_date: "2026-09-01",
+    mercury_customer_id: null,
+    aliases: ["SAUNA BOY INC"],
+  },
+  {
+    slug: "ta",
+    display_name: "Technology Associates",
+    billing_note: null,
+    monthly_rate_cents: 10000,
+    billing_source: "mercury",
+    churn_date: null,
+    launch_date: "2026-08-01",
+    mercury_customer_id: null,
+    aliases: [],
+  },
+  {
+    slug: "st",
+    display_name: "Stripe Shop",
+    billing_note: null,
+    monthly_rate_cents: 5000,
+    billing_source: "stripe",
+    churn_date: null,
+    launch_date: null,
+    mercury_customer_id: null,
+    aliases: [],
+  },
+];
+const stripeOk = {
+  mrrCents: 5000,
+  activeSubscriptions: 1,
+  charges30dCents: 0,
+  subs: [],
+  excluded: [{ id: "sub_x", cancelAt: "2026-11-15" }],
+};
+const mercuryOk = {
+  balanceCents: 123450,
+  in30dCents: 11000,
+  out30dCents: 0,
+  txns: [
+    {
+      at: "2026-10-20T10:00:00Z",
+      amountCents: 11000,
+      counterparty: "SAUNA BOY INC",
+      status: "sent",
+    },
+  ],
+};
+
+test("Money tab: MRR tile, the Mercury/Stripe split, 'cancels <date>', and a paid chip per client", () => {
+  const html = render({
+    tab: "money",
+    clients,
+    money: { stripe: stripeOk, mercury: mercuryOk, invoices: [], invoicing: false },
+    now: NOW,
+  });
+  assert.match(html, /MRR/);
+  assert.match(html, /\$260/); // 110 + 100 Mercury rates + 50 Stripe
+  assert.match(html, /Mercury recurring \$210/);
+  assert.match(html, /Stripe \$50/);
+  assert.match(html, /sub_x cancels 2026-11-15/);
+  assert.match(html, /Sauna Boy[\s\S]*?chip ok">paid/);
+  assert.match(html, /Technology Associates[\s\S]*?chip warn">no payment found/);
+  assert.match(html, /billed via Stripe/);
+  assert.match(html, /\$1,235/); // Mercury cash
+});
+
+test("Money tab: Mercury invoicing 403 (or a failed /ar/customers) shows an error chip with the message, never empty", async () => {
+  process.env.MERCURY_KEY = "secret-token:test-not-real";
+  process.env.MERCURY_INVOICING = "1";
+  globalThis.fetch = async (url) =>
+    String(url).includes("/ar/customers")
+      ? new Response("{}", { status: 403 })
+      : new Response(JSON.stringify({ invoices: [] }), { status: 200 });
+  money.clearMoneyMemo();
+  const invoices = await money.mercuryInvoices();
+  assert.equal(money.isUnavailable(invoices), true);
+  const html = render({
+    tab: "money",
+    clients,
+    money: { stripe: stripeOk, mercury: mercuryOk, invoices, invoicing: true },
+    now: NOW,
+  });
+  assert.match(html, /chip bad">Mercury invoicing: [^<]*\/ar\/customers 403[^<]*Invoicing scope/);
+  assert.doesNotMatch(html, /secret-token/);
+  // and with a bare Unavailable (no message) it still says so
+  const bare = render({
+    tab: "money",
+    clients,
+    money: {
+      stripe: stripeOk,
+      mercury: mercuryOk,
+      invoices: { unavailable: true },
+      invoicing: true,
+    },
+    now: NOW,
+  });
+  assert.match(bare, /chip bad">Mercury invoicing unavailable/);
+});
+
+test("Tabs: the nav links all four sections and marks the current one; parseTab falls back to money", () => {
+  const html = render({ tab: "sales", finance: null, now: NOW });
+  for (const t of ["money", "sales", "ops", "unit"])
+    assert.match(html, new RegExp(`href="/numbers\\?tab=${t}"`));
+  assert.match(html, /class="on" aria-current="page">Sales funnel/);
+  assert.equal(parseTab("unit"), "unit");
+  assert.equal(parseTab("nope"), "money");
+  assert.equal(parseTab(["ops"]), "money");
+  assert.equal(parseTab(undefined), "money");
+});
+
+test("loadClients selects the billing keys and surfaces an error", async () => {
+  const sb = fakeSb({ "clients.select": { data: clients, error: null } });
+  assert.equal((await loadClients(sb)).length, 3);
+  assert.match(sb.log[0].args.select, /mercury_customer_id, aliases/);
+  await assert.rejects(
+    loadClients(fakeSb({ "clients.select": { data: null, error: { message: "denied" } } })),
+    /denied/
+  );
 });
 
 const fx = {
@@ -94,27 +237,19 @@ test("loadFinance surfaces a query error", async () => {
   await assert.rejects(loadFinance(sb), /denied/);
 });
 
-test("the page offers Freeze on a finished unfrozen month only: not the current month, not a frozen one", async () => {
+test("Sales and Unit tabs render the loaded numbers: funnel steps, CAC, LTV:CAC, avg rate input", async () => {
   const now = new Date("2026-10-07T16:00:00Z");
   const fin = await loadFinance(loaderSb(fx), now);
-  const frozen = { month: "2026-08-01", data: { rows: [] } };
-  const fin2 = { ...fin, months: F.monthlyView(fin.live, [frozen], { from: fin.from, now }) };
-  const html = render({
-    finance: fin2,
-    ops: emptyOps,
-    runs: [],
-    stripe: { unavailable: true },
-    mercury: { unavailable: true },
-    firesSlot: null,
-    freeze: async () => {},
-  });
-  assert.match(html, /\$250/); // CAC
-  assert.match(html, /6\.7x/); // LTV:CAC
-  assert.match(html, /Freeze 2026-09/);
-  assert.match(html, /name="month" value="2026-09-01"/);
-  assert.match(html, /live, not frozen/); // October
-  assert.doesNotMatch(html, /Freeze 2026-10/); // current month
-  assert.doesNotMatch(html, /Freeze 2026-08/); // already frozen
+  const sales = render({ tab: "sales", finance: fin, now });
+  assert.match(sales, /Calls per week/);
+  assert.match(sales, /This week&#x27;s funnel/);
+  assert.match(sales, /Consults booked/);
+  assert.match(sales, /goal 60/);
+  const unit = render({ tab: "unit", finance: fin, clients, now });
+  assert.match(unit, /CAC/);
+  assert.match(unit, /LTV : CAC/);
+  assert.match(unit, /Average rate<\/span><b>\$87\/mo/); // (110 + 100 + 50) / 3 live clients
+  assert.doesNotMatch(unit, /Freeze/);
 });
 
 test("ops section: connector grid, failed HQ runs, tickets, and the Instinct/Sentry links", () => {
@@ -144,17 +279,18 @@ test("ops section: connector grid, failed HQ runs, tickets, and the Instinct/Sen
   };
   const runs = [{ job: "digest", ok: false, at: "2026-10-27T10:00:00Z", ms: 4, error: "boom" }];
   const html = render({
-    finance: null,
-    ops,
-    runs,
-    stripe: { unavailable: true },
-    mercury: { unavailable: true },
-    firesSlot: null,
-    instinctUrl: "https://instinct.example",
-    sentryUrl: "https://sentry.example",
+    tab: "ops",
+    ops: {
+      ops,
+      runs,
+      firesSlot: null,
+      instinctUrl: "https://instinct.example",
+      sentryUrl: "https://sentry.example",
+    },
+    now: NOW,
   });
-  assert.match(html, /chip bad">auth_failed/);
-  assert.match(html, /Orders missing/);
+  assert.match(html, /<span class="dot bad"><\/span>shopify auth failed/);
+  assert.match(html, /<b>1<\/b>/); // open tickets
   assert.match(html, /digest/);
   assert.match(html, /href="https:\/\/instinct.example"/);
   assert.match(html, /href="https:\/\/sentry.example"/);

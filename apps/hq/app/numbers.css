@@ -1,0 +1,161 @@
+/* Numbers (item C): tabs, tiles, charts. Scoped under .nm so it cannot touch the shell's .tabs/.card/.row. */
+.nm .sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--mute);
+}
+.nm h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.nm h2.gap {
+  margin-top: 28px;
+}
+.nm .ntabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 18px;
+}
+.nm .ntabs a {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.nm .ntabs a.on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.nm .grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.nm .grid2 {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 960px) {
+  .nm .grid4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .nm .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.nm .tile {
+  padding: 14px 16px;
+}
+.nm .tile .lbl {
+  font-size: 12px;
+  color: var(--mute);
+  font-weight: 600;
+}
+.nm .tile .val {
+  font-size: 28px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.nm .tile .foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.nm .up {
+  color: var(--ok);
+}
+.nm .down {
+  color: var(--bad);
+}
+.nm .bar {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 3px;
+  background: var(--line2);
+  overflow: hidden;
+}
+.nm .bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.nm .nc text {
+  font-size: 12px;
+  fill: var(--mute);
+}
+.nm .nc text.hi {
+  fill: var(--ink);
+  font-weight: 650;
+}
+.nm .tile .row {
+  padding: 8px 0;
+  align-items: center;
+  border-left: 0;
+}
+.nm .tile p {
+  margin: 4px 0 8px;
+}
+.nm .funnel .fr {
+  display: grid;
+  grid-template-columns: 120px 1fr 56px 56px;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line2);
+}
+.nm .funnel .fr:last-child {
+  border: 0;
+}
+.nm .funnel .fb {
+  height: 22px;
+  border-radius: 5px;
+  background: var(--accent);
+}
+.nm .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.nm table.ops {
+  width: 100%;
+  border-collapse: collapse;
+}
+.nm .ops td,
+.nm .ops th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line2);
+  text-align: left;
+}
+.nm .ops th {
+  font-size: 12px;
+  color: var(--mute);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.nm .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.nm .dot.ok {
+  background: var(--ok);
+}
+.nm .dot.warn {
+  background: #d39b20;
+}
+.nm .dot.bad {
+  background: var(--bad);
+}
