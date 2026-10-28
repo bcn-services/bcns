@@ -253,7 +253,8 @@ function SalesTab(p: { finance: Finance | null | undefined; weeks: string[]; lab
     ["Pilots", pilots],
     ["Won", s("signed")],
   ];
-  const top = last(calls) || 1;
+  // bars scale to the largest stage: a later stage can exceed Calls (pilots booked from earlier weeks)
+  const top = Math.max(1, ...steps.map(([, v]) => last(v)));
   return (
     <>
       <Grid>

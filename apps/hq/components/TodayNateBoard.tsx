@@ -5,9 +5,13 @@ import { createTaskFromFire, markDone, updateTaskAction } from "@/app/(app)/work
 import type { Fire } from "@/lib/fires";
 import type { ProposalView } from "@/lib/proposals";
 import { humanDay, OWNERS, type Task } from "@/lib/tasks";
+import type { BoardCard, Column, Track } from "@/lib/tracks";
 import { HintBar, type Hint } from "./HintBar";
+import type { ClientOpt } from "./NewTaskModal";
 import { useDecide } from "./ProposalDecide";
+import { TrackBoard } from "./TrackBoard";
 import { useRowKeys } from "./WorkKeys";
+import { WorkTaskDetail, type WorkLink, type WorkNote, type WorkTask } from "./WorkTaskDetail";
 
 export interface ToAssign {
   task: Task;
@@ -18,7 +22,10 @@ export interface ToAssign {
 const APPROVE_SHOWN = 5;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** The left column of Nate's Today (Approve, Fires, To assign, Your tasks) beside `right` (the board). */
+/**
+ * Nate's Today, same shape as Work: Approve / Fires / To assign / Your tasks on the left, his day's
+ * board on the right; a selected task replaces the board with the Work task detail.
+ */
 export function TodayNateBoard(props: {
   today: string;
   dateLabel: string;
@@ -27,9 +34,16 @@ export function TodayNateBoard(props: {
   toAssign: ToAssign[];
   mine: Task[];
   calendar: ReactNode;
-  right: ReactNode;
+  tasks: WorkTask[];
+  tracks: Track[];
+  clients: ClientOpt[];
+  notes: Record<string, WorkNote[]>;
+  links: Record<string, WorkLink[]>;
+  board: Record<Column, BoardCard[]>;
+  boardSub: string;
 }) {
-  const { today, dateLabel, proposals, fires, toAssign, mine, calendar, right } = props;
+  const { today, dateLabel, proposals, fires, toAssign, mine, calendar } = props;
+  const { tasks, tracks, clients, notes, links, board, boardSub } = props;
   const shown = proposals.slice(0, APPROVE_SHOWN);
   const keys = [
     ...shown.map((p) => `p:${p.id}`),
@@ -44,9 +58,8 @@ export function TodayNateBoard(props: {
 
   const prop = shown.find((p) => `p:${p.id}` === sel);
   const fire = fires.find((f) => `f:${f.key}` === sel);
-  const task = [...toAssign.map((a) => a.task), ...mine].find(
-    (t) => `a:${t.id}` === sel || `m:${t.id}` === sel
-  );
+  // a:/m: rows on the left, t: a board step; any of them opens the task on the right
+  const task = tasks.find((t) => sel === `a:${t.id}` || sel === `m:${t.id}` || sel === `t:${t.id}`);
 
   const act = (f: () => Promise<{ ok: boolean; error?: string }>, okMsg: string | null) =>
     start(async () => {
@@ -63,7 +76,14 @@ export function TodayNateBoard(props: {
     a: () => prop && decide(prop, true),
     r: () => prop && decide(prop, false),
     c: () => makeTask(fire),
-    d: () => task && act(() => markDone(task.id), null),
+    // close the pane too: the task stays in `tasks` after revalidation, so `sel` would keep finding it
+    d: () =>
+      task &&
+      act(async () => {
+        const r = await markDone(task.id);
+        if (r.ok) setSel(null);
+        return r;
+      }, null),
   });
 
   const row = (key: string, title: string, meta?: string, right?: ReactNode) => (
@@ -243,7 +263,26 @@ export function TodayNateBoard(props: {
             mine.length
           )}
         </section>
-        {right}
+        <main className="td-r" aria-label="Board">
+          {task ? (
+            <WorkTaskDetail
+              task={task}
+              notes={notes[task.id] ?? []}
+              links={links[task.id] ?? []}
+              tracks={tracks}
+              clients={clients}
+              onBack={() => setSel(null)}
+            />
+          ) : (
+            <>
+              <div className="td-rh">
+                <h2>Your day</h2>
+                <span className="sub">{boardSub}</span>
+              </div>
+              <TrackBoard board={board} onStep={(id) => setSel(`t:${id}`)} />
+            </>
+          )}
+        </main>
       </div>
       <HintBar hints={hints} />
     </>

@@ -381,22 +381,45 @@ test("createTask / updateTask accept client_slug and track_id (and an unassigned
   assert.deepEqual([u.owner, u.client_slug, u.track_id], ["brandon", null, null]);
   await T.updateTask(sb, ACTOR, "ui", t.id, { owner: null, client_slug: "other" }, NOW);
   assert.deepEqual([sb.db.tasks[0].owner, sb.db.tasks[0].client_slug], [null, "other"]);
-  await assert.rejects(() => T.createTask(sb, ACTOR, "ui", { title: "x", owner: "nate", clientSlug: "Not A Slug" }), /client_slug/);
-  await assert.rejects(() => T.createTask(sb, ACTOR, "ui", { title: "x", owner: "nate", trackId: "nope" }), /track_id/);
+  await assert.rejects(
+    () => T.createTask(sb, ACTOR, "ui", { title: "x", owner: "nate", clientSlug: "Not A Slug" }),
+    /client_slug/
+  );
+  await assert.rejects(
+    () => T.createTask(sb, ACTOR, "ui", { title: "x", owner: "nate", trackId: "nope" }),
+    /track_id/
+  );
   assert.throws(() => T.buildTaskPatch({ track_id: "nope" }, NOW), /track_id/);
   // the UI create action passes both through
-  const actions = readFileSync(fileURLToPath(new URL("../app/(app)/work/actions.ts", import.meta.url)), "utf8");
+  const actions = readFileSync(
+    fileURLToPath(new URL("../app/(app)/work/actions.ts", import.meta.url)),
+    "utf8"
+  );
   assert.match(actions, /\.\.\.t, source: "manual"/);
 });
 
 test("workGroups: Unassigned first, then nate / brandon / claude; empty groups are left out", () => {
-  const mk = (id, owner, status = "todo", due = null) => ({ id, owner, status, due, created_at: "x" });
-  const g = T.workGroups([mk("a", "claude"), mk("b", null), mk("c", "nate", "todo", "2026-10-30"), mk("d", "nate", "doing")]);
-  assert.deepEqual(g.map((x) => [x.key, x.label, x.tasks.map((t) => t.id)]), [
-    ["unassigned", "Unassigned", ["b"]],
-    ["nate", "Nate", ["d", "c"]],
-    ["claude", "Claude", ["a"]],
+  const mk = (id, owner, status = "todo", due = null) => ({
+    id,
+    owner,
+    status,
+    due,
+    created_at: "x",
+  });
+  const g = T.workGroups([
+    mk("a", "claude"),
+    mk("b", null),
+    mk("c", "nate", "todo", "2026-10-30"),
+    mk("d", "nate", "doing"),
   ]);
+  assert.deepEqual(
+    g.map((x) => [x.key, x.label, x.tasks.map((t) => t.id)]),
+    [
+      ["unassigned", "Unassigned", ["b"]],
+      ["nate", "Nate", ["d", "c"]],
+      ["claude", "Claude", ["a"]],
+    ]
+  );
 });
 
 test("humanDay: today, a weekday within 6 days, else month + day", () => {
@@ -426,8 +449,14 @@ test("board: Done column = tracks with done_at in the last 7 days; steps ride th
   ];
   const b = TR.buildBoard(tracks, tasks, NOW);
   assert.deepEqual(Object.keys(b), ["now", "next", "wait", "done"]);
-  assert.deepEqual(b.done.map((c) => c.track.id), ["fresh"]);
-  assert.deepEqual(b.now[0].steps.map((s) => s.id), ["s2", "s1"]);
+  assert.deepEqual(
+    b.done.map((c) => c.track.id),
+    ["fresh"]
+  );
+  assert.deepEqual(
+    b.now[0].steps.map((s) => s.id),
+    ["s2", "s1"]
+  );
   assert.deepEqual([b.next.length, b.wait.length], [1, 1]);
 });
 
@@ -438,18 +467,76 @@ test("tracks: create / move / update write the row and an events row; done stamp
   const done = await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", NOW);
   assert.equal(done.done_at, "2026-10-27T15:00:00.000Z");
   const later = new Date("2026-11-01T00:00:00Z"); // done -> done keeps done_at and writes no second event
-  assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", later)).done_at, "2026-10-27T15:00:00.000Z");
+  assert.equal(
+    (await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", later)).done_at,
+    "2026-10-27T15:00:00.000Z"
+  );
   assert.equal(sb.db.events.filter((e) => e.kind === "track.moved").length, 1);
   assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "now", NOW)).done_at, null);
-  assert.equal((await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot 2", client_slug: "acme-demo" })).client_slug, "acme-demo");
-  assert.deepEqual(sb.db.events.map((e) => [e.kind, e.via]), [
-    ["track.created", "mcp"],
-    ["track.moved", "ui"],
-    ["track.moved", "ui"],
-    ["track.updated", "ui"],
-  ]);
+  assert.equal(
+    (await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot 2", client_slug: "acme-demo" }))
+      .client_slug,
+    "acme-demo"
+  );
+  assert.deepEqual(
+    sb.db.events.map((e) => [e.kind, e.via]),
+    [
+      ["track.created", "mcp"],
+      ["track.moved", "ui"],
+      ["track.moved", "ui"],
+      ["track.updated", "ui"],
+    ]
+  );
   await assert.rejects(() => TR.moveTrack(sb, ACTOR, "ui", t.id, "later"), /column/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: " " }), /name/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "x", area: "bogus" }), /area/);
   await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
+});
+
+test("todaySteps: only mine, due by today or doing, plus done today; undated todo and others' tasks stay off", () => {
+  const t = (o) => ({
+    id: o.id,
+    title: o.id,
+    body: null,
+    owner: null,
+    area: null,
+    status: "todo",
+    due: null,
+    source: "manual",
+    business_id: null,
+    client_slug: null,
+    track_id: null,
+    alert_key: null,
+    waiting_on: null,
+    done_at: null,
+    created_at: "2026-10-01T00:00:00Z",
+    ...o,
+  });
+  const tasks = [
+    t({ id: "due-today", owner: "nate", due: "2026-10-28" }),
+    t({ id: "overdue", owner: "nate", due: "2026-10-20" }),
+    t({ id: "doing-undated", owner: "nate", status: "doing" }),
+    t({ id: "done-today", owner: "nate", status: "done", done_at: "2026-10-28T14:00:00Z" }),
+    t({ id: "done-yesterday", owner: "nate", status: "done", done_at: "2026-10-27T14:00:00Z" }),
+    // 11pm New York on Oct 27 is already Oct 28 in UTC: it belongs to the 27th
+    t({ id: "done-late-27", owner: "nate", status: "done", done_at: "2026-10-28T03:00:00Z" }),
+    t({ id: "tomorrow", owner: "nate", due: "2026-10-29" }),
+    t({ id: "undated-todo", owner: "nate" }),
+    t({ id: "brandons", owner: "brandon", due: "2026-10-28" }),
+    t({ id: "unassigned", due: "2026-10-28" }),
+  ];
+  assert.deepEqual(
+    T.todaySteps(tasks, "nate", "2026-10-28").map((x) => x.id),
+    ["due-today", "overdue", "doing-undated", "done-today"]
+  );
+  assert.deepEqual(
+    T.todaySteps(tasks, "brandon", "2026-10-28").map((x) => x.id),
+    ["brandons"]
+  );
+  assert.deepEqual(
+    T.todaySteps(tasks, "nate", "2026-10-27")
+      .filter((x) => x.status === "done")
+      .map((x) => x.id),
+    ["done-today", "done-yesterday", "done-late-27"]
+  );
 });
