@@ -196,6 +196,19 @@ test("history: subject, status and date per row; a closed and an answered ticket
   assert.doesNotMatch(html, /Nothing yet/);
 });
 
+test("a ticket with a resolution shows 'Reply from bcns · <date>' and the text, escaped; one without shows none", () => {
+  const base = { id: ID, subject: "Sync is stuck", body: "b", severity: "urgent", status: "closed", created_at: "2026-10-22T03:30:00Z" };
+  const html = render({
+    timezone: "America/New_York",
+    tickets: [
+      { ...base, resolution: "Fixed <b>today</b>.\nRetry now.", resolved_at: "2026-10-28T03:30:00Z" },
+      { ...base, id: "6b1c7d0e-3f0a-4b8e-9a52-0d6f1c2e4a77", resolution: null, resolved_at: null },
+    ],
+  });
+  assert.match(html, /Reply from bcns · 2026-10-27<\/p><p>Fixed &lt;b&gt;today&lt;\/b&gt;\.\nRetry now\.<\/p>/, "date in workspace timezone, text escaped");
+  assert.equal(html.match(/Reply from bcns/g)?.length, 1, "only the resolved ticket has a reply block");
+});
+
 test("banners: sent, no key and failed send each say so; the last two carry the mailto button", () => {
   assert.match(render({ sent: "1" }), /Sent\. We&#x27;ll reply by email\./);
   const mailto = "mailto:nseluga@bcn-services.com?subject=x";

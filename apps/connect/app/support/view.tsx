@@ -12,10 +12,13 @@ import {
   type TicketRow,
 } from "@/lib/support";
 
+/** A ticket row plus bcns's reply (set when HQ closes the ticket; null until then). */
+export type SupportTicket = TicketRow & { resolution?: string | null; resolved_at?: string | null };
+
 const TONE: Record<string, string> = { answered: "st-ok", closed: "st-idle" };
 
 export interface SupportViewProps {
-  tickets: TicketRow[];
+  tickets: SupportTicket[];
   /** The history query failed (for example the migration is not applied yet). */
   historyFailed?: boolean;
   /** `sent` from the redirect: "1" emailed, "mailto" no key, "failed" send failed. */
@@ -108,6 +111,14 @@ export function SupportView({ tickets, historyFailed, sent, error, mailto, timez
                 <time className="tiny" dateTime={t.created_at}>
                   {formatDateTime(t.created_at, timezone ?? undefined).slice(0, 10)}
                 </time>
+                {t.resolution ? (
+                  <div className="basis-full whitespace-pre-line text-sm">
+                    <p className="tiny">
+                      {`Reply from bcns${t.resolved_at ? ` · ${formatDateTime(t.resolved_at, timezone ?? undefined).slice(0, 10)}` : ""}`}
+                    </p>
+                    <p>{t.resolution}</p>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
