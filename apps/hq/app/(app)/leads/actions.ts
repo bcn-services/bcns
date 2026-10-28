@@ -1,8 +1,11 @@
 "use server";
 
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { createSupabaseServer } from "@/lib/supabase";
+import { requestStep } from "@/lib/deliverables";
 import {
   addLeadNote,
   etLocalToDate,
@@ -81,4 +84,22 @@ export async function saveLead(form: FormData): Promise<void> {
   if (!Object.keys(patch).length) return;
   await updateLead(sb, actor, "ui", { id: String(form.get("id") ?? ""), patch });
   revalidatePath("/", "layout");
+}
+
+/** clients/<slug> already in the os clone (HQ_OS_DIR): a new lead must never be named after a real client's folder. */
+const folderExists = (slug: string): Promise<boolean> => {
+  const dir = process.env.HQ_OS_DIR;
+  return dir ? fs.lstat(path.join(dir, "clients", slug)).then(() => true, () => false) : Promise.resolve(false);
+};
+
+/** Pitch tab buttons: step = prototypes | redo | deck | quote. Validates, then inserts one queued `deliverables` row as the signed-in user. */
+export async function requestPitchStep(
+  businessId: string,
+  step: string,
+  opts: { pick?: string; feedback?: string } = {}
+): Promise<Result> {
+  return run(async () => {
+    const { sb, actor } = await ctx();
+    await requestStep(sb, actor, { businessId, step, pick: opts.pick, feedback: opts.feedback }, folderExists);
+  });
 }

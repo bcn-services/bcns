@@ -1,0 +1,375 @@
+/* Leads + Pitch (HQ v2 item G): full-width table with a 540px drawer that pushes it (v2-leads variant A),
+   and the Pitch tab (v2-pitch variant A). Scoped under .lx so it cannot touch the shell. Nothing under 12px. */
+.lx {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lx-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.lx-main {
+  height: 100%;
+  overflow: auto;
+  padding: 22px 24px 40px;
+}
+/* the drawer pushes the table instead of covering it, and Trade + Consult give up their room */
+.lx-body.dr .lx-main {
+  padding-right: 564px;
+}
+.lx-body.dr .c-trade,
+.lx-body.dr .c-consult {
+  display: none;
+}
+.lx .sub {
+  margin: 2px 0 0;
+  color: var(--mute);
+}
+.lx-filters {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+.lx-filters select,
+.lx-filters input {
+  border: 1px solid #cdd1d9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+}
+.lx-filters input[name="q"] {
+  width: 240px;
+}
+
+.lx-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.lx-table th,
+.lx-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line2);
+  text-align: left;
+  white-space: nowrap;
+}
+.lx-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lx-table th a {
+  color: inherit;
+  text-decoration: none;
+}
+.lx-table td b {
+  font-weight: 600;
+}
+/* column widths from the prototype at 1440 (Business 314, Trade 151, Town 189, Stage 148, Fit 65, Owner 131,
+   Last 142, Next 107, Consult 144). Auto layout keeps them as hints, so Business is the one column that gives
+   (ellipsis) when the drawer takes the room or a name is long; every other cell is short and nowrap. */
+.lx-table th:nth-child(1) {
+  width: 314px;
+}
+.lx-table th:nth-child(2) {
+  width: 151px;
+}
+.lx-table th:nth-child(3) {
+  width: 189px;
+}
+.lx-table th:nth-child(4) {
+  width: 148px;
+}
+.lx-table th:nth-child(5) {
+  width: 65px;
+}
+.lx-table th:nth-child(6) {
+  width: 131px;
+}
+.lx-table th:nth-child(7) {
+  width: 142px;
+}
+.lx-table th:nth-child(8) {
+  width: 107px;
+}
+.lx-table th:nth-child(9) {
+  width: 144px;
+}
+.lx-table td:first-child {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lx-table .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.lx-table tbody tr {
+  cursor: pointer;
+}
+.lx-table tbody tr:hover {
+  background: #f7f8fc;
+}
+.lx-table tbody tr.f,
+.lx-table tbody tr.f:hover {
+  background: var(--tint);
+}
+.lx .chip.acc {
+  background: var(--tint);
+  color: var(--accent-d);
+}
+.lx .chip.nate {
+  background: var(--tint2);
+  color: var(--accent-d);
+}
+
+/* drawer */
+.lx-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 540px;
+  max-width: 100%;
+  overflow: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 30px rgba(0, 0, 0, 0.08);
+  padding: 26px 28px 40px;
+}
+.lx-drawer h1 {
+  font-size: 24px;
+  margin: 2px 52px 0 0;
+}
+.lx-drawer h2 {
+  margin: 22px 0 0;
+  font-size: 15px;
+}
+.lx-drawer .btn.x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.lx-drawer .tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin: 14px 0 16px;
+}
+.lx-drawer .tabs button {
+  border: 0;
+  background: none;
+  padding: 8px 12px;
+  color: var(--mute);
+  cursor: pointer;
+}
+.lx-drawer .tabs button.on {
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.lx-drawer .phone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fafbfd;
+}
+.lx-drawer .phone b {
+  font-size: 20px;
+  flex: 1;
+}
+.lx-drawer dl {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 10px;
+  margin: 16px 0 0;
+}
+.lx-drawer dt {
+  color: var(--mute);
+}
+.lx-drawer dd {
+  margin: 0;
+}
+.lx-drawer .outs {
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 10px;
+}
+.lx-drawer .outs .btn {
+  padding: 10px;
+}
+.lx-drawer .consultform {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+  margin-top: 10px;
+}
+.lx-drawer .consultform label {
+  display: grid;
+  gap: 2px;
+  color: var(--ink2);
+}
+.lx-drawer .consultform input {
+  border: 1px solid #cdd1d9;
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: #fff;
+}
+.lx .pmsg,
+.lx .perr {
+  margin: 8px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--badbg);
+  color: var(--bad);
+}
+.lx .perr {
+  margin: 8px 0 0;
+}
+
+/* pitch tab */
+.pitch .step {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--panel);
+}
+.pitch .step.off {
+  opacity: 0.45;
+}
+.pitch .step.cur {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.pitch .step h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pitch .step .n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--line2);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+.pitch .step.done .n {
+  background: var(--ok);
+  color: #fff;
+}
+.pitch .sact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pitch .pnote {
+  margin-top: 8px;
+}
+.pitch .protos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+.pitch .pc {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.pitch .pc.pick {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.pitch .pc .th {
+  height: 86px;
+  display: grid;
+  place-items: center;
+  color: var(--mute);
+  font-size: 12px;
+  background: linear-gradient(135deg, #dfe6fb, #f3f5fa);
+}
+.pitch .pc:nth-child(2) .th {
+  background: linear-gradient(135deg, #e6f3ea, #f3f5fa);
+}
+.pitch .pc:nth-child(3) .th {
+  background: linear-gradient(135deg, #f6ecdf, #f3f5fa);
+}
+.pitch .pc .ft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.pitch .pc .ft .btn {
+  padding: 2px 8px;
+}
+.pitch textarea {
+  width: 100%;
+  min-height: 70px;
+  border: 1px solid #cdd1d9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 10px;
+}
+.pitch .file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line2);
+}
+.pitch .file:first-of-type {
+  border-top: 0;
+}
+.pitch .file b {
+  flex: 1;
+  font-weight: 600;
+}
+.pitch .path {
+  font:
+    12px ui-monospace,
+    Menlo,
+    monospace;
+  color: var(--mute);
+}
+.pitch .run {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--mute);
+  margin-top: 10px;
+}
+.pitch .spin {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: lx-spin 1s linear infinite;
+}
+@keyframes lx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
