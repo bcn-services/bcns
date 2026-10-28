@@ -349,7 +349,11 @@ export interface NewProposal {
   reason?: string;
 }
 
-/** Pending proposal only. Deciding is decide_proposal() (a human click), never a function here. */
+/**
+ * Pending proposal only. Deciding is decide_proposal() (a human click), never a function here.
+ * `old` and `via` below are advisory: since 0031 the proposals_server_fields trigger overwrites
+ * both (old = the live value, via from the X-HQ-Via header), so a client cannot forge either.
+ */
 export async function propose(sb: Sb, actor: string, via: Via, p: NewProposal) {
   if (!PROPOSAL_KINDS.includes(p.kind)) throw new Error(`unknown proposal kind ${p.kind}`);
   const row = must<{ id: string }>(

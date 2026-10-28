@@ -88,6 +88,24 @@ describe("hq_ops_ro", () => {
     ).toBe(false);
   });
 
+  it("privilege matrix: SELECT only on ops.*, nothing on any other schema's relations", async () => {
+    const r = await sql<{ n: string; schema: string; sel: boolean; other: boolean; any: boolean }>(
+      `select n.nspname||'.'||c.relname n, n.nspname schema,
+              has_table_privilege('hq_ops_ro', c.oid, 'select') sel,
+              has_table_privilege('hq_ops_ro', c.oid, 'insert,update,delete,truncate,references,trigger') other,
+              has_table_privilege('hq_ops_ro', c.oid, 'select,insert,update,delete,truncate,references,trigger') "any"
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where c.relkind in ('r','p','v','m','f')
+          and n.nspname not in ('pg_catalog','information_schema','pg_toast')`
+    );
+    const ops = r.rows.filter((x) => x.schema === "ops");
+    expect(ops.map((x) => x.n.slice(4)).sort()).toEqual([...VIEWS].sort());
+    for (const x of ops) expect([x.n, x.sel, x.other]).toEqual([x.n, true, false]);
+    // data.*, public.*, api.*, auth.*, anything else: no privilege of any kind
+    expect(r.rows.filter((x) => x.schema !== "ops" && x.any).map((x) => x.n)).toEqual([]);
+    expect(r.rows.some((x) => x.schema === "data")).toBe(true); // the check is not vacuous
+  });
+
   it("no ops column can carry secrets or error text", async () => {
     const cols = await sql<{ table_name: string; column_name: string; data_type: string }>(
       `select table_name, column_name, data_type from information_schema.columns where table_schema = 'ops'`
