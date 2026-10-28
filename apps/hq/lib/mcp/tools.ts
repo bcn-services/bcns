@@ -1,5 +1,5 @@
 /**
- * tools.ts — the HQ MCP's tool surface: exactly 12 tools, each a thin wrapper over the same lib
+ * tools.ts — the HQ MCP's tool surface: 17 tools, each a thin wrapper over the same lib
  * functions the UI uses (via='mcp', actor = the connecting user, so the audit shows "Claude (<handle>)").
  * Claude may only PROPOSE: there is no tool that writes businesses.stage or finance_inputs, decides a
  * proposal, or deletes anything. Pure of next/* so tests import it with a fake Supabase client.
@@ -28,11 +28,13 @@ import {
   OWNERS,
   propose,
   STATUSES,
+  addNote,
   updateTask,
   waitingStatus,
   type Status,
   type Task,
 } from "../tasks";
+import { buildBoard, COLUMNS, createTrack, listTracks, moveTrack, updateTrack } from "../tracks";
 
 export interface Ctx {
   sb: SupabaseClient;
@@ -92,6 +94,7 @@ export function stripContacts(v: unknown): unknown {
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "client slug");
 
 /** Read result or throw; the row type is named by the caller (the client is untyped). */
 function read<T>(r: { data: unknown; error: { message: string } | null }, what: string): T {
@@ -159,7 +162,8 @@ export const TOOLS: ToolDef[] = [
   tool({
     name: "create_task",
     title: "Create a task",
-    description: "Create a task. owner defaults to claude. area is one of the HQ areas.",
+    description:
+      "Create a task, e.g. 'add A to B, due C'. owner: nate|brandon|claude (default claude); due: YYYY-MM-DD; client_slug links a client; track_id puts it on a board track (see list_board).",
     readOnly: false,
     shape: {
       title: z.string().min(1).max(300),
@@ -168,6 +172,8 @@ export const TOOLS: ToolDef[] = [
       due: day.optional(),
       body: z.string().max(5000).optional(),
       business_id: uuid.optional(),
+      client_slug: slug.optional(),
+      track_id: uuid.optional(),
     },
     async run({ sb, actor }, a) {
       const t = await createTask(sb, actor.id, "mcp", {
@@ -177,6 +183,8 @@ export const TOOLS: ToolDef[] = [
         due: a.due,
         body: a.body,
         businessId: a.business_id,
+        clientSlug: a.client_slug,
+        trackId: a.track_id,
       });
       return { task: t };
     },
@@ -186,11 +194,14 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Change a task's status, body, waiting_on or due (null clears). Setting status=done works only on tasks owned by claude; for anyone else's task, say so and leave it.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status, body, waiting_on, client_slug, track_id. status=done: an admin closes any task; anyone else closes their own and claude's, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
       status: z.enum(STATUSES).optional(),
+      owner: z.enum(OWNERS).optional(),
+      client_slug: slug.nullable().optional(),
+      track_id: uuid.nullable().optional(),
       body: z.string().max(5000).nullable().optional(),
       waiting_on: z.string().max(200).nullable().optional(),
       due: day.nullable().optional(),
@@ -205,14 +216,103 @@ export const TOOLS: ToolDef[] = [
           "task"
         );
         if (!cur) throw new ToolError("task not found");
-        // The done-refusal: Claude closes only its own tasks.
-        if (a.status === "done" && cur.owner !== "claude")
-          throw new ToolError(
-            `refused: this task is owned by ${cur.owner ?? "nobody"}, only claude's tasks can be marked done through MCP`
+        // The done rule: an admin closes anything; staff close their own and claude's (or unowned) tasks.
+        if (a.status === "done" && cur.owner && cur.owner !== "claude" && cur.owner !== actor.handle) {
+          const me = read<{ role: string } | null>(
+            await sb.from("profiles").select("role").eq("id", actor.id).maybeSingle(),
+            "profile"
           );
+          if (me?.role !== "admin")
+            throw new ToolError(
+              `refused: this task is owned by ${cur.owner}; only ${cur.owner} or an admin can mark it done. Tell the user and leave it.`
+            );
+        }
         if (byWaiting) patch.status = waitingStatus(a.waiting_on ?? "", cur.status);
       }
       return { task: await updateTask(sb, actor.id, "mcp", id, patch) };
+    },
+  }),
+
+  // ---- board + notes (work item) -----------------------------------------------------------
+
+  tool({
+    name: "add_task_note",
+    title: "Add a note to a task",
+    description:
+      "Add a note to a task (id from list_tasks). Name people as nate|brandon|claude and dates as YYYY-MM-DD. Do not put phone numbers or email addresses in it.",
+    readOnly: false,
+    shape: { id: uuid, body: z.string().min(1).max(5000) },
+    async run({ sb, actor }, a) {
+      await addNote(sb, actor.id, "mcp", { taskId: a.id, body: a.body });
+      return { ok: true };
+    },
+  }),
+
+  tool({
+    name: "list_board",
+    title: "List the board",
+    description:
+      "List the Work board: tracks in Now, Next, Waiting, and Done (last 7 days), each with its steps (tasks).",
+    readOnly: true,
+    shape: {},
+    async run({ sb }) {
+      const board = buildBoard(await listTracks(sb), await listTasks(sb));
+      return {
+        board: Object.fromEntries(
+          COLUMNS.map((c) => [
+            c,
+            board[c].map(({ track, steps }) => ({
+              ...track,
+              steps: steps.map((t) => ({ id: t.id, title: t.title, status: t.status, owner: t.owner, due: t.due })),
+            })),
+          ])
+        ),
+      };
+    },
+  }),
+
+  tool({
+    name: "create_track",
+    title: "Create a track",
+    description:
+      "Create a board track, a named stream of work whose steps are tasks. column defaults to next; area is one of the HQ areas.",
+    readOnly: false,
+    shape: {
+      name: z.string().min(1).max(120),
+      column: z.enum(COLUMNS).default("next"),
+      area: z.enum(AREAS).optional(),
+      client_slug: slug.optional(),
+    },
+    async run({ sb, actor }, a) {
+      return { track: await createTrack(sb, actor.id, "mcp", a) };
+    },
+  }),
+
+  tool({
+    name: "move_track",
+    title: "Move a track",
+    description: "Move a board track to now, next, wait or done. Moving to done starts its 7-day stay on the board.",
+    readOnly: false,
+    shape: { id: uuid, column: z.enum(COLUMNS) },
+    async run({ sb, actor }, a) {
+      return { track: await moveTrack(sb, actor.id, "mcp", a.id, a.column) };
+    },
+  }),
+
+  tool({
+    name: "update_track",
+    title: "Update a track",
+    description: "Rename a board track or change its area or client_slug (null clears). Tracks cannot be deleted.",
+    readOnly: false,
+    shape: {
+      id: uuid,
+      name: z.string().min(1).max(120).optional(),
+      area: z.enum(AREAS).nullable().optional(),
+      client_slug: slug.nullable().optional(),
+    },
+    async run({ sb, actor }, a) {
+      const { id, ...f } = a;
+      return { track: await updateTrack(sb, actor.id, "mcp", id, f) };
     },
   }),
 
