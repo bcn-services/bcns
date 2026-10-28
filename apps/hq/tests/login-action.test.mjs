@@ -14,7 +14,8 @@ globalThis.AsyncLocalStorage = AsyncLocalStorage;
 process.env.NEXT_PUBLIC_SUPABASE_URL = "http://hq-test.invalid";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-key";
 
-const { signInWithPassword, requestPasswordReset, setNewPassword } = await import("../app/login/actions.ts");
+const { signInWithPassword, requestPasswordReset } = await import("../app/login/actions.ts");
+const { setNewPassword } = await import("../app/reset/actions.ts");
 const { POST: signOut } = await import("../app/signout/route.ts");
 const { NextRequest } = await import("next/server");
 const { requestAsyncStorage } =
@@ -149,17 +150,20 @@ test("signInWithPassword: GoTrue 5xx is 'failed', not a wrong-password claim", a
   assert.equal((await run()).to, "/login?error=failed&email=staff%40example.test");
 });
 
-test("login page source: errors name the email, forgot link, reset form needs a code", async () => {
+test("login page source: errors name the email, forgot link, no reset mode", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("../app/login/page.tsx", import.meta.url), "utf8");
   assert.match(src, /`wrong password for \$\{email\}`/);
   assert.match(src, /`no HQ account for \$\{email\}`/);
   assert.match(src, /unconfigured: "HQ is not configured"/);
   assert.match(src, /href="\/login\?mode=forgot"/);
-  assert.match(src, /searchParams\.mode === "reset" && searchParams\.code/);
+  assert.doesNotMatch(src, /setNewPassword|mode=reset/);
+  const reset = readFileSync(new URL("../app/reset/page.tsx", import.meta.url), "utf8");
+  assert.match(reset, /searchParams\.code \? \(/);
+  assert.match(reset, /action=\{setNewPassword\}/);
 });
 
-test("requestPasswordReset: asks GoTrue to recover, redirectTo is the public /login?mode=reset, lands on sent", async () => {
+test("requestPasswordReset: asks GoTrue to recover, redirectTo is the public /reset, lands on sent", async () => {
   const calls = fakeSupabase();
   const bodies = [];
   const f = globalThis.fetch;
@@ -170,7 +174,7 @@ test("requestPasswordReset: asks GoTrue to recover, redirectTo is the public /lo
   const { to } = await run("staff@example.test", "", requestPasswordReset);
   assert.equal(to, "/login?mode=forgot&sent=1&email=staff%40example.test");
   assert.equal(bodies.length, 1);
-  assert.match(bodies[0], /redirect_to=https%3A%2F%2Fhq\.example\.test%2Flogin%3Fmode%3Dreset/);
+  assert.match(bodies[0], /redirect_to=https%3A%2F%2Fhq\.example\.test%2Freset(&|\s|$)/);
   assert.ok(calls.some((c) => c.includes("/auth/v1/recover")));
 });
 
@@ -179,8 +183,8 @@ test("setNewPassword: short or mismatched password never spends the code; good o
   // the PKCE verifier lives in the cookie jar that requested the reset email
   const { jar } = await run("staff@example.test", "", requestPasswordReset);
   const go = (password, confirm) => run("", password, setNewPassword, { code: "abc", confirm }, jar);
-  assert.equal((await go("short", "short")).to, "/login?mode=reset&code=abc&error=weak");
-  assert.equal((await go("longenough1", "different1")).to, "/login?mode=reset&code=abc&error=mismatch");
+  assert.equal((await go("short", "short")).to, "/reset?code=abc&error=weak");
+  assert.equal((await go("longenough1", "different1")).to, "/reset?code=abc&error=mismatch");
   assert.ok(!calls.some((c) => c.includes("/auth/v1/token")), "code untouched");
   assert.equal((await go("longenough1", "longenough1")).to, "/");
   assert.ok(calls.some((c) => c.includes("/auth/v1/token")) && calls.some((c) => c.startsWith("PUT") && c.includes("/auth/v1/user")));
