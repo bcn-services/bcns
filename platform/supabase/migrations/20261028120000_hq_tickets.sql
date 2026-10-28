@@ -38,8 +38,9 @@ grant select on api.tickets_v1 to authenticated;
 create schema if not exists ops;
 revoke all on schema ops from public;
 
--- Tickets updated in the last 90 days, any status, with the workspace slug. HQ closes its task when
--- a ticket it knows has status 'closed' here.
+-- Every non-closed ticket, plus closed ones updated in the last 90 days (the window bounds closed
+-- tickets only, so an old open ticket still gets its reply), with the workspace slug. HQ closes its
+-- task when a ticket it knows has status 'closed' here.
 create or replace function ops.hq_tickets_pull()
 returns table (id uuid, slug text, subject text, body text, severity text, status text,
                created_at timestamptz, updated_at timestamptz)
@@ -47,7 +48,7 @@ language sql stable security definer set search_path = '' as $$
   select t.id, c.slug, t.subject, t.body, t.severity, t.status, t.created_at, t.updated_at
     from data.tickets t
     join data.clients c on c.id = t.client_id
-   where t.updated_at > now() - interval '90 days'
+   where t.status <> 'closed' or t.updated_at > now() - interval '90 days'
    order by t.updated_at desc
 $$;
 

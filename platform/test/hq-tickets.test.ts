@@ -76,18 +76,21 @@ describe("hq_tickets", () => {
     expect(Object.keys(rows[0]).sort()).toEqual(["body", "created_at", "id", "severity", "slug", "status", "subject", "updated_at"]);
   });
 
-  it("pull skips tickets not updated in 90 days", async () => {
+  it("pull keeps an open ticket past 90 days but drops a closed one", async () => {
     const cl = await mkClient();
-    const id = await mkTicket(cl.id);
+    const open = await mkTicket(cl.id);
+    const closed = await mkTicket(cl.id);
     // The touch trigger resets updated_at on update, so disable it for the backdate.
     await sql(`alter table data.tickets disable trigger touch`);
     try {
-      await sql(`update data.tickets set updated_at = now() - interval '91 days' where id = $1`, [id]);
+      await sql(`update data.tickets set updated_at = now() - interval '91 days' where id = $1`, [open]);
+      await sql(`update data.tickets set status = 'closed', updated_at = now() - interval '91 days' where id = $1`, [closed]);
     } finally {
       await sql(`alter table data.tickets enable trigger touch`);
     }
     const c = await asRole();
-    expect((await c.query(`select 1 from ops.hq_tickets_pull() where id = $1`, [id])).rowCount).toBe(0);
+    expect((await c.query(`select 1 from ops.hq_tickets_pull() where id = $1`, [open])).rowCount).toBe(1);
+    expect((await c.query(`select 1 from ops.hq_tickets_pull() where id = $1`, [closed])).rowCount).toBe(0);
   });
 
   it("resolve sets resolution, resolved_at and status=closed; a second call changes nothing and returns 0", async () => {

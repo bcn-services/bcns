@@ -112,7 +112,7 @@ export function SupportView({ tickets, historyFailed, sent, error, mailto, timez
                   {formatDateTime(t.created_at, timezone ?? undefined).slice(0, 10)}
                 </time>
                 {t.resolution ? (
-                  <div className="basis-full whitespace-pre-line text-sm">
+                  <div className="basis-full min-w-0 whitespace-pre-line text-sm [overflow-wrap:anywhere]">
                     <p className="tiny">
                       {`Reply from bcns${t.resolved_at ? ` · ${formatDateTime(t.resolved_at, timezone ?? undefined).slice(0, 10)}` : ""}`}
                     </p>
