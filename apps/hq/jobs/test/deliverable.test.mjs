@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run, createGit, gitMeta, buildPrompt, parsePorcelain, underSlug, deliverableDeps, TOOLS } from "../deliverable.mjs";
+import { run, createGit, gitMeta, buildPrompt, STEP_TAGS, parsePorcelain, underSlug, deliverableDeps, TOOLS } from "../deliverable.mjs";
 import { jobDeps } from "../run.mjs";
 
 const tmp = (p) => mkdtempSync(join(tmpdir(), p));
@@ -320,6 +320,12 @@ test("step + pick tag lines become a run instruction outside the fence; user tex
     assert.doesNotMatch(outside(sq), /Base the final deck|demo-[abd]\.html\.|chosen prototype/i, JSON.stringify(fb));
     assert.equal(fenced(sq), JSON.stringify(kept));
   }
+});
+
+test("drift guard: every step tag the job accepts, and the pick prefix, is still written byte-for-byte by lib/deliverables.ts", () => {
+  const ts = readFileSync(new URL("../../lib/deliverables.ts", import.meta.url), "utf8");
+  assert.equal(STEP_TAGS.length, 4);
+  for (const lit of [...STEP_TAGS, "Chosen prototype: demo-"]) assert.ok(ts.includes(lit), `deliverables.ts lost: ${lit}`);
 });
 
 test("git calls: hooks and fsmonitor nulled, argv arrays, deploy key + pinned known_hosts, add is scoped to the slug", async () => {

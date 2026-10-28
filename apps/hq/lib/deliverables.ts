@@ -50,8 +50,10 @@ export const leadSlug = (l: { os_slug?: string | null }): string | null =>
   l.os_slug && SLUG_RE.test(l.os_slug) ? l.os_slug : null;
 
 // ---- what the job is told -------------------------------------------------------------------
-// The step rides in `feedback` (the row has no step column). The job fences it as data and the /demo
-// and /quote skills read it; pitchState() reads the same prefixes back to tell the rows apart.
+// The step rides in `feedback` (the row has no step column). The job (jobs/deliverable.mjs splitFeedback)
+// lifts exact-matched TAG / pick lines into a run instruction outside the data fence and fences the rest, so
+// TAG must stay byte-identical to the job's STEPS keys (the job test checks it); pitchState() reads the same
+// prefixes back to tell the rows apart.
 export const TAG = {
   prototypes: "Step: pitch prototypes (3 variants).",
   redo: "Step: redo the 3 pitch prototypes with the feedback below.",

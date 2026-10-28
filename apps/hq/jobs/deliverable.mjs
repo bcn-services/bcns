@@ -64,6 +64,8 @@ const STEPS = {
   "Step: draft the quote after a good consult.": () => `draft the quote only; no prototypes, no deck.`,
 };
 
+export const STEP_TAGS = Object.keys(STEPS); // for the drift test against lib/deliverables.ts TAG
+
 // -> { step: run instruction | null, rest: the feedback left to fence }. An unrecognised first line: no instruction, all of it fenced.
 export function splitFeedback(feedback, slug) {
   const [tag, ...more] = String(feedback ?? "").split("\n");
