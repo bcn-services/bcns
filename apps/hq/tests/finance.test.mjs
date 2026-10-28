@@ -215,3 +215,50 @@ test("freezable: complete past months inside the window only", () => {
   assert.equal(frozenSep[1].freezable, false); // already frozen
   assert.ok(F.monthlyView(live, []).every((m) => !m.freezable)); // no window, no Freeze
 });
+
+// --- Numbers tabs ---------------------------------------------------------------------------------
+
+const wrow = (period, channel, o = {}) => ({
+  period,
+  channel,
+  calls: 0,
+  reached: 0,
+  consults: 0,
+  pilots: 0,
+  signed: 0,
+  spendCents: 0,
+  hours: 0,
+  ...o,
+});
+
+test("weekTotals sums every channel per week, in the order of the weeks given", () => {
+  const rows = [
+    wrow("2026-10-19", "cold", { calls: 10 }),
+    wrow("2026-10-19", "referral", { calls: 5 }),
+    wrow("2026-10-26", "cold", { calls: 7 }),
+  ];
+  assert.deepEqual(
+    F.weekTotals(rows, ["2026-10-12", "2026-10-19", "2026-10-26"], "calls"),
+    [0, 15, 7]
+  );
+});
+
+test("unitEconomics: CAC over the trailing window, LTV from the margin, an undefined CAC is null not 0", () => {
+  const weeks = ["2026-10-12", "2026-10-19", "2026-10-26"];
+  const rows = [
+    wrow("2026-10-19", "cold", { spendCents: 20000, signed: 1 }),
+    wrow("2026-10-26", "cold", { spendCents: 10000, signed: 1 }),
+  ];
+  const u = F.unitEconomics(rows, weeks, 20000); // $200/mo rate
+  assert.equal(u.now.cacCents, 15000); // $300 over 2 new clients
+  assert.equal(u.now.newClients, 2);
+  const margin = (20000 - F.UNIT.infraCents) / 20000;
+  assert.equal(u.now.ltvCents, Math.round(20000 * margin * F.UNIT.expectedMonths));
+  assert.equal(u.now.marginPct, Math.round(margin * 100));
+  assert.equal(u.now.ratio, Math.round((u.now.ltvCents / 15000) * 10) / 10);
+  assert.equal(u.series.cac[0], 0); // no signing yet that week: drawn as 0 ...
+  const none = F.unitEconomics([], weeks, 20000);
+  assert.equal(none.now.cacCents, null); // ... but the tile reads null, not a made-up $0
+  assert.equal(none.now.ratio, null);
+  assert.equal(F.unitEconomics(rows, weeks, 0).now.ltvCents, 0); // no paying client: no divide by zero
+});

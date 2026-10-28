@@ -5,7 +5,8 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   createOAuth,
   newState,
@@ -15,18 +16,23 @@ import {
   publicOrigin,
   realRandomBytes,
   supabaseSessionDeps,
+  supabaseTokenStore,
   CODE_TTL_MS,
   MAX_CODES,
   MAX_BODY_BYTES,
-  MAX_TOKEN_PAIRS,
   KNOWN_IP_MAX,
   KNOWN_IP_TTL_MS,
   RETRY_AFTER_BLIP_SECONDS,
   RETRY_AFTER_SECONDS,
   TOKEN_MARGIN_SECONDS,
+  REFRESH_TTL_MS,
 } from "../lib/mcp/oauth.ts";
+import { authorizeMcp, originAllowed, revokeMcpTokens } from "../lib/mcp/auth.ts";
+import { fakeTokenDb } from "./_token-db.mjs";
 
 delete process.env.HQ_PUBLIC_ORIGIN;
+const TEST_KEY = "test-key-".padEnd(48, "k"); // stands in for MCP_TOKEN_KEY; a throwaway, not a secret
+process.env.MCP_TOKEN_KEY = TEST_KEY;
 const ISS = "https://hq.bcn-services.com";
 const RESOURCE = `${ISS}/mcp`;
 const CLAUDE = "https://claude.ai/api/mcp/auth_callback";
@@ -36,7 +42,7 @@ const VERIFIER = "v".repeat(43);
 const CHALLENGE = b64u(VERIFIER);
 const NATE = { id: "user-1", handle: "nate" };
 
-/** `over` replaces any dep; `t` exposes the fakes and the state maps. */
+/** `over` replaces any dep; `t` exposes the fakes, the state maps and the fake token database (`t.db`). */
 function boot(over = {}) {
   const t = { now: 1_000_000, signIns: [], refreshes: [], members: [], counter: 0 };
   const deps = {
@@ -70,7 +76,14 @@ function boot(over = {}) {
     allowUnknownRefresh: () => true,
     ...over,
   };
+  // Tokens live in Postgres: the real supabaseTokenStore, talking to a fake of the mcp_token_* functions.
+  t.db = fakeTokenDb(() => t.now);
+  deps.tokens ??= supabaseTokenStore(
+    { url: "https://sb.test", anonKey: "anon-key" },
+    { fetch: t.db.fetch }
+  );
   t.state = newState();
+  t.deps = deps;
   t.oauth = createOAuth(deps, t.state);
   return t;
 }
@@ -152,8 +165,6 @@ test("redirectAllowed: exactly the spec list, every lookalike refused", () => {
   for (const ok of [
     CLAUDE,
     "https://claude.com/api/mcp/auth_callback",
-    "https://chatgpt.com/connector_platform_oauth_redirect",
-    "https://chatgpt.com/connector/oauth/abc_DEF-1",
     "http://localhost:6274/callback",
     "http://127.0.0.1:8080",
   ])
@@ -169,12 +180,12 @@ test("redirectAllowed: exactly the spec list, every lookalike refused", () => {
     "http://user:pw@localhost:6274/cb",
     "http://localhost:99999/cb",
     "http://localhost/cb",
-    "https://chatgpt.com/connector/oauth/a/b",
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    "https://chatgpt.com/connector/oauth/abc_DEF-1",
     "javascript:alert(1)",
     "",
     null,
     42,
-    `https://chatgpt.com/connector/oauth/${"a".repeat(600)}`,
   ])
     assert.equal(redirectAllowed(bad), false, String(bad));
 });
@@ -188,7 +199,7 @@ test("register: good redirects get a random client_id and nothing is stored", as
   assert.equal(j.token_endpoint_auth_method, "none");
   assert.deepEqual(j.redirect_uris, [CLAUDE]);
   assert.ok(j.client_id);
-  assert.equal(t.state.codes.size + t.state.access.size + t.state.refresh.size, 0);
+  assert.equal(t.state.codes.size + t.db.rows.size, 0);
   for (const bad of [
     {},
     { redirect_uris: [] },
@@ -416,18 +427,18 @@ test("token: success returns an OPAQUE pair, uncached; the Supabase session neve
     !raw.includes(SB_JWT) && !raw.includes("sb-refresh-1"),
     "the Supabase session never reaches the client"
   );
-  assert.deepEqual(t.oauth.resolve(j.access_token), { jwt: SB_JWT, member: NATE });
-  assert.equal(t.oauth.resolve(SB_JWT), null, "the JWT itself is not a bearer");
-  assert.equal(t.oauth.resolve("nope"), null);
+  assert.deepEqual(await t.oauth.resolve(j.access_token), { jwt: SB_JWT, member: NATE });
+  assert.equal(await t.oauth.resolve(SB_JWT), null, "the JWT itself is not a bearer");
+  assert.equal(await t.oauth.resolve("nope"), null);
 });
 
 test("token: the opaque access token expires with the margin; the pair survives for refresh", async () => {
   const t = boot();
   const j = await connect(t);
   t.now += (600 - TOKEN_MARGIN_SECONDS) * 1000 - 1;
-  assert.ok(t.oauth.resolve(j.access_token));
+  assert.ok(await t.oauth.resolve(j.access_token));
   t.now += 1;
-  assert.equal(t.oauth.resolve(j.access_token), null);
+  assert.equal(await t.oauth.resolve(j.access_token), null);
   assert.equal((await t.oauth.token(refreshReq(j.refresh_token))).status, 200);
 });
 
@@ -444,7 +455,7 @@ test("token: PKCE mismatch, redirect mismatch and client mismatch are invalid_gr
     assert.equal(res.status, 400, JSON.stringify(over));
     assert.equal((await res.json()).error, "invalid_grant");
     assert.equal((await t.oauth.token(exchange(code))).status, 400, "burned");
-    assert.equal(t.state.access.size, 0);
+    assert.equal(t.db.count("access"), 0);
   }
 });
 
@@ -490,7 +501,7 @@ test("token: concurrent redemption of one code mints exactly one pair", async ()
     t.oauth.token(exchange(code)),
   ]);
   assert.deepEqual(rs.map((r) => r.status).sort(), [200, 400, 400]);
-  assert.equal(t.state.access.size, 1);
+  assert.equal(t.db.count("access"), 1);
 });
 
 test("token: a code is not a refresh token and a refresh token is not a code", async () => {
@@ -527,10 +538,10 @@ test("refresh: maps opaque -> stored Supabase refresh token, issues a NEW opaque
   assert.notEqual(second.access_token, first.access_token);
   assert.notEqual(second.refresh_token, first.refresh_token);
   assert.match(second.access_token, /^[A-Za-z0-9_-]{43}$/);
-  assert.equal(t.oauth.resolve(first.access_token), null, "old access dropped");
-  assert.ok(t.oauth.resolve(second.access_token));
-  assert.equal(t.state.access.size, 1);
-  assert.equal(t.state.refresh.size, 1);
+  assert.equal(await t.oauth.resolve(first.access_token), null, "old access dropped");
+  assert.ok(await t.oauth.resolve(second.access_token));
+  assert.equal(t.db.count("access"), 1);
+  assert.equal(t.db.count("refresh"), 1);
   // the old refresh token is gone: invalid_grant, and no second upstream call
   const reuse = await t.oauth.token(refreshReq(first.refresh_token));
   assert.equal((await reuse.json()).error, "invalid_grant");
@@ -559,8 +570,8 @@ test("refresh: GoTrue 400/403 is invalid_grant and drops the pair; anything else
     const res = await t.oauth.token(refreshReq(j.refresh_token));
     assert.equal(res.status, 400);
     assert.equal((await res.json()).error, "invalid_grant");
-    assert.equal(t.oauth.resolve(j.access_token), null);
-    assert.equal(t.state.refresh.size, 0);
+    assert.equal(await t.oauth.resolve(j.access_token), null);
+    assert.equal(t.db.count("refresh"), 0);
   }
   for (const [status, retry] of [
     [0, String(RETRY_AFTER_BLIP_SECONDS)],
@@ -575,8 +586,8 @@ test("refresh: GoTrue 400/403 is invalid_grant and drops the pair; anything else
     assert.equal(res.status, 503, String(status));
     assert.equal((await res.json()).error, "temporarily_unavailable");
     assert.equal(res.headers.get("retry-after"), retry);
-    assert.ok(t.oauth.resolve(j.access_token), "the pair is kept");
-    assert.equal(t.state.refresh.size, 1);
+    assert.ok(await t.oauth.resolve(j.access_token), "the pair is kept");
+    assert.equal(t.db.count("refresh"), 1);
   }
 });
 
@@ -589,9 +600,9 @@ test("refresh: membership is re-checked with the NEW session; revoked = invalid_
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error, "invalid_grant");
   assert.equal(t.members.length, 2, "once at sign-in, once after the refresh");
-  assert.equal(t.oauth.resolve(j.access_token), null);
-  assert.equal(t.state.access.size, 0);
-  assert.equal(t.state.refresh.size, 0);
+  assert.equal(await t.oauth.resolve(j.access_token), null);
+  assert.equal(t.db.count("access"), 0);
+  assert.equal(t.db.count("refresh"), 0);
 });
 
 test("refresh: a failing membership lookup is a 503 that keeps the pair, pointed at GoTrue's rotated token", async () => {
@@ -607,7 +618,7 @@ test("refresh: a failing membership lookup is a 503 that keeps the pair, pointed
   const res = await t.oauth.token(refreshReq(j.refresh_token));
   assert.equal(res.status, 503);
   assert.equal((await res.json()).error, "temporarily_unavailable");
-  assert.ok(t.oauth.resolve(j.access_token), "the pair is kept");
+  assert.ok(await t.oauth.resolve(j.access_token), "the pair is kept");
   down = false;
   const again = await t.oauth.token(refreshReq(j.refresh_token));
   assert.equal(again.status, 200);
@@ -663,13 +674,299 @@ test("markKnown is bounded and evicts the oldest", () => {
   assert.ok(!t.state.knownIps.has("ip0"));
 });
 
-test("the opaque pair table is bounded: the oldest pair is evicted, newer ones keep working", async () => {
+// ---- persistence (migration 0031: mcp_tokens) -------------------------------------------------
+
+test("tokens persist: a restart (fresh process state) still resolves the bearer, and refresh still works", async () => {
+  const t = boot({ randomBytes: realRandomBytes });
+  const j = await connect(t);
+  // a deploy: globalThis.__hqOAuthState and every in-process Map are gone; only the database remains
+  t.state = newState();
+  const after = createOAuth(t.deps, t.state);
+  assert.deepEqual(await after.resolve(j.access_token), { jwt: SB_JWT, member: NATE });
+  const res = await after.token(refreshReq(j.refresh_token));
+  assert.equal(res.status, 200);
+  const second = await res.json();
+  assert.deepEqual(t.refreshes, ["sb-refresh-1"]);
+  assert.equal(
+    await after.resolve(j.access_token),
+    null,
+    "rotated: the old access token is revoked"
+  );
+  assert.ok(await after.resolve(second.access_token));
+});
+
+test("tokens are stored under an HMAC hex key with an expiry, never in the clear", async () => {
+  const t = boot({ randomBytes: realRandomBytes });
+  const j = await connect(t);
+  assert.equal(t.db.rows.size, 2);
+  const ah = createHmac("sha256", TEST_KEY).update(j.access_token).digest("hex");
+  const rh = createHmac("sha256", TEST_KEY).update(j.refresh_token).digest("hex");
+  assert.match(ah, /^[0-9a-f]{64}$/);
+  assert.equal(t.deps.tokens.id(j.access_token), ah);
+  assert.notEqual(
+    ah,
+    createHash("sha256").update(j.access_token).digest("hex"),
+    "not a bare sha256"
+  );
+  assert.deepEqual([...t.db.rows.keys()].sort(), [ah, rh].sort());
+  const a = t.db.rows.get(ah);
+  const r = t.db.rows.get(rh);
+  assert.equal(a.expires_at, t.now + (600 - TOKEN_MARGIN_SECONDS) * 1000);
+  assert.equal(r.expires_at, t.now + REFRESH_TTL_MS);
+  assert.equal(a.kind, "access");
+  assert.equal(r.kind, "refresh");
+  assert.equal(a.payload.refresh_hash, rh, "the pair is linked by hash");
+  const stored = JSON.stringify([...t.db.rows.entries()]);
+  assert.ok(!stored.includes(j.access_token) && !stored.includes(j.refresh_token));
+  // the store is called with the user's own JWT; lookups and revokes carry only the anon key
+  const store = t.db.calls.filter((c) => c.fn === "mcp_token_store");
+  assert.ok(store.length === 2 && store.every((c) => c.auth === SB_JWT));
+  await t.oauth.resolve(j.access_token);
+  assert.equal(t.db.calls.at(-1).fn, "mcp_token_lookup");
+  assert.equal(t.db.calls.at(-1).auth, "anon-key");
+});
+
+test("an expired row is refused: the access token at its TTL, the refresh token at 30 days", async () => {
   const t = boot();
-  const first = await connect(t);
-  for (let i = 0; i < MAX_TOKEN_PAIRS; i++) await connect(t);
-  assert.equal(t.state.refresh.size, MAX_TOKEN_PAIRS);
-  assert.equal(t.oauth.resolve(first.access_token), null);
-  assert.equal(t.state.access.size, t.state.refresh.size);
+  const j = await connect(t);
+  t.now += (600 - TOKEN_MARGIN_SECONDS) * 1000;
+  assert.equal(await t.oauth.resolve(j.access_token), null);
+  t.now += REFRESH_TTL_MS - (600 - TOKEN_MARGIN_SECONDS) * 1000 - 1;
+  assert.equal(
+    (await t.oauth.token(refreshReq(j.refresh_token))).status,
+    200,
+    "still live at 30d - 1ms"
+  );
+  const k = await connect(t);
+  t.now += REFRESH_TTL_MS;
+  const res = await t.oauth.token(refreshReq(k.refresh_token));
+  assert.equal((await res.json()).error, "invalid_grant");
+  assert.equal(t.refreshes.length, 1, "no upstream call for an expired row");
+});
+
+test("a bad or missing row kind never resolves: a refresh token is not a bearer", async () => {
+  const t = boot();
+  const j = await connect(t);
+  assert.equal(await t.oauth.resolve(j.refresh_token), null);
+});
+
+test("a token-store outage is a 503, not invalid_grant: resolve throws, refresh retries, issue fails closed", async () => {
+  const t = boot();
+  const j = await connect(t);
+  const down = createOAuth(
+    {
+      ...t.deps,
+      tokens: supabaseTokenStore(
+        { url: "https://sb.test", anonKey: "anon-key" },
+        { fetch: async () => new Response("{}", { status: 500 }) }
+      ),
+    },
+    newState()
+  );
+  await assert.rejects(down.resolve(j.access_token));
+  const res = await down.token(refreshReq(j.refresh_token));
+  assert.equal(res.status, 503);
+  assert.equal(t.refreshes.length, 0, "GoTrue was not called, so its token was not rotated");
+  // issuing with a store that refuses writes: 503, and no half-written pair survives
+  const u = boot({
+    tokens: {
+      put: async () => {
+        throw new Error("down");
+      },
+      get: async () => null,
+      del: async () => {},
+      delUser: async () => {},
+    },
+  });
+  const r = await u.oauth.token(exchange(await getCode(u)));
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).error, "temporarily_unavailable");
+});
+
+test("issue: a failed access-row write removes the refresh row that was stored first", async () => {
+  let n = 0;
+  const t = boot();
+  const inner = t.deps.tokens;
+  const flaky = createOAuth(
+    {
+      ...t.deps,
+      tokens: {
+        ...inner,
+        put: (jwt, row) => (++n === 2 ? Promise.reject(new Error("x")) : inner.put(jwt, row)),
+      },
+    },
+    newState()
+  );
+  const res = await flaky.token(exchange(await getCode({ oauth: flaky })));
+  assert.equal(res.status, 503);
+  assert.equal(t.db.rows.size, 0);
+});
+
+test("the chatgpt redirects are gone: neither the allowlist nor register accepts them", async () => {
+  const t = boot();
+  for (const uri of [
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    "https://chatgpt.com/connector/oauth/abc",
+  ]) {
+    assert.equal(redirectAllowed(uri), false);
+    const r = await t.oauth.register(
+      new Request(`${ISS}/register`, {
+        method: "POST",
+        body: JSON.stringify({ redirect_uris: [uri] }),
+      })
+    );
+    assert.equal(r.status, 400);
+  }
+  const src = readFileSync(new URL("../lib/mcp/oauth.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /chatgpt/i);
+});
+
+test("supabaseTokenStore: the real RPC shape (paths, bodies, credentials) and fail-closed parsing", async () => {
+  const calls = [];
+  const store = supabaseTokenStore(
+    { url: "https://sb.test/", anonKey: "sb_publishable_x" },
+    {
+      fetch: async (url, init) => {
+        calls.push({ url: String(url), init });
+        const fn = String(url).split("/").pop();
+        if (fn === "mcp_token_lookup") {
+          const j = JSON.parse(init.body).p_hash;
+          if (j === "bad") return new Response(JSON.stringify({ kind: "weird" }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              kind: "access",
+              user_id: "u1",
+              payload: { jwt: "j" },
+              expires_at: "2026-10-27T10:00:00+00:00",
+            }),
+            { status: 200 }
+          );
+        }
+        return new Response(null, { status: 204 });
+      },
+    }
+  );
+  const row = {
+    hash: "h".repeat(64),
+    kind: "access",
+    userId: "u1",
+    payload: { jwt: "j" },
+    expiresAt: 1_000,
+  };
+  await store.put("user-jwt", row);
+  assert.equal(calls[0].url, "https://sb.test/rest/v1/rpc/mcp_token_store");
+  assert.equal(calls[0].init.headers.Authorization, "Bearer user-jwt");
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    p_hash: row.hash,
+    p_kind: "access",
+    p_user_id: "u1",
+    p_payload: { jwt: "j" },
+    p_expires_at: new Date(1_000).toISOString(),
+  });
+  const got = await store.get("x".repeat(64));
+  assert.deepEqual(got, {
+    hash: "x".repeat(64),
+    kind: "access",
+    userId: "u1",
+    payload: { jwt: "j" },
+    expiresAt: Date.parse("2026-10-27T10:00:00+00:00"),
+  });
+  assert.equal(
+    calls[1].init.headers.Authorization,
+    undefined,
+    "a publishable key is never a Bearer"
+  );
+  assert.equal(await store.get("bad"), null, "a malformed row is a miss");
+  await store.delUser("user-jwt", "u1");
+  assert.equal(calls.at(-1).url, "https://sb.test/rest/v1/rpc/mcp_token_revoke_user");
+});
+
+test("auth.ts: a bearer issued before a restart still becomes an McpCaller; outage = 503, unknown = 401", async () => {
+  const t = boot({ randomBytes: realRandomBytes });
+  const j = await connect(t);
+  const clients = [];
+  const rtFor = (oauth) => ({
+    oauth,
+    limiter: { allow: () => true },
+    client: (jwt) => (clients.push(jwt), { sb: "client" }),
+  });
+  const req = (bearer, headers = {}) =>
+    new Request(`${ISS}/mcp`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bearer}`, ...headers },
+    });
+  // the process restarts: globalThis.__hqOAuthState is reset and a new createOAuth reads it
+  globalThis.__hqOAuthState = undefined;
+  const fresh = createOAuth(t.deps);
+  assert.equal(fresh.resolve !== t.oauth.resolve, true);
+  const caller = await authorizeMcp(req(j.access_token), rtFor(fresh));
+  assert.deepEqual(caller.actor, NATE);
+  assert.deepEqual(caller.sb, { sb: "client" });
+  assert.deepEqual(clients, [SB_JWT]);
+  globalThis.__hqOAuthState = undefined;
+  assert.equal((await authorizeMcp(req("nope"), rtFor(fresh))).status, 401);
+  assert.equal((await authorizeMcp(req(j.refresh_token), rtFor(fresh))).status, 401);
+  const down = createOAuth({
+    ...t.deps,
+    tokens: supabaseTokenStore(
+      { url: "https://sb.test", anonKey: "k" },
+      { fetch: async () => new Response("", { status: 502 }) }
+    ),
+  });
+  assert.equal((await authorizeMcp(req(j.access_token), rtFor(down))).status, 503);
+  // chatgpt.com is no longer an allowed browser origin
+  assert.equal(originAllowed("https://chatgpt.com"), false);
+  assert.equal(originAllowed("https://claude.ai"), true);
+  assert.equal(
+    (await authorizeMcp(req(j.access_token, { origin: "https://chatgpt.com" }), rtFor(fresh)))
+      .status,
+    403
+  );
+});
+
+test("sign-out revokes the user's MCP tokens: revokeMcpTokens deletes every row of the signed-in user only", async () => {
+  const t = boot({ randomBytes: realRandomBytes });
+  await connect(t);
+  await connect(t);
+  t.db.rows.set("f".repeat(64), {
+    kind: "access",
+    user_id: "someone-else",
+    payload: {},
+    expires_at: t.now + 1e6,
+  });
+  assert.equal(t.db.rows.size, 5);
+  const store = supabaseTokenStore(
+    { url: "https://sb.test", anonKey: "anon-key" },
+    { fetch: t.db.fetch }
+  );
+  // the cookie-session client: getUser() and rpc() as that user. rpc goes through the same fake database.
+  const sb = {
+    auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
+    rpc: async (fn, args) => (
+      assert.equal(fn, "mcp_token_revoke_user"),
+      await store.delUser(SB_JWT, args.p_user_id),
+      { error: null }
+    ),
+  };
+  await revokeMcpTokens(sb);
+  assert.deepEqual(
+    [...t.db.rows.values()].map((r) => r.user_id),
+    ["someone-else"]
+  );
+  // signed out already: nothing to revoke, no rpc
+  await revokeMcpTokens({ auth: { getUser: async () => ({ data: { user: null } }) } });
+  // an rpc error surfaces (the route logs it and still signs out)
+  await assert.rejects(
+    revokeMcpTokens({ auth: sb.auth, rpc: async () => ({ error: { message: "boom" } }) }),
+    /mcp_token_revoke_user/
+  );
+  const route = readFileSync(new URL("../app/signout/route.ts", import.meta.url), "utf8");
+  assert.match(route, /revokeMcpTokens\(sb\)/);
+  assert.ok(
+    route.indexOf("revokeMcpTokens(sb)") < route.indexOf("sb?.auth.signOut()"),
+    "revoke runs before the session is cleared"
+  );
+  assert.match(route, /\.catch\(/, "a revoke failure never blocks sign-out");
 });
 
 // ---- ip helpers -----------------------------------------------------------------------------
@@ -777,4 +1074,75 @@ test("real deps: unreachable, hung and malformed answers are status 0 and log on
   }
   assert.equal(JSON.parse(lines[0]).event, "gotrue_signin_failed");
   assert.equal(JSON.parse(lines[1]).event, "gotrue_refresh_failed");
+});
+
+test("MCP_TOKEN_KEY: a row key derived from the bearer alone (plain sha256) misses; the key is required", async () => {
+  const t = boot({ randomBytes: realRandomBytes });
+  const j = await connect(t);
+  // what a bearer holder can compute with no server secret: the public anon-callable lookup finds nothing
+  const sha = (x) => createHash("sha256").update(x).digest("hex");
+  const rpc = async (hash) =>
+    (
+      await t.db.fetch("https://sb.test/rest/v1/rpc/mcp_token_lookup", {
+        method: "POST",
+        headers: {
+          apikey: "anon-key",
+          authorization: "Bearer anon-key",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ p_hash: hash }),
+      })
+    ).json();
+  assert.equal(await rpc(sha(j.access_token)), null);
+  assert.equal(await rpc(sha(j.refresh_token)), null);
+  assert.notEqual(
+    await rpc(t.deps.tokens.id(j.access_token)),
+    null,
+    "control: the keyed hash does hit"
+  );
+  // a restart with the key still set resolves it
+  globalThis.__hqOAuthState = undefined;
+  assert.ok(await createOAuth(t.deps).resolve(j.access_token));
+  // another key (or none) cannot resolve it
+  for (const key of ["", "short", "x".repeat(64)]) {
+    const other = createOAuth({
+      ...t.deps,
+      tokens: supabaseTokenStore(
+        { url: "https://sb.test", anonKey: "anon-key" },
+        { fetch: t.db.fetch, key }
+      ),
+    });
+    if (key.length < 32) await assert.rejects(other.resolve(j.access_token), /MCP_TOKEN_KEY/);
+    else assert.equal(await other.resolve(j.access_token), null);
+  }
+});
+
+test("MCP_TOKEN_KEY unset or short: nothing is issued (503), refresh is 503, bearer is a 503, no row is written", async () => {
+  const saved = process.env.MCP_TOKEN_KEY;
+  try {
+    const t = boot({ randomBytes: realRandomBytes });
+    const good = await connect(t);
+    const rowsBefore = t.db.rows.size;
+    for (const v of [undefined, "", "k".repeat(31)]) {
+      if (v === undefined) delete process.env.MCP_TOKEN_KEY;
+      else process.env.MCP_TOKEN_KEY = v;
+      const res = await t.oauth.token(exchange(await getCode(t)));
+      assert.equal(res.status, 503, `issue refused with key ${JSON.stringify(v)}`);
+      const refresh = await t.oauth.token(refreshReq(good.refresh_token));
+      assert.equal(refresh.status, 503);
+      await assert.rejects(t.oauth.resolve(good.access_token), /MCP_TOKEN_KEY/);
+      const rt = { oauth: t.oauth, limiter: { allow: () => true }, client: () => ({}) };
+      const r = await authorizeMcp(
+        new Request(`${ISS}/mcp`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${good.access_token}` },
+        }),
+        rt
+      );
+      assert.equal(r.status, 503);
+      assert.equal(t.db.rows.size, rowsBefore, "no row written while the key is missing");
+    }
+  } finally {
+    process.env.MCP_TOKEN_KEY = saved;
+  }
 });

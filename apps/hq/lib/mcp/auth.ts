@@ -16,6 +16,7 @@ import {
   SIGNIN_GLOBAL_LIMIT_PER_MIN,
   SIGNIN_IP_LIMIT_PER_MIN,
   supabaseSessionDeps,
+  supabaseTokenStore,
   type Member,
   type OAuth,
 } from "./oauth";
@@ -26,20 +27,21 @@ const BEARER_RE = /^Bearer\s+(\S+)$/i;
 export const resourceMetadataUrl = () =>
   `${publicOrigin()}/.well-known/oauth-protected-resource/mcp`;
 
-/** Origins that may reach /mcp from a browser: ours and the two hosted connector UIs. Absent Origin (CLI, server-side connector) is fine. */
+/** Origins that may reach /mcp from a browser: ours and Claude's hosted connector UI. Absent Origin (CLI, server-side connector) is fine. */
 export function originAllowed(origin: string | null): boolean {
-  return (
-    origin === null || [publicOrigin(), "https://claude.ai", "https://chatgpt.com"].includes(origin)
-  );
+  return origin === null || [publicOrigin(), "https://claude.ai"].includes(origin);
 }
 
-/** supabase-js client acting as the user: anon key + their JWT, no session storage. */
+/**
+ * supabase-js client acting as the user: anon key + their JWT, no session storage. X-HQ-Via tells
+ * the database this write came through the MCP connector (proposals.via is derived from it, 0031).
+ */
 export function clientForJwt(jwt: string): SupabaseClient {
   const { supabaseUrl, supabaseAnonKey } = getConfig();
   if (!supabaseUrl || !supabaseAnonKey) throw new Error("Supabase env is not set");
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    global: { headers: { Authorization: `Bearer ${jwt}`, "x-hq-via": "mcp" } },
   });
 }
 
@@ -84,6 +86,7 @@ export function getRuntime(): McpRuntime {
   const oauth = createOAuth({
     ...supabaseSessionDeps({ url: supabaseUrl, anonKey: supabaseAnonKey }),
     member: memberFor,
+    tokens: supabaseTokenStore({ url: supabaseUrl, anonKey: supabaseAnonKey }),
     now: () => Date.now(),
     randomBytes: realRandomBytes,
     allowLogin: (ip) => loginLimiter.allow(ip),
@@ -118,13 +121,27 @@ export interface McpCaller {
   actor: { id: string; handle: "nate" | "brandon" | null };
 }
 
+/** HQ sign-out: delete every MCP token the signed-in user holds. `sb` is their cookie-session client. */
+export async function revokeMcpTokens(sb: SupabaseClient): Promise<void> {
+  const { data } = await sb.auth.getUser();
+  if (!data.user) return;
+  const { error } = await sb.rpc("mcp_token_revoke_user", { p_user_id: data.user.id });
+  if (error) throw new Error(`mcp_token_revoke_user: ${error.message}`);
+}
+
 /** Origin, then Bearer, then rate limit, then the opaque-token lookup. A Response is a refusal. */
-export function authorizeMcp(req: Request, rt: McpRuntime): McpCaller | Response {
+export async function authorizeMcp(req: Request, rt: McpRuntime): Promise<McpCaller | Response> {
   if (!originAllowed(req.headers.get("origin"))) return err(403, "forbidden_origin");
   const opaque = req.headers.get("authorization")?.match(BEARER_RE)?.[1];
   if (!opaque) return UNAUTHORIZED();
   if (!rt.limiter.allow(opaque)) return err(429, "rate_limited");
-  const hit = rt.oauth.resolve(opaque);
+  let hit: Awaited<ReturnType<OAuth["resolve"]>>;
+  try {
+    hit = await rt.oauth.resolve(opaque);
+  } catch (e) {
+    console.error(`[mcp] token lookup failed: ${e instanceof Error ? e.message : "error"}`); // names MCP_TOKEN_KEY when that is the cause
+    return err(503, "temporarily_unavailable"); // token store down: not a 401, the connector must not drop its tokens
+  }
   if (!hit) return UNAUTHORIZED(); // unknown or expired: the connector refreshes
   return { sb: rt.client(hit.jwt), actor: hit.member };
 }

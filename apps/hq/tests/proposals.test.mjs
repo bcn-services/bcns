@@ -16,7 +16,7 @@ const P = await import("../lib/proposals.ts");
 const ACTOR = "00000000-0000-4000-8000-000000000001";
 const root = fileURLToPath(new URL("../", import.meta.url));
 
-test("propose inserts a pending row with via, created_by and the compare-and-set old value", async () => {
+test("propose inserts a pending row with created_by (old and via are advisory: the database overwrites them, 0031)", async () => {
   const sb = fakeSb();
   const row = await T.propose(sb, ACTOR, "mcp", {
     kind: "lead_stage",
@@ -29,9 +29,9 @@ test("propose inserts a pending row with via, created_by and the compare-and-set
   const p = sb.db.proposals[0];
   assert.equal(row.id, p.id);
   assert.equal(p.status, "pending");
-  assert.equal(p.via, "mcp");
   assert.equal(p.created_by, ACTOR);
   assert.equal(p.kind, "lead_stage");
+  assert.equal(p.via, "mcp");
   assert.equal(p.old, "new");
   assert.equal(p.new, "contacted");
   assert.equal(p.reason, "called twice");
@@ -41,6 +41,84 @@ test("propose inserts a pending row with via, created_by and the compare-and-set
       T.propose(sb, ACTOR, "ui", { kind: "delete_lead", targetId: "x", field: "stage", new: "x" }),
     /kind/
   );
+});
+
+test("listPendingProposals: canDecide follows is_admin(); an rpc error or a missing rpc means false", async () => {
+  const mk = (rpc) => {
+    const sb = fakeSb({
+      proposals: [
+        {
+          id: "p1",
+          kind: "finance",
+          target_id: "2026-10-19",
+          field: "cold_call/spend_cents",
+          old: 0,
+          new: 500,
+          status: "pending",
+          created_at: "2026-10-27T10:00:00Z",
+        },
+      ],
+    });
+    if (rpc) sb.rpc = rpc;
+    return sb;
+  };
+  const now = new Date("2026-10-27T12:00:00Z");
+  const asked = [];
+  const admin = await P.listPendingProposals(
+    mk(async (fn) => (asked.push(fn), { data: true, error: null })),
+    now
+  );
+  assert.equal(admin[0].canDecide, true);
+  assert.deepEqual(asked, ["is_admin"]);
+  const staff = await P.listPendingProposals(
+    mk(async () => ({ data: false, error: null })),
+    now
+  );
+  assert.equal(staff[0].canDecide, false);
+  const err = await P.listPendingProposals(
+    mk(async () => ({ data: null, error: { message: "x" } })),
+    now
+  );
+  assert.equal(err[0].canDecide, false);
+  const thrown = await P.listPendingProposals(
+    mk(async () => {
+      throw new Error("boom");
+    }),
+    now
+  );
+  assert.equal(thrown[0].canDecide, false);
+  assert.equal((await P.listPendingProposals(mk(null), now))[0].canDecide, false);
+});
+
+test("staff sees no Approve / Reject buttons; an admin does", async () => {
+  const React = (await import("react")).default;
+  globalThis.React = React; // tsx compiles .tsx with the classic JSX runtime
+  React.cache ??= (f) => f; // the actions module pulls in session.ts, which wants the server build of react
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { ProposalDetail } = await import("../components/ProposalDecide.tsx");
+  const view = {
+    id: "p1",
+    kind: "lead_stage",
+    target: "Acme Roofing",
+    field: "stage",
+    old: "new",
+    next: "won",
+    reason: "",
+    who: "Claude (nate)",
+    via: "mcp",
+    age: "5m",
+  };
+  const html = (canDecide) =>
+    renderToStaticMarkup(
+      React.createElement(ProposalDetail, { p: { ...view, canDecide }, busy: false, onDecide() {} })
+    );
+  const staff = html(false);
+  assert.doesNotMatch(staff, /Approve/);
+  assert.doesNotMatch(staff, /Reject/);
+  assert.match(staff, /Only an admin can approve or reject/);
+  const admin = html(true);
+  assert.match(admin, /Approve/);
+  assert.match(admin, /Reject/);
 });
 
 test("diff view helpers", () => {
@@ -153,19 +231,23 @@ test(
       kind: "lead_stage",
       targetId: BIZ,
       field: "stage",
-      old: "qualified",
+      old: "forged-old", // advisory only: the database must replace it
       new: "call_due",
       reason: "test",
     });
     const p = sb.captured.find((c) => c.table === "proposals").payload;
+    assert.equal(p.old, "forged-old");
+    assert.equal(p.via, "mcp");
+    // the exact payload propose() sends, replayed as the signed-in user
     const out = asUser(`
 insert into proposals (kind, target_id, field, old, new, reason, status, created_by, via)
   values ('${p.kind}', '${p.target_id}', '${p.field}', '${JSON.stringify(p.old)}'::jsonb, '${JSON.stringify(p.new)}'::jsonb, '${p.reason}', '${p.status}', '${p.created_by}', '${p.via}');
+select old::text || ' ' || via from proposals where target_id = '${BIZ}';
 select public.decide_proposal((select id from proposals where target_id = '${BIZ}'), true);
 select stage from businesses where id = '${BIZ}';
 select status from proposals where target_id = '${BIZ}';`);
-    // psql -t -A prints "INSERT 0 1"-less output with -q; the three selects are the last three lines
-    assert.deepEqual(out.slice(-3), ["approved", "call_due", "approved"]);
+    // 0031: old is the live stage and via is 'ui' (no X-HQ-Via header on this connection), not what the payload said
+    assert.deepEqual(out.slice(-4), ['"qualified" ui', "approved", "call_due", "approved"]);
   }
 );
 
@@ -174,12 +256,13 @@ test(
   { skip: !up },
   async () => {
     const out = asUser(`
-insert into proposals (kind, target_id, field, old, new, status, created_by, via)
-  values ('lead_stage', '${BIZ}', 'stage', '"call_due"'::jsonb, '"won"'::jsonb, 'pending', '${UID}', 'mcp');
+insert into proposals (kind, target_id, field, new, status, created_by)
+  values ('lead_stage', '${BIZ}', 'stage', '"won"'::jsonb, 'pending', '${UID}');
+update businesses set stage = 'call_due' where id = '${BIZ}';
 select public.decide_proposal((select id from proposals where target_id = '${BIZ}'), true);
 select stage from businesses where id = '${BIZ}';
 select status from proposals where target_id = '${BIZ}';`);
-    assert.deepEqual(out.slice(-3), ["stale", "qualified", "stale"]);
+    assert.deepEqual(out.slice(-3), ["stale", "call_due", "stale"]);
   }
 );
 
@@ -188,8 +271,8 @@ test(
   { skip: !up },
   async () => {
     const out = asUser(`
-insert into proposals (kind, target_id, field, old, new, status, created_by, via)
-  values ('lead_stage', '${BIZ}', 'stage', '"qualified"'::jsonb, '"won"'::jsonb, 'pending', '${UID}', 'ui');
+insert into proposals (kind, target_id, field, new, status, created_by)
+  values ('lead_stage', '${BIZ}', 'stage', '"won"'::jsonb, 'pending', '${UID}');
 select public.decide_proposal((select id from proposals where target_id = '${BIZ}'), false);
 select stage from businesses where id = '${BIZ}';`);
     assert.deepEqual(out.slice(-2), ["rejected", "qualified"]);
@@ -221,4 +304,11 @@ update proposals set status = 'approved' where id = '77777777-7777-4777-8777-777
 rollback;`);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /permission denied/);
+});
+
+test("useDecide: the a/r shortcuts do nothing for a viewer who cannot decide (guard sits before the RPC)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../components/ProposalDecide.tsx", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("function decide("), src.indexOf("decideProposal(p.id"));
+  assert.match(body, /if \(busy \|\| !p\.canDecide\) return/);
 });

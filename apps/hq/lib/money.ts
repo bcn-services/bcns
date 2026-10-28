@@ -8,8 +8,10 @@
  * paid Mercury plan, so invoices are fetched only when MERCURY_INVOICING=1 (off by default).
  */
 import { getConfig } from "./env";
+import { addDays, nyWeek } from "./finance";
 
-export type Unavailable = { unavailable: true };
+/** `error` is a status line only (host, path, HTTP status), never a response body or a key. */
+export type Unavailable = { unavailable: true; error?: string };
 export const isUnavailable = (v: unknown): v is Unavailable =>
   typeof v === "object" && v !== null && "unavailable" in v;
 
@@ -31,21 +33,39 @@ async function memoised<T>(
     memo.set(key, { until: Date.now() + OK_TTL, value });
     return value;
   } catch (e) {
-    console.error(`[money] ${key} unavailable: ${e instanceof Error ? e.message : "error"}`);
-    const value: Unavailable = { unavailable: true };
+    const error = e instanceof Error ? e.message : "error";
+    console.error(`[money] ${key} unavailable: ${error}`);
+    const value: Unavailable = { unavailable: true, error };
     memo.set(key, { until: Date.now() + FAIL_TTL, value });
     return value;
   }
 }
 
+/** Throws a status line only (host, path with any account id masked, status). The detail of a network
+ *  or parse failure stays in the server log: it can quote a response body. */
 async function getJson(url: string, token: string): Promise<unknown> {
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    signal: AbortSignal.timeout(5000),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`${new URL(url).host} ${res.status}`); // status only, never the body
-  return res.json();
+  const u = new URL(url);
+  const where = `${u.host}${u.pathname.replace(/\/account\/[^/]+/, "/account/…")}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+      cache: "no-store",
+    });
+  } catch (e) {
+    console.error(
+      `[money] ${u.host}${u.pathname} fetch failed: ${e instanceof Error ? e.message : e}`
+    );
+    throw new Error(`${where} unreachable`);
+  }
+  if (!res.ok) throw new Error(`${where} ${res.status}`);
+  try {
+    return await res.json();
+  } catch (e) {
+    console.error(`[money] ${u.host}${u.pathname} bad body: ${e instanceof Error ? e.message : e}`);
+    throw new Error(`${where} invalid response`);
+  }
 }
 
 const rec = (v: unknown): Record<string, unknown> =>
@@ -56,44 +76,74 @@ const cents = (dollars: number) => Math.round(dollars * 100);
 
 // --- Stripe ------------------------------------------------------------------------------------
 
-export interface StripeSummary {
+export interface StripeSub {
+  id: string;
   mrrCents: number;
+  created: number; // unix seconds
+  /** cancel_at_period_end: still active, but ends at `cancelAt` (YYYY-MM-DD, "" if Stripe gave none). */
+  cancelling: boolean;
+  cancelAt: string;
+}
+export interface StripeSummary {
+  /** Active subscriptions that are not cancelling. */
+  mrrCents: number;
+  /** Counted in mrrCents. */
   activeSubscriptions: number;
   charges30dCents: number;
+  subs: StripeSub[];
+  /** The cancelling subs left out of mrrCents. */
+  excluded: { id: string; cancelAt: string }[];
 }
 
 const PER_MONTH: Record<string, number> = { month: 1, year: 1 / 12, week: 52 / 12, day: 365 / 12 };
+const day = (unix: number) => (unix > 0 ? new Date(unix * 1000).toISOString().slice(0, 10) : "");
 
 export function stripeSummary(): Promise<StripeSummary | Unavailable> {
   const key = getConfig().stripeKey;
   return memoised("stripe", key, async () => {
     const since = Math.floor(Date.now() / 1000) - 30 * 86400;
     // ponytail: first 100 of each list; paginate when bcns passes 100 subscriptions or charges a month.
-    const [subs, charges] = await Promise.all([
+    const [raw, charges] = await Promise.all([
       getJson("https://api.stripe.com/v1/subscriptions?status=active&limit=100", key!),
       getJson(`https://api.stripe.com/v1/charges?created[gte]=${since}&limit=100`, key!),
     ]);
-    let mrr = 0;
-    const list = arr(rec(subs).data);
-    for (const s of list)
-      for (const it of arr(rec(rec(s).items).data)) {
-        const price = rec(rec(it).price);
-        const rc = rec(price.recurring);
-        const every = Math.max(1, num(rc.interval_count));
-        mrr +=
-          (num(price.unit_amount) *
-            (num(rec(it).quantity) || 1) *
-            (PER_MONTH[String(rc.interval)] ?? 0)) /
-          every;
-      }
+    const subs: StripeSub[] = arr(rec(raw).data)
+      .map(rec)
+      .map((s) => {
+        const items = arr(rec(s.items).data).map(rec);
+        let mrr = 0;
+        for (const it of items) {
+          const price = rec(it.price);
+          const rc = rec(price.recurring);
+          mrr +=
+            (num(price.unit_amount) *
+              (num(it.quantity) || 1) *
+              (PER_MONTH[String(rc.interval)] ?? 0)) /
+            Math.max(1, num(rc.interval_count));
+        }
+        return {
+          id: String(s.id ?? ""),
+          mrrCents: Math.round(mrr),
+          created: num(s.created),
+          // a custom cancel date (Dashboard "cancel on …") sets cancel_at without cancel_at_period_end
+          cancelling: s.cancel_at_period_end === true || num(s.cancel_at) > 0,
+          // newer API versions keep the period end on the item
+          cancelAt: day(
+            num(s.cancel_at) || num(s.current_period_end) || num(items[0]?.current_period_end)
+          ),
+        };
+      });
+    const counted = subs.filter((s) => !s.cancelling);
     const charged = arr(rec(charges).data)
       .map(rec)
       .filter((c) => c.status === "succeeded")
-      .reduce((s, c) => s + num(c.amount) - num(c.amount_refunded), 0);
+      .reduce((t, c) => t + num(c.amount) - num(c.amount_refunded), 0);
     return {
-      mrrCents: Math.round(mrr),
-      activeSubscriptions: list.length,
+      mrrCents: counted.reduce((t, s) => t + s.mrrCents, 0),
+      activeSubscriptions: counted.length,
       charges30dCents: charged,
+      subs,
+      excluded: subs.filter((s) => s.cancelling).map((s) => ({ id: s.id, cancelAt: s.cancelAt })),
     };
   });
 }
@@ -160,19 +210,26 @@ export interface MercuryInvoice {
   status: string; // Unpaid | Paid | Cancelled | Processing
   amountCents: number;
   dueDate: string; // YYYY-MM-DD
-  customer: string; // from /ar/customers; "" when that lookup is not available
+  customer: string; // the /ar/customers name for customerId
+  customerId?: string; // the key clients.mercury_customer_id matches
 }
 
 export const invoicingEnabled = () => process.env.MERCURY_INVOICING === "1";
 
+/** Both calls must succeed: a 403 on either (no Invoicing scope / not on the paid plan) is an
+ *  Unavailable carrying the message, so the page shows why instead of an empty list. */
 export function mercuryInvoices(): Promise<MercuryInvoice[] | Unavailable> {
   const key = getConfig().mercuryKey;
   if (!invoicingEnabled()) return Promise.resolve({ unavailable: true });
   return memoised("mercury-invoices", key, async () => {
     const [inv, cus] = await Promise.all([
       getJson(`${MERCURY}/ar/invoices?limit=1000&order=desc`, key!),
-      getJson(`${MERCURY}/ar/customers`, key!).catch(() => ({})),
-    ]);
+      getJson(`${MERCURY}/ar/customers`, key!),
+    ]).catch((e) => {
+      throw new Error(
+        `Mercury invoicing: ${e instanceof Error ? e.message : "error"} (needs the Invoicing scope on a paid plan)`
+      );
+    });
     const names = new Map(
       arr(rec(cus).customers)
         .map(rec)
@@ -186,18 +243,21 @@ export function mercuryInvoices(): Promise<MercuryInvoice[] | Unavailable> {
         amountCents: cents(num(i.amount)),
         dueDate: String(i.dueDate ?? "").slice(0, 10),
         customer: names.get(String(i.customerId)) ?? "",
+        customerId: String(i.customerId ?? ""),
       }));
   });
 }
 
 // --- per-client billing ------------------------------------------------------------------------
 
-/** Case-insensitive "counterparty contains client name". Names under 3 chars are skipped: "SB" would
- *  match half the bank statement, so those clients rely on billing_note. */
-export function nameMatches(clientName: string, counterparty: string): boolean {
-  const n = clientName.trim().toLowerCase();
-  return n.length >= 3 && counterparty.toLowerCase().includes(n);
+/** The match keys a client row carries. No keys, no match: a name is never guessed from display_name. */
+export interface BillingKeys {
+  mercury_customer_id?: string | null;
+  aliases?: string[] | null;
 }
+const norm = (v: string) => v.trim().toLowerCase();
+const aliasOf = (c: BillingKeys, name: string) =>
+  !!name && !!c.aliases?.some((a) => norm(a) === norm(name)); // exact name, not contains
 
 export interface ClientBilling {
   /** false when Mercury could not be read; the note still shows. */
@@ -209,19 +269,28 @@ export interface ClientBilling {
 }
 
 export function clientBilling(
-  client: { display_name: string; billing_note: string | null },
+  client: { display_name: string; billing_note: string | null } & BillingKeys,
   txns: MercuryTxn[] | Unavailable,
   invoices: MercuryInvoice[] | Unavailable | null = null,
   today: string = new Date().toISOString().slice(0, 10)
 ): ClientBilling {
   const note = client.billing_note?.trim() || null;
   if (isUnavailable(txns)) return { mercury: false, lastPaid: null, invoice: null, note };
-  const hit = txns.find(
-    (t) => t.amountCents > 0 && nameMatches(client.display_name, t.counterparty)
-  ); // newest first
+  let hit: { at: string; amountCents: number } | undefined = txns.find(
+    (t) => t.amountCents > 0 && aliasOf(client, t.counterparty)
+  ); // newest first; Mercury transactions carry no customer id, so aliases are the only key
   let invoice: ClientBilling["invoice"] = null;
   if (invoices && !isUnavailable(invoices)) {
-    const mine = invoices.filter((i) => i.customer && nameMatches(client.display_name, i.customer));
+    // customer id when the client has one; the alias match is the fallback, not an extra
+    const byId = !!client.mercury_customer_id;
+    const mine = invoices.filter((i) =>
+      byId ? i.customerId === client.mercury_customer_id : aliasOf(client, i.customer)
+    );
+    // ponytail: an invoice has no paid date here, so its due date stands in when no transaction matched
+    const paid = mine
+      .filter((i) => i.status === "Paid")
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
+    if (!hit && paid) hit = { at: paid.dueDate, amountCents: paid.amountCents };
     const unpaid = mine.filter((i) => i.status === "Unpaid");
     invoice = {
       nextDue:
@@ -237,5 +306,91 @@ export function clientBilling(
     lastPaid: hit ? { at: hit.at, amountCents: hit.amountCents } : null,
     invoice,
     note,
+  };
+}
+
+// --- MRR and the weekly series the Numbers tiles draw ------------------------------------------
+
+export interface RateRow {
+  monthly_rate_cents: number | null;
+  billing_source?: string | null;
+  churn_date?: string | null;
+  launch_date?: string | null;
+}
+export interface Mrr {
+  total: number;
+  stripe: number;
+  mercury: number;
+  /** Stripe subs left out because they cancel at period end. */
+  excluded: { id: string; cancelAt: string }[];
+}
+
+const viaMercury = (c: RateRow) => c.billing_source === "mercury" && !c.churn_date;
+
+/** Mercury's AR API has no recurring-series endpoint, so Mercury MRR is the contracted monthly rate
+ *  of the clients billed through Mercury and not churned. Stripe is the live active subscriptions
+ *  minus the ones cancelling. A Stripe outage counts as $0 here; the page shows the chip beside it. */
+export function mrr(stripe: StripeSummary | Unavailable, clients: RateRow[]): Mrr {
+  const s = isUnavailable(stripe) ? 0 : stripe.mrrCents;
+  const m = clients.filter(viaMercury).reduce((t, c) => t + (c.monthly_rate_cents ?? 0), 0);
+  return {
+    total: s + m,
+    stripe: s,
+    mercury: m,
+    excluded: isUnavailable(stripe) ? [] : stripe.excluded,
+  };
+}
+
+/** `weeks` = Monday dates, oldest first. MRR at each week's end, rebuilt from launch/churn dates and
+ *  Stripe `created`. ponytail: subs that already ended are not listed by Stripe's active filter, so
+ *  history understates Stripe; upgrade when a subscription ledger exists. */
+export function mrrSeries(
+  weeks: string[],
+  stripe: StripeSummary | Unavailable,
+  clients: RateRow[]
+): number[] {
+  return weeks.map((w) => {
+    const end = addDays(w, 6);
+    const m = clients
+      .filter(
+        (c) =>
+          c.billing_source === "mercury" &&
+          (!c.launch_date || c.launch_date <= end) &&
+          (!c.churn_date || c.churn_date > end)
+      )
+      .reduce((t, c) => t + (c.monthly_rate_cents ?? 0), 0);
+    const s = isUnavailable(stripe)
+      ? 0
+      : stripe.subs
+          // a cancelling sub billed until its cancel date: it only drops from MRR from then on
+          .filter(
+            (x) => day(x.created) <= end && (!x.cancelling || !x.cancelAt || end < x.cancelAt)
+          )
+          .reduce((t, x) => t + x.mrrCents, 0);
+    return m + s;
+  });
+}
+
+/** Cash at each week's end, plus money in and out per week, from the ~120 days of transactions
+ *  already fetched. ponytail: transfers between bcns's own Mercury accounts show as in and out. */
+export function mercuryWeeks(weeks: string[], m: MercurySummary) {
+  const bucket = (w: string) => m.txns.filter((t) => t.at && nyWeek(t.at) === w);
+  return {
+    inflow: weeks.map((w) =>
+      bucket(w)
+        .filter((t) => t.amountCents > 0)
+        .reduce((s, t) => s + t.amountCents, 0)
+    ),
+    burn: weeks.map(
+      (w) =>
+        bucket(w)
+          .filter((t) => t.amountCents < 0)
+          .reduce((s, t) => s - t.amountCents, 0) // 0 minus, so an empty week is 0 and never -0
+    ),
+    cash: weeks.map(
+      (w) =>
+        m.balanceCents -
+        m.txns.filter((t) => t.at && nyWeek(t.at) > w).reduce((s, t) => s + t.amountCents, 0)
+    ),
   };
 }
