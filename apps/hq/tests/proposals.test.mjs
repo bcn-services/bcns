@@ -312,3 +312,167 @@ test("useDecide: the a/r shortcuts do nothing for a viewer who cannot decide (gu
   const body = src.slice(src.indexOf("function decide("), src.indexOf("decideProposal(p.id"));
   assert.match(body, /if \(busy \|\| !p\.canDecide\) return/);
 });
+
+// ---- kind 'client' (item D): propose_client files it, decide_proposal applies it ----------------------
+
+test("client proposals: proposeClient files a pending kind=client row; the list labels it and formats the rate", async () => {
+  const { mcpFake } = await import("./_mcp-fake.mjs");
+  const { proposeClient } = await import("../lib/clients/propose.ts");
+  const fake = mcpFake({
+    clients: [{ slug: "sb", monthly_rate_cents: 11000, notes: null }],
+    profiles: [{ id: ACTOR, handle: "nate" }],
+  });
+  const r = await proposeClient(fake, ACTOR, "mcp", {
+    slug: "sb",
+    field: "monthly_rate_cents",
+    value: 12000,
+    reason: "renewal",
+  });
+  const row = fake.db.proposals.find((p) => p.id === r.id);
+  assert.deepEqual(
+    [row.kind, row.target_id, row.field, row.old, row.new, row.status, row.via],
+    ["client", "sb", "monthly_rate_cents", 11000, 12000, "pending", "mcp"]
+  );
+  const [v] = await P.listPendingProposals(fake, new Date("2026-10-27T12:00:00Z"));
+  assert.deepEqual([v.kind, v.target, v.old, v.next], ["client", "client sb", "$110.00/mo", "$120.00/mo"]);
+  // nothing but the proposal and its event was written
+  assert.deepEqual(
+    fake.ops.filter((o) => o.op !== "select").map((o) => o.table).sort(),
+    ["events", "proposals"]
+  );
+});
+
+test("client proposals: a field outside the whitelist or a bad value is never filed", async () => {
+  const { mcpFake } = await import("./_mcp-fake.mjs");
+  const { proposeClient } = await import("../lib/clients/propose.ts");
+  const fake = mcpFake({ clients: [{ slug: "sb", notes: null }] });
+  for (const [field, value] of [
+    ["health", "green"],
+    ["stage", "live"],
+    ["display_name", "x"],
+    ["repo_url", "http://insecure.test"],
+    ["notes", null],
+  ])
+    await assert.rejects(proposeClient(fake, ACTOR, "mcp", { slug: "sb", field, value }), undefined, field);
+  assert.equal(fake.db.proposals?.length ?? 0, 0);
+});
+
+// The database repeats the whitelist (proposals_client_shape) and applies approved rows (0034).
+const has0034 =
+  up && psql("select 1 from pg_constraint where conname = 'proposals_client_shape'").stdout.trim() === "1";
+if (up && !has0034) console.log("client proposals integration: SKIPPED (local DB is behind 0034; supabase db reset)");
+const CSLUG = "hq34-test";
+const asClientAdmin = (body, role = "admin") => {
+  const r = psql(`
+begin;
+insert into auth.users (id, email) values ('${UID}', 'hq34-test@example.invalid');
+insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'hq34@example.invalid', 'hq34', null, '${role}');
+insert into clients (slug, display_name, monthly_rate_cents, notes) values ('${CSLUG}', 'hq34', 11000, null);
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"${UID}"}';
+${body}
+rollback;`);
+  return r;
+};
+const lines = (r) => r.stdout.trim().split("\n").filter(Boolean);
+
+test("integration: approving a client proposal updates the whitelisted column; old is the live value", { skip: !has0034 }, () => {
+  const r = asClientAdmin(`
+insert into proposals (kind, target_id, field, old, new, status, created_by)
+  values ('client', '${CSLUG}', 'monthly_rate_cents', '999'::jsonb, '12000'::jsonb, 'pending', '${UID}');
+insert into proposals (kind, target_id, field, new, status, created_by)
+  values ('client', '${CSLUG}', 'aliases', '["Acme LLC","Acme"]'::jsonb, 'pending', '${UID}');
+select old::text from proposals where field = 'monthly_rate_cents';
+select public.decide_proposal((select id from proposals where field = 'monthly_rate_cents'), true);
+select public.decide_proposal((select id from proposals where field = 'aliases'), true);
+select monthly_rate_cents || ' ' || array_to_string(aliases, '|') from clients where slug = '${CSLUG}';`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(lines(r).slice(-4), ["11000", "approved", "approved", "12000 Acme LLC|Acme"]);
+});
+
+test("integration: a client proposal whose column moved is stale and writes nothing", { skip: !has0034 }, () => {
+  const r = asClientAdmin(`
+insert into proposals (kind, target_id, field, new, status, created_by)
+  values ('client', '${CSLUG}', 'notes', '"from claude"'::jsonb, 'pending', '${UID}');
+update clients set notes = 'typed by hand' where slug = '${CSLUG}';
+select public.decide_proposal((select id from proposals where field = 'notes'), true);
+select notes from clients where slug = '${CSLUG}';`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(lines(r).slice(-2), ["stale", "typed by hand"]);
+});
+
+test("integration: the database refuses a client proposal outside the whitelist or with a bad value", { skip: !has0034 }, () => {
+  for (const [field, val] of [
+    ["health", '"green"'],
+    ["stage", '"live"'],
+    ["monthly_rate_cents", '"12000"'],
+    ["monthly_rate_cents", "-5"],
+    ["billing_source", '"cash"'],
+    ["repo_url", '"http://x.test"'],
+    ["notes", "null"],
+  ]) {
+    const r = asClientAdmin(`
+insert into proposals (kind, target_id, field, new, status, created_by)
+  values ('client', '${CSLUG}', '${field}', '${val}'::jsonb, 'pending', '${UID}');`);
+    assert.notEqual(r.status, 0, `${field}=${val} was accepted`);
+    assert.match(r.stderr, /proposals_client_shape|null value/, field);
+  }
+  // every whitelisted field has one value the database accepts (a malformed pattern would refuse them all)
+  const good = asClientAdmin(`
+insert into proposals (kind, target_id, field, new, status, created_by) values
+  ('client', '${CSLUG}', 'monthly_rate_cents', '12000', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'billing_source', '"stripe"', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'mercury_customer_id', '"cus_1-A"', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'aliases', '["A"]', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'repo_url', '"https://github.com/x/y"', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'launch_date', '"2026-10-01"', 'pending', '${UID}'),
+  ('client', '${CSLUG}', 'notes', '"ok"', 'pending', '${UID}');
+select count(*) from proposals;`);
+  assert.equal(good.status, 0, good.stderr);
+  assert.equal(lines(good).slice(-1)[0], "7");
+});
+
+test("integration: staff cannot decide a client proposal or edit clients; only an admin can", { skip: !has0034 }, () => {
+  const staff = asClientAdmin(
+    `
+insert into proposals (kind, target_id, field, new, status, created_by)
+  values ('client', '${CSLUG}', 'notes', '"x"'::jsonb, 'pending', '${UID}');
+select public.decide_proposal((select id from proposals where field = 'notes'), true);`,
+    "staff"
+  );
+  assert.notEqual(staff.status, 0);
+  assert.match(staff.stderr, /not authorized/);
+  const edit = (role) =>
+    lines(
+      asClientAdmin(
+        `with u as (update clients set notes = 'x' where slug = '${CSLUG}' returning 1) select count(*) from u;`,
+        role
+      )
+    ).slice(-1)[0];
+  assert.equal(edit("staff"), "0"); // RLS hides the row from the update
+  assert.equal(edit("admin"), "1");
+});
+
+test("integration: uptime_checks is readable by HQ staff and writable by no API role", { skip: !has0034 }, () => {
+  const r = psql(`
+begin;
+insert into auth.users (id, email) values ('${UID}', 'hq34-test@example.invalid');
+insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'hq34@example.invalid', 'hq34', null, 'staff');
+insert into uptime_checks (target, ok, status, checked_at) values ('sb', true, 200, now() - interval '10 min'), ('sb', false, 503, now());
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"${UID}"}';
+select ok::text || ' ' || (last_ok_at is not null)::text from uptime_status where target = 'sb';
+rollback;`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(lines(r).slice(-1)[0], "false true"); // latest failed, an earlier OK is remembered
+  const w = psql(`
+begin;
+insert into auth.users (id, email) values ('${UID}', 'hq34-test@example.invalid');
+insert into profiles (id, email, display_name, handle, role) values ('${UID}', 'hq34@example.invalid', 'hq34', null, 'admin');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"${UID}"}';
+insert into uptime_checks (target, ok) values ('sb', true);
+rollback;`);
+  assert.notEqual(w.status, 0);
+  assert.match(w.stderr, /permission denied/);
+});
