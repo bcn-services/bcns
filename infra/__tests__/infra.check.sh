@@ -212,6 +212,13 @@ unitcheck "$work/badunit" Unit Service && bad "unit parser accepted a malformed 
 printf '[Bogus]\nA=b\n' > "$work/badsec"
 unitcheck "$work/badsec" Unit Service && bad "unit parser accepted an unknown section" || ok "unit parser rejects an unknown section"
 
+# hq-uptime.timer: timer-only, it starts the existing hq-job@ template (no service of its own).
+upt="$here/hq-uptime.timer"
+unitcheck "$upt" Unit Timer Install && ok "hq-uptime.timer parses" || bad "hq-uptime.timer has a malformed line or section"
+check "hq-uptime.timer: every 5 minutes" "$(unitval "$upt" OnCalendar)" "*:0/5"
+check "hq-uptime.timer: starts hq-job@uptime" "$(unitval "$upt" Unit)" "hq-job@uptime.service"
+check "hq-uptime.timer: installs into timers.target" "$(unitval "$upt" WantedBy)" "timers.target"
+
 echo "syntax"
 for f in "$here"/*.sh; do
   bash -n "$f" 2>/dev/null && ok "$(basename "$f") parses" || bad "$(basename "$f") syntax error"
