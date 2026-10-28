@@ -17,6 +17,7 @@ export function LeadBoard(props: {
   details: Record<string, ReactNode>;
   idle?: ReactNode;
   emptyText?: string;
+  initialKey?: string;
 }) {
   const [consult, setConsult] = useState<Row | null>(null);
   const [local, setLocal] = useState("");

@@ -68,10 +68,10 @@ function fakeSupabase({ user = USER, profile = { id: USER.id }, down = false } =
 const req = (path, { cookie, method = "GET" } = {}) =>
   new NextRequest(`http://localhost:3105${path}`, { method, headers: cookie ? { cookie } : {} });
 
-test("PUBLIC_PATHS is exactly /login /signout /api/health /mcp /authorize /token /register, plus the /.well-known/ prefix", () => {
+test("PUBLIC_PATHS is exactly /login /reset /signout /api/health /mcp /authorize /token /register, plus the /.well-known/ prefix", () => {
   assert.deepEqual(
     [...PUBLIC_PATHS],
-    ["/login", "/signout", "/api/health", "/mcp", "/authorize", "/token", "/register"]
+    ["/login", "/reset", "/signout", "/api/health", "/mcp", "/authorize", "/token", "/register"]
   );
   assert.equal(PUBLIC_PREFIX, "/.well-known/");
 });

@@ -45,6 +45,8 @@ export function Board(props: {
   /** Detail pane content when nothing is selected. */
   idle?: ReactNode;
   emptyText?: string;
+  /** Row open on first render (Today opens the top call); Esc still clears it. */
+  initialKey?: string;
   onOpen?: (row: Row) => void;
   onLeave?: () => void;
   onOutcome?: (n: 1 | 2 | 3 | 4, row: Row) => void;
@@ -55,9 +57,9 @@ export function Board(props: {
   /** Extra key hints in the footer. */
   hints?: ReactNode;
 }) {
-  const { head, sections, details, idle, emptyText, onOpen, onLeave, onOutcome, onKey, bar, hints } = props;
+  const { head, sections, details, idle, emptyText, initialKey, onOpen, onLeave, onOutcome, onKey, bar, hints } = props;
   const rows = sections.flatMap((s) => s.rows);
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(initialKey ?? null);
   const current = rows.find((r) => r.key === sel) ?? null;
   const detailRef = useRef<HTMLElement>(null);
   const handlers = useRef({ rows, current, onOpen, onLeave, onOutcome, onKey });
