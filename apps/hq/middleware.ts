@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { hardenCookie, sessionCookieOptions } from "./lib/cookie-options";
 import { getConfig } from "./lib/env";
 import { gate, type Check } from "./lib/gate";
 
@@ -9,13 +10,16 @@ const check: Check = async (request) => {
   if (!supabaseUrl || !supabaseAnonKey) return null;
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: sessionCookieOptions(),
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (all) => {
         // Host-only: no `domain` option. Refreshed tokens go to the downstream request and the browser.
         all.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
-        all.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        all.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, hardenCookie(options))
+        );
       },
     },
   });

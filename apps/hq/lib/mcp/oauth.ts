@@ -4,11 +4,20 @@
 // Difference that matters: apps/mcp hands the connector the plain Supabase session. HQ must not.
 // A profiles user can UPDATE businesses.stage and call decide_proposal straight through PostgREST,
 // so the Supabase JWT never leaves this process: /token returns random opaque tokens, and the
-// real session is mapped server-side (State.access / State.refresh, on globalThis).
+// real session is mapped server-side in public.mcp_tokens (migration 0031): keyed by an
+// HMAC-SHA256 of the opaque token under the server-only MCP_TOKEN_KEY, with an expiry, so a deploy
+// or restart no longer signs every connector out. Plain sha256 would let a bearer holder compute
+// the row key and read the session back through the anon-callable lookup; without the key nothing
+// is issued and nothing resolves.
 //
 // Cookies are ignored on purpose: HQ's own session cookie reaches this host, and nothing here may
 // read or reuse it.
-import { createHash, randomBytes as nodeRandomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes as nodeRandomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 import { isIP } from "node:net";
 import { forget } from "./limit";
 
@@ -23,6 +32,8 @@ export const CODE_TTL_MS = 60_000;
 export const MAX_CODES = 1000;
 /** Bound on live opaque pairs (oldest evicted: that user reconnects). */
 export const MAX_TOKEN_PAIRS = 1000;
+/** Opaque refresh tokens live this long (the DB refuses more than 90 days). */
+export const REFRESH_TTL_MS = 30 * 24 * 3600_000;
 export const MAX_BODY_BYTES = 16 * 1024;
 /** Failed or successful, every POST /authorize counts, per client IP (/64 for IPv6). */
 export const LOGIN_LIMIT_PER_MIN = 10;
@@ -76,6 +87,153 @@ export interface OAuthDeps {
   allowKnownIpRefresh(ip: string): boolean;
   allowUnknownIpRefresh(ip: string): boolean;
   allowUnknownRefresh(): boolean;
+  /** Where the opaque tokens live. Omitted = in this process's memory (tests). */
+  tokens?: TokenStore;
+}
+
+// ---- Token store ----------------------------------------------------------------------------
+
+/** One stored opaque token. `hash` is HMAC-SHA256 hex of the token (see TokenStore.id); the token itself is never stored. */
+export interface TokenRow {
+  hash: string;
+  kind: "access" | "refresh";
+  userId: string;
+  /** access: {jwt, handle, refresh_hash}. refresh: {sbRefresh, handle, access_hash}. */
+  payload: Record<string, unknown>;
+  expiresAt: number;
+}
+
+export interface TokenStore {
+  /** The row key for an opaque token. Throws when the store has no usable key: fail closed, never a bare sha256. */
+  id(token: string): string;
+  /** Insert or re-point a row. `jwt` is that user's Supabase access token (the DB checks it is theirs). */
+  put(jwt: string, row: TokenRow): Promise<void>;
+  /** null = unknown or expired. Throws when the store is unreachable: an outage is not "invalid". */
+  get(hash: string): Promise<TokenRow | null>;
+  del(hash: string): Promise<void>;
+  /** Every row of one user (HQ sign-out). */
+  delUser(jwt: string, userId: string): Promise<void>;
+}
+
+/** Shortest MCP_TOKEN_KEY accepted. */
+export const MIN_TOKEN_KEY_LENGTH = 32;
+
+const hmacId = (key: string, token: string): string =>
+  createHmac("sha256", key).update(token).digest("hex");
+
+/** In-process store: the default for tests, bounded like the old Maps. */
+export function memoryTokenStore(now: () => number = Date.now): TokenStore & {
+  rows: Map<string, TokenRow>;
+} {
+  const rows = new Map<string, TokenRow>();
+  const key = nodeRandomBytes(32).toString("hex"); // per instance: a memory store dies with its process anyway
+  return {
+    rows,
+    id: (token) => hmacId(key, token),
+    async put(_jwt, row) {
+      forget(rows, row.hash);
+      while (rows.size >= MAX_TOKEN_PAIRS * 2) forget(rows, rows.keys().next().value as string);
+      rows.set(row.hash, row);
+    },
+    async get(hash) {
+      const row = rows.get(hash);
+      if (!row) return null;
+      if (row.expiresAt <= now()) return (forget(rows, hash), null);
+      return row;
+    },
+    async del(hash) {
+      forget(rows, hash);
+    },
+    async delUser(_jwt, userId) {
+      for (const [h, r] of rows) if (r.userId === userId) forget(rows, h);
+    },
+  };
+}
+
+/**
+ * The public.mcp_token_* functions over PostgREST (plain fetch, hard timeout). store/revoke_user
+ * carry the user's own JWT; lookup/revoke carry only the anon key, because the caller's only
+ * credential is the token. No service-role key anywhere. `opts.fetch` is the test seam.
+ */
+export function supabaseTokenStore(
+  env: SupabaseEnv,
+  opts: { timeoutMs?: number; fetch?: typeof fetch; key?: string } = {}
+): TokenStore {
+  const doFetch = opts.fetch ?? fetch;
+  const base = `${env.url.replace(/\/+$/, "")}/rest/v1/rpc/`;
+  async function rpc(fn: string, args: Record<string, unknown>, jwt?: string): Promise<unknown> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      apikey: env.anonKey,
+    };
+    // New-format keys are not JWTs and must never be sent as a Bearer token.
+    const bearer = jwt ?? (/^sb_(publishable|secret)_/.test(env.anonKey) ? undefined : env.anonKey);
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    const res = await doFetch(base + fn, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(args),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? UPSTREAM_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      await res.body?.cancel();
+      throw new Error(`${fn}: ${res.status}`); // status only, never a body
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+  return {
+    id(token) {
+      const key = opts.key ?? process.env.MCP_TOKEN_KEY; // read per call: set on the droplet, never in a file
+      if (!key || key.length < MIN_TOKEN_KEY_LENGTH)
+        throw new Error(`MCP_TOKEN_KEY is unset or shorter than ${MIN_TOKEN_KEY_LENGTH} chars`);
+      return hmacId(key, token);
+    },
+    async put(jwt, r) {
+      await rpc(
+        "mcp_token_store",
+        {
+          p_hash: r.hash,
+          p_kind: r.kind,
+          p_user_id: r.userId,
+          p_payload: r.payload,
+          p_expires_at: new Date(r.expiresAt).toISOString(),
+        },
+        jwt
+      );
+    },
+    async get(hash) {
+      const j = (await rpc("mcp_token_lookup", { p_hash: hash })) as {
+        kind?: unknown;
+        user_id?: unknown;
+        payload?: unknown;
+        expires_at?: unknown;
+      } | null;
+      if (!j) return null;
+      const expiresAt = typeof j.expires_at === "string" ? Date.parse(j.expires_at) : NaN;
+      if (
+        (j.kind !== "access" && j.kind !== "refresh") ||
+        typeof j.user_id !== "string" ||
+        !j.payload ||
+        typeof j.payload !== "object" ||
+        Number.isNaN(expiresAt)
+      )
+        return null;
+      return {
+        hash,
+        kind: j.kind,
+        userId: j.user_id,
+        payload: j.payload as Record<string, unknown>,
+        expiresAt,
+      };
+    },
+    async del(hash) {
+      await rpc("mcp_token_revoke", { p_hash: hash });
+    },
+    async delUser(jwt, userId) {
+      await rpc("mcp_token_revoke_user", { p_user_id: userId }, jwt);
+    },
+  };
 }
 
 // ---- Supabase-backed deps -------------------------------------------------------------------
@@ -158,15 +316,13 @@ export function realRandomBytes(size: number): Buffer {
 const REDIRECT_EXACT = new Set([
   "https://claude.ai/api/mcp/auth_callback",
   "https://claude.com/api/mcp/auth_callback",
-  "https://chatgpt.com/connector_platform_oauth_redirect",
 ]);
-const CHATGPT_CONNECTOR_RE = /^https:\/\/chatgpt\.com\/connector\/oauth\/[A-Za-z0-9_-]+$/;
 const LOOPBACK_RE = /^http:\/\/(localhost|127\.0\.0\.1):\d{1,5}(\/[^#\s]*)?$/;
 
 /** Exact match for the hosted connectors, any port for loopback (Claude Code), http only there. */
 export function redirectAllowed(uri: unknown): uri is string {
   if (typeof uri !== "string" || uri.length > 512) return false;
-  if (REDIRECT_EXACT.has(uri) || CHATGPT_CONNECTOR_RE.test(uri)) return true;
+  if (REDIRECT_EXACT.has(uri)) return true;
   if (!LOOPBACK_RE.test(uri)) return false;
   try {
     const u = new URL(uri);
@@ -227,14 +383,12 @@ function appLabel(redirectUri: string): string {
   const host = new URL(redirectUri).hostname;
   if (host === "claude.ai") return "Claude (claude.ai)";
   if (host === "claude.com") return "Claude (claude.com)";
-  if (host === "chatgpt.com") return "ChatGPT (chatgpt.com)";
   return "An app on your computer";
 }
 
 function appNoun(redirectUri: string): string {
   const host = new URL(redirectUri).hostname;
   if (host === "claude.ai" || host === "claude.com") return "your Claude";
-  if (host === "chatgpt.com") return "your ChatGPT";
   return "an app on this computer";
 }
 
@@ -395,39 +549,20 @@ interface CodeRecord {
   expiresAt: number;
 }
 
-/** The Supabase session behind one opaque access token. */
-interface AccessRecord {
-  jwt: string;
-  member: Member;
-  expiresAt: number;
-  refresh: string; // the opaque refresh token issued with it
-}
-
-/** The Supabase refresh token behind one opaque refresh token. */
-interface RefreshRecord {
-  sbRefresh: string;
-  member: Member;
-  access: string; // the opaque access token issued with it
-}
-
 export interface State {
   codes: Map<string, CodeRecord>;
   /** IPs that recently completed a good exchange; first key = least recent. */
   knownIps: Map<string, number>;
-  access: Map<string, AccessRecord>;
-  refresh: Map<string, RefreshRecord>;
 }
 
 export const newState = (): State => ({
   codes: new Map(),
   knownIps: new Map(),
-  access: new Map(),
-  refresh: new Map(),
 });
 
-// ponytail: OAuth state lives in this process's memory (one standalone Next process). A restart
-// signs every connector out (they re-auth) and a second instance would break the code and token
-// hand-off. Move to Postgres the day HQ runs more than one process.
+// ponytail: auth codes (60 s) and the known-IP set live in this process's memory (one standalone
+// Next process); a restart only costs an in-flight sign-in. The tokens are in Postgres. Move the
+// codes there too the day HQ runs more than one process.
 export function oauthState(): State {
   const g = globalThis as { __hqOAuthState?: State };
   return (g.__hqOAuthState ??= newState());
@@ -436,7 +571,8 @@ export function oauthState(): State {
 // ---- Handlers -------------------------------------------------------------------------------
 
 export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
-  const { codes, knownIps, access, refresh } = state;
+  const { codes, knownIps } = state;
+  const tokens = deps.tokens ?? memoryTokenStore(deps.now);
 
   function isKnown(ip: string): boolean {
     const at = knownIps.get(ip);
@@ -461,25 +597,39 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
     }
   }
 
-  /** Mint a random opaque pair for a Supabase session and remember the mapping. Returns the pair only. */
-  function issue(session: Session, member: Member) {
+  /**
+   * Mint a random opaque pair for a Supabase session and store its hashes. Returns the pair only,
+   * or null when the store refused (nothing half-written is left usable).
+   */
+  async function issue(session: Session, member: Member) {
     const now = deps.now();
-    for (const [t, rec] of access) if (rec.expiresAt <= now) forget(access, t); // expired: refresh still works
-    while (refresh.size >= MAX_TOKEN_PAIRS) drop(refresh.keys().next().value as string);
     const accessToken = deps.randomBytes(32).toString("base64url");
     const refreshToken = deps.randomBytes(32).toString("base64url");
     const ttl = Math.max(1, session.expires_in - TOKEN_MARGIN_SECONDS);
-    access.set(accessToken, {
-      jwt: session.access_token,
-      member,
-      expiresAt: now + ttl * 1000,
-      refresh: refreshToken,
-    });
-    refresh.set(refreshToken, {
-      sbRefresh: session.refresh_token,
-      member,
-      access: accessToken,
-    });
+    let rh: string | undefined;
+    try {
+      const ah = tokens.id(accessToken);
+      rh = tokens.id(refreshToken);
+      // refresh first: an access token whose refresh row is missing would strand the connector at expiry
+      await tokens.put(session.access_token, {
+        hash: rh,
+        kind: "refresh",
+        userId: member.id,
+        payload: { sbRefresh: session.refresh_token, handle: member.handle, access_hash: ah },
+        expiresAt: now + REFRESH_TTL_MS,
+      });
+      await tokens.put(session.access_token, {
+        hash: ah,
+        kind: "access",
+        userId: member.id,
+        payload: { jwt: session.access_token, handle: member.handle, refresh_hash: rh },
+        expiresAt: now + ttl * 1000,
+      });
+    } catch (e) {
+      console.error(`[mcp] token issue failed: ${e instanceof Error ? e.message : "error"}`);
+      if (rh) await tokens.del(rh).catch(() => {});
+      return null;
+    }
     return {
       access_token: accessToken,
       token_type: "Bearer",
@@ -488,11 +638,13 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
     };
   }
 
-  /** Forget an opaque pair given its refresh token. */
-  function drop(refreshToken: string): void {
-    const rec = refresh.get(refreshToken);
-    forget(refresh, refreshToken);
-    if (rec) forget(access, rec.access);
+  /** Forget an opaque pair given its refresh row. */
+  async function drop(refreshHash: string, rec: TokenRow): Promise<void> {
+    const ah = rec.payload.access_hash;
+    await Promise.all([
+      tokens.del(refreshHash),
+      typeof ah === "string" ? tokens.del(ah) : undefined,
+    ]).catch(() => {}); // an unreachable store: the rows expire on their own
   }
 
   async function authorizeGet(req: Request): Promise<Response> {
@@ -587,15 +739,29 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
         ? deps.allowKnownIpRefresh(ip)
         : deps.allowUnknownIpRefresh(ip) && deps.allowUnknownRefresh();
       if (!admitted) return unavailable();
-      const rec = refresh.get(opaque);
-      if (!rec) return tokenError("invalid_grant"); // unknown (never issued, or already rotated): no upstream call
+      let rh: string;
+      let rec: TokenRow | null;
+      try {
+        rh = tokens.id(opaque);
+        rec = await tokens.get(rh);
+      } catch {
+        return unavailable(RETRY_AFTER_BLIP_SECONDS);
+      }
+      const sbRefresh = rec?.kind === "refresh" ? rec.payload.sbRefresh : undefined;
+      if (!rec || typeof sbRefresh !== "string") return tokenError("invalid_grant"); // unknown, expired or already rotated: no upstream call
       if (!deps.allowRefreshUpstream()) return unavailable();
-      const result = await deps.refresh(rec.sbRefresh);
+      // GoTrue rotates its refresh token on use: if we cannot finish, point the stored row at the new
+      // one so the connector's retry still works.
+      const repoint = (newRefresh: string, jwt: string) =>
+        tokens
+          .put(jwt, { ...rec, payload: { ...rec.payload, sbRefresh: newRefresh } })
+          .catch(() => {});
+      const result = await deps.refresh(sbRefresh);
       if (!result.ok && result.status !== 400 && result.status !== 403) {
         return unavailable(result.status === 0 ? RETRY_AFTER_BLIP_SECONDS : RETRY_AFTER_SECONDS);
       }
       if (!result.ok) {
-        drop(opaque); // GoTrue says the underlying refresh token is dead
+        await drop(rh, rec); // GoTrue says the underlying refresh token is dead
         return tokenError("invalid_grant");
       }
       // Membership can be revoked after sign-in: no profiles row now means no new pair.
@@ -603,19 +769,24 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
       try {
         member = await deps.member(result.session.access_token);
       } catch {
-        // GoTrue already rotated its refresh token, so keep the pair but point it at the new one for the retry.
-        rec.sbRefresh = result.session.refresh_token;
+        await repoint(result.session.refresh_token, result.session.access_token);
         return unavailable();
       }
       if (!member) {
-        drop(opaque);
+        await drop(rh, rec);
         return tokenError("invalid_grant");
+      }
+      // New pair first, then the old one goes: a store failure keeps the old pair retryable.
+      const pair = await issue(result.session, member);
+      if (!pair) {
+        await repoint(result.session.refresh_token, result.session.access_token);
+        return unavailable();
       }
       // ponytail: the old pair is dropped at once. If this response is lost, the retry with the old
       // refresh token is invalid_grant (reconnect). Keep it 10 s (GoTrue's reuse window) if that bites.
-      drop(opaque);
+      await drop(rh, rec);
       markKnown(ip);
-      return json(200, issue(result.session, member), NO_STORE);
+      return json(200, pair, NO_STORE);
     }
 
     if (grant !== "authorization_code")
@@ -636,7 +807,14 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
     if (!VERIFIER_RE.test(verifier) || !safeEqual(sha256b64u(verifier), rec.challenge))
       return tokenError("invalid_grant");
     markKnown(ipKey(clientIp(req)));
-    return json(200, issue(rec.session, rec.member), NO_STORE);
+    const pair = await issue(rec.session, rec.member);
+    if (!pair)
+      return json(
+        503,
+        { error: "temporarily_unavailable" },
+        { ...NO_STORE, "Retry-After": String(RETRY_AFTER_BLIP_SECONDS) }
+      );
+    return json(200, pair, NO_STORE);
   }
 
   // Stateless DCR: validate the redirects, mint a random client_id, remember nothing.
@@ -693,15 +871,19 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
     });
   }
 
-  /** Opaque access token -> the Supabase JWT and member behind it, or null (unknown or expired). */
-  function resolve(opaque: string): { jwt: string; member: Member } | null {
-    const rec = access.get(opaque);
-    if (!rec) return null;
-    if (rec.expiresAt <= deps.now()) {
-      forget(access, opaque);
-      return null;
-    }
-    return { jwt: rec.jwt, member: rec.member };
+  /**
+   * Opaque access token -> the Supabase JWT and member behind it, or null (unknown or expired).
+   * Throws when the token store is unreachable: that is a 503, not a 401.
+   */
+  async function resolve(opaque: string): Promise<{ jwt: string; member: Member } | null> {
+    const rec = await tokens.get(tokens.id(opaque));
+    if (!rec || rec.kind !== "access" || rec.expiresAt <= deps.now()) return null;
+    const { jwt, handle } = rec.payload;
+    if (typeof jwt !== "string") return null;
+    return {
+      jwt,
+      member: { id: rec.userId, handle: handle === "nate" || handle === "brandon" ? handle : null },
+    };
   }
 
   return {

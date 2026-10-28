@@ -216,3 +216,53 @@ test("opsFires: an unreachable platform database is reported as unavailable, not
   assert.match(fires[0].detail, /platform query failed/);
   delete process.env.PLATFORM_OPS_URL;
 });
+
+test("verifyFullUrl: always ends in sslmode=verify-full, replacing any other sslmode", async () => {
+  const { verifyFullUrl } = await import("../lib/ops.ts");
+  const V = "sslmode=verify-full";
+  assert.equal(verifyFullUrl("postgresql://u:p@h:5432/db"), `postgresql://u:p@h:5432/db?${V}`);
+  assert.equal(
+    verifyFullUrl("postgresql://u:p@h/db?sslmode=require"),
+    `postgresql://u:p@h/db?${V}`
+  );
+  assert.equal(
+    verifyFullUrl("postgresql://u:p@h/db?sslmode=disable"),
+    `postgresql://u:p@h/db?${V}`
+  );
+  assert.equal(
+    verifyFullUrl("postgresql://u:p@h/db?application_name=hq&SSLMODE=allow&x=1"),
+    `postgresql://u:p@h/db?application_name=hq&x=1&${V}`
+  );
+  // raw %, # and ? in the password survive untouched
+  assert.equal(verifyFullUrl("postgresql://u:p%w#d?x@h/db"), `postgresql://u:p%w#d?x@h/db?${V}`);
+});
+
+test("opsSnapshot rows: ticket subject is cut to 80 chars at the read path", async () => {
+  const { ticketRow } = await import("../lib/ops.ts");
+  const t = ticketRow({
+    id: "1",
+    slug: "a",
+    subject: "x".repeat(500),
+    severity: "high",
+    status: "open",
+    created_at: "2026-10-26T00:00:00Z",
+  });
+  assert.equal(t.subject.length, 80);
+});
+
+test("failureReason: a certificate verification failure names NODE_EXTRA_CA_CERTS, other errors stay plain", async () => {
+  const { failureReason } = await import("../lib/ops.ts");
+  const cert = Object.assign(new Error("self-signed certificate in certificate chain"), {
+    code: "SELF_SIGNED_CERT_IN_CHAIN",
+  });
+  assert.match(failureReason(cert), /NODE_EXTRA_CA_CERTS/);
+  assert.match(
+    failureReason(Object.assign(new Error("x"), { code: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" })),
+    /NODE_EXTRA_CA_CERTS/
+  );
+  assert.equal(
+    failureReason(new Error("connect ECONNREFUSED 127.0.0.1:1")),
+    "connect ECONNREFUSED 127.0.0.1:1"
+  );
+  assert.equal(failureReason("nope"), "error");
+});

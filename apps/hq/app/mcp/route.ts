@@ -17,7 +17,7 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
 export async function POST(req: Request): Promise<Response> {
   try {
     const rt = getRuntime();
-    const caller = authorizeMcp(req, rt);
+    const caller = await authorizeMcp(req, rt);
     if (caller instanceof Response) return caller;
     rt.oauth.markKnown(ipKey(clientIp(req)));
     const raw = await readBody(req, MAX_BODY_BYTES);
