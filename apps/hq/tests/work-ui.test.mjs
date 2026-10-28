@@ -46,7 +46,16 @@ test("Work page (v2-work A): 420px list grouped Unassigned/Nate/Brandon/Claude, 
 
 test("New task modal: Title, Description, owner, date, track, client; Esc closes; creates with clientSlug + trackId", () => {
   const m = src("components/NewTaskModal.tsx");
-  for (const t of ["New task", "Title", "Description", "Unassigned", "No track", "No client", "Create task", "Cancel"])
+  for (const t of [
+    "New task",
+    "Title",
+    "Description",
+    "Unassigned",
+    "No track",
+    "No client",
+    "Create task",
+    "Cancel",
+  ])
     assert.ok(m.includes(t), t);
   assert.match(m, /type="date"/);
   assert.match(m, /e\.key === "Escape"/);
@@ -118,4 +127,11 @@ test("fires-tasks seam: ops tasks due within 7 days + pending proposals; fires.t
   assert.match(s, /\.neq\("status", "done"\)/);
   assert.match(s, /addDays\(today, 7\)/);
   assert.match(s, /key: `proposal:\$\{p\.id\}`/);
+});
+
+test("QA fix-round-2: filter selects are fixed at the prototype's 93px; Save cannot null a client slug that has no clients row", () => {
+  assert.match(src("app/work.css"), /\.wk-filters select \{\s*flex: 0 0 93px/);
+  const d = src("components/WorkTaskDetail.tsx");
+  assert.match(d, /task\.client_slug && !clients\.some\(\(c\) => c\.slug === task\.client_slug\)/);
+  assert.match(d, /<option value=\{task\.client_slug\}>/);
 });
