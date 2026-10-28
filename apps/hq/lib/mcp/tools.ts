@@ -16,7 +16,7 @@ import {
   type Actor,
 } from "../leads";
 import { CLIENT_FIELDS } from "../clients/fields";
-import { deriveFor, loadHealthSources, type ClientBase } from "../clients/load";
+import { CLIENT_SELECT, deriveFor, loadHealthSources, type ClientBase } from "../clients/load";
 import { proposeClient } from "../clients/propose";
 import { listPendingProposals } from "../proposals";
 import {
@@ -506,7 +506,7 @@ export const TOOLS: ToolDef[] = [
       // (a bearer caller has none). Connector/job fires (lib/fires-ops.ts) are not included.
       const now = new Date();
       const today = isoDay(now);
-      const [proposals, tasks, fires, clients] = await Promise.all([
+      const [proposals, tasks, fires, clients, sources] = await Promise.all([
         listPendingProposals(sb, now),
         listTasks(sb),
         sb
@@ -518,9 +518,10 @@ export const TOOLS: ToolDef[] = [
           .order("due"),
         sb
           .from("clients")
-          .select("slug, display_name, kind, stage, health, owner")
+          .select(CLIENT_SELECT)
           .is("churn_date", null)
           .order("display_name"),
+        loadHealthSources(sb),
       ]);
       const open = tasks.filter((t) => t.status !== "done");
       return {
@@ -536,7 +537,15 @@ export const TOOLS: ToolDef[] = [
           .filter((t) => t.waiting_on?.trim().toLowerCase() === "nate")
           .sort(byDue),
         nate_tasks: open.filter((t) => t.owner === "nate").sort(byDue),
-        clients: read(clients, "clients"),
+        // health is derived (uptime + connectors + payment), never the clients.health column
+        clients: read<ClientBase[]>(clients, "clients").map((c) => ({
+          slug: c.slug,
+          display_name: c.display_name,
+          kind: c.kind,
+          stage: c.stage,
+          health: deriveFor(c, sources, now).derived.health,
+          owner: c.owner,
+        })),
       };
     },
   }),

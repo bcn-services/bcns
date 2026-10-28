@@ -11,6 +11,7 @@ export const LOGIN_PATH = "/login";
 /** Exact paths open without a session. /mcp /authorize /token /register are the OAuth surface of a later item. */
 export const PUBLIC_PATHS = [
   "/login",
+  "/reset",
   "/signout",
   "/api/health",
   "/mcp",
