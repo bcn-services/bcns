@@ -1,186 +1,198 @@
 "use client";
 
-import { useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { cycleOwner, createTaskAction, markDone } from "@/app/(app)/work/actions";
-import type { ProposalView } from "@/lib/proposals";
-import { AREAS, AREA_LABEL, OWNERS, groupByOwner, type Area } from "@/lib/tasks";
-import { ProposalDetail, ProposalTable, useDecide } from "./ProposalDecide";
+import { useMemo, useState, useTransition } from "react";
+import { cycleOwner, markDone } from "@/app/(app)/work/actions";
+import { AREA_LABEL, humanDay, workGroups, type Area } from "@/lib/tasks";
+import { buildBoard, type Track } from "@/lib/tracks";
+import { NewTaskModal, type ClientOpt } from "./NewTaskModal";
+import { TrackBoard } from "./TrackBoard";
 import { WorkTaskDetail, type WorkLink, type WorkNote, type WorkTask } from "./WorkTaskDetail";
 import { useRowKeys } from "./WorkKeys";
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const CHECK = (
-  <svg viewBox="0 0 12 12" aria-hidden="true">
-    <path d="M2 6.5l2.5 2.5L10 3.5" fill="none" stroke="currentColor" strokeWidth="2" />
-  </svg>
-);
-
-/** Work: "Needs you" proposals on top, then tasks by owner then status; detail pane on the right. */
+/** Work: tasks by person on the left, the track board on the right; an open task replaces the board. */
 export function WorkBoard(props: {
-  head: ReactNode;
-  proposals: ProposalView[];
   tasks: WorkTask[];
+  tracks: Track[];
+  clients: ClientOpt[];
   notes: Record<string, WorkNote[]>;
   links: Record<string, WorkLink[]>;
   today: string;
+  initialTask?: string | null;
 }) {
-  const { head, proposals, tasks, notes, links, today } = props;
-  const groups = groupByOwner(tasks);
-  const keys = [
-    ...proposals.map((p) => `p:${p.id}`),
-    ...groups.flatMap((g) => g.tasks.map((t) => `t:${t.id}`)),
-  ];
-  const [sel, setSel] = useState<string | null>(null);
+  const { tasks, tracks, clients, notes, links, today } = props;
+  const [sel, setSel] = useState<string | null>(props.initialTask ?? null);
+  const [modal, setModal] = useState(false);
+  const [q, setQ] = useState("");
+  const [trackF, setTrackF] = useState("");
+  const [clientF, setClientF] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
-  const { msg: decideMsg, busy: deciding, decide } = useDecide();
-  const detailRef = useRef<HTMLElement>(null);
 
-  const byKey = (k: string | null) =>
-    k?.startsWith("t:") ? tasks.find((t) => `t:${t.id}` === k) : undefined;
-  const propOf = (k: string | null) =>
-    k?.startsWith("p:") ? proposals.find((p) => `p:${p.id}` === k) : undefined;
+  const trackName = useMemo(() => new Map(tracks.map((t) => [t.id, t.name])), [tracks]);
+  const clientName = useMemo(
+    () => new Map(clients.map((c) => [c.slug, c.display_name])),
+    [clients]
+  );
+  const groups = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return workGroups(
+      tasks.filter(
+        (t) =>
+          t.status !== "done" &&
+          (!needle || t.title.toLowerCase().includes(needle)) &&
+          (!trackF || t.track_id === trackF) &&
+          (!clientF || t.client_slug === clientF)
+      )
+    );
+  }, [tasks, q, trackF, clientF]);
+  const board = useMemo(() => buildBoard(tracks, tasks), [tracks, tasks]);
+  const open = tasks.find((t) => t.id === sel);
+
   const act = (f: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await f();
       setMsg(r.ok ? null : (r.error ?? "failed"));
     });
-  const focus = (id: string) => document.getElementById(id)?.focus();
+  const byId = (k: string | null) => tasks.find((t) => t.id === k);
 
+  // The modal owns the keyboard while it is open: the row keys would otherwise act on the task hidden behind it.
   useRowKeys(
-    keys,
+    modal ? [] : groups.flatMap((g) => g.tasks.map((t) => t.id)),
     sel,
-    setSel,
-    {
-      a: (k) => propOf(k) && decide(propOf(k)!, true),
-      r: (k) => propOf(k) && decide(propOf(k)!, false),
-      d: (k) => byKey(k) && act(() => markDone(byKey(k)!.id)),
-      o: (k) => byKey(k) && act(() => cycleOwner(byKey(k)!.id, byKey(k)!.owner)),
-      w: (k) => byKey(k) && focus("wk-waiting"),
-      n: () => focus("wk-new-title"),
-    },
-    () => detailRef.current?.focus()
+    modal ? () => {} : setSel,
+    modal
+      ? {}
+      : {
+          n: () => setModal(true),
+          d: (k) => byId(k) && act(() => markDone(k!)),
+          o: (k) => byId(k) && act(() => cycleOwner(k!, byId(k)!.owner)),
+          w: (k) => byId(k) && setTimeout(() => document.getElementById("wk-waiting")?.focus(), 0),
+        },
+    modal ? undefined : () => document.getElementById("wk-board-pane")?.focus()
   );
-
-  function addTask(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const f = new FormData(form);
-    act(async () => {
-      const r = await createTaskAction({
-        title: String(f.get("title") ?? ""),
-        owner: String(f.get("owner")) as (typeof OWNERS)[number],
-        area: String(f.get("area") ?? "") || null,
-        due: String(f.get("due") ?? "") || null,
-      });
-      if (r.ok) form.reset();
-      return r;
-    });
-  }
-
-  const sp = propOf(sel);
-  const st = byKey(sel);
-  const open = tasks.filter((t) => t.status !== "done").length;
 
   return (
     <>
-      <div className="cols">
-        <section className="lst" aria-label="Work">
-          <div className="lpad">
+      <div className="wk-lay">
+        <section className="wk-l" aria-label="Tasks">
+          <div className="wk-top">
             <h1>Work</h1>
-            <p className="date">{open} open · grouped by owner</p>
-            {head}
-            <form className="newtask acts" onSubmit={addTask}>
-              <input
-                id="wk-new-title"
-                name="title"
-                placeholder="New task"
-                aria-label="Title"
-                required
-              />
-              <select name="owner" aria-label="Owner" defaultValue="nate">
-                {OWNERS.map((o) => (
-                  <option key={o} value={o}>
-                    {cap(o)}
-                  </option>
-                ))}
-              </select>
-              <select name="area" aria-label="Area" defaultValue="">
-                <option value="">No area</option>
-                {AREAS.map((a) => (
-                  <option key={a} value={a}>
-                    {AREA_LABEL[a]}
-                  </option>
-                ))}
-              </select>
-              <input type="date" name="due" aria-label="Due" />
-              <button className="btn pri sm" disabled={busy}>
-                Add <b className="k">n</b>
-              </button>
-            </form>
-            {msg ? (
-              <p className="note err" role="alert">
-                {msg}
-              </p>
-            ) : null}
-            {decideMsg ? (
-              <p className="note" role="status">
-                {decideMsg}
-              </p>
-            ) : null}
-
-            {proposals.length ? (
-              <section className="sx">
-                <div className="sh">
-                  <h2>Needs you</h2>
-                  <span className="cnt hot">{proposals.length}</span>
-                  <span className="sub">Claude proposed these</span>
-                </div>
-                <div className="card">
-                  <ProposalTable proposals={proposals} sel={sel} onSelect={setSel} />
-                </div>
-              </section>
-            ) : null}
-
-            {groups.map((g) => (
-              <section className="sx" key={g.owner}>
-                <div className="sh">
-                  <h2>{cap(g.owner)}</h2>
-                  <span className="cnt">{g.tasks.length}</span>
-                </div>
-                <div className="card">
-                  {g.tasks.length ? (
-                    g.tasks.map((t) => (
-                      <TaskRow
-                        key={t.id}
-                        t={t}
-                        today={today}
-                        on={sel === `t:${t.id}`}
-                        onSelect={() => setSel(`t:${t.id}`)}
-                        onDone={() => act(() => markDone(t.id))}
-                        onOwner={() => act(() => cycleOwner(t.id, t.owner))}
-                      />
-                    ))
-                  ) : (
-                    <div className="empty">Nothing here.</div>
-                  )}
-                </div>
-              </section>
-            ))}
+            <button className="btn pri" onClick={() => setModal(true)}>
+              + New task <b className="k">n</b>
+            </button>
           </div>
+          <div className="wk-filters">
+            <input
+              type="search"
+              placeholder="Search"
+              aria-label="Search tasks"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select aria-label="Track" value={trackF} onChange={(e) => setTrackF(e.target.value)}>
+              <option value="">Any track</option>
+              {tracks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Client"
+              value={clientF}
+              onChange={(e) => setClientF(e.target.value)}
+            >
+              <option value="">Any client</option>
+              {clients.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.display_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {msg ? (
+            <p className="note err" role="alert">
+              {msg}
+            </p>
+          ) : null}
+          {groups.map((g) => (
+            <section key={g.key} aria-label={g.label}>
+              <div className="wk-sh">
+                <h2>{g.label}</h2>
+                <span className={`cnt${g.key === "unassigned" ? " wk-warn" : ""}`}>
+                  {g.tasks.length}
+                </span>
+              </div>
+              {g.tasks.map((t) => {
+                const late = !!t.due && t.due < today;
+                const sub = [
+                  (t.track_id && trackName.get(t.track_id)) ||
+                    (t.area ? (AREA_LABEL[t.area as Area] ?? t.area) : null),
+                  t.client_slug ? (clientName.get(t.client_slug) ?? t.client_slug) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <div
+                    key={t.id}
+                    className={`wk-tr${sel === t.id ? " f" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-current={sel === t.id ? "true" : undefined}
+                    onClick={() => setSel(sel === t.id ? null : t.id)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && e.key === "Enter") setSel(t.id);
+                    }}
+                  >
+                    <button
+                      className="wk-cb"
+                      aria-label={`Mark done: ${t.title}`}
+                      disabled={busy}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (sel === t.id) setSel(null);
+                        act(() => markDone(t.id));
+                      }}
+                    />
+                    <div className="wk-tt">
+                      <div className="wk-rt">{t.title}</div>
+                      <div className="wk-s">{sub || " "}</div>
+                    </div>
+                    <span className={late ? "wk-od" : "muted"}>
+                      {t.due ? humanDay(t.due, today) : ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </section>
+          ))}
+          {!groups.length ? <p className="muted wk-empty">No open tasks match.</p> : null}
         </section>
-        <main className="detail" aria-label="Details" tabIndex={-1} ref={detailRef}>
-          {sp ? (
-            <ProposalDetail p={sp} busy={deciding} onDecide={(a) => decide(sp, a)} />
-          ) : st ? (
-            <WorkTaskDetail task={st} notes={notes[st.id] ?? []} links={links[st.id] ?? []} />
+
+        <main className="wk-r" id="wk-board-pane" aria-label="Board" tabIndex={-1}>
+          {open ? (
+            <WorkTaskDetail
+              task={open}
+              notes={notes[open.id] ?? []}
+              links={links[open.id] ?? []}
+              tracks={tracks}
+              clients={clients}
+              onBack={() => setSel(null)}
+            />
           ) : (
-            <div className="dwrap">
-              <p className="hint">Press j or click a row to open it here.</p>
-            </div>
+            <>
+              <div className="wk-bh">
+                <h2>Board</h2>
+                <span className="sub">click a step to open it</span>
+              </div>
+              <TrackBoard board={board} onStep={setSel} />
+            </>
           )}
         </main>
       </div>
+      {modal ? (
+        <NewTaskModal tracks={tracks} clients={clients} onClose={() => setModal(false)} />
+      ) : null}
       <footer className="keys">
         <span>
           <b className="k">j</b>
@@ -199,80 +211,12 @@ export function WorkBoard(props: {
           <b className="k">w</b> waiting on
         </span>
         <span>
-          <b className="k">enter</b> detail
+          <b className="k">enter</b> open
         </span>
         <span>
-          <b className="k">a</b>
-          <b className="k">r</b> approve / reject
-        </span>
-        <span>
-          <b className="k">esc</b> leave
+          <b className="k">esc</b> board
         </span>
       </footer>
     </>
-  );
-}
-
-function TaskRow(props: {
-  t: WorkTask;
-  today: string;
-  on: boolean;
-  onSelect: () => void;
-  onDone: () => void;
-  onOwner: () => void;
-}) {
-  const { t, today, on, onSelect, onDone, onOwner } = props;
-  const done = t.status === "done";
-  const late = !done && !!t.due && t.due < today;
-  const meta = [
-    t.area ? (AREA_LABEL[t.area as Area] ?? t.area) : null,
-    t.due ? `${late ? "overdue" : "due"} ${t.due}` : null,
-    t.lead,
-    t.waiting_on ? `waiting on ${t.waiting_on}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <div
-      className={`row${on ? " f" : ""}${done ? " done" : ""}`}
-      onClick={onSelect}
-      aria-current={on ? "true" : undefined}
-    >
-      <button
-        className={`cb${done ? " on" : ""}`}
-        aria-label={done ? "Done" : "Mark done"}
-        aria-pressed={done}
-        disabled={done}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDone();
-        }}
-      >
-        {done ? CHECK : null}
-      </button>
-      <div className="rb">
-        <div className="r1">
-          <span className="rt">{t.title}</span>
-          <span className="rm">
-            <span
-              className={`chip${t.status === "waiting" ? " warn" : t.status === "doing" ? " stage" : done ? " ok" : ""}`}
-            >
-              {cap(t.status)}
-            </span>
-            <button
-              className={`chip own ${t.owner ?? ""}`}
-              title="Click to cycle owner (o)"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOwner();
-              }}
-            >
-              {cap(t.owner ?? "—")}
-            </button>
-          </span>
-        </div>
-        {meta ? <div className={`r2${late ? " bad" : ""}`}>{meta}</div> : null}
-      </div>
-    </div>
   );
 }
