@@ -1,8 +1,23 @@
-# One HQ job per run: systemctl start hq-job@source (or @qualify). %i is the
-# job name passed to apps/hq/jobs/run.mjs. Fired by hq-source.timer and
-# hq-qualify.timer, so there is deliberately no [Install] section here.
-# Secrets (DATABASE_URL, GOOGLE_PLACES_API_KEY, CLAUDE_CODE_OAUTH_TOKEN) live in
-# /srv/hq/jobs.env, mode 0600, owned by hq.
+# One HQ job per run: systemctl start hq-job@source (or @qualify, @deliverable).
+# %i is the job name passed to apps/hq/jobs/run.mjs. Fired by hq-source.timer,
+# hq-qualify.timer and hq-deliverable.timer, so there is deliberately no
+# [Install] section here.
+#
+# Secrets: /srv/hq/jobs.env (mode 0600, owned by root) holds the JOBS-role
+# DATABASE_URL (the hq_jobs login from migration 0032, NOT the app's) and
+# GOOGLE_PLACES_API_KEY. CLAUDE_CODE_OAUTH_TOKEN no longer lives there: each
+# Claude subscription token is a systemd credential, readable only by this
+# service as $CREDENTIALS_DIRECTORY/claude-<handle> (see jobs/lib/claude.mjs).
+#
+# Nate-run once on the droplet before the first deliverable (never from CI):
+#   install -m 0600 -o root /dev/stdin /srv/hq/creds/claude-nate      # paste token, Ctrl-D
+#   install -m 0600 -o root /dev/stdin /srv/hq/creds/claude-brandon
+#   install -m 0600 -o root /dev/stdin /srv/hq/creds/os-deploy-key    # write-scoped deploy key for the os repo
+#   ssh-keyscan github.com > /srv/hq/jobs-state/known_hosts           # pinned host key, StrictHostKeyChecking=yes
+#   mkdir -p /srv/hq/jobs-state/claude-home && chown -R hq:hq /srv/hq/jobs-state && chmod -R g+rwX /srv/hq/jobs-state
+#   chgrp -R hq /srv/hq/os/clients /srv/hq/os/.git && chmod -R g+rwX /srv/hq/os/clients /srv/hq/os/.git
+#   find /srv/hq/os/clients /srv/hq/os/.git -type d -exec chmod g+s {} +
+# DynamicUser has no fixed uid, so it writes the os clone through SupplementaryGroups=hq.
 [Unit]
 Description=HQ job: %i
 After=network-online.target
@@ -12,20 +27,29 @@ ConditionPathExists=/srv/hq/current
 
 [Service]
 Type=oneshot
-User=hq
-Group=hq
+DynamicUser=yes
+SupplementaryGroups=hq
 WorkingDirectory=/srv/hq/current
 EnvironmentFile=/srv/hq/jobs.env
+LoadCredential=claude-nate:/srv/hq/creds/claude-nate
+LoadCredential=claude-brandon:/srv/hq/creds/claude-brandon
+LoadCredential=os-deploy-key:/srv/hq/creds/os-deploy-key
 # The claude CLI keeps its config under HOME; ProtectHome hides the real one.
-Environment=HOME=/srv/hq/claude-home
+Environment=HOME=/srv/hq/jobs-state/claude-home
+# The deliverable job reads and writes the os clone here (jobs/deliverable.mjs).
+Environment=HQ_OS_DIR=/srv/hq/os
 ExecStart=/usr/bin/node jobs/run.mjs %i
 # run.mjs stops taking new work at 22 min; this is the hard stop.
 TimeoutStartSec=25min
 MemoryMax=384M
 CPUQuota=50%
-# Hardening: read-only OS, private /tmp, no privilege escalation.
+# Hardening: read-only OS, private /tmp, no privilege escalation. The os clone is
+# read-only except clients/ (what the deliverable job writes) and .git (its commit
+# step: Claude has no Bash and git hooks are nulled).
 ProtectSystem=strict
-ReadWritePaths=/srv/hq
+ReadOnlyPaths=/srv/hq/os
+ReadWritePaths=/srv/hq/os/clients /srv/hq/jobs-state
+ReadWritePaths=/srv/hq/os/.git
 PrivateTmp=true
 NoNewPrivileges=true
 ProtectHome=true

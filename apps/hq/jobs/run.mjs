@@ -1,4 +1,4 @@
-// node jobs/run.mjs <source|qualify>
+// node jobs/run.mjs <source|qualify|deliverable>
 //
 // One entry point for the systemd units (infra/hq-job@.service). Writes one
 // events row per run, {job, kind:'run', via:'job', detail:{ok, ms, error}},
@@ -11,7 +11,7 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const JOBS = ["source", "qualify"];
+export const JOBS = ["source", "qualify", "deliverable"];
 
 // systemd's TimeoutStartSec is 25 min; this is the point after which a job
 // stops taking on new work, leaving room for the last row and the db close.
@@ -50,6 +50,10 @@ export async function jobDeps(name, { env, sql, db }) {
       cellsPerRun: num(env, "SOURCE_CELLS_PER_RUN"),
     };
   }
+  if (name === "deliverable") {
+    const { deliverableDeps } = await import("./deliverable.mjs");
+    return deliverableDeps(env);
+  }
   const [{ createFetchPage }, { claudeClient }] = await Promise.all([
     import("./lib/fetch-page.mjs"),
     import("./lib/claude.mjs"),
@@ -57,7 +61,7 @@ export async function jobDeps(name, { env, sql, db }) {
   return {
     fetchPage: createFetchPage(),
     // Absent CLI or token just means code-only scoring (qualify handles it).
-    claude: claudeClient(),
+    claude: claudeClient({ env }),
     callTasksPerDay: num(env, "CALL_TASKS_PER_DAY"),
     budgetMs: num(env, "QUALIFY_BUDGET_MS"),
   };

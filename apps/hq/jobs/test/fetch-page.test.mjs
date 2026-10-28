@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertPublicUrl, createFetchPage } from "../lib/fetch-page.mjs";
+import http from "node:http";
+import {
+  assertPublicUrl,
+  createFetchPage,
+  guardedLookup,
+  isBlockedHostname,
+  isPrivateAddr,
+  pinnedFetch,
+} from "../lib/fetch-page.mjs";
 
 const pub = async () => [{ address: "93.184.216.34" }];
 const res = (over = {}) => ({
@@ -159,4 +167,136 @@ test("the request carries a timeout signal and does not auto-follow redirects", 
   await f("https://a.example.invalid/");
   assert.equal(init.redirect, "manual");
   assert.ok(init.signal instanceof AbortSignal);
+});
+
+// --- address classes: one test each ----------------------------------------
+
+const blocked = (list) => {
+  for (const a of list) assert.equal(isPrivateAddr(a), true, a);
+};
+
+test("class: loopback 127/8 and ::1 are blocked", () => blocked(["127.0.0.1", "127.255.255.254", "::1", "0:0:0:0:0:0:0:1"]));
+test("class: RFC1918 10/8, 172.16/12, 192.168/16 are blocked (and the edges outside are not)", () => {
+  blocked(["10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.0.1"]);
+  assert.equal(isPrivateAddr("172.32.0.1"), false);
+  assert.equal(isPrivateAddr("172.15.0.1"), false);
+});
+test("class: link-local 169.254/16 (cloud metadata) and fe80::/10 are blocked", () =>
+  blocked(["169.254.169.254", "169.254.0.1", "fe80::1", "febf::1"]));
+test("class: CGNAT 100.64/10 is blocked, 100.63 and 100.128 are not", () => {
+  blocked(["100.64.0.1", "100.100.100.200", "100.127.255.255"]);
+  assert.equal(isPrivateAddr("100.63.0.1"), false);
+  assert.equal(isPrivateAddr("100.128.0.1"), false);
+});
+test("class: 0/8 and the unspecified address are blocked", () => blocked(["0.0.0.0", "0.1.2.3", "::"]));
+test("class: benchmarking 198.18/15 is blocked, 198.20 is not", () => {
+  blocked(["198.18.0.1", "198.19.255.255"]);
+  assert.equal(isPrivateAddr("198.20.0.1"), false);
+});
+test("class: multicast 224/4 and reserved 240/4 (incl. broadcast) are blocked", () =>
+  blocked(["224.0.0.1", "239.255.255.255", "240.0.0.1", "255.255.255.255"]));
+test("class: unique-local fc00::/7 and multicast ff00::/8 are blocked", () =>
+  blocked(["fc00::1", "fd12:3456::1", "ff02::1"]));
+test("class: IPv4-mapped IPv6, dotted and hex spellings, follows the v4 rules", () => {
+  blocked(["::ffff:10.0.0.1", "::ffff:127.0.0.1", "::ffff:7f00:1", "::FFFF:7F00:0001", "0:0:0:0:0:ffff:a00:1", "::ffff:a9fe:a9fe"]);
+  assert.equal(isPrivateAddr("::ffff:93.184.216.34"), false);
+  assert.equal(isPrivateAddr("::ffff:5db8:d822"), false);
+});
+test("class: NAT64 64:ff9b::/96 is blocked", () => blocked(["64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b::808:808"]));
+test("class: v4-compatible ::/96, 6to4, Teredo and documentation v6 are blocked", () =>
+  blocked(["::7f00:1", "2002:7f00:1::1", "2001::1", "2001:db8::1"]));
+test("a malformed or zone-id address fails closed", () => blocked(["not-an-ip", "fe80::1%eth0", ""]));
+test("ordinary public addresses pass", () => {
+  for (const a of ["93.184.216.34", "8.8.8.8", "1.1.1.1", "2606:4700:4700::1111", "2a00:1450:4001::200e"])
+    assert.equal(isPrivateAddr(a), false, a);
+});
+
+test("class: localhost, .localhost, .internal, .local, bare names and metadata hosts are blocked", async () => {
+  for (const h of [
+    "localhost", "LOCALHOST", "localhost.", "a.localhost", "db.internal", "metadata.google.internal",
+    "METADATA.GOOGLE.INTERNAL.", "x.local", "metadata", "instance-data", "metadata.goog", "intranet",
+  ])
+    assert.equal(isBlockedHostname(h), true, h);
+  for (const u of [
+    "http://metadata.google.internal/computeMetadata/v1/",
+    "http://169.254.169.254/latest/meta-data/",
+    "http://[::ffff:7f00:1]/",
+    "http://[64:ff9b::7f00:1]/",
+    "http://2130706433/", // decimal 127.0.0.1, normalised by URL
+    "http://0x7f.1/",
+  ])
+    await assert.rejects(assertPublicUrl(u, async () => assert.fail("must not resolve")), /blocked/, u);
+  assert.equal(isBlockedHostname("example.com"), false);
+});
+
+// --- connect-time check (the rebinding gap) ---------------------------------
+
+const cbResolver = (addrs) => (_h, _o, cb) => cb(null, addrs);
+
+test("guardedLookup: every resolved address is checked, one private among public blocks", async () => {
+  const run = (addrs, opts = {}) =>
+    new Promise((res) => guardedLookup(cbResolver(addrs))("a.example.invalid", opts, (...r) => res(r)));
+  const [e1] = await run([{ address: "93.184.216.34", family: 4 }, { address: "10.0.0.1", family: 4 }]);
+  assert.match(e1.message, /blocked host/);
+  const [e2] = await run([{ address: "::ffff:7f00:1", family: 6 }]);
+  assert.match(e2.message, /blocked host/);
+  const [e3] = await run([]);
+  assert.match(e3.message, /blocked host/);
+  assert.deepEqual(await run([{ address: "93.184.216.34", family: 4 }]), [null, "93.184.216.34", 4]);
+  assert.deepEqual(await run([{ address: "93.184.216.34", family: 4 }], { all: true }), [null, [{ address: "93.184.216.34", family: 4 }]]);
+});
+
+function server(handler) {
+  let hits = 0;
+  const srv = http.createServer((req, res) => {
+    hits++;
+    handler(req, res);
+  });
+  return new Promise((r) => srv.listen(0, "127.0.0.1", () => r({ srv, port: srv.address().port, hits: () => hits })));
+}
+
+test("rebinding: the pre-check sees a public answer, the connect-time answer is loopback: no connection is made", async () => {
+  const s = await server((_q, res) => res.end("secret"));
+  try {
+    const f = createFetchPage({
+      lookup: pub, // first resolution: public
+      fetchImpl: pinnedFetch(guardedLookup(cbResolver([{ address: "127.0.0.1", family: 4 }]))), // second: rebound
+    });
+    await assert.rejects(f(`http://rebind.example.invalid:${s.port}/`), /blocked host/);
+    assert.equal(s.hits(), 0);
+  } finally {
+    s.srv.close();
+  }
+});
+
+test("pinnedFetch connects to the validated address and streams the body through the cap", async () => {
+  const s = await server((_q, res) => res.end("x".repeat(100)));
+  try {
+    const f = createFetchPage({
+      lookup: pub,
+      maxBytes: 10,
+      fetchImpl: pinnedFetch(guardedLookup(cbResolver([{ address: "127.0.0.1", family: 4 }]), () => false)),
+    });
+    assert.equal(await f(`http://ok.example.invalid:${s.port}/`), "x".repeat(10));
+    assert.equal(s.hits(), 1);
+  } finally {
+    s.srv.close();
+  }
+});
+
+test("pinnedFetch hands redirects back unfollowed (the caller re-checks each hop)", async () => {
+  const s = await server((_q, res) => {
+    res.writeHead(302, { location: "http://evil.example.invalid/" });
+    res.end();
+  });
+  try {
+    const r = await pinnedFetch(guardedLookup(cbResolver([{ address: "127.0.0.1", family: 4 }]), () => false))(
+      `http://ok.example.invalid:${s.port}/`
+    );
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get("location"), "http://evil.example.invalid/");
+    assert.equal(s.hits(), 1);
+  } finally {
+    s.srv.close();
+  }
 });
