@@ -122,6 +122,29 @@ export function claimDeliverable(sql) {
   `;
 }
 
+// A run is killed (OOM, reboot) leaves its row `running`; the unit's hard stop is
+// 25 min, so anything older than 30 is dead.
+export function failStaleDeliverables(sql) {
+  return sql`
+    update deliverables
+    set status = 'failed', error = 'stale run', finished_at = now()
+    where status = 'running' and started_at < now() - interval '30 minutes'
+    returning id
+  `;
+}
+
+export function otherRunning(sql, id) {
+  return sql`select id from deliverables where status = 'running' and id <> ${id} limit 1`;
+}
+
+export function requeueDeliverable(sql, id) {
+  return sql`
+    update deliverables set status = 'queued', started_at = null
+    where id = ${id} and status = 'running'
+    returning id
+  `;
+}
+
 export function finishDeliverable(sql, id, { status, paths = [], error = null }) {
   return sql`
     update deliverables

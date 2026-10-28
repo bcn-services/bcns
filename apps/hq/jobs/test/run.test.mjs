@@ -275,3 +275,22 @@ test("run.mjs reached through a symlinked dir (/srv/hq/current style) still runs
     rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("an idle pass ({claimed:0}) writes no run event, so a once-a-minute timer cannot flood the ops window", async () => {
+  const s = setup({ run: async () => ({ claimed: 0 }) });
+  assert.equal(await main(s.args("deliverable")), 0);
+  assert.equal(s.events.length, 0);
+});
+
+test("a pass that did work, or a failing job, is still logged (claimed:1, claimed:0 busy is idle, throw)", async () => {
+  const w = setup({ run: async () => ({ claimed: 1, status: "failed" }) });
+  assert.equal(await main(w.args("deliverable")), 0);
+  assert.equal(w.events.length, 1);
+  const t = setup({ run: async () => { throw new Error("boom"); } });
+  assert.equal(await main(t.args("deliverable")), 1);
+  assert.equal(t.events.length, 1);
+  assert.equal(t.events[0].detail.ok, false);
+  const q = setup({ run: async () => ({ done: 0 }) }); // other jobs have no `claimed`: always logged
+  await main(q.args("qualify"));
+  assert.equal(q.events.length, 1);
+});

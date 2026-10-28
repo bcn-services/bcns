@@ -2,7 +2,8 @@
 //
 // One entry point for the systemd units (infra/hq-job@.service). Writes one
 // events row per run, {job, kind:'run', via:'job', detail:{ok, ms, error}},
-// whether the job passed or threw; exits 0 / 1 (job failed) / 2 (usage).
+// whether the job passed or threw (except an idle {claimed:0} pass); exits
+// 0 / 1 (job failed) / 2 (usage).
 //
 // DATABASE_URL is the HQ project's pooler URL, set only in /srv/hq/jobs.env.
 // `postgres` is imported only once the job name is valid and no db is injected,
@@ -82,6 +83,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
   let db;
   let ok = false;
   let error = null;
+  let out;
   try {
     if (!sql) {
       if (!env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
@@ -94,7 +96,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
     const jobDeps_ = { ...(await jobDeps(name, { env, sql, db })), ...deps.job };
     // Drop unset optionals so the job's own defaults apply.
     for (const k of Object.keys(jobDeps_)) if (jobDeps_[k] === undefined) delete jobDeps_[k];
-    const out = await mod.run({ sql, db, deadline: startedAt + PROCESS_BUDGET_MS, ...jobDeps_ });
+    out = await mod.run({ sql, db, deadline: startedAt + PROCESS_BUDGET_MS, ...jobDeps_ });
     console.log(JSON.stringify(out));
     ok = true;
   } catch (err) {
@@ -103,9 +105,13 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
   }
 
   let code = ok ? 0 : 1;
+  // An idle tick ({claimed:0}) logs nothing: the deliverable timer fires every
+  // minute and ops reads only the newest 200 run events, so idle rows would push
+  // real job failures out of that window within hours.
+  const idle = ok && out?.claimed === 0;
   try {
     if (!db || !sql) throw new Error("no database to record the run in");
-    await db.logEvent(sql, name, "run", { ok, ms: Date.now() - startedAt, error });
+    if (!idle) await db.logEvent(sql, name, "run", { ok, ms: Date.now() - startedAt, error });
   } catch (err) {
     console.error(`could not write the run event: ${String(err?.message ?? err)}`);
     code = 1;

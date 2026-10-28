@@ -81,3 +81,20 @@ test("deliverable mode: listed tools, dontAsk, allowedTools, cwd; still strict-m
   ]);
   assert.ok(!args.some((a) => /Bash|WebFetch|WebSearch/.test(a)));
 });
+
+test("a CLI that exits 0 with is_error:true (e.g. a 401) throws a short message, never the token", async () => {
+  const mk = (result) => ({
+    exec: () => Promise.resolve({ stdout: JSON.stringify({ is_error: true, result }) }),
+  });
+  const read = reader({ "/run/creds/claude-nate": "tok-secret\n" });
+  await assert.rejects(
+    claudeClient({ env: ENV, exec: mk("Failed to authenticate. API Error: 401 Invalid bearer token").exec, read }).ask("p"),
+    /^Error: claude reported an error: Failed to authenticate\. API Error: 401/
+  );
+  const echoed = await claudeClient({ env: ENV, exec: mk("bad tok-secret here ".repeat(20)).exec, read }).ask("p").catch((e) => e.message);
+  assert.ok(!echoed.includes("tok-secret"), echoed);
+  assert.ok(echoed.length < 160);
+  // is_error absent/false still returns the answer
+  const ok = { exec: () => Promise.resolve({ stdout: JSON.stringify({ is_error: false, result: "fine" }) }) };
+  assert.equal(await claudeClient({ env: ENV, exec: ok.exec, read }).ask("p"), "fine");
+});

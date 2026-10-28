@@ -85,6 +85,9 @@ export function claudeClient({
       child.child?.stdin?.end();
       const { stdout } = await child;
       const envelope = JSON.parse(stdout);
+      // The CLI exits 0 on an API error (e.g. a 401) and reports it in the envelope.
+      if (envelope.is_error)
+        throw new Error(`claude reported an error: ${String(envelope.result ?? "").replaceAll(token, "[token]").slice(0, 120)}`);
       return envelope.result ?? envelope;
     },
   };

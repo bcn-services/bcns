@@ -202,6 +202,9 @@ test("class: IPv4-mapped IPv6, dotted and hex spellings, follows the v4 rules", 
   assert.equal(isPrivateAddr("::ffff:93.184.216.34"), false);
   assert.equal(isPrivateAddr("::ffff:5db8:d822"), false);
 });
+test("class: IPv4-translated ::ffff:0:0/96 is blocked in every spelling", () => {
+  blocked(["::ffff:0:127.0.0.1", "::ffff:0:7f00:1", "0:0:0:0:ffff:0:a00:1", "::ffff:0:93.184.216.34", "::FFFF:0:808:808"]);
+});
 test("class: NAT64 64:ff9b::/96 is blocked", () => blocked(["64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b::808:808"]));
 test("class: v4-compatible ::/96, 6to4, Teredo and documentation v6 are blocked", () =>
   blocked(["::7f00:1", "2002:7f00:1::1", "2001::1", "2001:db8::1"]));

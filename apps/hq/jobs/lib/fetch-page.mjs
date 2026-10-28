@@ -56,6 +56,7 @@ export function isPrivateAddr(addr) {
     if (g.length !== 8 || g.some(Number.isNaN)) return true;
     const low96zero = g.slice(0, 6).every((x) => x === 0);
     if (low96zero) return true; // ::, ::1, ::/96 (v4-compatible)
+    if (g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g[5] === 0) return true; // ::ffff:0:0/96 IPv4-translated
     if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) {
       return blockedV4(`${g[6] >> 8}.${g[6] & 255}.${g[7] >> 8}.${g[7] & 255}`); // v4-mapped, any spelling
     }

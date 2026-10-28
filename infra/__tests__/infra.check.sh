@@ -205,6 +205,9 @@ check "hq-job@: env file" "$(unitval "$svc" EnvironmentFile)" "/srv/hq/jobs.env"
 check "hq-job@: HOME for the claude CLI" "$(unitval "$svc" Environment)" "HOME=/srv/hq/jobs-state/claude-home"
 check "hq-job@: ExecStart passes the instance name" "$(unitval "$svc" ExecStart)" "/usr/bin/node jobs/run.mjs %i"
 check "hq-job@: memory and cpu caps" "$(unitval "$svc" MemoryMax)/$(unitval "$svc" CPUQuota)" "384M/50%"
+check "hq-job@: an OOM kill leaves node alive to fail the row; group-writable files" "$(unitval "$svc" OOMPolicy) $(unitval "$svc" UMask)" "continue 0002"
+check "hq-job@: header carries the sharedRepository step, the all-three-credentials warning and the job-owned clone note" \
+  "$(grep -c -e 'git -C /srv/hq/os config core.sharedRepository group' -e 'ALL THREE credential source files' -e 'JOB-OWNED' "$svc" | tr -d ' ')" "3"
 check "hq-job@: start timeout outlasts the 22 min process budget" "$(unitval "$svc" TimeoutStartSec)" "25min"
 check "hq-job@: hardening matches bcns-app@" \
   "$(unitval "$svc" ProtectSystem) $(unitval "$svc" PrivateTmp) $(unitval "$svc" NoNewPrivileges) $(unitval "$svc" ProtectHome)" \
