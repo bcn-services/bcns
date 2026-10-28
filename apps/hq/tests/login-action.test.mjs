@@ -14,7 +14,7 @@ globalThis.AsyncLocalStorage = AsyncLocalStorage;
 process.env.NEXT_PUBLIC_SUPABASE_URL = "http://hq-test.invalid";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-key";
 
-const { signInWithPassword } = await import("../app/login/actions.ts");
+const { signInWithPassword, requestPasswordReset, setNewPassword } = await import("../app/login/actions.ts");
 const { POST: signOut } = await import("../app/signout/route.ts");
 const { NextRequest } = await import("next/server");
 const { requestAsyncStorage } =
@@ -46,12 +46,17 @@ function fakeSupabase({ login = "ok", profile = true } = {}) {
         status,
         headers: { "content-type": "application/json" },
       });
+    if (u.includes("/auth/v1/token") && u.includes("pkce")) {
+      return login === "expired" ? json(400, { error: "invalid_grant" }) : json(200, TOKEN);
+    }
     if (u.includes("/auth/v1/token")) {
       return login === "ok"
         ? json(200, TOKEN)
         : json(400, { error: "invalid_grant", error_description: "Invalid login credentials" });
     }
     if (u.includes("/auth/v1/logout")) return new Response(null, { status: 204 });
+    if (u.includes("/auth/v1/recover")) return json(200, {});
+    if (u.includes("/auth/v1/user")) return json(200, USER);
     if (u.includes("/rest/v1/profiles")) {
       return profile
         ? json(200, { id: USER.id })
@@ -68,56 +73,57 @@ function fakeSupabase({ login = "ok", profile = true } = {}) {
 }
 
 /** Runs the action inside a fake Next request scope; resolves to the redirect target (or null). */
-async function run(email = "staff@example.test", password = "pw") {
-  const jar = new Map();
+async function run(email = "staff@example.test", password = "pw", action = signInWithPassword, extra = {}, jar = new Map()) {
+  const opts = new Map(); // cookie name -> the options the app set it with
   const cookies = {
     getAll: () => [...jar].map(([name, value]) => ({ name, value })),
     get: (name) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
-    set: (name, value) => void jar.set(name, value),
+    set: (name, value, o) => void (jar.set(name, value), opts.set(name, o)),
   };
   const form = new FormData();
   form.set("email", email);
   form.set("password", password);
+  for (const [k, v] of Object.entries(extra)) form.set(k, v);
   let to = null;
   try {
     await requestAsyncStorage.run(
-      { cookies, mutableCookies: cookies, headers: new Headers() },
-      () => signInWithPassword(form)
+      { cookies, mutableCookies: cookies, headers: new Headers({ host: "hq.example.test", "x-forwarded-proto": "https" }) },
+      () => action(form)
     );
   } catch (e) {
     // next/navigation redirect() throws NEXT_REDIRECT;<type>;<url>;<status>;
     if (typeof e?.digest !== "string" || !e.digest.startsWith("NEXT_REDIRECT;")) throw e;
     to = e.digest.split(";")[2];
   }
-  return { to, jar };
+  return { to, jar, opts };
 }
 
 test("signInWithPassword: good password + profiles row -> redirect /, session cookie set", async () => {
   const calls = fakeSupabase();
-  const { to, jar } = await run();
+  const { to, jar, opts } = await run();
   assert.equal(to, "/");
-  assert.ok(
-    [...jar.keys()].some((k) => k.startsWith("sb-hq-test-auth-token")),
-    "session cookie written"
-  );
+  const name = [...jar.keys()].find((k) => k.startsWith("sb-hq-test-auth-token"));
+  assert.ok(name, "session cookie written");
+  assert.equal(opts.get(name).maxAge, 2592000, "30-day session, not @supabase/ssr's 400 days");
+  assert.equal(opts.get(name).httpOnly, true);
   assert.ok(calls.some((c) => c.includes("/rest/v1/profiles")));
   assert.ok(!calls.some((c) => c.includes("/logout")), "not signed out");
 });
 
-test("signInWithPassword: good password but NO profiles row -> signs out, /login?error=no-profile", async () => {
+test("signInWithPassword: good password but NO profiles row -> signs out, names the email", async () => {
   const calls = fakeSupabase({ profile: false });
   const { to } = await run();
-  assert.equal(to, "/login?error=no-profile");
+  assert.equal(to, "/login?error=no-profile&email=staff%40example.test");
   assert.ok(
     calls.some((c) => c.endsWith("/auth/v1/logout")),
     "signOut hit GoTrue /logout"
   );
 });
 
-test("signInWithPassword: bad password -> /login?error=invalid, profiles never read", async () => {
+test("signInWithPassword: bad password -> error=invalid with the email, profiles never read", async () => {
   const calls = fakeSupabase({ login: "bad" });
-  const { to, jar } = await run("staff@example.test", "wrong");
-  assert.equal(to, "/login?error=invalid");
+  const { to, jar } = await run("  staff@example.test ", "wrong");
+  assert.equal(to, "/login?error=invalid&email=staff%40example.test");
   assert.ok(!calls.some((c) => c.includes("/rest/v1/profiles")));
   assert.equal(jar.size, 0, "no session cookie");
 });
@@ -131,6 +137,57 @@ test("signInWithPassword: Supabase env unset -> /login?error=unconfigured", asyn
   } finally {
     process.env.NEXT_PUBLIC_SUPABASE_URL = url;
   }
+});
+
+test("signInWithPassword: GoTrue 5xx is 'failed', not a wrong-password claim", async () => {
+  fakeSupabase();
+  const fetch200 = globalThis.fetch;
+  globalThis.fetch = async (url, init) =>
+    String(url).includes("/auth/v1/token")
+      ? new Response(JSON.stringify({ msg: "down" }), { status: 503, headers: { "content-type": "application/json" } })
+      : fetch200(url, init);
+  assert.equal((await run()).to, "/login?error=failed&email=staff%40example.test");
+});
+
+test("login page source: errors name the email, forgot link, reset form needs a code", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../app/login/page.tsx", import.meta.url), "utf8");
+  assert.match(src, /`wrong password for \$\{email\}`/);
+  assert.match(src, /`no HQ account for \$\{email\}`/);
+  assert.match(src, /unconfigured: "HQ is not configured"/);
+  assert.match(src, /href="\/login\?mode=forgot"/);
+  assert.match(src, /searchParams\.mode === "reset" && searchParams\.code/);
+});
+
+test("requestPasswordReset: asks GoTrue to recover, redirectTo is the public /login?mode=reset, lands on sent", async () => {
+  const calls = fakeSupabase();
+  const bodies = [];
+  const f = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/auth/v1/recover")) bodies.push(String(url) + " " + String(init?.body));
+    return f(url, init);
+  };
+  const { to } = await run("staff@example.test", "", requestPasswordReset);
+  assert.equal(to, "/login?mode=forgot&sent=1&email=staff%40example.test");
+  assert.equal(bodies.length, 1);
+  assert.match(bodies[0], /redirect_to=https%3A%2F%2Fhq\.example\.test%2Flogin%3Fmode%3Dreset/);
+  assert.ok(calls.some((c) => c.includes("/auth/v1/recover")));
+});
+
+test("setNewPassword: short or mismatched password never spends the code; good one exchanges, updates, enters", async () => {
+  const calls = fakeSupabase();
+  // the PKCE verifier lives in the cookie jar that requested the reset email
+  const { jar } = await run("staff@example.test", "", requestPasswordReset);
+  const go = (password, confirm) => run("", password, setNewPassword, { code: "abc", confirm }, jar);
+  assert.equal((await go("short", "short")).to, "/login?mode=reset&code=abc&error=weak");
+  assert.equal((await go("longenough1", "different1")).to, "/login?mode=reset&code=abc&error=mismatch");
+  assert.ok(!calls.some((c) => c.includes("/auth/v1/token")), "code untouched");
+  assert.equal((await go("longenough1", "longenough1")).to, "/");
+  assert.ok(calls.some((c) => c.includes("/auth/v1/token")) && calls.some((c) => c.startsWith("PUT") && c.includes("/auth/v1/user")));
+  fakeSupabase({ login: "expired" }); // GoTrue refuses the code (used or past its hour)
+  const again = await run("staff@example.test", "", requestPasswordReset);
+  const goAgain = () => run("", "longenough1", setNewPassword, { code: "abc", confirm: "longenough1" }, again.jar);
+  assert.equal((await goAgain()).to, "/login?mode=forgot&error=expired");
 });
 
 test("POST /signout: Supabase logout fails (5xx) -> still 303 /login with every sb-* cookie expired", async () => {

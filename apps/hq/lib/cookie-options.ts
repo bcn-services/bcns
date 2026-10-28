@@ -17,8 +17,15 @@ export function sessionCookieOptions(): {
   };
 }
 
-/** Per-cookie options from @supabase/ssr's setAll, with the session flags forced on top. */
-export const hardenCookie = <T extends object>(options?: T) => ({
+/** 30 days. @supabase/ssr forces its own 400-day maxAge on every set, so the cap is applied here, on the way out. */
+export const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
+
+/**
+ * Per-cookie options from @supabase/ssr's setAll, with the session flags forced on top and maxAge capped
+ * at 30 days (a shorter one, e.g. 0 on removal, passes through). Every refresh re-sets it, so it rolls.
+ */
+export const hardenCookie = <T extends { maxAge?: number }>(options?: T) => ({
   ...options,
   ...sessionCookieOptions(),
+  maxAge: Math.min(options?.maxAge ?? SESSION_MAX_AGE, SESSION_MAX_AGE),
 });
