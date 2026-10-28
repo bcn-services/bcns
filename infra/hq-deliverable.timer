@@ -1,0 +1,12 @@
+# Picks up one queued deliverable (demo or quote request) per minute. A run that
+# is still active is not started twice (oneshot), so a slow Claude run just
+# delays the next claim.
+[Unit]
+Description=HQ deliverable job, every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00 UTC
+Unit=hq-job@deliverable.service
+
+[Install]
+WantedBy=timers.target

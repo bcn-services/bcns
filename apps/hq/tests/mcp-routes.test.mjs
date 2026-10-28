@@ -68,7 +68,7 @@ function boot({ limit = 1000 } = {}) {
         { url: "https://sb.example.test", anonKey: "anon.jwt.key" },
         { fetch: fetchStub, log: () => {} }
       ),
-      member: async () => ({ id: "11111111-1111-4111-8111-111111111111", handle: "nate" }),
+      member: async () => ({ id: "11111111-1111-4111-8111-111111111111", handle: "brandon" }), // staff: nate's task stays refused
       now: () => Date.now(),
       randomBytes: realRandomBytes,
       allowLogin: () => true,
@@ -229,7 +229,7 @@ test("end to end: the client holds only opaque tokens; the Supabase JWT never re
   const list = await see(await mcp.POST(rpc(pair.access_token, "tools/list")));
   assert.equal(list.status, 200);
   const names = (await list.json()).result.tools.map((t) => t.name).sort();
-  assert.equal(names.length, 13);
+  assert.equal(names.length, 18);
   assert.ok(
     names.includes("propose_lead_stage") && !names.some((n) => /approve|decide|delete/.test(n))
   );

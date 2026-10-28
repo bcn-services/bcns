@@ -6,14 +6,75 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const src = (p) => readFileSync(new URL(p, root), "utf8");
 
-test("Work keys: a/r decide the selected proposal, d done, o cycles owner, n new, w waiting", () => {
+test("Work keys: d done, o cycles owner, n opens the New task modal, w waiting, enter opens; no proposal keys", () => {
   const s = src("components/WorkBoard.tsx");
-  assert.match(s, /a: \(k\) => propOf\(k\) && decide\(propOf\(k\)!, true\)/);
-  assert.match(s, /r: \(k\) => propOf\(k\) && decide\(propOf\(k\)!, false\)/);
   assert.match(s, /d: .*markDone\(/);
   assert.match(s, /o: .*cycleOwner\(/);
-  assert.match(s, /n: \(\) => focus\("wk-new-title"\)/);
-  assert.match(s, /w: .*focus\("wk-waiting"\)/);
+  assert.match(s, /n: \(\) => setModal\(true\)/);
+  assert.match(s, /w: .*"wk-waiting"/);
+  assert.doesNotMatch(s, /decide|a: \(|r: \(/);
+});
+
+test("Work keys are off while the New task modal is open (no rows, no handlers, no selection change)", () => {
+  const s = src("components/WorkBoard.tsx");
+  const call = s.slice(s.indexOf("useRowKeys(\n"), s.indexOf("\n  );", s.indexOf("useRowKeys(\n")));
+  assert.match(call, /modal \? \[\]/);
+  assert.match(call, /modal \? \(\) => \{\}/);
+  assert.match(call, /modal\s*\? \{\}/);
+  assert.match(call, /modal \? undefined/);
+});
+
+test("Work page (v2-work A): 420px list grouped Unassigned/Nate/Brandon/Claude, filters, board with a step list per track", () => {
+  const css = src("app/work.css");
+  assert.match(css, /grid-template-columns: 420px minmax\(0, 1fr\)/);
+  const b = src("components/WorkBoard.tsx");
+  assert.match(b, /workGroups\(/);
+  for (const t of ["Search", "Any track", "Any client", "+ New task", "click a step to open it"])
+    assert.ok(b.includes(t), t);
+  assert.match(b, /<TrackBoard board=\{board\} onStep=\{setSel\}/); // a step opens the task
+  assert.match(b, /\{open \? \(\s*<WorkTaskDetail/); // an open task replaces the board
+  assert.match(b, /onBack=\{\(\) => setSel\(null\)\}/);
+  assert.match(b, /t\.status !== "done"/); // done tasks leave the list
+  assert.match(b, /Mark done:/); // checkbox completes
+  const d = src("components/WorkTaskDetail.tsx");
+  for (const t of ["← Board", "✓ Done", "Save", "Waiting on", "Unassigned", "Description"])
+    assert.ok(d.includes(t), t);
+  assert.match(d, /track_id: s\(f, "track"\) \|\| null/);
+  assert.match(d, /client_slug: s\(f, "client"\) \|\| null/);
+  assert.match(src("app/(app)/work/page.tsx"), /import "\.\.\/\.\.\/work\.css"/);
+});
+
+test("New task modal: Title, Description, owner, date, track, client; Esc closes; creates with clientSlug + trackId", () => {
+  const m = src("components/NewTaskModal.tsx");
+  for (const t of [
+    "New task",
+    "Title",
+    "Description",
+    "Unassigned",
+    "No track",
+    "No client",
+    "Create task",
+    "Cancel",
+  ])
+    assert.ok(m.includes(t), t);
+  assert.match(m, /type="date"/);
+  assert.match(m, /e\.key === "Escape"/);
+  assert.match(m, /trackId: s\("track"\) \|\| null/);
+  assert.match(m, /clientSlug: s\("client"\) \|\| null/);
+  assert.match(m, /createTaskAction\(/);
+});
+
+test("TrackBoard: shared and presentational (no 'use client', no server actions), four columns from lib/tracks; Board.tsx untouched", () => {
+  const t = src("components/TrackBoard.tsx");
+  assert.doesNotMatch(t, /use client|actions/);
+  assert.match(t, /export function TrackBoard\(/);
+  assert.match(t, /COLUMNS\.map/);
+  assert.match(src("lib/tracks.ts"), /done: "Done · 7 days"/);
+  assert.match(src("components/TrackCard.tsx"), /export function TrackCard\(/);
+});
+
+test("work.css and the v2 components set no text under 12px", () => {
+  assert.doesNotMatch(src("app/work.css"), /font-size:\s*(1[01](\.\d+)?|[0-9](\.\d+)?)px/);
 });
 
 test("Today (Nate): a/r decide, c on a fire creates the ops task but not from a task: key, d done", () => {
@@ -66,4 +127,11 @@ test("fires-tasks seam: ops tasks due within 7 days + pending proposals; fires.t
   assert.match(s, /\.neq\("status", "done"\)/);
   assert.match(s, /addDays\(today, 7\)/);
   assert.match(s, /key: `proposal:\$\{p\.id\}`/);
+});
+
+test("QA fix-round-2: filter selects are fixed at the prototype's 93px; Save cannot null a client slug that has no clients row", () => {
+  assert.match(src("app/work.css"), /\.wk-filters select \{\s*flex: 0 0 93px/);
+  const d = src("components/WorkTaskDetail.tsx");
+  assert.match(d, /task\.client_slug && !clients\.some\(\(c\) => c\.slug === task\.client_slug\)/);
+  assert.match(d, /<option value=\{task\.client_slug\}>/);
 });

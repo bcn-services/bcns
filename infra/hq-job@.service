@@ -1,8 +1,35 @@
-# One HQ job per run: systemctl start hq-job@source (or @qualify). %i is the
-# job name passed to apps/hq/jobs/run.mjs. Fired by hq-source.timer and
-# hq-qualify.timer, so there is deliberately no [Install] section here.
-# Secrets (DATABASE_URL, GOOGLE_PLACES_API_KEY, CLAUDE_CODE_OAUTH_TOKEN) live in
-# /srv/hq/jobs.env, mode 0600, owned by hq.
+# One HQ job per run: systemctl start hq-job@source (or @qualify, @deliverable).
+# %i is the job name passed to apps/hq/jobs/run.mjs. Fired by hq-source.timer,
+# hq-qualify.timer and hq-deliverable.timer, so there is deliberately no
+# [Install] section here.
+#
+# Secrets: /srv/hq/jobs.env (mode 0600, owned by root) holds the JOBS-role
+# DATABASE_URL (the hq_jobs login from migration 0032, NOT the app's) and
+# GOOGLE_PLACES_API_KEY. CLAUDE_CODE_OAUTH_TOKEN no longer lives there: each
+# Claude subscription token is a systemd credential, readable only by this
+# service as $CREDENTIALS_DIRECTORY/claude-<handle> (see jobs/lib/claude.mjs).
+#
+# ALL THREE credential source files below (claude-nate, claude-brandon, os-deploy-key) must
+# exist before the next deploy installs this unit: LoadCredential= with a missing file fails
+# every instance start (243/CREDENTIALS), source and qualify included.
+#
+# The os clone at /srv/hq/os is JOB-OWNED: only hq-job@deliverable writes it. A dirty clone
+# at the start of a run (or a commit ahead of its upstream), with no other row running, is a
+# killed run's leftovers and is discarded (hard reset to the upstream, then clean -ffdx).
+# If a run changed .git/config, .git/info/, .git/commondir or the .git/hooks listing, the job runs no more git, fails the row and writes
+# /srv/hq/jobs-state/git-meta-changed; every later run refuses until Nate inspects the clone
+# and deletes that file.
+#
+# Nate-run once on the droplet before the first deliverable (never from CI):
+#   install -m 0600 -o root /dev/stdin /srv/hq/creds/claude-nate      # paste token, Ctrl-D
+#   install -m 0600 -o root /dev/stdin /srv/hq/creds/claude-brandon
+#   install -m 0600 -o root /dev/stdin /srv/hq/creds/os-deploy-key    # write-scoped deploy key for the os repo
+#   ssh-keyscan github.com > /srv/hq/jobs-state/known_hosts           # pinned host key, StrictHostKeyChecking=yes
+#   mkdir -p /srv/hq/jobs-state/claude-home && chown -R hq:hq /srv/hq/jobs-state && chmod -R g+rwX /srv/hq/jobs-state
+#   chgrp -R hq /srv/hq/os/clients /srv/hq/os/.git && chmod -R g+rwX /srv/hq/os/clients /srv/hq/os/.git
+#   find /srv/hq/os/clients /srv/hq/os/.git -type d -exec chmod g+s {} +
+#   git -C /srv/hq/os config core.sharedRepository group              # new objects stay group-writable (UMask=0002 below)
+# DynamicUser has no fixed uid, so it writes the os clone through SupplementaryGroups=hq.
 [Unit]
 Description=HQ job: %i
 After=network-online.target
@@ -12,20 +39,38 @@ ConditionPathExists=/srv/hq/current
 
 [Service]
 Type=oneshot
-User=hq
-Group=hq
+DynamicUser=yes
+SupplementaryGroups=hq
 WorkingDirectory=/srv/hq/current
 EnvironmentFile=/srv/hq/jobs.env
+LoadCredential=claude-nate:/srv/hq/creds/claude-nate
+LoadCredential=claude-brandon:/srv/hq/creds/claude-brandon
+LoadCredential=os-deploy-key:/srv/hq/creds/os-deploy-key
 # The claude CLI keeps its config under HOME; ProtectHome hides the real one.
-Environment=HOME=/srv/hq/claude-home
+Environment=HOME=/srv/hq/jobs-state/claude-home
+# The deliverable job reads and writes the os clone here (jobs/deliverable.mjs).
+Environment=HQ_OS_DIR=/srv/hq/os
 ExecStart=/usr/bin/node jobs/run.mjs %i
 # run.mjs stops taking new work at 22 min; this is the hard stop.
 TimeoutStartSec=25min
+# 384M also bounds a deliverable's claude CLI; the droplet is small and shared with every app,
+# so it is not raised here. If a deliverable dies with SIGKILL (journalctl shows the OOM kill),
+# check `free -m`, then raise it for that instance only: systemctl edit hq-job@deliverable
+# -> [Service] MemoryMax=768M.
 MemoryMax=384M
+# An OOM kill takes the claude child, not the whole unit: node survives to mark the row
+# failed and discard the partial files (the default, stop, would leave the row `running`).
+OOMPolicy=continue
+# New files in the shared clone stay group-writable for the hq group.
+UMask=0002
 CPUQuota=50%
-# Hardening: read-only OS, private /tmp, no privilege escalation.
+# Hardening: read-only OS, private /tmp, no privilege escalation. The os clone is
+# read-only except clients/ (what the deliverable job writes) and .git (its commit
+# step: Claude has no Bash and git hooks are nulled).
 ProtectSystem=strict
-ReadWritePaths=/srv/hq
+ReadOnlyPaths=/srv/hq/os
+ReadWritePaths=/srv/hq/os/clients /srv/hq/jobs-state
+ReadWritePaths=/srv/hq/os/.git
 PrivateTmp=true
 NoNewPrivileges=true
 ProtectHome=true

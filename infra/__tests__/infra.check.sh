@@ -186,26 +186,40 @@ unitcheck() { # file allowed-sections...
 }
 unitval() { grep -E "^$2=" "$1" | head -1 | cut -d= -f2-; }
 
-svc="$here/hq-job@.service"; src="$here/hq-source.timer"; qul="$here/hq-qualify.timer"
+svc="$here/hq-job@.service"; src="$here/hq-source.timer"; qul="$here/hq-qualify.timer"; dlv="$here/hq-deliverable.timer"
 unitcheck "$svc" Unit Service && ok "hq-job@.service parses as Unit/Service" || bad "hq-job@.service has a malformed line or section"
 unitcheck "$src" Unit Timer Install && ok "hq-source.timer parses" || bad "hq-source.timer has a malformed line or section"
 unitcheck "$qul" Unit Timer Install && ok "hq-qualify.timer parses" || bad "hq-qualify.timer has a malformed line or section"
+unitcheck "$dlv" Unit Timer Install && ok "hq-deliverable.timer parses" || bad "hq-deliverable.timer has a malformed line or section"
 check "hq-job@: oneshot" "$(unitval "$svc" Type)" "oneshot"
-check "hq-job@: runs as hq" "$(unitval "$svc" User)/$(unitval "$svc" Group)" "hq/hq"
+check "hq-job@: DynamicUser, no fixed User/Group" "$(unitval "$svc" DynamicUser)/$(grep -cE '^(User|Group)=' "$svc" | tr -d ' ')" "yes/0"
+check "hq-job@: reaches the os clone through group hq" "$(unitval "$svc" SupplementaryGroups)" "hq"
+check "hq-job@: claude credentials per handle" "$(grep -E '^LoadCredential=claude-' "$svc" | tr '\n' ' ')" "LoadCredential=claude-nate:/srv/hq/creds/claude-nate LoadCredential=claude-brandon:/srv/hq/creds/claude-brandon "
+check "hq-job@: os deploy key credential" "$(grep -c '^LoadCredential=os-deploy-key:/srv/hq/creds/os-deploy-key$' "$svc" | tr -d ' ')" "1"
+check "hq-job@: os clone read-only except clients/ and jobs-state" "$(unitval "$svc" ReadOnlyPaths) | $(grep -E '^ReadWritePaths=' "$svc" | head -1 | cut -d= -f2-)" "/srv/hq/os | /srv/hq/os/clients /srv/hq/jobs-state"
+check "hq-job@: .git is writable for the commit step" "$(grep -c '^ReadWritePaths=/srv/hq/os/\.git$' "$svc" | tr -d ' ')" "1"
+check "hq-job@: nothing broader than the os subpaths is writable" "$(grep -E '^ReadWritePaths=' "$svc" | cut -d= -f2- | tr ' ' '\n' | grep -cE '^/srv/hq/?$' | tr -d ' ')" "0"
+check "hq-job@: no Claude token in the env file's contract (comment says credentials)" "$(grep -c 'CLAUDE_CODE_OAUTH_TOKEN no longer lives there' "$svc" | tr -d ' ')" "1"
+check "hq-job@: HQ_OS_DIR points at the clone" "$(grep -c '^Environment=HQ_OS_DIR=/srv/hq/os$' "$svc" | tr -d ' ')" "1"
 check "hq-job@: env file" "$(unitval "$svc" EnvironmentFile)" "/srv/hq/jobs.env"
-check "hq-job@: HOME for the claude CLI" "$(unitval "$svc" Environment)" "HOME=/srv/hq/claude-home"
+check "hq-job@: HOME for the claude CLI" "$(unitval "$svc" Environment)" "HOME=/srv/hq/jobs-state/claude-home"
 check "hq-job@: ExecStart passes the instance name" "$(unitval "$svc" ExecStart)" "/usr/bin/node jobs/run.mjs %i"
 check "hq-job@: memory and cpu caps" "$(unitval "$svc" MemoryMax)/$(unitval "$svc" CPUQuota)" "384M/50%"
+check "hq-job@: an OOM kill leaves node alive to fail the row; group-writable files" "$(unitval "$svc" OOMPolicy) $(unitval "$svc" UMask)" "continue 0002"
+check "hq-job@: header carries the sharedRepository step, the all-three-credentials warning and the job-owned clone note" \
+  "$(grep -c -e 'git -C /srv/hq/os config core.sharedRepository group' -e 'ALL THREE credential source files' -e 'JOB-OWNED' "$svc" | tr -d ' ')" "3"
 check "hq-job@: start timeout outlasts the 22 min process budget" "$(unitval "$svc" TimeoutStartSec)" "25min"
 check "hq-job@: hardening matches bcns-app@" \
-  "$(unitval "$svc" ProtectSystem) $(unitval "$svc" ReadWritePaths) $(unitval "$svc" PrivateTmp) $(unitval "$svc" NoNewPrivileges) $(unitval "$svc" ProtectHome)" \
-  "strict /srv/hq true true true"
+  "$(unitval "$svc" ProtectSystem) $(unitval "$svc" PrivateTmp) $(unitval "$svc" NoNewPrivileges) $(unitval "$svc" ProtectHome)" \
+  "strict true true true"
 check "hq-job@: template has no [Install] (timers start it)" "$(grep -c '^\[Install\]' "$svc" | tr -d ' ')" "0"
 check "hq-source.timer: Mon-Fri 11:00 UTC" "$(unitval "$src" OnCalendar)" "Mon..Fri *-*-* 11:00:00 UTC"
 check "hq-source.timer: persistent, starts hq-job@source" "$(unitval "$src" Persistent) $(unitval "$src" Unit)" "true hq-job@source.service"
 check "hq-qualify.timer: hourly 08-20 UTC" "$(unitval "$qul" OnCalendar)" "*-*-* 08..20:15:00 UTC"
 check "hq-qualify.timer: starts hq-job@qualify" "$(unitval "$qul" Unit)" "hq-job@qualify.service"
-check "both timers install into timers.target" "$(unitval "$src" WantedBy) $(unitval "$qul" WantedBy)" "timers.target timers.target"
+check "hq-deliverable.timer: every minute, starts hq-job@deliverable" "$(unitval "$dlv" OnCalendar) $(unitval "$dlv" Unit)" "*-*-* *:*:00 UTC hq-job@deliverable.service"
+check "all three timers install into timers.target" "$(unitval "$src" WantedBy) $(unitval "$qul" WantedBy) $(unitval "$dlv" WantedBy)" "timers.target timers.target timers.target"
+check "hq-deliverable has no separate .service (the template is reused)" "$([ -e "$here/hq-deliverable.service" ] && echo yes || echo no)" "no"
 # The parser must actually reject junk, or the three checks above prove nothing.
 printf '[Service]\nthis is not a key value line\n' > "$work/badunit"
 unitcheck "$work/badunit" Unit Service && bad "unit parser accepted a malformed line" || ok "unit parser rejects a malformed line"

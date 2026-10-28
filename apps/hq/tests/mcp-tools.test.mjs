@@ -6,6 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { TOOLS, stripContacts } from "../lib/mcp/tools.ts";
+import { handleMcp } from "../lib/mcp/server.ts";
 import { mcpFake } from "./_mcp-fake.mjs";
 
 delete process.env.HQ_LATE_STAGES;
@@ -13,6 +14,9 @@ const ACTOR = { id: "11111111-1111-4111-8111-111111111111", handle: "nate" };
 const BIZ = "22222222-2222-4222-8222-222222222222";
 const T_NATE = "33333333-3333-4333-8333-333333333331";
 const T_CLAUDE = "33333333-3333-4333-8333-333333333332";
+const T_BRANDON = "33333333-3333-4333-8333-333333333333";
+const TRACK = "44444444-4444-4444-8444-444444444441";
+const ADMIN = { id: "55555555-5555-4555-8555-555555555555", handle: "brandon" };
 const byName = Object.fromEntries(TOOLS.map((t) => [t.name, t]));
 const call = (sb, name, args = {}) => byName[name].run({ sb, actor: ACTOR }, args);
 
@@ -103,34 +107,90 @@ const seed = () =>
 
 const writes = (fake) => fake.ops.filter((o) => o.op !== "select");
 
-test("exactly the 13 tools, and none is named like an approve / decide / delete", () => {
+/** seed() + a brandon task, the profiles the done rule reads (brandon admin, nate staff) and one track. */
+const withTeam = () => {
+  const fake = seed();
+  fake.db.tasks.push({
+    id: T_BRANDON,
+    title: "call the supplier",
+    owner: "brandon",
+    status: "todo",
+    area: "ops",
+    due: null,
+    waiting_on: null,
+    created_at: "2026-09-03T00:00:00Z",
+  });
+  fake.db.profiles = [
+    { id: ACTOR.id, role: "staff", handle: "nate" },
+    { id: ADMIN.id, role: "admin", handle: "brandon" },
+  ];
+  fake.db.tracks = [
+    { id: TRACK, name: "Warm contacts", area: "warm", client_slug: null, column: "now", done_at: null, created_at: "2026-09-01T00:00:00Z" },
+  ];
+  return fake;
+};
+const as = (actor, sb, name, args = {}) => byName[name].run({ sb, actor }, args);
+
+test("exactly the 18 tools, and none is named like an approve / decide / delete", () => {
   assert.deepEqual(TOOLS.map((t) => t.name).sort(), [
     "add_link",
+    "add_task_note",
     "create_task",
+    "create_track",
     "get_client",
     "get_lead",
     "get_task",
+    "list_board",
     "list_tasks",
     "log_lead_note",
+    "move_track",
     "propose_client",
     "propose_finance",
     "propose_lead_stage",
     "search_leads",
     "today",
     "update_task",
+    "update_track",
   ]);
-  assert.equal(TOOLS.length, 13);
+  assert.equal(TOOLS.length, 18);
   assert.equal(TOOLS.filter((t) => /approve|decide|delete/i.test(t.name)).length, 0);
 });
 
-test("update_task -> done is refused for a task owned by nate, with no update issued", async () => {
-  const fake = seed();
+test("update_task -> done: a staff caller closing another human's task is refused naming the owner, with no write", async () => {
+  const fake = withTeam();
   await assert.rejects(
-    call(fake, "update_task", { id: T_NATE, status: "done" }),
-    /refused: this task is owned by nate/
+    call(fake, "update_task", { id: T_BRANDON, status: "done" }),
+    /refused: this task is owned by brandon/
   );
   assert.equal(writes(fake).length, 0);
-  assert.equal(fake.db.tasks.find((t) => t.id === T_NATE).status, "todo");
+  assert.equal(fake.db.tasks.find((t) => t.id === T_BRANDON).status, "todo");
+});
+
+test("update_task: staff reassigning another human's task is refused (so a refused close cannot be dodged by taking the task); admin and the owner may", async () => {
+  const fake = withTeam();
+  await assert.rejects(
+    call(fake, "update_task", { id: T_BRANDON, owner: "nate" }), // nate (staff) takes brandon's task
+    /refused: this task is owned by brandon; only brandon or an admin can reassign it/
+  );
+  assert.equal(fake.db.tasks.find((t) => t.id === T_BRANDON).owner, "brandon");
+  assert.equal(writes(fake).length, 0);
+  const other = withTeam(); // brandon (admin) may reassign nate's task; staff may hand off their own
+  assert.equal((await as(ADMIN, other, "update_task", { id: T_NATE, owner: "brandon" })).task.owner, "brandon");
+  assert.equal((await call(withTeam(), "update_task", { id: T_NATE, owner: "claude" })).task.owner, "claude");
+});
+
+test("update_task -> done: an admin closes brandon's task; staff close their own; a role-less caller is staff", async () => {
+  const fake = withTeam();
+  const closed = await as(ADMIN, fake, "update_task", { id: T_NATE, status: "done" }); // admin closes nate's
+  assert.equal(closed.task.status, "done");
+  const mine = await as(ADMIN, fake, "update_task", { id: T_BRANDON, status: "done" }); // brandon closes his own
+  assert.equal(mine.task.status, "done");
+  assert.ok(mine.task.done_at);
+  const own = withTeam(); // nate (staff) closes his own
+  assert.equal((await call(own, "update_task", { id: T_NATE, status: "done" })).task.status, "done");
+  const noProfile = seed(); // no profiles row at all: staff, so another human's task is refused
+  noProfile.db.tasks.find((t) => t.id === T_CLAUDE).owner = "brandon";
+  await assert.rejects(call(noProfile, "update_task", { id: T_CLAUDE, status: "done" }), /owned by brandon/);
 });
 
 test("update_task -> done is allowed for a task owned by claude, as via=mcp", async () => {
@@ -144,12 +204,12 @@ test("update_task -> done is allowed for a task owned by claude, as via=mcp", as
   assert.equal(ev.payload.actor, ACTOR.id);
 });
 
-test("update_task reads the CURRENT owner: a task reassigned to nate is refused, an unknown id is not found", async () => {
+test("update_task reads the CURRENT owner: a task reassigned to brandon is refused, an unknown id is not found", async () => {
   const fake = seed();
-  fake.db.tasks.find((t) => t.id === T_CLAUDE).owner = "nate";
+  fake.db.tasks.find((t) => t.id === T_CLAUDE).owner = "brandon";
   await assert.rejects(
     call(fake, "update_task", { id: T_CLAUDE, status: "done" }),
-    /owned by nate/
+    /owned by brandon/
   );
   await assert.rejects(
     call(fake, "update_task", { id: "33333333-3333-4333-8333-333333333399", status: "done" }),
@@ -170,8 +230,86 @@ test("update_task: non-done changes on anyone's task are allowed; invalid input 
   await assert.rejects(call(fake, "update_task", { id: "not-a-uuid", status: "done" }));
   await assert.rejects(call(fake, "update_task", { id: T_NATE, status: "archived" }));
   assert.equal(fake.ops.length, before, "nothing was queried");
-  const strict = await call(fake, "update_task", { id: T_NATE, owner: "claude", status: "todo" }); // unknown keys are dropped, not applied
-  assert.equal(strict.task.owner, "nate", "update_task cannot reassign a task");
+  const strict = await call(fake, "update_task", { id: T_NATE, assigned_to: "claude", status: "todo" }); // unknown keys are dropped, not applied
+  assert.equal(strict.task.owner, "nate");
+  await assert.rejects(call(fake, "update_task", { id: T_NATE, owner: "mallory" })); // owner is nate|brandon|claude
+});
+
+test("update_task reassigns nate -> brandon and sets client_slug / track_id, via=mcp", async () => {
+  const fake = withTeam();
+  const { task } = await call(fake, "update_task", {
+    id: T_NATE,
+    owner: "brandon",
+    client_slug: "acme-demo",
+    track_id: TRACK,
+  });
+  assert.equal(task.owner, "brandon");
+  assert.equal(task.client_slug, "acme-demo");
+  assert.equal(task.track_id, TRACK);
+  const ev = fake.db.events.find((e) => e.kind === "task.updated");
+  assert.deepEqual([ev.via, ev.actor], ["mcp", ACTOR.id]);
+  const cleared = await call(fake, "update_task", { id: T_NATE, client_slug: null, track_id: null });
+  assert.deepEqual([cleared.task.client_slug, cleared.task.track_id], [null, null]);
+  await assert.rejects(call(fake, "update_task", { id: T_NATE, client_slug: "Not A Slug" }));
+});
+
+test("create_task takes client_slug and track_id; add_task_note writes notes(task_id, body, actor, via=mcp) and get_task shows it", async () => {
+  const fake = withTeam();
+  const { task } = await call(fake, "create_task", {
+    title: "send invoice",
+    owner: "brandon",
+    due: "2026-10-30",
+    client_slug: "acme-demo",
+    track_id: TRACK,
+  });
+  assert.deepEqual([task.owner, task.client_slug, task.track_id, task.due, task.via], ["brandon", "acme-demo", TRACK, "2026-10-30", "mcp"]);
+  await call(fake, "add_task_note", { id: task.id, body: "waiting on PO number" });
+  const row = fake.db.notes.find((n) => n.body === "waiting on PO number");
+  assert.deepEqual([row.task_id, row.actor, row.via], [task.id, ACTOR.id, "mcp"]);
+  assert.equal(row.business_id ?? null, null);
+  const got = await call(fake, "get_task", { id: task.id });
+  assert.deepEqual(got.notes.map((n) => [n.body, n.via]), [["waiting on PO number", "mcp"]]);
+  await assert.rejects(call(fake, "add_task_note", { id: task.id, body: "" }));
+  await assert.rejects(call(fake, "create_task", { title: "x", track_id: "nope" }));
+});
+
+test("board tools: create_track, move_track (done stamps done_at, leaving clears it), update_track, list_board; none deletes", async () => {
+  const fake = withTeam();
+  const { track } = await call(fake, "create_track", { name: "Q4 pilot", area: "client", client_slug: "acme-demo" });
+  assert.equal(track.column, "next");
+  const moved = await call(fake, "move_track", { id: track.id, column: "done" });
+  assert.ok(moved.track.done_at);
+  assert.equal((await call(fake, "move_track", { id: track.id, column: "now" })).track.done_at, null);
+  const renamed = await call(fake, "update_track", { id: track.id, name: "Q4 pilot v2", client_slug: null });
+  assert.equal(renamed.track.name, "Q4 pilot v2");
+  await assert.rejects(call(fake, "update_track", { id: track.id }), /nothing to update/);
+  await assert.rejects(call(fake, "move_track", { id: track.id, column: "later" }));
+  await call(fake, "update_task", { id: T_NATE, track_id: TRACK });
+  const { board } = await call(fake, "list_board");
+  assert.deepEqual(Object.keys(board), ["now", "next", "wait", "done"]);
+  const warm = board.now.find((c) => c.id === TRACK);
+  assert.deepEqual(warm.steps.map((x) => x.id), [T_NATE]);
+  assert.ok(writes(fake).every((o) => o.op !== "delete"));
+  for (const e of fake.db.events) assert.equal(e.via, "mcp");
+});
+
+test("tools/list: create_task, update_task, add_task_note open with an imperative and name nate|brandon|claude and YYYY-MM-DD", async () => {
+  const body = { jsonrpc: "2.0", id: 1, method: "tools/list" };
+  const req = new Request("http://hq.test/mcp", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify(body),
+  });
+  const res = await handleMcp(req, { sb: seed(), actor: ACTOR }, body);
+  const rows = (await res.json()).result.tools.map((t) => [t.name, t.description]);
+  for (const name of ["create_task", "update_task", "add_task_note"]) {
+    const d = rows.find(([n]) => n === name)[1];
+    assert.match(d, /^(Create|Reassign|Add|Update|Close)\b/, name);
+    assert.ok(d.includes("nate|brandon|claude"), `${name}: owners`);
+    assert.ok(d.includes("YYYY-MM-DD"), `${name}: date format`);
+  }
+  for (const name of ["list_board", "create_track", "move_track", "update_track"])
+    assert.ok(rows.some(([n]) => n === name), name);
 });
 
 test("propose_lead_stage inserts a pending proposal with old = the current stage, via mcp, and writes nothing else", async () => {
@@ -472,12 +610,17 @@ test("writes: create_task, log_lead_note, add_link all carry via=mcp and the con
 });
 
 test("no tool, with plausible args, ever writes businesses, finance_inputs, profiles or decides a proposal", async () => {
-  const fake = seed();
+  const fake = withTeam();
   const args = {
     list_tasks: {},
     get_task: { id: T_NATE },
     create_task: { title: "x" },
     update_task: { id: T_CLAUDE, status: "done" },
+    add_task_note: { id: T_NATE, body: "n" },
+    list_board: {},
+    create_track: { name: "t" },
+    move_track: { id: TRACK, column: "wait" },
+    update_track: { id: TRACK, name: "u" },
     search_leads: { name: "h" },
     get_lead: { id: BIZ },
     log_lead_note: { business_id: BIZ, body: "n" },
@@ -508,7 +651,7 @@ test("no tool, with plausible args, ever writes businesses, finance_inputs, prof
   assert.equal(
     writes(fake)
       .filter((o) => o.op === "update")
-      .every((o) => o.table === "tasks"),
+      .every((o) => o.table === "tasks" || o.table === "tracks"),
     true
   );
   assert.equal(fake.db.businesses[0].stage, "qualified");
