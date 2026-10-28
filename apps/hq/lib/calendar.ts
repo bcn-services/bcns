@@ -110,3 +110,18 @@ export async function loadCalendar(
   }
   return { state: "ok", events };
 }
+
+const ET = "America/New_York";
+const etDay = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: ET });
+
+/** "2:00" for today (ET), "Wed 2:00" later this week, "all day" / "Wed" for all-day events. */
+export function calTime(e: Pick<CalEvent, "start" | "allDay">, now: Date): string {
+  // an all-day `start` is a bare date: pin it to noon UTC so every zone reads the same day
+  const d = new Date(e.allDay ? `${e.start}T12:00:00Z` : e.start);
+  const today = etDay(d) === etDay(now);
+  const day = d.toLocaleDateString("en-US", { timeZone: e.allDay ? "UTC" : ET, weekday: "short" });
+  if (e.allDay) return today && e.start === etDay(now) ? "all day" : `${day} all day`;
+  const t = d.toLocaleTimeString("en-US", { timeZone: ET, hour: "numeric", minute: "2-digit", hour12: true });
+  const hm = t.replace(/\s?[AP]M$/, "");
+  return today ? hm : `${day} ${hm}`;
+}

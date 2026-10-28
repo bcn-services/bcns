@@ -121,3 +121,14 @@ test("a garbage private key degrades to error instead of throwing", async () => 
   const { f } = stub();
   assert.equal((await loadCalendar("nate@bcn-services.com", { fetch: f, now: NOW })).state, "error");
 });
+
+test("calTime: ET clock without am/pm, weekday prefix off today, all-day wording", async () => {
+  const { calTime } = await import("../lib/calendar.ts");
+  const now = new Date("2026-10-27T15:00:00Z"); // Tue Oct 27, 11:00 ET
+  assert.equal(calTime({ start: "2026-10-27T19:00:00Z", allDay: false }, now), "3:00");
+  assert.equal(calTime({ start: "2026-10-28T18:30:00Z", allDay: false }, now), "Wed 2:30");
+  assert.equal(calTime({ start: "2026-10-27", allDay: true }, now), "all day");
+  assert.equal(calTime({ start: "2026-10-30", allDay: true }, now), "Fri all day");
+  // 02:00 UTC on the 28th is still the 27th in New York
+  assert.equal(calTime({ start: "2026-10-28T02:00:00Z", allDay: false }, now), "10:00");
+});
