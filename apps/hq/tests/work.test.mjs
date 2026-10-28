@@ -473,6 +473,9 @@ test("buildBoard: open orphan tasks form one Unassigned card, last in Now; none 
   assert.equal(b.now[1].track.name, "Unassigned");
   assert.deepEqual(b.now[1].steps.map((s) => s.id), ["o2", "o3"]);
   for (const c of ["next", "wait", "done"]) assert.equal(b[c].length, 0);
+  // a task on a hidden (done > 7 days) track is not an orphan
+  const stale = [{ id: "old", name: "old", column: "done", done_at: "2020-01-01T00:00:00Z" }];
+  assert.equal(TR.buildBoard(stale, [{ id: "x", track_id: "old", status: "todo" }], NOW).now.length, 0);
   const none = TR.buildBoard(tracks, [open[0], open[3]], NOW);
   assert.deepEqual(none.now.map((c) => c.track.id), ["now1"]);
 });
