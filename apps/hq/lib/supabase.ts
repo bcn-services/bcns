@@ -6,6 +6,7 @@
 
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { hardenCookie, sessionCookieOptions } from "./cookie-options";
 import { getConfig } from "./env";
 
 /** Null when Supabase env is unset (callers treat that as signed-out / unconfigured). */
@@ -14,12 +15,13 @@ export function createSupabaseServer() {
   if (!supabaseUrl || !supabaseAnonKey) return null;
   const jar = cookies();
   return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: sessionCookieOptions(),
     cookies: {
       getAll: () => jar.getAll(),
       setAll: (all) => {
         // Server components cannot set cookies; middleware refreshes the session instead.
         try {
-          all.forEach(({ name, value, options }) => jar.set(name, value, options));
+          all.forEach(({ name, value, options }) => jar.set(name, value, hardenCookie(options)));
         } catch {
           // read-only cookie store
         }
