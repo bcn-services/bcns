@@ -180,6 +180,17 @@ export function byDue(a: { due: string | null }, b: { due: string | null }): num
   return (a.due ?? "9999").localeCompare(b.due ?? "9999");
 }
 
+/** The steps one person works today: theirs, due by today or in progress, plus what they finished today. */
+export function todaySteps<T extends Task>(tasks: T[], me: string, today: string): T[] {
+  return tasks.filter(
+    (t) =>
+      t.owner === me &&
+      (t.status === "done"
+        ? (t.done_at ?? "") >= today
+        : t.status === "doing" || (!!t.due && t.due <= today))
+  );
+}
+
 const byRank = (a: Task, b: Task) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDue(a, b);
 
 /** Owner sections (Nate, Brandon, Claude), each ordered by status then due. */
@@ -195,7 +206,11 @@ export function workGroups<T extends Task>(
   tasks: T[]
 ): { key: "unassigned" | Owner; label: string; tasks: T[] }[] {
   return [
-    { key: "unassigned" as const, label: "Unassigned", tasks: tasks.filter((t) => !t.owner).sort(byRank) },
+    {
+      key: "unassigned" as const,
+      label: "Unassigned",
+      tasks: tasks.filter((t) => !t.owner).sort(byRank),
+    },
     ...groupByOwner(tasks).map((g) => ({
       key: g.owner,
       label: g.owner.charAt(0).toUpperCase() + g.owner.slice(1),

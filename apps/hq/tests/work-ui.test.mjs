@@ -135,3 +135,27 @@ test("QA fix-round-2: filter selects are fixed at the prototype's 93px; Save can
   assert.match(d, /task\.client_slug && !clients\.some\(\(c\) => c\.slug === task\.client_slug\)/);
   assert.match(d, /<option value=\{task\.client_slug\}>/);
 });
+
+test("Today (Nate) matches Work: same 420px split, a selected task or board step opens WorkTaskDetail on the right, board = todaySteps for the signed-in handle", () => {
+  const css = src("app/globals.css");
+  assert.match(css, /\.td-lay \{[^}]*grid-template-columns: 420px minmax\(0, 1fr\)/);
+  assert.doesNotMatch(css, /\.td-lay \{\s*grid-template-columns: 340px/); // no narrow override Work lacks
+  const b = src("components/TodayNateBoard.tsx");
+  assert.match(b, /sel === `t:\$\{t\.id\}`/); // a board step selects its task
+  assert.match(b, /\{task \? \(\s*<WorkTaskDetail/); // which replaces the board
+  assert.match(b, /onBack=\{\(\) => setSel\(null\)\}/);
+  assert.match(b, /<TrackBoard board=\{board\} onStep=\{\(id\) => setSel\(`t:\$\{id\}`\)\}/);
+  const n = src("components/TodayNate.tsx");
+  assert.match(n, /todaySteps\(tasks, me, today\)/);
+  assert.match(n, /const me = profile\.handle/);
+  assert.match(n, /filter\(\(card\) => card\.steps\.length\)/); // empty tracks drop off Today
+  // Work and Today load the detail data through one loader
+  assert.match(src("app/(app)/work/page.tsx"), /loadWorkData\(sb\)/);
+  assert.match(n, /loadWorkData\(sb\)/);
+});
+
+test("Numbers funnel: bars scale to the largest stage, so a stage above Calls cannot overflow the card", () => {
+  const v = src("app/(app)/numbers/View.tsx");
+  assert.match(v, /const top = Math\.max\(1, \.\.\.steps\.map\(\(\[, v\]\) => last\(v\)\)\)/);
+  assert.doesNotMatch(v, /const top = last\(calls\)/);
+});
