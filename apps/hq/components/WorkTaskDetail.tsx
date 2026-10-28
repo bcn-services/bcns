@@ -123,6 +123,10 @@ export function WorkTaskDetail(props: {
           <dd>
             <select name="client" aria-label="Client" defaultValue={task.client_slug ?? ""}>
               <option value="">No client</option>
+              {/* A slug with no clients row (no FK, or the clients query failed) stays selected, so Save cannot null it. */}
+              {task.client_slug && !clients.some((c) => c.slug === task.client_slug) && (
+                <option value={task.client_slug}>{task.client_slug}</option>
+              )}
               {clients.map((c) => (
                 <option key={c.slug} value={c.slug}>
                   {c.display_name}

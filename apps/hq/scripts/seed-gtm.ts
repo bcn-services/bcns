@@ -124,7 +124,7 @@ export async function seedGtm(
     if (r.error) throw new Error(`tracks insert: ${r.error.message}`);
     for (const row of (r.data ?? []) as Row[]) idByName.set(row.name, row.id);
   }
-  // tasks: first run inserts all in ONE statement (a failure leaves none); later runs only back-fill track_id
+  // tasks: first run inserts all in ONE statement (a failure leaves none); a run that creates tracks over existing tasks back-fills track_id; any other rerun changes nothing
   const haveTasks = await read("tasks", "id, title, track_id", ["source", "tracker"]);
   let inserted = 0;
   let linked = 0;
@@ -134,7 +134,8 @@ export async function seedGtm(
       .insert(tasks.map((t) => buildTaskRow(actor, "job", { ...t, trackId: idByName.get(t.track) }, now)));
     if (ins.error) throw new Error(`tasks insert: ${ins.error.message}`);
     inserted = tasks.length;
-  } else {
+  } else if (missing.length) {
+    // Only the run that creates the tracks back-fills: a later rerun must not re-link a step someone unlinked.
     for (const t of tasks) {
       const ids = haveTasks
         .filter((h) => h.title === t.title && !h.track_id)

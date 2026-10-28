@@ -91,6 +91,15 @@ test("--apply on a db seeded before tracks existed adds the tracks and back-fill
   assert.ok(sb.db.tasks.every((t) => t.track_id));
 });
 
+test("a rerun does not re-link a step someone unlinked from its track", async () => {
+  const sb = fakeSb();
+  await seedGtm(sb, ACTOR, seed, () => {});
+  sb.db.tasks[0].track_id = null; // unlinked on purpose
+  const r = await seedGtm(sb, ACTOR, seed, () => {});
+  assert.deepEqual(r, { tracks: 0, tasks: 0, items: 0 });
+  assert.equal(sb.db.tasks[0].track_id, null);
+});
+
 test("--apply inserts every task in ONE insert; a failed insert leaves nothing and a rerun works", async () => {
   const sb = fakeSb();
   let taskInserts = 0;

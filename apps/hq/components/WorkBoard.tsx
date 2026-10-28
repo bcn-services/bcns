@@ -55,17 +55,20 @@ export function WorkBoard(props: {
     });
   const byId = (k: string | null) => tasks.find((t) => t.id === k);
 
+  // The modal owns the keyboard while it is open: the row keys would otherwise act on the task hidden behind it.
   useRowKeys(
-    groups.flatMap((g) => g.tasks.map((t) => t.id)),
+    modal ? [] : groups.flatMap((g) => g.tasks.map((t) => t.id)),
     sel,
-    setSel,
-    {
-      n: () => setModal(true),
-      d: (k) => byId(k) && act(() => markDone(k!)),
-      o: (k) => byId(k) && act(() => cycleOwner(k!, byId(k)!.owner)),
-      w: (k) => byId(k) && setTimeout(() => document.getElementById("wk-waiting")?.focus(), 0),
-    },
-    () => document.getElementById("wk-board-pane")?.focus()
+    modal ? () => {} : setSel,
+    modal
+      ? {}
+      : {
+          n: () => setModal(true),
+          d: (k) => byId(k) && act(() => markDone(k!)),
+          o: (k) => byId(k) && act(() => cycleOwner(k!, byId(k)!.owner)),
+          w: (k) => byId(k) && setTimeout(() => document.getElementById("wk-waiting")?.focus(), 0),
+        },
+    modal ? undefined : () => document.getElementById("wk-board-pane")?.focus()
   );
 
   return (

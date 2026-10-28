@@ -15,6 +15,15 @@ test("Work keys: d done, o cycles owner, n opens the New task modal, w waiting, 
   assert.doesNotMatch(s, /decide|a: \(|r: \(/);
 });
 
+test("Work keys are off while the New task modal is open (no rows, no handlers, no selection change)", () => {
+  const s = src("components/WorkBoard.tsx");
+  const call = s.slice(s.indexOf("useRowKeys(\n"), s.indexOf("\n  );", s.indexOf("useRowKeys(\n")));
+  assert.match(call, /modal \? \[\]/);
+  assert.match(call, /modal \? \(\) => \{\}/);
+  assert.match(call, /modal\s*\? \{\}/);
+  assert.match(call, /modal \? undefined/);
+});
+
 test("Work page (v2-work A): 420px list grouped Unassigned/Nate/Brandon/Claude, filters, board with a step list per track", () => {
   const css = src("app/work.css");
   assert.match(css, /grid-template-columns: 420px minmax\(0, 1fr\)/);

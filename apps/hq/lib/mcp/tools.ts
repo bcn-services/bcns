@@ -194,7 +194,7 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status, body, waiting_on, client_slug, track_id. status=done: an admin closes any task; anyone else closes their own and claude's, and is refused on another person's task.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status, body, waiting_on, client_slug, track_id. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
@@ -208,23 +208,27 @@ export const TOOLS: ToolDef[] = [
     },
     async run({ sb, actor }, a) {
       const { id, ...patch } = a;
-      // Read the CURRENT row when the owner gates a close, or when waiting_on alone must pick the status (as the UI does).
+      // Read the CURRENT row when the owner gates a close or a reassign, or when waiting_on alone must pick the status (as the UI does).
       const byWaiting = a.status === undefined && a.waiting_on !== undefined;
-      if (a.status === "done" || byWaiting) {
+      const gated = a.status === "done" || a.owner !== undefined;
+      if (gated || byWaiting) {
         const cur = read<{ owner: string | null; status: Status } | null>(
           await sb.from("tasks").select("owner, status").eq("id", id).maybeSingle(),
           "task"
         );
         if (!cur) throw new ToolError("task not found");
-        // The done rule: an admin closes anything; staff close their own and claude's (or unowned) tasks.
-        if (a.status === "done" && cur.owner && cur.owner !== "claude" && cur.owner !== actor.handle) {
+        // The owner rule: an admin changes anything; staff close or reassign their own, claude's and unowned tasks only.
+        // Reassigning is gated like closing, or a refused close could be dodged by taking the task first.
+        if (gated && cur.owner && cur.owner !== "claude" && cur.owner !== actor.handle) {
           const me = read<{ role: string } | null>(
             await sb.from("profiles").select("role").eq("id", actor.id).maybeSingle(),
             "profile"
           );
           if (me?.role !== "admin")
             throw new ToolError(
-              `refused: this task is owned by ${cur.owner}; only ${cur.owner} or an admin can mark it done. Tell the user and leave it.`
+              `refused: this task is owned by ${cur.owner}; only ${cur.owner} or an admin can ${
+                a.status === "done" ? "mark it done" : "reassign it"
+              }. Tell the user and leave it.`
             );
         }
         if (byWaiting) patch.status = waitingStatus(a.waiting_on ?? "", cur.status);

@@ -165,6 +165,19 @@ test("update_task -> done: a staff caller closing another human's task is refuse
   assert.equal(fake.db.tasks.find((t) => t.id === T_BRANDON).status, "todo");
 });
 
+test("update_task: staff reassigning another human's task is refused (so a refused close cannot be dodged by taking the task); admin and the owner may", async () => {
+  const fake = withTeam();
+  await assert.rejects(
+    call(fake, "update_task", { id: T_BRANDON, owner: "nate" }), // nate (staff) takes brandon's task
+    /refused: this task is owned by brandon; only brandon or an admin can reassign it/
+  );
+  assert.equal(fake.db.tasks.find((t) => t.id === T_BRANDON).owner, "brandon");
+  assert.equal(writes(fake).length, 0);
+  const other = withTeam(); // brandon (admin) may reassign nate's task; staff may hand off their own
+  assert.equal((await as(ADMIN, other, "update_task", { id: T_NATE, owner: "brandon" })).task.owner, "brandon");
+  assert.equal((await call(withTeam(), "update_task", { id: T_NATE, owner: "claude" })).task.owner, "claude");
+});
+
 test("update_task -> done: an admin closes brandon's task; staff close their own; a role-less caller is staff", async () => {
   const fake = withTeam();
   const closed = await as(ADMIN, fake, "update_task", { id: T_NATE, status: "done" }); // admin closes nate's

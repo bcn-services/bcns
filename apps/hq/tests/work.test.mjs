@@ -437,6 +437,9 @@ test("tracks: create / move / update write the row and an events row; done stamp
   assert.deepEqual([t.name, t.column, t.done_at], ["Pilot", "next", null]);
   const done = await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", NOW);
   assert.equal(done.done_at, "2026-10-27T15:00:00.000Z");
+  const later = new Date("2026-11-01T00:00:00Z"); // done -> done keeps done_at and writes no second event
+  assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", later)).done_at, "2026-10-27T15:00:00.000Z");
+  assert.equal(sb.db.events.filter((e) => e.kind === "track.moved").length, 1);
   assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "now", NOW)).done_at, null);
   assert.equal((await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot 2", client_slug: "acme-demo" })).client_slug, "acme-demo");
   assert.deepEqual(sb.db.events.map((e) => [e.kind, e.via]), [

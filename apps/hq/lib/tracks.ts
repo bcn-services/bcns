@@ -124,6 +124,9 @@ export async function moveTrack(
   now: Date = new Date()
 ): Promise<Track> {
   const set = columnPatch(assertColumn(column), now);
+  // done -> done keeps the original done_at: a repeat must not restart the 7-day Done window.
+  const cur = must<Track>(await sb.from("tracks").select("*").eq("id", id).single(), "tracks read");
+  if (cur.column === "done" && column === "done") return cur;
   const row = must<Track>(await sb.from("tracks").update(set).eq("id", id).select().single(), "tracks move");
   await logEvent(sb, actor, via, "track.moved", { track_id: id, ...set });
   return row;

@@ -40,7 +40,7 @@
   flex: 1;
 }
 .wk-filters select {
-  flex: 0 1 120px;
+  flex: 0 0 93px; /* the prototype width: Search keeps the rest (~187px at 1440) */
 }
 .wk-filters select,
 .wk-filters input,
