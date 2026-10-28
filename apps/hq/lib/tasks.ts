@@ -186,7 +186,7 @@ export function todaySteps<T extends Task>(tasks: T[], me: string, today: string
     (t) =>
       t.owner === me &&
       (t.status === "done"
-        ? (t.done_at ?? "") >= today
+        ? !!t.done_at && isoDay(new Date(t.done_at)) >= today
         : t.status === "doing" || (!!t.due && t.due <= today))
   );
 }

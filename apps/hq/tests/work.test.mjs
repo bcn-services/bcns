@@ -518,6 +518,8 @@ test("todaySteps: only mine, due by today or doing, plus done today; undated tod
     t({ id: "doing-undated", owner: "nate", status: "doing" }),
     t({ id: "done-today", owner: "nate", status: "done", done_at: "2026-10-28T14:00:00Z" }),
     t({ id: "done-yesterday", owner: "nate", status: "done", done_at: "2026-10-27T14:00:00Z" }),
+    // 11pm New York on Oct 27 is already Oct 28 in UTC: it belongs to the 27th
+    t({ id: "done-late-27", owner: "nate", status: "done", done_at: "2026-10-28T03:00:00Z" }),
     t({ id: "tomorrow", owner: "nate", due: "2026-10-29" }),
     t({ id: "undated-todo", owner: "nate" }),
     t({ id: "brandons", owner: "brandon", due: "2026-10-28" }),
@@ -530,5 +532,11 @@ test("todaySteps: only mine, due by today or doing, plus done today; undated tod
   assert.deepEqual(
     T.todaySteps(tasks, "brandon", "2026-10-28").map((x) => x.id),
     ["brandons"]
+  );
+  assert.deepEqual(
+    T.todaySteps(tasks, "nate", "2026-10-27")
+      .filter((x) => x.status === "done")
+      .map((x) => x.id),
+    ["done-today", "done-yesterday", "done-late-27"]
   );
 });

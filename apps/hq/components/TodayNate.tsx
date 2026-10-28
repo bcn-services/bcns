@@ -36,7 +36,9 @@ export async function TodayNate() {
   const steps = todaySteps(tasks, me, today);
   const board = buildBoard(tracks, steps, now);
   for (const c of COLUMNS) board[c] = board[c].filter((card) => card.steps.length);
-  const stepsDone = steps.filter((t) => t.status === "done").length;
+  // count what the board draws (steps on a shown track), not every todaySteps result
+  const onBoard = COLUMNS.flatMap((c) => board[c].flatMap((card) => card.steps));
+  const stepsDone = onBoard.filter((t) => t.status === "done").length;
 
   return (
     <TodayNateBoard
@@ -59,7 +61,7 @@ export async function TodayNate() {
         .sort(byDue)}
       calendar={<TodayCalendar cal={cal} now={now} />}
       board={board}
-      boardSub={`${steps.length} step${steps.length === 1 ? "" : "s"} · ${stepsDone} done`}
+      boardSub={`${onBoard.length} step${onBoard.length === 1 ? "" : "s"} · ${stepsDone} done`}
     />
   );
 }

@@ -76,7 +76,14 @@ export function TodayNateBoard(props: {
     a: () => prop && decide(prop, true),
     r: () => prop && decide(prop, false),
     c: () => makeTask(fire),
-    d: () => task && act(() => markDone(task.id), null),
+    // close the pane too: the task stays in `tasks` after revalidation, so `sel` would keep finding it
+    d: () =>
+      task &&
+      act(async () => {
+        const r = await markDone(task.id);
+        if (r.ok) setSel(null);
+        return r;
+      }, null),
   });
 
   const row = (key: string, title: string, meta?: string, right?: ReactNode) => (
