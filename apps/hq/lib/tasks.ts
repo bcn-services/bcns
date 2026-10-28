@@ -61,6 +61,7 @@ export interface Task {
   source: Source;
   business_id: string | null;
   client_slug: string | null;
+  track_id: string | null;
   alert_key: string | null;
   waiting_on: string | null;
   done_at: string | null;
@@ -92,6 +93,24 @@ function assertStatus(s: unknown): Status {
   return s as Status;
 }
 
+/** null / "" = unassigned (tasks.owner is nullable); anything else must be a real owner. */
+export function assertOwnerOrNull(o: unknown): Owner | null {
+  return o === null || o === "" ? null : assertOwner(o);
+}
+
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function assertSlug(s: unknown): string | null {
+  if (s === null || s === "") return null;
+  if (typeof s !== "string" || !SLUG.test(s)) throw new Error("client_slug must be a client slug");
+  return s;
+}
+function assertTrackId(s: unknown): string | null {
+  if (s === null || s === "") return null;
+  if (typeof s !== "string" || !UUID.test(s)) throw new Error("track_id must be a track id");
+  return s;
+}
+
 function assertDay(d: unknown): string {
   if (typeof d !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d)))
     throw new Error("due must be YYYY-MM-DD");
@@ -109,7 +128,9 @@ export function statusPatch(
 
 export interface TaskPatch {
   status?: Status;
-  owner?: Owner;
+  owner?: Owner | null;
+  client_slug?: string | null;
+  track_id?: string | null;
   due?: string | null;
   waiting_on?: string | null;
   body?: string | null;
@@ -119,7 +140,9 @@ export interface TaskPatch {
 export function buildTaskPatch(p: TaskPatch, now: Date): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (p.status !== undefined) Object.assign(out, statusPatch(p.status, now));
-  if (p.owner !== undefined) out.owner = assertOwner(p.owner);
+  if (p.owner !== undefined) out.owner = assertOwnerOrNull(p.owner);
+  if (p.client_slug !== undefined) out.client_slug = assertSlug(p.client_slug);
+  if (p.track_id !== undefined) out.track_id = assertTrackId(p.track_id);
   if (p.due !== undefined) out.due = p.due === null || p.due === "" ? null : assertDay(p.due);
   if (p.waiting_on !== undefined) out.waiting_on = p.waiting_on?.trim() || null;
   if (p.body !== undefined) out.body = p.body?.trim() || null;
@@ -143,19 +166,42 @@ export function nextListStatus(s: ListStatus): ListStatus {
 
 const STATUS_RANK: Record<Status, number> = { doing: 0, todo: 1, waiting: 2, done: 3 };
 
+/** A due date as people say it: "today", a weekday within the next 6 days, else "Oct 24". Calendar math on YYYY-MM-DD, no timezone drift. */
+export function humanDay(due: string, today: string): string {
+  const n = (Date.parse(`${due}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000;
+  if (n === 0) return "today";
+  const d = new Date(`${due}T00:00:00Z`);
+  if (n > 0 && n < 7) return d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 /** Due asc, undated last. */
 export function byDue(a: { due: string | null }, b: { due: string | null }): number {
   return (a.due ?? "9999").localeCompare(b.due ?? "9999");
 }
 
+const byRank = (a: Task, b: Task) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDue(a, b);
+
 /** Owner sections (Nate, Brandon, Claude), each ordered by status then due. */
 export function groupByOwner<T extends Task>(tasks: T[]): { owner: Owner; tasks: T[] }[] {
   return OWNERS.map((owner) => ({
     owner,
-    tasks: tasks
-      .filter((t) => t.owner === owner)
-      .sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDue(a, b)),
+    tasks: tasks.filter((t) => t.owner === owner).sort(byRank),
   }));
+}
+
+/** Work's left list: Unassigned first (owner null), then Nate / Brandon / Claude; empty groups are left out. */
+export function workGroups<T extends Task>(
+  tasks: T[]
+): { key: "unassigned" | Owner; label: string; tasks: T[] }[] {
+  return [
+    { key: "unassigned" as const, label: "Unassigned", tasks: tasks.filter((t) => !t.owner).sort(byRank) },
+    ...groupByOwner(tasks).map((g) => ({
+      key: g.owner,
+      label: g.owner.charAt(0).toUpperCase() + g.owner.slice(1),
+      tasks: g.tasks,
+    })),
+  ].filter((g) => g.tasks.length);
 }
 
 export interface TaskFilter {
@@ -176,7 +222,7 @@ export function filterTasks(tasks: Task[], f: TaskFilter): Task[] {
 // ---- DB plumbing ------------------------------------------------------------------------
 
 // The client is untyped (no generated Database type yet), so the caller names the row shape.
-function must<T>(
+export function must<T>(
   r: { data: unknown; error: { message: string; code?: string } | null },
   what: string
 ): T {
@@ -189,7 +235,7 @@ function must<T>(
 
 // ponytail: event is a second statement, not one transaction — a lost event row leaves a write
 // unaudited; upgrade to an RPC if the audit trail ever has to be exact.
-async function logEvent(
+export async function logEvent(
   sb: Sb,
   actor: string,
   via: Via,
@@ -212,7 +258,7 @@ export async function listTasks(sb: Sb): Promise<Task[]> {
 
 export interface NewTask {
   title: string;
-  owner: Owner;
+  owner: Owner | null; // null = unassigned
   area?: string | null;
   due?: string | null;
   body?: string | null;
@@ -220,6 +266,7 @@ export interface NewTask {
   source?: Source;
   businessId?: string | null;
   clientSlug?: string | null;
+  trackId?: string | null;
   alertKey?: string | null;
   waitingOn?: string | null;
 }
@@ -232,14 +279,15 @@ export function buildTaskRow(actor: string, via: Via, t: NewTask, now: Date = ne
   if (t.source && !SOURCES.includes(t.source)) throw new Error(`unknown source ${t.source}`);
   const row = {
     title,
-    owner: assertOwner(t.owner),
+    owner: assertOwnerOrNull(t.owner),
     area: t.area || null,
     due: t.due ? assertDay(t.due) : null,
     body: t.body?.trim() || null,
     ...statusPatch(t.status ?? "todo", now),
     source: t.source ?? "manual",
     business_id: t.businessId ?? null,
-    client_slug: t.clientSlug ?? null,
+    client_slug: assertSlug(t.clientSlug ?? null),
+    track_id: assertTrackId(t.trackId ?? null),
     alert_key: t.alertKey ?? null,
     waiting_on: t.waitingOn?.trim() || null,
     created_by: actor,
