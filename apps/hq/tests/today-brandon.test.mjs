@@ -158,3 +158,99 @@ test("loadExtras never sends more than 100 ids in one request, and still groups 
   assert.equal(m.size, 250);
   assert.ok(ids.every((id) => m.get(id).calls.length === 1));
 });
+
+// ---- the progress rail's numbers (components/TodayBrandonStats.ts) ----
+const { railStats, GOAL } = await import("../components/TodayBrandonStats.ts");
+
+// Wed Oct 28 2026, 14:00 ET. n calls on an ET day, at 10:00 ET + i minutes (EDT = UTC-4).
+const NOW_R = new Date("2026-10-28T18:00:00Z");
+const day = (d, n, outcome = "no_answer") =>
+  Array.from({ length: n }, (_, i) => ({ at: `${d}T${String(14 + Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}:00Z`, outcome, name: `${d}#${i}` }));
+
+test("rail goals are the pinned daily targets", () => {
+  assert.deepEqual(GOAL, { calls: 20, reached: 5, consults: 1 });
+});
+
+test("rail: today's counts use ET days, reached includes consult_booked, imported rows are ignored", () => {
+  const calls = [
+    ...day("2026-10-28", 3),
+    { at: "2026-10-28T15:00:00Z", outcome: "reached", name: "A" },
+    { at: "2026-10-28T16:00:00Z", outcome: "consult_booked", name: "B" },
+    { at: "2026-10-28T13:00:00Z", outcome: "imported", name: "X" },
+    { at: "2026-10-29T02:00:00Z", outcome: "reached", name: "late last night ET is still the 28th" },
+    { at: "2026-10-28T03:00:00Z", outcome: "reached", name: "before midnight ET: the 27th" },
+  ];
+  const s = railStats(calls, NOW_R);
+  assert.deepEqual(s.today, { calls: 6, reached: 3, consults: 1 });
+});
+
+test("rail: best day is the best EARLIER day; beaten flips only when today passes it", () => {
+  const calls = [...day("2026-10-26", 18), ...day("2026-10-27", 9), ...day("2026-10-28", 18)];
+  let s = railStats(calls, NOW_R);
+  assert.equal(s.best, 18);
+  assert.equal(s.beaten, false);
+  assert.equal(s.toBeat, 1);
+  s = railStats([...calls, ...day("2026-10-28", 1).map((c) => ({ ...c, at: "2026-10-28T17:30:00Z" }))], NOW_R);
+  assert.equal(s.beaten, true);
+  assert.equal(railStats([], NOW_R).best, 0);
+});
+
+test("rail: streak counts consecutive business days at the goal, skips weekends, an unfinished today does not break it", () => {
+  // Fri 23, Mon 26, Tue 27 hit; Wed 28 (today) at 3 so far; the weekend 24-25 in between has calls too
+  const calls = [...day("2026-10-23", 20), ...day("2026-10-24", 30), ...day("2026-10-26", 25), ...day("2026-10-27", 20), ...day("2026-10-28", 3)];
+  let s = railStats(calls, NOW_R);
+  assert.equal(s.streak, 3);
+  // today hitting the goal adds it
+  assert.equal(railStats([...calls, ...day("2026-10-28", 17).map((c, i) => ({ ...c, at: `2026-10-28T20:${String(i).padStart(2, "0")}:00Z` }))], NOW_R).streak, 4);
+  // a missed business day (Mon 26 at 19) ends the run at Tue
+  s = railStats([...day("2026-10-23", 20), ...day("2026-10-26", 19), ...day("2026-10-27", 20)], NOW_R);
+  assert.equal(s.streak, 1);
+  assert.equal(railStats([], NOW_R).streak, 0);
+});
+
+test("rail: streak boxes are the last 7 business days oldest first with today marked; weekend now reads from Friday", () => {
+  const s = railStats(day("2026-10-27", 20), NOW_R);
+  assert.equal(s.days.map((d) => d.label).join(""), "TWTFMTW"); // Tue20 Wed21 Thu22 Fri23 Mon26 Tue27 Wed28
+  assert.equal(s.days.length, 7);
+  assert.equal(s.days[6].today, true);
+  assert.deepEqual(s.days.map((d) => d.hit), [false, false, false, false, false, true, false]);
+  const sat = railStats(day("2026-10-30", 20), new Date("2026-10-31T16:00:00Z")); // Sat Oct 31
+  assert.equal(sat.days[6].today, false, "Saturday is not a business day");
+  assert.equal(sat.days[6].hit, true, "Friday's goal still shows");
+  assert.equal(sat.week.hi, -1);
+});
+
+test("rail: week chart is Mon-Fri of this ET week with today highlighted; wins are the newest 5 reached/consult rows", () => {
+  const calls = [
+    ...day("2026-10-26", 4),
+    ...day("2026-10-28", 2),
+    ...day("2026-10-19", 9), // last week: not in the chart
+    { at: "2026-10-28T15:40:00Z", outcome: "consult_booked", name: "Tidewater HVAC" },
+    { at: "2026-10-27T15:12:00Z", outcome: "reached", name: "Pelican Point Dental" },
+    ...["a", "b", "c", "d", "e"].map((n, i) => ({ at: `2026-10-2${i}T12:00:00Z`, outcome: "reached", name: n })),
+  ];
+  const s = railStats(calls, NOW_R);
+  assert.deepEqual(s.week.labels, ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  assert.equal(s.week.hi, 2);
+  assert.deepEqual(s.week.vals, [4, 1, 3, 0, 0]);
+  assert.equal(s.wins.length, 5);
+  assert.deepEqual(s.wins[0], { kind: "consult", name: "Tidewater HVAC", time: "11:40" });
+  assert.deepEqual(s.wins[1], { kind: "reached", name: "Pelican Point Dental", time: "Tue 11:12" });
+});
+
+test("Brandon's Today mounts the rail beside the board with his calendar, and never re-adds a sub-12px size", async () => {
+  const { readFileSync } = await import("node:fs");
+  const page = readFileSync(new URL("../components/TodayBrandon.tsx", import.meta.url), "utf8");
+  assert.match(page, /<TodayBrandonRail s=\{rail\} calendar=\{<TodayCalendar cal=\{cal\} now=\{now\} \/>\} \/>/);
+  assert.match(page, /\.eq\("by", "brandon"\)/);
+  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.doesNotMatch(css, /font-size:\s*(1[01](\.\d+)?|\d(\.\d+)?)px/);
+});
+
+test("MCP today derives client health instead of reading clients.health", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../lib/mcp/tools.ts", import.meta.url), "utf8");
+  const region = src.slice(src.indexOf('name: "today"'), src.indexOf('name: "propose_lead_stage"'));
+  assert.doesNotMatch(region, /display_name, kind, stage, health, owner/);
+  assert.match(region, /deriveFor\(c, sources, now\)\.derived\.health/);
+});
