@@ -159,3 +159,20 @@ test("Numbers funnel: bars scale to the largest stage, so a stage above Calls ca
   assert.match(v, /const top = Math\.max\(1, \.\.\.steps\.map\(\(\[, v\]\) => last\(v\)\)\)/);
   assert.doesNotMatch(v, /const top = last\(calls\)/);
 });
+
+test("ticket tasks: the Resolution textarea shows only for alert_key ticket:*, and Done sends it in the same patch as status done", () => {
+  const d = src("components/WorkTaskDetail.tsx");
+  assert.match(d, /const isTicket = !!task\.alert_key\?\.startsWith\("ticket:"\)/);
+  assert.match(d, /\{isTicket \? \(\s*<>\s*<textarea\s+name="resolution"/); // rendered only when gated
+  assert.equal(d.split('name="resolution"').length, 2, "one resolution textarea, inside the gate");
+  assert.ok(d.includes("Sent to the client&apos;s ticket when this task is done."));
+  assert.ok(d.includes("Done saves it."));
+  assert.match(d, /\.\.\.\(isTicket \? \{ resolution: s\(f, "resolution"\) \|\| null \} : \{\}\)/); // Save: ticket tasks only
+  assert.match(d, /updateTaskAction\(task\.id, \{ status: "done", resolution: res \|\| null \}\)/); // Done: one patch
+});
+
+test("Today (Nate): a Connect ticket fire ops:ticket:<id> is hidden when the job-owned task ticket:platform:<id> is open", () => {
+  const t = src("components/TodayNate.tsx");
+  assert.match(t, /key\.replace\(\/\^ops:ticket:\/, "ticket:platform:"\)/);
+  assert.match(t, /!isTaken\(f\.key\)/);
+});

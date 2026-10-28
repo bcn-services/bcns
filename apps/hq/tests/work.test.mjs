@@ -593,3 +593,19 @@ test("todaySteps: only mine, due by today or doing, plus done today; undated tod
     ["done-today", "done-yesterday", "done-late-27"]
   );
 });
+
+test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an over-cap value writes nothing", async () => {
+  assert.equal(T.buildTaskPatch({ resolution: "  fixed it \n" }, NOW).resolution, "fixed it");
+  assert.equal(T.buildTaskPatch({ resolution: "x".repeat(4000) }, NOW).resolution.length, 4000);
+  assert.throws(() => T.buildTaskPatch({ resolution: "x".repeat(4001) }, NOW), /resolution/);
+  assert.equal(T.buildTaskPatch({ resolution: null }, NOW).resolution, null);
+  assert.equal(T.buildTaskPatch({ resolution: "   " }, NOW).resolution, null);
+  assert.equal("resolution" in T.buildTaskPatch({ owner: "nate" }, NOW), false);
+  const sb = fakeSb();
+  const t = await T.createTask(sb, ACTOR, "ui", { title: "ticket", owner: "nate" }, NOW);
+  await T.updateTask(sb, ACTOR, "ui", t.id, { status: "done", resolution: " Reset your password. " }, NOW);
+  assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
+  assert.equal(sb.db.tasks[0].status, "done");
+  await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { resolution: "x".repeat(4001) }, NOW), /resolution/);
+  assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
+});

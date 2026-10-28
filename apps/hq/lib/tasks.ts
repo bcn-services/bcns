@@ -64,6 +64,7 @@ export interface Task {
   track_id: string | null;
   alert_key: string | null;
   waiting_on: string | null;
+  resolution: string | null; // ticket tasks: sent to the client's ticket when done (jobs/tickets.mjs)
   done_at: string | null;
   created_at: string;
 }
@@ -134,6 +135,7 @@ export interface TaskPatch {
   due?: string | null;
   waiting_on?: string | null;
   body?: string | null;
+  resolution?: string | null;
 }
 
 /** Validated DB patch for updateTask; only the keys present are touched. */
@@ -146,6 +148,11 @@ export function buildTaskPatch(p: TaskPatch, now: Date): Record<string, unknown>
   if (p.due !== undefined) out.due = p.due === null || p.due === "" ? null : assertDay(p.due);
   if (p.waiting_on !== undefined) out.waiting_on = p.waiting_on?.trim() || null;
   if (p.body !== undefined) out.body = p.body?.trim() || null;
+  if (p.resolution !== undefined) {
+    const r = p.resolution?.trim() || null;
+    if (r && r.length > 4000) throw new Error("resolution is over 4000 characters");
+    out.resolution = r;
+  }
   if (!Object.keys(out).length) throw new Error("nothing to update");
   return { ...out, updated_at: now.toISOString() };
 }

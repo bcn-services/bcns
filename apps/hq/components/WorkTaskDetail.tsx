@@ -35,6 +35,7 @@ export function WorkTaskDetail(props: {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
   const done = task.status === "done";
+  const isTicket = !!task.alert_key?.startsWith("ticket:");
 
   function submit(
     e: FormEvent<HTMLFormElement>,
@@ -71,7 +72,7 @@ export function WorkTaskDetail(props: {
       ) : null}
 
       <form
-        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}${task.track_id}${task.client_slug}`}
+        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}${task.resolution}${task.track_id}${task.client_slug}`}
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
@@ -86,6 +87,7 @@ export function WorkTaskDetail(props: {
               due: s(f, "due") || null,
               waiting_on: waiting || null,
               body: s(f, "body") || null,
+              ...(isTicket ? { resolution: s(f, "resolution") || null } : {}),
               track_id: s(f, "track") || null,
               client_slug: s(f, "client") || null,
             });
@@ -151,20 +153,37 @@ export function WorkTaskDetail(props: {
           placeholder="Description"
           defaultValue={task.body ?? ""}
         />
+        {isTicket ? (
+          <>
+            <textarea
+              name="resolution"
+              aria-label="Resolution"
+              placeholder="Resolution"
+              defaultValue={task.resolution ?? ""}
+            />
+            <p className="muted">
+              Sent to the client&apos;s ticket when this task is done. Done saves it.
+            </p>
+          </>
+        ) : null}
         <div className="wk-acts">
           <button
             type="button"
             className="btn pri"
             disabled={busy}
-            onClick={() =>
+            onClick={(e) => {
+              // a ticket's resolution goes in the same patch as done: the job pushes on done, so a later save is never sent
+              const res = isTicket && e.currentTarget.form ? s(new FormData(e.currentTarget.form), "resolution") : null;
               start(async () => {
                 const r = done
                   ? await updateTaskAction(task.id, { status: "todo" })
-                  : await markDone(task.id);
+                  : res === null
+                    ? await markDone(task.id)
+                    : await updateTaskAction(task.id, { status: "done", resolution: res || null });
                 if (!r.ok) setMsg(r.error);
                 else if (!done) onBack();
-              })
-            }
+              });
+            }}
           >
             {done ? "Reopen" : "✓ Done"}
           </button>
