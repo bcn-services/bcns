@@ -105,6 +105,27 @@ test("fail-soft: an HTTP error is unavailable too", async () => {
   assert.doesNotMatch(u.error, /body-must-not-leak/, "status line only, never the response body");
 });
 
+test("fail-soft: a 200 with an HTML body is a status line, and a Mercury account id never reaches the page", async () => {
+  stub((url) =>
+    url.endsWith("/accounts")
+      ? json({ accounts: [{ id: "acct-secret-123", currentBalance: 1 }] })
+      : new Response("<html>body-must-not-leak</html>", { status: 200 })
+  );
+  const u = await M.mercurySummary(NOW);
+  assert.equal(M.isUnavailable(u), true);
+  assert.match(u.error, /\/account\/…\/transactions invalid response/);
+  assert.doesNotMatch(u.error, /body-must-not-leak|acct-secret-123/);
+  M.clearMoneyMemo();
+  stub((url) =>
+    url.endsWith("/accounts")
+      ? json({ accounts: [{ id: "acct-secret-123", currentBalance: 1 }] })
+      : json({}, 403)
+  );
+  const v = await M.mercurySummary(NOW);
+  assert.match(v.error, /\/account\/…\/transactions 403/);
+  assert.doesNotMatch(v.error, /acct-secret-123/);
+});
+
 test("no key: unavailable without any network call", async () => {
   delete process.env.MERCURY_KEY;
   delete process.env.STRIPE_KEY;
@@ -410,11 +431,43 @@ test("mrr: Stripe active subs minus cancel_at_period_end, plus Mercury per-clien
   assert.deepEqual(r.excluded, [{ id: "sub_b", cancelAt: "2026-10-26" }]);
 });
 
+test("mrr: a sub with cancel_at set but cancel_at_period_end false is excluded with its cancel_at", async () => {
+  stub((url) =>
+    url.includes("/v1/subscriptions")
+      ? json({
+          data: [
+            sub("sub_a", 10000),
+            sub("sub_c", 4000, { cancel_at_period_end: false, cancel_at: 1_793_000_000 }),
+          ],
+        })
+      : json({ data: [] })
+  );
+  const r = M.mrr(await M.stripeSummary(), []);
+  assert.equal(r.stripe, 10000);
+  assert.deepEqual(r.excluded, [{ id: "sub_c", cancelAt: "2026-10-26" }]);
+});
+
 test("mrr: a Stripe outage counts as $0 and lists nothing excluded; Mercury rates still add", () => {
   const r = M.mrr({ unavailable: true, error: "x" }, [
     { monthly_rate_cents: 100, billing_source: "mercury" },
   ]);
   assert.deepEqual(r, { total: 100, stripe: 0, mercury: 100, excluded: [] });
+});
+
+test("mrrSeries counts a cancelling Stripe sub in the weeks before its cancel date, not after", () => {
+  const stripe = {
+    mrrCents: 0,
+    activeSubscriptions: 1,
+    charges30dCents: 0,
+    subs: [
+      { id: "s", mrrCents: 4000, created: 1_760_000_000, cancelling: true, cancelAt: "2026-10-22" },
+    ],
+    excluded: [{ id: "s", cancelAt: "2026-10-22" }],
+  };
+  assert.deepEqual(
+    M.mrrSeries(["2026-10-05", "2026-10-12", "2026-10-19"], stripe, []),
+    [4000, 4000, 0]
+  );
 });
 
 test("mrrSeries rebuilds weekly MRR from launch and churn dates; mercuryWeeks buckets cash and flows", () => {

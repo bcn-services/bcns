@@ -12,14 +12,16 @@
 --                        churn_date is null; 'stripe' = Stripe subscription;
 --                        'none' = no recurring billing (e.g. a handed-off app).
 -- churn_date and monthly_rate_cents already exist (0020). No data is invented
--- here: the ids and aliases are filled in by hand (the client form).
+-- here: the ids and aliases are set through item D's Clients Edit form
+-- (the lib/clients/fields.ts whitelist) or a Nate-run
+-- `update clients set aliases = ..., mercury_customer_id = ... where slug = ...`.
 -- ---------------------------------------------------------------------------
 begin;
 
 alter table clients
-  add column mercury_customer_id text,
-  add column aliases             text[] default '{}',
-  add column billing_source      text default 'mercury'
+  add column if not exists mercury_customer_id text,
+  add column if not exists aliases             text[] default '{}',
+  add column if not exists billing_source      text default 'mercury'
     check (billing_source in ('mercury', 'stripe', 'none'));
 
 commit;

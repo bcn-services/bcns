@@ -273,28 +273,30 @@ function SalesTab(p: { finance: Finance | null | undefined; weeks: string[]; lab
           <h2>Calls per week</h2>
           <Cols name="Calls per week" vals={calls} labels={p.labels} fmt={int} goal={GOALS.calls} />
         </div>
-        <div className="card tile funnel">
+        <div>
           <h2>This week&apos;s funnel</h2>
-          {steps.map(([name, v], i) => {
-            const n = last(v);
-            const before = i ? last(steps[i - 1]?.[1] ?? []) : 0;
-            return (
-              <div key={name} className="fr">
-                <span>{name}</span>
-                <div>
-                  <div
-                    className="fb"
-                    style={{ width: `${Math.max(2, (n / top) * 100)}%` }}
-                    title={String(n)}
-                  />
+          <div className="card tile funnel">
+            {steps.map(([name, v], i) => {
+              const n = last(v);
+              const before = i ? last(steps[i - 1]?.[1] ?? []) : 0;
+              return (
+                <div key={name} className="fr">
+                  <span>{name}</span>
+                  <div>
+                    <div
+                      className="fb"
+                      style={{ width: `${Math.max(2, (n / top) * 100)}%` }}
+                      title={String(n)}
+                    />
+                  </div>
+                  <b className="num">{n}</b>
+                  <span className="muted num">
+                    {i ? `${Math.round((n / (before || 1)) * 100)}%` : ""}
+                  </span>
                 </div>
-                <b className="num">{n}</b>
-                <span className="muted num">
-                  {i ? `${Math.round((n / (before || 1)) * 100)}%` : ""}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </Pair>
     </>
@@ -493,30 +495,11 @@ function UnitTab(p: {
         </div>
         <div className="card tile">
           <h2>Inputs</h2>
-          <div className="row">
-            <span style={{ flex: 1 }}>Sales spend (90d)</span>
-            <b>{usd(n.spendCents)}</b>
-          </div>
-          <div className="row">
-            <span style={{ flex: 1 }}>New clients (90d)</span>
-            <b>{n.newClients}</b>
-          </div>
-          <div className="row">
-            <span style={{ flex: 1 }}>Average rate</span>
-            <b>{usd(n.avgRateCents)}/mo</b>
-          </div>
-          <div className="row">
-            <span style={{ flex: 1 }}>Expected months</span>
-            <b>{UNIT.expectedMonths}</b>
-          </div>
-          <div className="row">
-            <span style={{ flex: 1 }}>Infra per client</span>
-            <b>{usd(UNIT.infraCents)}/mo</b>
-          </div>
-          <div className="row">
-            <span style={{ flex: 1 }}>Payback</span>
-            <b>{n.paybackMonths == null ? "–" : `${n.paybackMonths} mo`}</b>
-          </div>
+          <p className="note">
+            Sales spend (90d) <b>{usd(n.spendCents)}</b> · new clients (90d) <b>{n.newClients}</b> ·
+            avg rate <b>{usd(n.avgRateCents)}</b> · expected months <b>{UNIT.expectedMonths}</b> ·
+            infra per client <b>{usd(UNIT.infraCents)}/mo</b>
+          </p>
           <button
             type="button"
             className="btn"

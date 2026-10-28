@@ -210,14 +210,12 @@ const fx = {
       signed: null,
     },
   ],
-  snaps: [],
 };
 const loaderSb = (f) =>
   fakeSb({
     "call_weeks.select": { data: f.calls, error: null },
     "businesses.select": { data: f.biz, error: null },
     "finance_inputs.select": { data: f.inputs, error: null },
-    "finance_snapshots.select": { data: f.snaps, error: null },
   });
 
 test("loadFinance: pilots by consult_done_at, signed by won_at, each in its New York week", async () => {
@@ -227,9 +225,6 @@ test("loadFinance: pilots by consult_done_at, signed by won_at, each in its New 
   assert.equal(w.cacCents, 25000);
   const last = fin.weekly.find((r) => r.channel === "cold" && r.period === "2026-09-28");
   assert.equal(last.signed, 1);
-  assert.deepEqual(fin.months[0].month, "2026-10-01");
-  assert.equal(fin.months[0].frozen, false);
-  assert.equal(fin.from, "2026-03-30"); // 27 weeks before the current one
 });
 
 test("loadFinance surfaces a query error", async () => {
@@ -248,7 +243,7 @@ test("Sales and Unit tabs render the loaded numbers: funnel steps, CAC, LTV:CAC,
   const unit = render({ tab: "unit", finance: fin, clients, now });
   assert.match(unit, /CAC/);
   assert.match(unit, /LTV : CAC/);
-  assert.match(unit, /Average rate<\/span><b>\$87\/mo/); // (110 + 100 + 50) / 3 live clients
+  assert.match(unit, /avg rate <b>\$87<\/b>/); // (110 + 100 + 50) / 3 live clients
   assert.doesNotMatch(unit, /Freeze/);
 });
 

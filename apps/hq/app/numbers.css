@@ -6,7 +6,13 @@
 }
 .nm h2 {
   margin: 0 0 8px;
-  font-size: 15px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink2);
+}
+.nm .dl {
+  font-size: 12px;
 }
 .nm h2.gap {
   margin-top: 28px;
@@ -158,4 +164,7 @@
 }
 .nm .dot.bad {
   background: var(--bad);
+}
+.nm .tile > .btn {
+  margin-top: 10px;
 }

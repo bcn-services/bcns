@@ -41,15 +41,31 @@ async function memoised<T>(
   }
 }
 
+/** Throws a status line only (host, path with any account id masked, status). The detail of a network
+ *  or parse failure stays in the server log: it can quote a response body. */
 async function getJson(url: string, token: string): Promise<unknown> {
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    signal: AbortSignal.timeout(5000),
-    cache: "no-store",
-  });
   const u = new URL(url);
-  if (!res.ok) throw new Error(`${u.host}${u.pathname} ${res.status}`); // status only, never the body
-  return res.json();
+  const where = `${u.host}${u.pathname.replace(/\/account\/[^/]+/, "/account/…")}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+      cache: "no-store",
+    });
+  } catch (e) {
+    console.error(
+      `[money] ${u.host}${u.pathname} fetch failed: ${e instanceof Error ? e.message : e}`
+    );
+    throw new Error(`${where} unreachable`);
+  }
+  if (!res.ok) throw new Error(`${where} ${res.status}`);
+  try {
+    return await res.json();
+  } catch (e) {
+    console.error(`[money] ${u.host}${u.pathname} bad body: ${e instanceof Error ? e.message : e}`);
+    throw new Error(`${where} invalid response`);
+  }
 }
 
 const rec = (v: unknown): Record<string, unknown> =>
@@ -109,8 +125,9 @@ export function stripeSummary(): Promise<StripeSummary | Unavailable> {
           id: String(s.id ?? ""),
           mrrCents: Math.round(mrr),
           created: num(s.created),
-          cancelling: s.cancel_at_period_end === true,
-          // cancel_at is set with cancel_at_period_end; newer API versions keep the period end on the item
+          // a custom cancel date (Dashboard "cancel on …") sets cancel_at without cancel_at_period_end
+          cancelling: s.cancel_at_period_end === true || num(s.cancel_at) > 0,
+          // newer API versions keep the period end on the item
           cancelAt: day(
             num(s.cancel_at) || num(s.current_period_end) || num(items[0]?.current_period_end)
           ),
@@ -345,7 +362,10 @@ export function mrrSeries(
     const s = isUnavailable(stripe)
       ? 0
       : stripe.subs
-          .filter((x) => !x.cancelling && day(x.created) <= end)
+          // a cancelling sub billed until its cancel date: it only drops from MRR from then on
+          .filter(
+            (x) => day(x.created) <= end && (!x.cancelling || !x.cancelAt || end < x.cancelAt)
+          )
           .reduce((t, x) => t + x.mrrCents, 0);
     return m + s;
   });
