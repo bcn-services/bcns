@@ -1,0 +1,219 @@
+/* Clients (HQ v2 item D): 320px list + detail, per the v2-clients prototype (variant A).
+   Scoped under .cx so it cannot touch the shell's .card/.btn/.row. Nothing under 12px. */
+.cx {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+}
+.cx > div {
+  overflow: auto;
+  min-height: 0;
+}
+.cx-list {
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.cx-head {
+  padding: 22px 24px 6px;
+}
+.cx .sub {
+  margin: 2px 0 0;
+  color: var(--mute);
+}
+.cx .srch {
+  width: 100%;
+  border: 1px solid #cdd1d9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 12px;
+  background: #fff;
+}
+.cx .hf {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.cx .hf .btn {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.cx .hf .btn.on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.cx .gh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink2);
+}
+.cx .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.cx .g {
+  background: var(--ok);
+}
+.cx .a {
+  background: #d49a1a;
+}
+.cx .r {
+  background: var(--bad);
+}
+.cx .cl {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line2);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.cx .cl.f {
+  background: var(--tint);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.cx .cl-main {
+  flex: 1;
+  min-width: 0;
+}
+.cx .cl-main > span {
+  display: block;
+}
+.cx .cl-name {
+  font-weight: 600;
+}
+.cx .cl .rt {
+  font-size: 13px;
+}
+.cx-empty {
+  padding: 14px;
+}
+.cx .det {
+  padding: 24px 30px 90px;
+}
+.cx .dh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cx .dh h1 {
+  flex: 1;
+  font-size: 24px;
+}
+.cx .why {
+  font-size: 13px;
+  color: var(--mute);
+  margin-top: 4px;
+}
+.cx .grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.cx .tl {
+  padding: 14px 16px;
+}
+.cx .tl h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink2);
+}
+.cx .src {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line2);
+}
+.cx .src:last-of-type {
+  border-bottom: 0;
+}
+.cx .src b {
+  flex: 1;
+  font-weight: 600;
+}
+.cx .mstats {
+  display: flex;
+  gap: 28px;
+}
+.cx .big {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cx .foot {
+  margin-top: 10px;
+}
+.cx .strong {
+  font-weight: 600;
+}
+.cx .bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line2);
+  overflow: hidden;
+  margin: 8px 0;
+}
+.cx .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.cx .act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cx .inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cx .inline input {
+  flex: 1;
+  min-width: 140px;
+}
+.cx input:not([type="hidden"]),
+.cx select,
+.cx textarea {
+  border: 1px solid #cdd1d9;
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 8px;
+}
+.cx .bad {
+  color: var(--bad);
+  font-size: 13px;
+}
+.cx .edit {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  max-width: 520px;
+}
+.cx .edit label {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--mute);
+}

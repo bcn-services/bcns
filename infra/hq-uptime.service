@@ -1,0 +1,30 @@
+# Uptime monitor, fired by hq-uptime.timer every 5 minutes. Its own unit (not hq-job@uptime)
+# on purpose: the shared template LoadCredential=s the Claude tokens and the os deploy key and
+# needs the os clone, so a missing credential file (243/CREDENTIALS) or path (226/NAMESPACE)
+# would stop the monitor silently. Uptime needs only fetch and the db: the JOBS-role
+# DATABASE_URL in /srv/hq/jobs.env (mode 0600, root), no credentials, no os clone.
+# No [Install] section: the timer starts it.
+[Unit]
+Description=HQ job: uptime
+After=network-online.target
+Wants=network-online.target
+# No release deployed yet means nothing to run.
+ConditionPathExists=/srv/hq/current
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+# /srv/hq is 750 hq:hq; a DynamicUser cannot enter it without the group (same as hq-job@).
+SupplementaryGroups=hq
+WorkingDirectory=/srv/hq/current
+EnvironmentFile=/srv/hq/jobs.env
+ExecStart=/usr/bin/node jobs/run.mjs uptime
+# 5 targets x 10s fetch timeout, run in sequence at worst, plus startup and the db write.
+TimeoutStartSec=2min
+MemoryMax=256M
+CPUQuota=50%
+# Hardening, same as hq-job@: read-only OS, private /tmp, no privilege escalation.
+ProtectSystem=strict
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true

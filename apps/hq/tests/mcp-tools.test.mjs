@@ -131,7 +131,7 @@ const withTeam = () => {
 };
 const as = (actor, sb, name, args = {}) => byName[name].run({ sb, actor }, args);
 
-test("exactly the 17 tools, and none is named like an approve / decide / delete", () => {
+test("exactly the 18 tools, and none is named like an approve / decide / delete", () => {
   assert.deepEqual(TOOLS.map((t) => t.name).sort(), [
     "add_link",
     "add_task_note",
@@ -144,6 +144,7 @@ test("exactly the 17 tools, and none is named like an approve / decide / delete"
     "list_tasks",
     "log_lead_note",
     "move_track",
+    "propose_client",
     "propose_finance",
     "propose_lead_stage",
     "search_leads",
@@ -151,7 +152,7 @@ test("exactly the 17 tools, and none is named like an approve / decide / delete"
     "update_task",
     "update_track",
   ]);
-  assert.equal(TOOLS.length, 17);
+  assert.equal(TOOLS.length, 18);
   assert.equal(TOOLS.filter((t) => /approve|decide|delete/i.test(t.name)).length, 0);
 });
 
@@ -627,6 +628,7 @@ test("no tool, with plausible args, ever writes businesses, finance_inputs, prof
     get_client: { slug: "acme-demo" },
     today: {},
     propose_lead_stage: { business_id: BIZ, stage: "lost" },
+    propose_client: { slug: "acme-demo", field: "monthly_rate_cents", value: 12000 },
     propose_finance: { week: "2026-10-05", channel: "web", column: "leads", value: 4 },
   };
   assert.deepEqual(
@@ -653,5 +655,56 @@ test("no tool, with plausible args, ever writes businesses, finance_inputs, prof
     true
   );
   assert.equal(fake.db.businesses[0].stage, "qualified");
-  assert.equal(fake.db.proposals.length, 2);
+  assert.equal(fake.db.proposals.length, 3);
+});
+
+// ---- propose_client (item D): one whitelist shared with the admin Edit form --------------------------
+
+test("propose_client files a pending kind=client proposal with via=mcp and the live value as old", async () => {
+  const fake = seed();
+  fake.db.clients[0].monthly_rate_cents = 10000;
+  const r = await call(fake, "propose_client", {
+    slug: "acme-demo",
+    field: "monthly_rate_cents",
+    value: 12000,
+    reason: " raised at renewal ",
+  });
+  assert.equal(r.status, "pending");
+  assert.equal(r.old, 10000);
+  assert.equal(r.new, 12000);
+  const p = fake.db.proposals.find((x) => x.id === r.proposal_id);
+  assert.deepEqual(
+    [p.kind, p.target_id, p.field, p.status, p.via, p.created_by, p.reason],
+    ["client", "acme-demo", "monthly_rate_cents", "pending", "mcp", ACTOR.id, "raised at renewal"]
+  );
+  assert.equal("old" in p, false, "the insert sends no old: proposals_server_fields sets it");
+  assert.equal(fake.db.clients[0].monthly_rate_cents, 10000, "nothing was applied");
+  assert.equal(
+    writes(fake).filter((o) => o.table === "clients").length,
+    0,
+    "the tool never writes clients"
+  );
+  assert.ok(fake.db.events.some((e) => e.kind === "proposal.created" && e.via === "mcp"));
+});
+
+test("propose_client takes exactly the Edit whitelist: other fields, bad values and no-ops are refused", async () => {
+  const { CLIENT_FIELDS } = await import("../lib/clients/fields.ts");
+  assert.deepEqual(byName.propose_client.shape.field.options, [...CLIENT_FIELDS]);
+  const fake = seed();
+  fake.db.clients[0].monthly_rate_cents = 10000;
+  const bad = (a, re) => assert.rejects(call(fake, "propose_client", { slug: "acme-demo", ...a }), re);
+  await bad({ field: "health", value: "green" }, /health|field|Invalid/i); // derived, not proposable
+  await bad({ field: "stage", value: "live" }, /field|Invalid/i);
+  await bad({ field: "monthly_rate_cents", value: 12.5 }, /whole cents/);
+  await bad({ field: "monthly_rate_cents", value: -1 }, /whole cents/);
+  await bad({ field: "billing_source", value: "cash" }, /billing_source/);
+  await bad({ field: "repo_url", value: "http://x.test/r" }, /https/);
+  await bad({ field: "launch_date", value: "2026-02-30" }, /launch_date/);
+  await bad({ field: "aliases", value: "Acme" }, /aliases/);
+  await bad({ field: "monthly_rate_cents", value: 10000 }, /already/);
+  await assert.rejects(
+    call(fake, "propose_client", { slug: "nope", field: "notes", value: "x" }),
+    /no client/
+  );
+  assert.equal(fake.db.proposals.length, 0, "a refused proposal files nothing");
 });

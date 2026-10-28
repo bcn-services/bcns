@@ -1,23 +1,25 @@
+import { isSlug, CLIENT_FIELDS } from "@/lib/clients/fields";
 import type { createSupabaseServer } from "@/lib/supabase";
 import { planUpdate } from "./update";
 
 type Sb = NonNullable<ReturnType<typeof createSupabaseServer>>;
 
-/** Applies the edit form: updates only changed fields, one `events` row per change. Returns the changes written. */
+/**
+ * Applies the Edit form: admin only (the clients update policy is is_admin() too, 0034), whitelisted
+ * fields only, updates what changed, one `events` row per change. Returns the changes written.
+ */
 export async function applyClientUpdate(
   sb: Sb,
   userId: string,
-  form: Record<string, FormDataEntryValue>
+  form: Record<string, FormDataEntryValue>,
+  { admin }: { admin: boolean }
 ): Promise<{ ok: boolean; changed: number; reason?: string }> {
+  if (!admin) return { ok: false, changed: 0, reason: "only an admin can edit a client" };
   const slug = String(form.slug ?? "");
-  if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)) return { ok: false, changed: 0, reason: "bad slug" };
-  const cur = await sb
-    .from("clients")
-    .select("health, stage, owner, billing_note")
-    .eq("slug", slug)
-    .single();
+  if (!isSlug(slug)) return { ok: false, changed: 0, reason: "bad slug" };
+  const cur = await sb.from("clients").select(CLIENT_FIELDS.join(", ")).eq("slug", slug).single();
   if (cur.error) return { ok: false, changed: 0, reason: cur.error.message };
-  const plan = planUpdate(cur.data, form);
+  const plan = planUpdate(cur.data as unknown as Record<string, unknown>, form);
   if (!plan.ok) return { ok: false, changed: 0, reason: plan.reason };
   if (!plan.changes.length) return { ok: true, changed: 0 };
 
