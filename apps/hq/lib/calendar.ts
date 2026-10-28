@@ -15,8 +15,7 @@ export interface CalEvent {
   meet: string | null;
 }
 export type CalResult =
-  | { state: "ok"; events: CalEvent[] }
-  | { state: "unconfigured" | "error"; events: [] };
+  { state: "ok"; events: CalEvent[] } | { state: "unconfigured" | "error"; events: [] };
 
 interface GEvent {
   id?: string;
@@ -44,7 +43,9 @@ export function signAssertion(email: string, privateKey: string, nowS: number): 
   const claim = b64(
     JSON.stringify({ iss: email, scope: SCOPE, aud: TOKEN_URL, iat: nowS, exp: nowS + 3600 })
   );
-  const sig = createSign("RSA-SHA256").update(`${head}.${claim}`).sign(privateKey.replace(/\\n/g, "\n"));
+  const sig = createSign("RSA-SHA256")
+    .update(`${head}.${claim}`)
+    .sign(privateKey.replace(/\\n/g, "\n"));
   return `${head}.${claim}.${b64(sig)}`;
 }
 
@@ -88,8 +89,13 @@ export async function loadCalendar(
   const now = opts.now ?? new Date();
   if (!cache || now.getTime() - cache.at >= TTL_MS || now.getTime() < cache.at) {
     try {
-      cache = { at: now.getTime(), list: await fetchList(opts.fetch ?? fetch, now, sa, key, calId) };
-    } catch {
+      cache = {
+        at: now.getTime(),
+        list: await fetchList(opts.fetch ?? fetch, now, sa, key, calId),
+      };
+    } catch (e) {
+      // the messages are HTTP statuses and parse errors; never the key or a token (see fetchList)
+      console.error("[calendar]", e instanceof Error ? e.message : "failed");
       cache = { at: now.getTime(), list: "error" };
     }
   }
@@ -121,7 +127,12 @@ export function calTime(e: Pick<CalEvent, "start" | "allDay">, now: Date): strin
   const today = etDay(d) === etDay(now);
   const day = d.toLocaleDateString("en-US", { timeZone: e.allDay ? "UTC" : ET, weekday: "short" });
   if (e.allDay) return today && e.start === etDay(now) ? "all day" : `${day} all day`;
-  const t = d.toLocaleTimeString("en-US", { timeZone: ET, hour: "numeric", minute: "2-digit", hour12: true });
+  const t = d.toLocaleTimeString("en-US", {
+    timeZone: ET,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
   const hm = t.replace(/\s?[AP]M$/, "");
   return today ? hm : `${day} ${hm}`;
 }

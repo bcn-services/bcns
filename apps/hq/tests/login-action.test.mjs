@@ -37,7 +37,7 @@ const TOKEN = {
 };
 
 /** Fake Supabase HTTP; records calls and whether /logout was hit. */
-function fakeSupabase({ login = "ok", profile = true } = {}) {
+function fakeSupabase({ login = "ok", profile = true, recover = 200 } = {}) {
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url);
@@ -50,13 +50,16 @@ function fakeSupabase({ login = "ok", profile = true } = {}) {
     if (u.includes("/auth/v1/token") && u.includes("pkce")) {
       return login === "expired" ? json(400, { error: "invalid_grant" }) : json(200, TOKEN);
     }
+    if (u.includes("/auth/v1/token") && login === "rate")
+      return json(429, { error_code: "over_request_rate_limit", msg: "Request rate limit reached" });
     if (u.includes("/auth/v1/token")) {
       return login === "ok"
         ? json(200, TOKEN)
         : json(400, { error: "invalid_grant", error_description: "Invalid login credentials" });
     }
     if (u.includes("/auth/v1/logout")) return new Response(null, { status: 204 });
-    if (u.includes("/auth/v1/recover")) return json(200, {});
+    if (u.includes("/auth/v1/recover"))
+      return recover === 200 ? json(200, {}) : json(recover, { error_code: "over_email_send_rate_limit", msg: "rate" });
     if (u.includes("/auth/v1/user")) return json(200, USER);
     if (u.includes("/rest/v1/profiles")) {
       return profile
@@ -150,12 +153,36 @@ test("signInWithPassword: GoTrue 5xx is 'failed', not a wrong-password claim", a
   assert.equal((await run()).to, "/login?error=failed&email=staff%40example.test");
 });
 
+test("signInWithPassword: GoTrue 429 is its own 'rate' message, not wrong-password", async () => {
+  fakeSupabase({ login: "rate" });
+  assert.equal((await run()).to, "/login?error=rate&email=staff%40example.test");
+});
+
+test("requestPasswordReset: a 4xx (unknown email, or 429 send limit on a real one) still lands on sent; only 5xx and network failures say failed", async () => {
+  for (const recover of [200, 400, 422, 429]) {
+    fakeSupabase({ recover });
+    assert.equal((await run("staff@example.test", "", requestPasswordReset)).to, "/login?mode=forgot&sent=1&email=staff%40example.test", String(recover));
+  }
+  fakeSupabase({ recover: 503 });
+  assert.equal((await run("staff@example.test", "", requestPasswordReset)).to, "/login?mode=forgot&error=failed&email=staff%40example.test");
+  fakeSupabase();
+  globalThis.fetch = async () => {
+    throw new TypeError("fetch failed");
+  };
+  assert.equal((await run("staff@example.test", "", requestPasswordReset)).to, "/login?mode=forgot&error=failed&email=staff%40example.test");
+});
+
 test("login page source: errors name the email, forgot link, no reset mode", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("../app/login/page.tsx", import.meta.url), "utf8");
   assert.match(src, /`wrong password for \$\{email\}`/);
   assert.match(src, /`no HQ account for \$\{email\}`/);
   assert.match(src, /unconfigured: "HQ is not configured"/);
+  assert.match(src, /`too many tries for \$\{email\}, wait a minute`/);
+  // the email query param is echoed only when it is a plain address (no spaces, no angle brackets), else dropped
+  assert.match(src, /\^\[\^\\s@<>\]\+@/);
+  assert.match(src, /const who = email \|\| "that email"/);
+  assert.match(src, /same browser you request it from/);
   assert.match(src, /href="\/login\?mode=forgot"/);
   assert.doesNotMatch(src, /setNewPassword|mode=reset/);
   const reset = readFileSync(new URL("../app/reset/page.tsx", import.meta.url), "utf8");

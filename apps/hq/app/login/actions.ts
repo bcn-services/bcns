@@ -21,7 +21,11 @@ export async function signInWithPassword(form: FormData): Promise<void> {
   // ponytail: with the anon key, an unknown email and a wrong password look the same ("invalid_credentials"),
   // so "wrong password for <email>" covers both. Telling them apart needs a service-role lookup, not worth it.
   if (error || !data.user) {
-    redirect(back({ error: error?.status && error.status < 500 ? "invalid" : "failed", email }));
+    const st = error?.status ?? 0;
+    // 429 is GoTrue's sign-in rate limit: say so, or a correct password keeps being retried into it
+    redirect(
+      back({ error: st === 429 ? "rate" : st > 0 && st < 500 ? "invalid" : "failed", email })
+    );
   }
   // A valid auth user with no profiles row is not HQ staff: the gate would bounce them anyway, so say why.
   const { data: row } = await supabase
@@ -49,5 +53,8 @@ export async function requestPasswordReset(form: FormData): Promise<void> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: host ? `${proto}://${host}/reset` : undefined,
   });
-  redirect(back({ mode: "forgot", [error ? "error" : "sent"]: error ? "failed" : "1", email }));
+  // Any 4xx (an unknown email, and a known one inside its ~60 s send window: 429) lands on "sent", or the form
+  // would tell strangers from account holders. Only a 5xx / network failure (status 0) is the user's to retry.
+  const down = error && !(error.status && error.status < 500);
+  redirect(back({ mode: "forgot", [down ? "error" : "sent"]: down ? "failed" : "1", email }));
 }

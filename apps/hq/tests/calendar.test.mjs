@@ -41,7 +41,10 @@ function setEnv() {
   process.env.GOOGLE_SA_PRIVATE_KEY = pem.replace(/\n/g, "\\n"); // env files carry literal \n
   process.env.GOOGLE_CALENDAR_ID = "team@group.calendar.google.com";
 }
+const logged = [];
+console.error = (...a) => void logged.push(a.join(" ")); // the catch logs why the calendar is down; keep it out of test output
 beforeEach(() => {
+  logged.length = 0;
   resetCalendarCache();
   for (const k of ENV) delete process.env[k];
 });
@@ -113,6 +116,17 @@ test("token failure, events failure, and a throwing fetch all degrade to error (
   const { f, calls } = stub();
   assert.equal((await loadCalendar("nate@bcn-services.com", { fetch: f, now: NOW })).state, "error");
   assert.equal(calls.length, 0);
+});
+
+test("a calendar failure logs the HTTP status for journald, never the key, the assertion or a token", async () => {
+  setEnv();
+  await loadCalendar("nate@bcn-services.com", { fetch: stub({ eventsOk: false }).f, now: NOW });
+  assert.deepEqual(logged, ["[calendar] events 500"]);
+  resetCalendarCache();
+  logged.length = 0;
+  await loadCalendar("nate@bcn-services.com", { fetch: stub({ tokenOk: false }).f, now: NOW });
+  assert.deepEqual(logged, ["[calendar] token 401"]);
+  for (const l of logged) assert.doesNotMatch(l, /PRIVATE|tok\b|eyJ/);
 });
 
 test("a garbage private key degrades to error instead of throwing", async () => {

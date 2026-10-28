@@ -17,8 +17,10 @@ import { TodayBrandonRail } from "./TodayBrandonRail";
 import { railStats, type CallLite } from "./TodayBrandonStats";
 import { TodayCalendar } from "./TodayCalendar";
 
-// the rail reads his last 90 days of calls: enough for best day and streak, well under PostgREST's row cap
-const RAIL_DAYS = 90;
+// The rail reads his last 45 days of calls (best day, streak, wins), newest first.
+// ponytail: PostgREST caps a response at max_rows = 1000 (supabase/config.toml), ~50 business days at his 20-call goal;
+// past that the oldest rows drop (today stays right, best day/streak read low). Aggregate per ET day in SQL if he gets there.
+const RAIL_DAYS = 45;
 
 const taskDue = (t: TaskRow) =>
   t.status === "waiting" && t.waiting_on
@@ -27,24 +29,24 @@ const taskDue = (t: TaskRow) =>
       ? `due ${fmtET(`${t.due}T12:00:00Z`)}`
       : "no due date";
 
-/** Today for Brandon: calls (fit-sorted), follow-ups, consults, his tasks; his week in the idle pane. */
+/** Today for Brandon: calls (fit-sorted), follow-ups, consults, his tasks; the top call open, his week in the idle pane. */
 export async function TodayBrandon({ all = false }: { all?: boolean }) {
   const sb = createSupabaseServer();
   if (!sb) return <p className="lpad muted">Supabase is not configured.</p>;
   const now = new Date();
   const since = new Date(now.getTime() - RAIL_DAYS * 86_400_000).toISOString();
-  const [t, { user }, callLog] = await Promise.all([
+  const [t, cal, callLog] = await Promise.all([
     loadBrandonToday(sb, "brandon", { all }),
-    getSession(),
+    getSession().then(({ user }) => loadCalendar(user?.email ?? "")), // a slow Google never waits behind the DB reads
     sb
       .from("calls")
       .select("at, outcome, businesses(name)")
       .eq("by", "brandon")
       .gte("at", since)
-      .limit(5000),
+      .order("at", { ascending: false })
+      .limit(1000),
   ]);
   if (callLog.error) throw new Error(`calls: ${callLog.error.message}`);
-  const cal = await loadCalendar(user?.email ?? "");
   // untyped client: the select above is the shape; the embed is one business (many-to-one), an array only if PostgREST says so
   const log: CallLite[] = (
     (callLog.data ?? []) as unknown as {
@@ -93,7 +95,10 @@ export async function TodayBrandon({ all = false }: { all?: boolean }) {
         : {}),
       rows: rows(t.followups, "follow"),
     },
-    { id: "consults", title: "Consults", rows: rows(t.consults, "consult") },
+    // the proto has no empty Consults card: show the section only when there is one
+    ...(t.consults.length
+      ? [{ id: "consults", title: "Consults", rows: rows(t.consults, "consult") }]
+      : []),
     {
       id: "tasks",
       title: "Your tasks",
@@ -118,26 +123,13 @@ export async function TodayBrandon({ all = false }: { all?: boolean }) {
     );
 
   const w = t.week;
-  const stat = (n: number, label: string) => (
-    <span className="stat">
-      <b>{n}</b> {label}
-    </span>
-  );
   return (
     <div className="tb">
       <div className="tb-main">
         <LeadBoard
-          head={
-            <>
-              <h1>Today, Brandon</h1>
-              <p className="date">{fmtET(new Date().toISOString())}</p>
-              <div className="stats" aria-label="This week">
-                {stat(w.calls, "calls")}
-                {stat(w.reached, "reached")}
-                {stat(w.consults, "consults")}
-              </div>
-            </>
-          }
+          head={null}
+          // the top due call is open on arrival, as in the proto; Esc leaves it for the idle pane
+          initialKey={leads[0]?.id}
           sections={sections}
           details={details}
           idle={

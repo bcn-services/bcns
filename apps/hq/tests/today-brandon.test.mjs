@@ -238,13 +238,31 @@ test("rail: week chart is Mon-Fri of this ET week with today highlighted; wins a
   assert.deepEqual(s.wins[1], { kind: "reached", name: "Pelican Point Dental", time: "Tue 11:12" });
 });
 
+test("rail: a win from more than 6 days ago shows its date, not a weekday", () => {
+  const s = railStats(
+    [
+      { at: "2026-10-22T15:00:00Z", outcome: "reached", name: "six days" }, // Thu Oct 22 = 6 days before Wed Oct 28
+      { at: "2026-10-21T15:00:00Z", outcome: "reached", name: "seven days" },
+      { at: "2026-10-12T15:00:00Z", outcome: "consult_booked", name: "old" },
+    ],
+    NOW_R
+  );
+  assert.deepEqual(s.wins.map((w) => w.time), ["Thu 11:00", "Oct 21", "Oct 12"]);
+});
+
 test("Brandon's Today mounts the rail beside the board with his calendar, and never re-adds a sub-12px size", async () => {
   const { readFileSync } = await import("node:fs");
   const page = readFileSync(new URL("../components/TodayBrandon.tsx", import.meta.url), "utf8");
   assert.match(page, /<TodayBrandonRail s=\{rail\} calendar=\{<TodayCalendar cal=\{cal\} now=\{now\} \/>\} \/>/);
   assert.match(page, /\.eq\("by", "brandon"\)/);
-  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.doesNotMatch(css, /font-size:\s*(1[01](\.\d+)?|\d(\.\d+)?)px/);
+  // font-size: and the font: shorthand ("600 11px/16px ...") alike, in every stylesheet under app/
+  const { readdirSync } = await import("node:fs");
+  const dir = new URL("../app/", import.meta.url);
+  const sheets = readdirSync(dir).filter((f) => f.endsWith(".css"));
+  assert.ok(sheets.includes("globals.css"));
+  for (const f of sheets)
+    for (const m of readFileSync(new URL(f, dir), "utf8").matchAll(/font(?:-size)?:\s*(?:[\w-]+\s+)*?(\d+(?:\.\d+)?)px/g))
+      assert.ok(Number(m[1]) >= 12, `${f}: ${m[0]}`);
 });
 
 test("MCP today derives client health instead of reading clients.health", async () => {
@@ -253,4 +271,12 @@ test("MCP today derives client health instead of reading clients.health", async 
   const region = src.slice(src.indexOf('name: "today"'), src.indexOf('name: "propose_lead_stage"'));
   assert.doesNotMatch(region, /display_name, kind, stage, health, owner/);
   assert.match(region, /deriveFor\(c, sources, now\)\.derived\.health/);
+});
+
+test("Today (Brandon): no header chips, default-open top call, Consults only with rows", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../components/TodayBrandon.tsx", import.meta.url), "utf8");
+  assert.match(src, /head=\{null\}/);
+  assert.match(src, /initialKey=\{leads\[0\]\?\.id\}/);
+  assert.match(src, /t\.consults\.length/);
 });

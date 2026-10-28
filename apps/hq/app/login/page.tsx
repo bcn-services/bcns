@@ -7,14 +7,19 @@ const messages = (email: string): Record<string, string> => ({
   unconfigured: "HQ is not configured",
   invalid: `wrong password for ${email}`,
   "no-profile": `no HQ account for ${email}`,
+  rate: `too many tries for ${email}, wait a minute`,
   failed: "Something went wrong. Try again.",
-  expired: "That reset link has expired. Ask for a new one.",
+  expired:
+    "That reset link has expired. Ask for a new one, and open the link in the same browser you request it from.",
 });
 
 export default function LoginPage({ searchParams }: { searchParams: Q }) {
-  const email = (searchParams.email ?? "").slice(0, 254);
+  // the query string is anyone's: only a plain address is echoed into the message, anything else is dropped
+  const raw = (searchParams.email ?? "").trim();
+  const email = raw.length <= 254 && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw) ? raw : "";
+  const who = email || "that email";
   const error = searchParams.error
-    ? (messages(email)[searchParams.error] ?? messages(email).failed)
+    ? (messages(who)[searchParams.error] ?? messages(who).failed)
     : null;
   const mode = searchParams.mode === "forgot" ? "forgot" : "in";
   return (
@@ -40,7 +45,7 @@ export default function LoginPage({ searchParams }: { searchParams: Q }) {
           ) : null}
           {searchParams.sent ? (
             <p role="status" className="chip ok">
-              If {email} has an HQ account, a reset link is on its way.
+              If {who} has an HQ account, a reset link is on its way.
             </p>
           ) : null}
           <button type="submit" className="btn pri">

@@ -33,7 +33,7 @@ function Ring({ done, goal }: { done: number; goal: number }) {
 function WeekChart({ week, goal }: { week: RailStats["week"]; goal: number }) {
   const W = 260;
   const H = 110;
-  const top = 8;
+  const top = 18; // room above the tallest bar for the today label
   const base = H - 4;
   const max = Math.max(goal, ...week.vals) * 1.1;
   const y = (v: number) => base - ((base - top) * v) / max;
@@ -42,6 +42,9 @@ function WeekChart({ week, goal }: { week: RailStats["week"]; goal: number }) {
   return (
     <svg className="wc" viewBox={`0 0 ${W} ${H + 18}`} role="img" aria-label="Calls this week">
       <line x1="0" x2={W} y1={y(goal)} y2={y(goal)} stroke="var(--mute)" strokeDasharray="4 4" />
+      <text x={W} y={y(goal) - 4} textAnchor="end" fontSize="12" fill="var(--mute)">
+        goal {goal}
+      </text>
       {week.vals.map((v, i) => {
         const x = i * step + (step - bw) / 2;
         return (
@@ -52,8 +55,20 @@ function WeekChart({ week, goal }: { week: RailStats["week"]; goal: number }) {
               width={bw}
               height={Math.max(2, base - y(v))}
               rx="4"
-              fill={i === week.hi ? "var(--accent)" : "var(--tint2)"}
+              fill={i === week.hi ? "var(--accent)" : "var(--tint)"}
             />
+            {i === week.hi ? (
+              <text
+                x={x + bw / 2}
+                y={y(v) - 4}
+                textAnchor="middle"
+                fontSize="12"
+                fontWeight="700"
+                fill="var(--ink)"
+              >
+                {v}
+              </text>
+            ) : null}
             <text x={x + bw / 2} y={H + 13} textAnchor="middle" fontSize="12" fill="var(--mute)">
               {week.labels[i]}
             </text>

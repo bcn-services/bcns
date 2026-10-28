@@ -88,10 +88,14 @@ export function railStats(all: CallLite[], now: Date, goal = GOAL): RailStats {
     .slice(0, 5)
     .map((c) => {
       const d = new Date(c.at);
+      // today: the time; within the last 6 days: weekday + time; older: the date (a bare weekday would read as this week)
+      const ago = (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${dayET(d)}T12:00:00Z`)) / 86_400_000;
       const when =
-        dayET(d) === today
+        ago === 0
           ? hm(d)
-          : `${d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" })} ${hm(d)}`;
+          : ago <= 6
+            ? `${d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" })} ${hm(d)}`
+            : d.toLocaleDateString("en-US", { timeZone: TZ, month: "short", day: "numeric" });
       return {
         kind: c.outcome === "consult_booked" ? "consult" : "reached",
         name: c.name?.trim() || "a lead",

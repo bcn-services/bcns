@@ -514,7 +514,7 @@ button.own.brandon {
   border-radius: 5px;
   background: #fff;
   font:
-    600 11px/16px ui-monospace,
+    600 12px/17px ui-monospace,
     Menlo,
     monospace;
   color: var(--ink2);
@@ -1048,15 +1048,21 @@ table.grid td select {
   border-left: 1px solid var(--line);
   background: #f6f7fa;
 }
-.tb-rail h2 {
+.tb-rail h2,
+.tb-rail h3,
+.tb-rail .sh h2 {
   margin: 0 0 8px;
-  font-size: 17px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink2);
 }
 .tb-rail h3 {
-  margin: 18px 0 6px;
-  font-size: 13px;
-  color: var(--mute);
-  font-weight: 600;
+  margin-top: 18px;
+}
+.tb-rail .sh h2 {
+  margin: 0;
 }
 .tb-rail .rg {
   display: block;
@@ -1095,8 +1101,8 @@ table.grid td select {
   font-size: 12px;
 }
 .tb-rail .streak i.on {
-  background: var(--okbg);
-  color: var(--ok);
+  background: var(--ok);
+  color: #fff;
   font-weight: 700;
 }
 .tb-rail .streak i.today {
