@@ -8,6 +8,15 @@ import { DB_URL, pool, sql } from "./helpers.js";
 
 const PW = `hq-ops-test-${randomUUID()}`;
 const VIEWS = ["connector_health", "connector_runs_7d", "tickets_open", "clients"];
+// Granted to PUBLIC by the extension scripts, not by us. pg_stat_statements: the `extensions` schema
+// has no PUBLIC usage, so hq_ops_ro cannot name them (prod identical, read-only checked 2026-10-27).
+// pg_net (`net.*`): only in the local image; prod has no net.http_request_queue/_http_response.
+const PUBLIC_EXTENSION_RELATIONS = new Set([
+  "extensions.pg_stat_statements",
+  "extensions.pg_stat_statements_info",
+  "net.http_request_queue",
+  "net._http_response",
+]);
 const opened: pg.Client[] = [];
 
 async function asRole(): Promise<pg.Client> {
@@ -86,6 +95,29 @@ describe("hq_ops_ro", () => {
     expect(
       (await sql(`select has_schema_privilege('hq_ops_ro', 'public', 'create') u`)).rows[0].u
     ).toBe(false);
+  });
+
+  it("privilege matrix: SELECT only on ops.*, nothing on any other schema's relations", async () => {
+    const r = await sql<{ n: string; schema: string; sel: boolean; other: boolean; any: boolean }>(
+      `select n.nspname||'.'||c.relname n, n.nspname schema,
+              has_table_privilege('hq_ops_ro', c.oid, 'select') sel,
+              has_table_privilege('hq_ops_ro', c.oid, 'insert,update,delete,truncate,references,trigger') other,
+              has_table_privilege('hq_ops_ro', c.oid, 'select,insert,update,delete,truncate,references,trigger') "any"
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where c.relkind in ('r','p','v','m','f')
+          and n.nspname not in ('pg_catalog','information_schema','pg_toast')`
+    );
+    const ops = r.rows.filter((x) => x.schema === "ops");
+    expect(ops.map((x) => x.n.slice(4)).sort()).toEqual([...VIEWS].sort());
+    for (const x of ops) expect([x.n, x.sel, x.other]).toEqual([x.n, true, false]);
+    // data.*, public.*, api.*, auth.*, anything else: no privilege of any kind. The only exceptions
+    // are extension-owned relations the Supabase image grants to PUBLIC, named one by one so a new
+    // grant anywhere else still fails (the message lists the names).
+    const exposed = r.rows.filter(
+      (x) => x.schema !== "ops" && x.any && !PUBLIC_EXTENSION_RELATIONS.has(x.n)
+    );
+    expect(exposed.map((x) => x.n)).toEqual([]);
+    expect(r.rows.some((x) => x.schema === "data")).toBe(true); // the check is not vacuous
   });
 
   it("no ops column can carry secrets or error text", async () => {

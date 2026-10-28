@@ -176,8 +176,13 @@ export function filterTasks(tasks: Task[], f: TaskFilter): Task[] {
 // ---- DB plumbing ------------------------------------------------------------------------
 
 // The client is untyped (no generated Database type yet), so the caller names the row shape.
-function must<T>(r: { data: unknown; error: { message: string } | null }, what: string): T {
-  if (r.error) throw new Error(`${what}: ${r.error.message}`);
+function must<T>(
+  r: { data: unknown; error: { message: string; code?: string } | null },
+  what: string
+): T {
+  // code kept (PostgREST/Postgres SQLSTATE) so a caller can tell a unique violation from an outage
+  if (r.error)
+    throw Object.assign(new Error(`${what}: ${r.error.message}`), { code: r.error.code });
   if (r.data == null) throw new Error(`${what}: no row`);
   return r.data as T;
 }
@@ -349,7 +354,11 @@ export interface NewProposal {
   reason?: string;
 }
 
-/** Pending proposal only. Deciding is decide_proposal() (a human click), never a function here. */
+/**
+ * Pending proposal only. Deciding is decide_proposal() (a human click), never a function here.
+ * `old` and `via` below are advisory: since 0031 the proposals_server_fields trigger overwrites
+ * both (old = the live value, via from the X-HQ-Via header), so a client cannot forge either.
+ */
 export async function propose(sb: Sb, actor: string, via: Via, p: NewProposal) {
   if (!PROPOSAL_KINDS.includes(p.kind)) throw new Error(`unknown proposal kind ${p.kind}`);
   const row = must<{ id: string }>(
@@ -418,31 +427,42 @@ export async function createOpsTask(
 ): Promise<Task> {
   const alertKey = i.alertKey?.trim();
   if (!alertKey) throw new Error("alertKey required");
-  const r = await sb
-    .from("tasks")
-    .select("*")
-    .eq("alert_key", alertKey)
-    .neq("status", "done")
-    .limit(1)
-    .maybeSingle();
-  if (r.error) throw new Error(`tasks: ${r.error.message}`);
-  if (r.data) return r.data as Task;
-  // ponytail: check-then-insert, so two simultaneous presses can both insert; a partial unique
-  // index on alert_key (status <> 'done') would close it — needs a migration, not worth it for 2 users.
-  return createTask(
-    sb,
-    actor,
-    via,
-    {
-      title: i.title,
-      owner: "nate",
-      area: "ops",
-      source: "alert",
-      alertKey,
-      due: addDays(isoDay(now), 2),
-    },
-    now
-  );
+  const open = async (): Promise<Task | null> => {
+    const r = await sb
+      .from("tasks")
+      .select("*")
+      .eq("alert_key", alertKey)
+      .neq("status", "done")
+      .limit(1)
+      .maybeSingle();
+    if (r.error) throw new Error(`tasks: ${r.error.message}`);
+    return (r.data as Task | null) ?? null;
+  };
+  const existing = await open();
+  if (existing) return existing;
+  // The partial unique index tasks_alert_key_open_idx (0031) is the real guard: of two simultaneous
+  // presses the loser gets 23505 and returns the winner's task.
+  try {
+    return await createTask(
+      sb,
+      actor,
+      via,
+      {
+        title: i.title,
+        owner: "nate",
+        area: "ops",
+        source: "alert",
+        alertKey,
+        due: addDays(isoDay(now), 2),
+      },
+      now
+    );
+  } catch (e) {
+    if ((e as { code?: unknown }).code !== "23505") throw e;
+    const winner = await open();
+    if (winner) return winner;
+    throw e;
+  }
 }
 
 export async function setListItemStatus(

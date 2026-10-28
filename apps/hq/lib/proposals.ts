@@ -15,6 +15,8 @@ export interface ProposalView {
   who: string;
   via: string;
   age: string;
+  /** Admins only. The decide_proposal RPC enforces it too; this just hides the buttons from staff. */
+  canDecide: boolean;
 }
 
 /** jsonb old/new -> display text. spend_cents shows as dollars; null = no value yet. */
@@ -35,6 +37,16 @@ export function ageLabel(iso: string, now: Date): string {
 export function whoLabel(handle: string | null, via: string | null): string {
   const h = handle ?? "someone";
   return via === "mcp" ? `Claude (${h})` : h;
+}
+
+/** profiles.role = 'admin' via is_admin(). Any error means false: the UI hides, the RPC still decides. */
+export async function isAdmin(sb: SupabaseClient): Promise<boolean> {
+  try {
+    const r = await sb.rpc("is_admin");
+    return r.error ? false : r.data === true;
+  } catch {
+    return false;
+  }
 }
 
 interface Row {
@@ -64,9 +76,10 @@ export async function listPendingProposals(
   const rows = (r.data ?? []) as Row[];
   if (!rows.length) return [];
   const bizIds = rows.filter((p) => p.kind === "lead_stage").map((p) => p.target_id);
-  const [biz, prof] = await Promise.all([
+  const [biz, prof, canDecide] = await Promise.all([
     bizIds.length ? sb.from("businesses").select("id, name").in("id", bizIds) : { data: [] },
     sb.from("profiles").select("id, handle"),
+    isAdmin(sb),
   ]);
   const names = new Map(
     ((biz.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name])
@@ -86,5 +99,6 @@ export async function listPendingProposals(
     who: whoLabel(handles.get(p.created_by ?? "") ?? null, p.via),
     via: p.via ?? "",
     age: ageLabel(p.created_at, now),
+    canDecide,
   }));
 }

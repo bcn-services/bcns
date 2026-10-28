@@ -9,7 +9,7 @@ export function useDecide() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
   function decide(p: ProposalView, approve: boolean) {
-    if (busy) return;
+    if (busy || !p.canDecide) return; // staff: the a/r shortcuts must not reach the RPC
     start(async () => {
       const r = await decideProposal(p.id, approve);
       setMsg(
@@ -116,15 +116,21 @@ export function ProposalDetail({
           <p>{p.reason}</p>
         </div>
       ) : null}
-      <div className="sec acts">
-        <button className="btn pri" disabled={busy} onClick={() => onDecide(true)}>
-          Approve <b className="k">a</b>
-        </button>
-        <button className="btn neg" disabled={busy} onClick={() => onDecide(false)}>
-          Reject <b className="k">r</b>
-        </button>
-      </div>
-      <p className="fine">Only a human click applies a change.</p>
+      {p.canDecide ? (
+        <div className="sec acts">
+          <button className="btn pri" disabled={busy} onClick={() => onDecide(true)}>
+            Approve <b className="k">a</b>
+          </button>
+          <button className="btn neg" disabled={busy} onClick={() => onDecide(false)}>
+            Reject <b className="k">r</b>
+          </button>
+        </div>
+      ) : null}
+      <p className="fine">
+        {p.canDecide
+          ? "Only a human click applies a change."
+          : "Only an admin can approve or reject."}
+      </p>
     </div>
   );
 }

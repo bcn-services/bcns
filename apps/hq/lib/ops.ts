@@ -55,12 +55,31 @@ export interface RunEvent {
   error: string | null;
 }
 
+/**
+ * Force certificate verification on the platform connection whatever the configured URL says.
+ * postgres.js maps the `sslmode` query param to its `ssl` option; `verify-full` checks chain + host.
+ * String ops, not `new URL`: the password may hold raw `%` or `#` that URL parsing would mangle.
+ */
+export function verifyFullUrl(url: string): string {
+  const q = url.indexOf("?", url.lastIndexOf("@") + 1);
+  // only a `?` after the last `@` starts the query; an earlier one is part of the password
+  const base = q < 0 ? url : url.slice(0, q);
+  const rest = q < 0 ? [] : url.slice(q + 1).split("&");
+  const kept = rest.filter((kv) => kv && !/^sslmode=/i.test(kv));
+  return `${base}?${[...kept, "sslmode=verify-full"].join("&")}`;
+}
+
 let pool: postgres.Sql | undefined;
 function db(): postgres.Sql | null {
   const url = getConfig().platformOpsUrl;
   if (!url) return null;
   // ponytail: one lazy pool per process; the role allows 3 connections, we take at most 2.
-  return (pool ??= postgres(url, { max: 2, prepare: false, connect_timeout: 5, idle_timeout: 30 }));
+  return (pool ??= postgres(verifyFullUrl(url), {
+    max: 2,
+    prepare: false,
+    connect_timeout: 5,
+    idle_timeout: 30,
+  }));
 }
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v));
@@ -72,6 +91,34 @@ const noData = (failed: string[]): OpsSnapshot => ({
   clients: [],
   failed,
 });
+
+/** Tenant free text reaches the HQ UI and MCP through here, so the subject is capped at 80 chars. */
+export function ticketRow(r: Record<string, unknown>): OpsSnapshot["tickets"][number] {
+  return {
+    id: String(r.id),
+    slug: String(r.slug),
+    subject: String(r.subject).slice(0, 80),
+    severity: String(r.severity),
+    status: String(r.status),
+    created_at: iso(r.created_at) ?? "",
+  };
+}
+
+/**
+ * Why a query failed, for the log. Supabase's pooler cert chains to Supabase's own root CA, which
+ * Node does not ship, so verify-full fails until that CA is trusted: say so (Nate-run step).
+ */
+export function failureReason(e: unknown): string {
+  if (!(e instanceof Error)) return "error";
+  const code = (e as { code?: unknown }).code;
+  const tls =
+    /^(SELF_SIGNED_CERT|DEPTH_ZERO_SELF_SIGNED|UNABLE_TO_(VERIFY_LEAF|GET_ISSUER)|CERT_|ERR_TLS_CERT)/.test(
+      typeof code === "string" ? code : ""
+    ) || /self[- ]signed|certificate/i.test(e.message);
+  return tls
+    ? `${e.message} (TLS verification: trust the Supabase root CA on the droplet via NODE_EXTRA_CA_CERTS)`
+    : e.message;
+}
 
 async function loadSnapshot(): Promise<OpsSnapshot> {
   const q = db();
@@ -90,9 +137,7 @@ async function loadSnapshot(): Promise<OpsSnapshot> {
   const rows = res.map((r, i) => {
     if (r.status === "fulfilled") return [...r.value] as Record<string, unknown>[];
     failed.push(names[i] ?? "query");
-    console.error(
-      `[ops] ${names[i] ?? "query"} query failed: ${r.reason instanceof Error ? r.reason.message : "error"}`
-    );
+    console.error(`[ops] ${names[i] ?? "query"} query failed: ${failureReason(r.reason)}`);
     return [];
   });
   const map = <T>(i: number, f: (r: Record<string, unknown>) => T) => (rows[i] ?? []).map(f);
@@ -113,14 +158,7 @@ async function loadSnapshot(): Promise<OpsSnapshot> {
       ok: Boolean(r.ok),
       duration_ms: r.duration_ms == null ? null : Number(r.duration_ms),
     })),
-    tickets: map(2, (r) => ({
-      id: String(r.id),
-      slug: String(r.slug),
-      subject: String(r.subject),
-      severity: String(r.severity),
-      status: String(r.status),
-      created_at: iso(r.created_at) ?? "",
-    })),
+    tickets: map(2, ticketRow),
     clients: map(3, (r) => ({
       slug: String(r.slug),
       name: String(r.name),
