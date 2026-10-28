@@ -141,7 +141,12 @@ export function WorkTaskDetail(props: {
             />
           </dd>
         </dl>
-        <textarea name="body" aria-label="Description" placeholder="Description" defaultValue={task.body ?? ""} />
+        <textarea
+          name="body"
+          aria-label="Description"
+          placeholder="Description"
+          defaultValue={task.body ?? ""}
+        />
         <div className="wk-acts">
           <button
             type="button"

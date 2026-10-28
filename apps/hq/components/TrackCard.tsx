@@ -2,7 +2,13 @@ import Link from "next/link";
 import type { BoardCard } from "@/lib/tracks";
 
 /** One board card: the track name and its steps. A step opens its task (onStep) or links to /work?task=. */
-export function TrackCard({ card, onStep }: { card: BoardCard; onStep?: (taskId: string) => void }) {
+export function TrackCard({
+  card,
+  onStep,
+}: {
+  card: BoardCard;
+  onStep?: (taskId: string) => void;
+}) {
   const { track, steps } = card;
   return (
     <div className="wk-card">

@@ -13,7 +13,11 @@ export interface ClientOpt {
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** "+ New task": Title, Description, owner, date, track, client. Esc or the scrim closes it. */
-export function NewTaskModal(props: { tracks: Track[]; clients: ClientOpt[]; onClose: () => void }) {
+export function NewTaskModal(props: {
+  tracks: Track[];
+  clients: ClientOpt[];
+  onClose: () => void;
+}) {
   const { tracks, clients, onClose } = props;
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
@@ -46,14 +50,27 @@ export function NewTaskModal(props: { tracks: Track[]; clients: ClientOpt[]; onC
 
   return (
     <div className="wk-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <form className="wk-modal" role="dialog" aria-modal="true" aria-label="New task" onSubmit={submit}>
+      <form
+        className="wk-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="New task"
+        onSubmit={submit}
+      >
         <div className="wk-hdr">
           <h2>New task</h2>
           <button type="button" className="btn" aria-label="Close" onClick={onClose}>
             ✕
           </button>
         </div>
-        <input name="title" className="wk-title-in" placeholder="Title" aria-label="Title" required autoFocus />
+        <input
+          name="title"
+          className="wk-title-in"
+          placeholder="Title"
+          aria-label="Title"
+          required
+          autoFocus
+        />
         <textarea name="body" placeholder="Description" aria-label="Description" />
         <div className="wk-g">
           <select name="owner" aria-label="Owner" defaultValue="">

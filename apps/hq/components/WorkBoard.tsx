@@ -29,7 +29,10 @@ export function WorkBoard(props: {
   const [busy, start] = useTransition();
 
   const trackName = useMemo(() => new Map(tracks.map((t) => [t.id, t.name])), [tracks]);
-  const clientName = useMemo(() => new Map(clients.map((c) => [c.slug, c.display_name])), [clients]);
+  const clientName = useMemo(
+    () => new Map(clients.map((c) => [c.slug, c.display_name])),
+    [clients]
+  );
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return workGroups(
@@ -91,7 +94,11 @@ export function WorkBoard(props: {
                 </option>
               ))}
             </select>
-            <select aria-label="Client" value={clientF} onChange={(e) => setClientF(e.target.value)}>
+            <select
+              aria-label="Client"
+              value={clientF}
+              onChange={(e) => setClientF(e.target.value)}
+            >
               <option value="">Any client</option>
               {clients.map((c) => (
                 <option key={c.slug} value={c.slug}>
@@ -109,7 +116,9 @@ export function WorkBoard(props: {
             <section key={g.key} aria-label={g.label}>
               <div className="wk-sh">
                 <h2>{g.label}</h2>
-                <span className={`cnt${g.key === "unassigned" ? " wk-warn" : ""}`}>{g.tasks.length}</span>
+                <span className={`cnt${g.key === "unassigned" ? " wk-warn" : ""}`}>
+                  {g.tasks.length}
+                </span>
               </div>
               {g.tasks.map((t) => {
                 const late = !!t.due && t.due < today;
@@ -146,7 +155,9 @@ export function WorkBoard(props: {
                       <div className="wk-rt">{t.title}</div>
                       <div className="wk-s">{sub || " "}</div>
                     </div>
-                    <span className={late ? "wk-od" : "muted"}>{t.due ? humanDay(t.due, today) : ""}</span>
+                    <span className={late ? "wk-od" : "muted"}>
+                      {t.due ? humanDay(t.due, today) : ""}
+                    </span>
                   </div>
                 );
               })}
@@ -176,7 +187,9 @@ export function WorkBoard(props: {
           )}
         </main>
       </div>
-      {modal ? <NewTaskModal tracks={tracks} clients={clients} onClose={() => setModal(false)} /> : null}
+      {modal ? (
+        <NewTaskModal tracks={tracks} clients={clients} onClose={() => setModal(false)} />
+      ) : null}
       <footer className="keys">
         <span>
           <b className="k">j</b>
