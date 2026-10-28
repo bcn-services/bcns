@@ -214,7 +214,7 @@ export const TOOLS: ToolDef[] = [
       const { id, ...patch } = a;
       // Read the CURRENT row when the owner gates a close or a reassign, or when waiting_on alone must pick the status (as the UI does).
       const byWaiting = a.status === undefined && a.waiting_on !== undefined;
-      const gated = a.status === "done" || a.owner !== undefined;
+      const gated = a.status === "done" || a.owner !== undefined || a.resolution !== undefined;
       if (gated || byWaiting) {
         const cur = read<{ owner: string | null; status: Status } | null>(
           await sb.from("tasks").select("owner, status").eq("id", id).maybeSingle(),
@@ -231,7 +231,7 @@ export const TOOLS: ToolDef[] = [
           if (me?.role !== "admin")
             throw new ToolError(
               `refused: this task is owned by ${cur.owner}; only ${cur.owner} or an admin can ${
-                a.status === "done" ? "mark it done" : "reassign it"
+                a.status === "done" ? "mark it done" : a.owner !== undefined ? "reassign it" : "edit its resolution"
               }. Tell the user and leave it.`
             );
         }

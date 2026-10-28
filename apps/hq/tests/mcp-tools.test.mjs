@@ -724,3 +724,14 @@ test("update_task takes a resolution (trimmed, clearable, max 4000) and its desc
     )
   );
 });
+
+test("update_task resolution is owner-gated like a close: staff are refused on another human's task with no write; the owner and an admin may", async () => {
+  const fake = withTeam();
+  await assert.rejects(
+    call(fake, "update_task", { id: T_BRANDON, resolution: "changed" }),
+    /refused: this task is owned by brandon; only brandon or an admin can edit its resolution/
+  );
+  assert.equal(writes(fake).length, 0);
+  assert.equal((await as(ADMIN, fake, "update_task", { id: T_BRANDON, resolution: "mine" })).task.resolution, "mine");
+  assert.equal((await call(withTeam(), "update_task", { id: T_NATE, resolution: "ok" })).task.resolution, "ok");
+});

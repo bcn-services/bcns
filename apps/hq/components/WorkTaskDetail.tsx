@@ -36,6 +36,8 @@ export function WorkTaskDetail(props: {
   const [busy, start] = useTransition();
   const done = task.status === "done";
   const isTicket = !!task.alert_key?.startsWith("ticket:");
+  // send resolution only when this form changed it: a stale open detail must not blank one set elsewhere (MCP)
+  const resChanged = (v: string) => v.trim() !== (task.resolution ?? "");
 
   function submit(
     e: FormEvent<HTMLFormElement>,
@@ -72,7 +74,7 @@ export function WorkTaskDetail(props: {
       ) : null}
 
       <form
-        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}${task.resolution}${task.track_id}${task.client_slug}`}
+        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}${task.track_id}${task.client_slug}`}
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
@@ -87,7 +89,9 @@ export function WorkTaskDetail(props: {
               due: s(f, "due") || null,
               waiting_on: waiting || null,
               body: s(f, "body") || null,
-              ...(isTicket ? { resolution: s(f, "resolution") || null } : {}),
+              ...(isTicket && resChanged(s(f, "resolution"))
+                ? { resolution: s(f, "resolution") || null }
+                : {}),
               track_id: s(f, "track") || null,
               client_slug: s(f, "client") || null,
             });
@@ -156,13 +160,23 @@ export function WorkTaskDetail(props: {
         {isTicket ? (
           <>
             <textarea
+              key={task.resolution ?? ""}
               name="resolution"
               aria-label="Resolution"
               placeholder="Resolution"
               defaultValue={task.resolution ?? ""}
+              // saved on leaving the box so the d key (which sends no text) closes with it; not via `start`, which would disable Done mid-click
+              onBlur={async (e) => {
+                const v = e.currentTarget.value;
+                if (!resChanged(v)) return;
+                const r = await updateTaskAction(task.id, { resolution: v.trim() || null });
+                if (!r.ok) setMsg(r.error);
+              }}
             />
             <p className="muted">
-              Sent to the client&apos;s ticket when this task is done. Done saves it.
+              {done
+                ? "Already sent if the ticket has synced; later edits are not pushed."
+                : "Sent to the client's ticket when this task is done. Saved when you leave the box or press Done."}
             </p>
           </>
         ) : null}
@@ -173,7 +187,11 @@ export function WorkTaskDetail(props: {
             disabled={busy}
             onClick={(e) => {
               // a ticket's resolution goes in the same patch as done: the job pushes on done, so a later save is never sent
-              const res = isTicket && e.currentTarget.form ? s(new FormData(e.currentTarget.form), "resolution") : null;
+              const typed =
+                isTicket && e.currentTarget.form
+                  ? s(new FormData(e.currentTarget.form), "resolution")
+                  : null;
+              const res = typed !== null && resChanged(typed) ? typed : null;
               start(async () => {
                 const r = done
                   ? await updateTaskAction(task.id, { status: "todo" })
