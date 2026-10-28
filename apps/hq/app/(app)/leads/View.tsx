@@ -40,8 +40,11 @@ export function LeadsView(props: {
   details: Record<string, ReactNode>;
   calls: Record<string, ReactNode>;
   rows: Record<string, Deliverable[]>;
+  /** Why the Pitch rows did not load ("" = fine) and why the trade list is short ("" = fine). */
+  pitchError: string;
+  tradesError: string;
 }) {
-  const { items, cols, filters, stages, trades, sub, sort, dir, details, calls, rows } = props;
+  const { items, cols, filters, stages, trades, sub, sort, dir, details, calls, rows, pitchError, tradesError } = props;
   const router = useRouter();
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -193,6 +196,11 @@ export function LeadsView(props: {
               ))}
             </select>
           </form>
+          {tradesError ? (
+            <p className="perr" role="alert">
+              The trade list is incomplete: {tradesError}
+            </p>
+          ) : null}
           {items.length ? (
             <div className="card">
               <table className="lx-table">
@@ -219,7 +227,7 @@ export function LeadsView(props: {
                         setOpen(true);
                       }}
                     >
-                      <td>
+                      <td title={l.name}>
                         <b>{l.name}</b>
                       </td>
                       <td className="c-trade">{l.trade}</td>
@@ -258,6 +266,7 @@ export function LeadsView(props: {
             consultOpen={consultOpen}
             onConsultOpen={setConsultOpen}
             rows={rows[drawer.id] ?? []}
+            pitchError={pitchError}
             details={details[drawer.id]}
             calls={calls[drawer.id]}
           />

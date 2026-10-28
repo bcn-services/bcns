@@ -74,6 +74,41 @@
 .lx-table td b {
   font-weight: 600;
 }
+/* column widths from the prototype at 1440 (Business 314, Trade 151, Town 189, Stage 148, Fit 65, Owner 131,
+   Last 142, Next 107, Consult 144). Auto layout keeps them as hints, so Business is the one column that gives
+   (ellipsis) when the drawer takes the room or a name is long; every other cell is short and nowrap. */
+.lx-table th:nth-child(1) {
+  width: 314px;
+}
+.lx-table th:nth-child(2) {
+  width: 151px;
+}
+.lx-table th:nth-child(3) {
+  width: 189px;
+}
+.lx-table th:nth-child(4) {
+  width: 148px;
+}
+.lx-table th:nth-child(5) {
+  width: 65px;
+}
+.lx-table th:nth-child(6) {
+  width: 131px;
+}
+.lx-table th:nth-child(7) {
+  width: 142px;
+}
+.lx-table th:nth-child(8) {
+  width: 107px;
+}
+.lx-table th:nth-child(9) {
+  width: 144px;
+}
+.lx-table td:first-child {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .lx-table .n {
   text-align: right;
   font-variant-numeric: tabular-nums;

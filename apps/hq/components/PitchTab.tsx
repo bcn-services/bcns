@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { requestPitchStep } from "@/app/(app)/leads/actions";
 import {
   PROTOS,
-  consultBooked,
+  consultOffer,
   fileHref,
   leadSlug,
   pathExt,
@@ -17,7 +17,7 @@ import {
   type Step,
 } from "@/lib/deliverables";
 import { consultTitle, googleCalendarUrl } from "@/lib/ics";
-import { fmtET, type LeadItem } from "@/lib/leads";
+import { callSummary, fmtET, type LeadItem } from "@/lib/leads";
 
 const POLL_MS = 5000; // the job ticks every minute; refresh while a row is queued or running
 
@@ -113,10 +113,13 @@ const Run = ({ children }: { children: ReactNode }) => (
 export function PitchTab({
   lead,
   rows,
+  loadError,
   onBookConsult,
 }: {
   lead: LeadItem;
   rows: Deliverable[];
+  /** Why the rows did not load ("" = they did): shown, and every step button is off, so no step is requested blind. */
+  loadError: string;
   /** "Consult booked": opens the consult-time prompt of Log a call. */
   onBookConsult: () => void;
 }) {
@@ -145,7 +148,7 @@ export function PitchTab({
     });
   }
   const btn = (label: string, step: Step, pri = false, extra: { pick?: Proto; feedback?: string } = {}) => (
-    <button className={`btn${pri ? " pri" : ""}`} type="button" disabled={pending || !st.can[step]} onClick={() => go(step, extra)}>
+    <button className={`btn${pri ? " pri" : ""}`} type="button" disabled={pending || !!loadError || !st.can[step]} onClick={() => go(step, extra)}>
       {label}
     </button>
   );
@@ -155,7 +158,9 @@ export function PitchTab({
   const { protos, deck, quote } = st;
   const good = !!protos && protos.status !== "failed";
   const review = protos?.status === "done" && (!deck || deck.status === "failed");
-  const consulted = consultBooked({ stage: lead.stage, consult_at: lead.consultIso });
+  const offer = consultOffer({ stage: lead.stage, consult_at: lead.consultIso });
+  const consulted = offer === "booked";
+  const lit = review ? pick : (st.picked ?? pick); // while choosing, the lit card is the one "Make final deck" sends
   const cls = (done: boolean, cur: boolean) => (done ? "done" : cur ? "cur" : "off");
   const deckHref = (file: string) => {
     const p = pathFor(slug, deck, file, "demo");
@@ -167,6 +172,11 @@ export function PitchTab({
 
   return (
     <div className="pitch">
+      {loadError ? (
+        <div className="perr" role="alert">
+          Could not load this lead&apos;s pitch history: {loadError}. Steps are off until it loads.
+        </div>
+      ) : null}
       {msg ? (
         <div className="pmsg" role="alert">
           {msg}
@@ -181,7 +191,7 @@ export function PitchTab({
           <div className="muted">Marked good · {fmtET(protos!.created_at, true)} ET</div>
         ) : (
           <>
-            <div className="muted">{lead.stageLabel} · wants to see something</div>
+            <div className="muted">{callSummary(lead)}</div>
             <div className="sact">{btn("✓ Good call → make pitch prototypes", "prototypes", true)}</div>
           </>
         )}
@@ -206,7 +216,7 @@ export function PitchTab({
                 return (
                   <div
                     key={p}
-                    className={`pc${p === (st.picked ?? pick) ? " pick" : ""}`}
+                    className={`pc${p === lit ? " pick" : ""}`}
                     onClick={() => review && setPick(p)}
                   >
                     <div className="th">{protoName(p).toLowerCase()}</div>
@@ -274,12 +284,14 @@ export function PitchTab({
                 { label: "Video guide", view: deckHref("video-guide.md") },
               ]}
             />
-            {!consulted ? (
+            {offer === "book" ? (
               <div className="sact">
                 <button className="btn" type="button" onClick={onBookConsult}>
                   Consult booked →
                 </button>
               </div>
+            ) : offer === "stage" ? (
+              <div className="muted pnote">To book the consult, set the stage to Reached first (Details → Stage and owner).</div>
             ) : null}
           </>
         )}

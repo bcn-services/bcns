@@ -2,9 +2,9 @@ import "../../leads.css";
 import type { ReactNode } from "react";
 import { LeadDrawerCalls } from "@/components/LeadDrawerCalls";
 import { LeadDrawerDetails } from "@/components/LeadDrawerDetails";
-import { loadDeliverables, leadSlug, type Deliverable } from "@/lib/deliverables";
+import { leadSlug, loadPitchRows, type Deliverable } from "@/lib/deliverables";
 import { createSupabaseServer } from "@/lib/supabase";
-import { ALL_STAGES, LEAD_COLS, leadItem, loadExtras, stageLabel, type Lead } from "@/lib/leads";
+import { ALL_STAGES, LEAD_COLS, leadItem, loadExtras, loadTrades, stageLabel, type Lead } from "@/lib/leads";
 import { LeadsView, type Col } from "./View";
 
 const PAGE = 150;
@@ -52,26 +52,21 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
   if (f.trade) q = q.eq("trade", f.trade);
   if (f.assigned === "nate" || f.assigned === "brandon") q = q.eq("assigned_to", f.assigned);
   const [res, tradeRes] = await Promise.all([
-    q.order(sortKey[2], { ascending: dir === "asc", nullsFirst: false }).order("name").limit(PAGE),
-    // ponytail: distinct trades by scanning the column; a view or rpc when the table outgrows PostgREST's row cap
-    sb.from("businesses").select("trade").is("suppressed_at", null).not("trade", "is", null).limit(2000),
+    // name then id break ties, so equal values keep one order between reloads
+    q.order(sortKey[2], { ascending: dir === "asc", nullsFirst: false }).order("name").order("id").limit(PAGE),
+    loadTrades(sb),
   ]);
   if (res.error) return <p className="lpad muted">Could not load leads: {res.error.message}</p>;
 
   // untyped client: LEAD_COLS is the shape
   const leads = (res.data ?? []) as Lead[];
-  const trades = [...new Set(((tradeRes.data ?? []) as { trade: string }[]).map((r) => r.trade))].sort();
+  const trades = tradeRes.trades;
   if (f.trade && !trades.includes(f.trade)) trades.unshift(f.trade);
   const extras = await loadExtras(sb, leads.map((l) => l.id));
 
-  // Pitch rows by lead; a lead with no folder yet has none. Without the table (0032 not applied) the tab just starts empty.
-  const slugs = leads.flatMap((l) => leadSlug(l) ?? []);
-  let bySlug = new Map<string, Deliverable[]>();
-  try {
-    bySlug = await loadDeliverables(sb, slugs);
-  } catch {
-    // Pitch tab shows no history; a request then fails with its own message
-  }
+  // Pitch rows by lead; a lead with no folder yet has none. Without the table (0032 not applied) the tab just
+  // starts empty; any other failure is shown in the tab (steps off) instead of passing as an empty history.
+  const { rows: bySlug, error: pitchError } = await loadPitchRows(sb, leads.flatMap((l) => leadSlug(l) ?? []));
 
   const keep = Object.entries(f).filter(([, v]) => v);
   const href = (sort: string, d: string) => `/leads?${new URLSearchParams([...keep, ["sort", sort], ["dir", d]])}`;
@@ -109,6 +104,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
       details={details}
       calls={calls}
       rows={rows}
+      pitchError={pitchError}
+      tradesError={tradeRes.error}
     />
   );
 }

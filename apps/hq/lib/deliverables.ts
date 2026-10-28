@@ -6,7 +6,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isUuid, type Actor } from "./leads";
+import { canLog, isUuid, type Actor } from "./leads";
 
 type Sb = SupabaseClient;
 
@@ -81,6 +81,9 @@ export interface PitchState {
 /** A consult is on the books (or already held): the quote step opens. */
 export const consultBooked = (l: { stage: string; consult_at: string | null }): boolean =>
   !!l.consult_at || ["consult_scheduled", "consult_done", "quoting"].includes(l.stage);
+/** What the deck step offers once the deck is done and no consult is booked: the Log-a-call consult form (it only renders on loggable stages) or, anywhere else, a pointer to the stage control. Never a button with no form behind it. */
+export const consultOffer = (l: { stage: string; consult_at: string | null }): "booked" | "book" | "stage" =>
+  consultBooked(l) ? "booked" : canLog(l.stage) ? "book" : "stage";
 const isDeck = (r: Deliverable) => r.kind === "pitch" && !!r.feedback?.startsWith(TAG.deck);
 
 /** Where each step stands, from the rows (newest first) and the lead. `can` is the one rule both the buttons and the action use. */
@@ -134,10 +137,14 @@ export function withPrint(html: string): string {
 }
 
 // ---- DB -------------------------------------------------------------------------------------
-function must<T extends { error: { message: string } | null }>(res: T): T {
-  if (res.error) throw new Error(res.error.message);
+// keeps the PostgREST/Postgres error code on the thrown Error so callers can tell "no such table" from a real failure
+function must<T extends { error: { message: string; code?: string } | null }>(res: T): T {
+  if (res.error) throw Object.assign(new Error(res.error.message), { code: res.error.code });
   return res;
 }
+const MISSING_TABLE = ["42P01", "PGRST205"]; // Postgres undefined_table, PostgREST schema-cache miss
+/** The `deliverables` table is not there (0032 not applied): the only load error the Pitch tab may swallow. */
+export const isMissingTable = (e: unknown): boolean => e instanceof Error && "code" in e && MISSING_TABLE.includes(String(e.code));
 
 /** Rows for a page of leads' slugs, newest first, grouped by slug (100 slugs per query). */
 export async function loadDeliverables(sb: Sb, slugs: string[]): Promise<Map<string, Deliverable[]>> {
@@ -153,6 +160,18 @@ export async function loadDeliverables(sb: Sb, slugs: string[]): Promise<Map<str
   return out;
 }
 
+/**
+ * The page's Pitch rows. A missing table is an empty history; any other failure comes back as `error`
+ * (the tab shows it and turns the steps off) so a lead with a running deck never reads as untouched.
+ */
+export async function loadPitchRows(sb: Sb, slugs: string[]): Promise<{ rows: Map<string, Deliverable[]>; error: string }> {
+  try {
+    return { rows: await loadDeliverables(sb, slugs), error: "" };
+  } catch (e) {
+    return { rows: new Map(), error: isMissingTable(e) ? "" : e instanceof Error ? e.message : "could not load" };
+  }
+}
+
 interface LeadFacts {
   id: string;
   name: string;
@@ -163,32 +182,48 @@ interface LeadFacts {
 }
 const LEAD_FACTS = "id, name, town, os_slug, stage, consult_at";
 
+/** Does clients/<slug> already exist in the os clone? Injected: only the server action can read the disk (this module also ships to the browser). */
+export type FolderExists = (slug: string) => Promise<boolean>;
+const badSlug = (s: string) =>
+  new Error(`this lead's folder name "${s.slice(0, 80)}" is not a valid slug (lowercase letters, digits and dashes, at most 63); fix businesses.os_slug by hand`);
+
 /**
- * Names the lead's slug the first time, so the job's lookup (businesses.os_slug = slug) finds it. The
- * name-only slug is tried first; a clash with another business (unique os_slug) falls back to name + town,
- * then name + id prefix.
+ * Names the lead's slug the first time, so the job's lookup (businesses.os_slug = slug) finds it. Tries
+ * name + town, then name + id prefix, and skips any name that is already an HQ client or an existing
+ * folder in the os clone (clients/<slug>): the job would otherwise write into a real client's folder.
  */
-async function ensureSlug(sb: Sb, l: LeadFacts): Promise<string> {
+async function ensureSlug(sb: Sb, l: LeadFacts, folderExists: FolderExists): Promise<string> {
   const own = leadSlug(l);
   if (own) return own;
-  for (const slug of [slugify(l.name), slugify(`${l.name} ${l.town ?? ""}`), `${slugify(l.name).slice(0, 56)}-${l.id.slice(0, 6)}`]) {
+  if (l.os_slug) throw badSlug(l.os_slug);
+  const cands = [...new Set([slugify(`${l.name} ${l.town ?? ""}`), `${slugify(l.name).slice(0, 56).replace(/-+$/, "")}-${l.id.slice(0, 6)}`])];
+  const clients = must(await sb.from("clients").select("slug").in("slug", cands));
+  const isClient = new Set(((clients.data ?? []) as { slug: string }[]).map((c) => c.slug)); // untyped client: the select is the shape
+  for (const slug of cands) {
+    if (isClient.has(slug) || (await folderExists(slug))) continue;
     const r = await sb.from("businesses").update({ os_slug: slug }).eq("id", l.id).is("os_slug", null).select("id");
-    if (!r.error && r.data?.length) return slug;
-    if (!r.error) {
-      // someone named it between our read and write: use theirs
-      const cur = await sb.from("businesses").select("os_slug").eq("id", l.id).maybeSingle();
-      const s = (cur.data as { os_slug: string | null } | null)?.os_slug;
-      if (s && SLUG_RE.test(s)) return s;
+    if (r.error) {
+      if (r.error.code === "23505") continue; // another business already has this os_slug
+      throw new Error(r.error.message);
+    }
+    if (r.data?.length) return slug;
+    // someone named it between our read and write: use theirs
+    const cur = await sb.from("businesses").select("os_slug").eq("id", l.id).maybeSingle();
+    const s = (cur.data as { os_slug: string | null } | null)?.os_slug;
+    if (s) {
+      if (SLUG_RE.test(s)) return s;
+      throw badSlug(s);
     }
   }
-  throw new Error("could not name this lead's folder");
+  throw new Error("could not name this lead's folder: every candidate is taken");
 }
 
 /** One step button = one queued row, as the signed-in user (RLS: is_hq(), status queued, requested_by = me). */
 export async function requestStep(
   sb: Sb,
   actor: Actor,
-  input: { businessId: string; step: string; pick?: string; feedback?: string }
+  input: { businessId: string; step: string; pick?: string; feedback?: string },
+  folderExists: FolderExists = async () => false
 ): Promise<{ id: string; slug: string; kind: Kind }> {
   const { step } = input;
   if (!(STEPS as readonly string[]).includes(step)) throw new Error("unknown step");
@@ -201,11 +236,12 @@ export async function requestStep(
   const { data } = must(await sb.from("businesses").select(LEAD_FACTS).eq("id", input.businessId).maybeSingle());
   const lead = data as LeadFacts | null;
   if (!lead) throw new Error("lead not found");
+  if (lead.os_slug && !leadSlug(lead)) throw badSlug(lead.os_slug); // not a silent "step not available"
   const slug0 = leadSlug(lead); // null = never requested, so no rows
   const rows = slug0 ? ((await loadDeliverables(sb, [slug0])).get(slug0) ?? []) : [];
   if (!pitchState(rows, lead).can[step as Step]) throw new Error("that step is not available yet, or one is still running");
 
-  const slug = await ensureSlug(sb, lead);
+  const slug = await ensureSlug(sb, lead, folderExists);
   const ins = await sb
     .from("deliverables")
     .insert({

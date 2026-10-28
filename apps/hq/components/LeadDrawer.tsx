@@ -30,10 +30,11 @@ export function LeadDrawer(props: {
   consultOpen: boolean;
   onConsultOpen: (open: boolean) => void;
   rows: Deliverable[];
+  pitchError: string;
   details: ReactNode;
   calls: ReactNode;
 }) {
-  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, details, calls } = props;
+  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls } = props;
   const [local, setLocal] = useState("");
   const [copied, setCopied] = useState(false);
   const where = [l.trade, l.town, l.fit != null ? `fit ${l.fit}` : ""].filter(Boolean).join(" · ");
@@ -84,6 +85,18 @@ export function LeadDrawer(props: {
             <dd>
               <span className={`chip ${l.assigned}`.trim()}>{l.assigned}</span>
             </dd>
+            {l.town || l.state ? (
+              <>
+                <dt>Where</dt>
+                <dd>{[l.town, l.state].filter(Boolean).join(", ")}</dd>
+              </>
+            ) : null}
+            {l.domain ? (
+              <>
+                <dt>Website</dt>
+                <dd>{l.domain}</dd>
+              </>
+            ) : null}
             <dt>Last call</dt>
             <dd>{l.last || "—"}</dd>
             <dt>Next contact</dt>
@@ -151,6 +164,7 @@ export function LeadDrawer(props: {
         <PitchTab
           lead={l}
           rows={rows}
+          loadError={pitchError}
           onBookConsult={() => {
             onTab("details");
             onConsultOpen(true);

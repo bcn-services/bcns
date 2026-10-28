@@ -404,6 +404,29 @@ export async function loadExtras(sb: Sb, ids: string[]): Promise<Map<string, Ext
   return out;
 }
 
+const TRADE_PAGE = 1000; // PostgREST max_rows in apps/hq/supabase/config.toml: a bigger .limit() is silently cut to this
+const TRADE_PAGES = 20;
+
+/** Distinct trades for the Leads filter: pages `businesses.trade` in ordered 1000-row ranges until a short page. */
+export async function loadTrades(sb: Sb): Promise<{ trades: string[]; error: string }> {
+  const seen = new Set<string>();
+  // ponytail: scans the column page by page, 20 pages = 20k businesses, then the list is cut short; a view or rpc past that
+  for (let p = 0; p < TRADE_PAGES; p++) {
+    const res = await sb
+      .from("businesses")
+      .select("trade")
+      .is("suppressed_at", null)
+      .not("trade", "is", null)
+      .order("id")
+      .range(p * TRADE_PAGE, (p + 1) * TRADE_PAGE - 1);
+    if (res.error) return { trades: [...seen].sort(), error: res.error.message };
+    const rows = (res.data ?? []) as { trade: string }[]; // untyped client: the select is the shape
+    for (const r of rows) seen.add(r.trade);
+    if (rows.length < TRADE_PAGE) break;
+  }
+  return { trades: [...seen].sort(), error: "" };
+}
+
 export interface TaskRow {
   id: string;
   title: string;
@@ -572,8 +595,11 @@ export interface LeadItem {
   assigned: string;
   phone: string;
   canLog: boolean;
+  domain: string;
   /** Last call / next contact / consult, as the table shows them. */
   last: string;
+  /** What the last call's note said (one line, cut at 80), or "". */
+  lastNote: string;
   next: { text: string; today: boolean };
   consult: string;
   consultIso: string | null;
@@ -592,11 +618,17 @@ export function leadItem(l: Lead, x: Extras | undefined, now = new Date()): Lead
     fit: fitOf(l),
     assigned: l.assigned_to,
     phone: l.phone ?? "",
+    domain: l.domain ?? "",
     canLog: canLog(l.stage),
     last: fmtShort(x?.calls[0]?.at),
+    lastNote: (x?.calls[0]?.note ?? "").replace(/\s+/g, " ").trim().slice(0, 80),
     next: nextCell(l, now),
     consult: fmtConsult(l.consult_at),
     consultIso: l.consult_at,
     slug: l.os_slug ?? null,
   };
 }
+
+/** Step 1's sub-line: the stage and what the last call said, never a claim the log doesn't back. */
+export const callSummary = (l: Pick<LeadItem, "stageLabel" | "last" | "lastNote">): string =>
+  `${l.stageLabel} · ${l.lastNote || (l.last ? `last call ${l.last}` : "no call logged yet")}`;
