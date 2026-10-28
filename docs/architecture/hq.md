@@ -473,9 +473,9 @@ unset NEXT_PUBLIC_SUPABASE_ANON_KEY HQ_SEED_PASSWORD
 
 (zsh syntax.)
 
-### 22. Monthly finance freeze
+### 22. Monthly finance freeze (dropped in v2)
 
-Numbers, monthly table -> "Freeze <month>" button, in the first days of each month. Insert-only: a frozen month cannot be edited afterwards (0030 revokes UPDATE).
+The v1 "Freeze <month>" button went with the Numbers rebuild (#182); nothing reads or writes `finance_snapshots` now. No action. Drop the table in a later migration if it stays unused.
 
 ### 23. Parallel week with Brandon
 
