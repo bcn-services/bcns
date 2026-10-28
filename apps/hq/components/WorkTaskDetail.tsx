@@ -1,16 +1,10 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { addLinkAction, addNoteAction, updateTaskAction } from "@/app/(app)/work/actions";
-import {
-  AREA_LABEL,
-  OWNERS,
-  STATUSES,
-  waitingStatus,
-  type Area,
-  type Status,
-  type Task,
-} from "@/lib/tasks";
+import { addLinkAction, addNoteAction, markDone, updateTaskAction } from "@/app/(app)/work/actions";
+import { OWNERS, waitingStatus, type Owner, type Status, type Task } from "@/lib/tasks";
+import type { Track } from "@/lib/tracks";
+import type { ClientOpt } from "./NewTaskModal";
 
 export interface WorkTask extends Task {
   lead: string | null; // linked business name
@@ -26,18 +20,21 @@ export interface WorkLink {
   url: string;
 }
 
-/** Detail pane for a task: edit fields, notes, links, linked lead / client. */
-export function WorkTaskDetail({
-  task,
-  notes,
-  links,
-}: {
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** An open task (replaces the board): fields, description, Done / Save, then notes and links. */
+export function WorkTaskDetail(props: {
   task: WorkTask;
   notes: WorkNote[];
   links: WorkLink[];
+  tracks: Track[];
+  clients: ClientOpt[];
+  onBack: () => void;
 }) {
+  const { task, notes, links, tracks, clients, onBack } = props;
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
+  const done = task.status === "done";
 
   function submit(
     e: FormEvent<HTMLFormElement>,
@@ -55,103 +52,121 @@ export function WorkTaskDetail({
   const s = (f: FormData, k: string) => String(f.get(k) ?? "");
 
   return (
-    <div className="dwrap">
-      <div className="chips">
-        {task.area ? (
-          <span className="chip">{AREA_LABEL[task.area as Area] ?? task.area}</span>
-        ) : null}
-        <span className="chip stage">{task.source}</span>
-        {task.alert_key ? <span className="chip warn">alert {task.alert_key}</span> : null}
+    <div className="wk-det">
+      <div className="wk-hdr">
+        <button type="button" className="btn" onClick={onBack}>
+          ← Board
+        </button>
       </div>
       <h1>{task.title}</h1>
-      <p className="sub2">
-        {task.lead ? (
-          <>
-            Lead: <a href="/leads">{task.lead}</a>
-          </>
-        ) : null}
-        {task.client_slug ? <>Client: {task.client_slug}</> : null}
-      </p>
+      {task.lead || task.alert_key ? (
+        <p className="sub2">
+          {task.lead ? (
+            <>
+              Lead: <a href="/leads">{task.lead}</a>{" "}
+            </>
+          ) : null}
+          {task.alert_key ? <span className="chip warn">alert {task.alert_key}</span> : null}
+        </p>
+      ) : null}
 
       <form
-        className="sec tform"
-        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}`}
+        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}${task.track_id}${task.client_slug}`}
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
             // status follows waiting_on only when the waiting text itself changed
             const status =
-              (s(f, "status") as Status) !== task.status
-                ? (s(f, "status") as Status)
-                : waiting.trim() !== (task.waiting_on ?? "").trim()
-                  ? (waitingStatus(waiting, task.status) ?? task.status)
-                  : task.status;
+              waiting.trim() !== (task.waiting_on ?? "").trim()
+                ? (waitingStatus(waiting, task.status) ?? task.status)
+                : task.status;
             return updateTaskAction(task.id, {
-              status,
-              owner: s(f, "owner") as (typeof OWNERS)[number],
+              status: status as Status,
+              owner: (s(f, "owner") || null) as Owner | null,
               due: s(f, "due") || null,
               waiting_on: waiting || null,
               body: s(f, "body") || null,
+              track_id: s(f, "track") || null,
+              client_slug: s(f, "client") || null,
             });
           })
         }
       >
         <dl>
-          <dt>Status</dt>
+          <dt>Owner</dt>
           <dd>
-            <select name="status" defaultValue={task.status}>
-              {STATUSES.map((x) => (
-                <option key={x}>{x}</option>
+            <select name="owner" aria-label="Owner" defaultValue={task.owner ?? ""}>
+              <option value="">Unassigned</option>
+              {OWNERS.map((x) => (
+                <option key={x} value={x}>
+                  {cap(x)}
+                </option>
               ))}
             </select>
           </dd>
-          <dt>Owner</dt>
-          <dd>
-            <select name="owner" defaultValue={task.owner ?? "nate"}>
-              {OWNERS.map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>{" "}
-            <span className="muted">
-              <b className="k">o</b> cycles
-            </span>
-          </dd>
           <dt>Due</dt>
           <dd>
-            <input type="date" name="due" defaultValue={task.due ?? ""} />
+            <input type="date" name="due" aria-label="Due" defaultValue={task.due ?? ""} />
+          </dd>
+          <dt>Track</dt>
+          <dd>
+            <select name="track" aria-label="Track" defaultValue={task.track_id ?? ""}>
+              <option value="">No track</option>
+              {tracks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </dd>
+          <dt>Client</dt>
+          <dd>
+            <select name="client" aria-label="Client" defaultValue={task.client_slug ?? ""}>
+              <option value="">No client</option>
+              {clients.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.display_name}
+                </option>
+              ))}
+            </select>
           </dd>
           <dt>Waiting on</dt>
           <dd>
             <input
               id="wk-waiting"
               name="waiting_on"
+              aria-label="Waiting on"
               defaultValue={task.waiting_on ?? ""}
-              placeholder="nate, brandon, or what"
-              list="wk-who"
-            />{" "}
-            <span className="muted">
-              <b className="k">w</b>
-            </span>
-            <datalist id="wk-who">
-              {OWNERS.map((x) => (
-                <option key={x} value={x} />
-              ))}
-            </datalist>
+              placeholder="who or what this waits on"
+            />
           </dd>
         </dl>
-        <div className="sec">
-          <h3>Description</h3>
-          <textarea name="body" rows={4} defaultValue={task.body ?? ""} />
-        </div>
-        <div className="sec acts">
-          <button className="btn pri" disabled={busy}>
+        <textarea name="body" aria-label="Description" placeholder="Description" defaultValue={task.body ?? ""} />
+        <div className="wk-acts">
+          <button
+            type="button"
+            className="btn pri"
+            disabled={busy}
+            onClick={() =>
+              start(async () => {
+                const r = done
+                  ? await updateTaskAction(task.id, { status: "todo" })
+                  : await markDone(task.id);
+                if (!r.ok) setMsg(r.error);
+                else if (!done) onBack();
+              })
+            }
+          >
+            {done ? "Reopen" : "✓ Done"}
+          </button>
+          <button className="btn" disabled={busy}>
             Save
           </button>
           {msg ? <span className="note">{msg}</span> : null}
         </div>
       </form>
 
-      <div className="sec">
+      <div className="wk-sec">
         <h3>Notes</h3>
         {notes.length ? (
           <ul className="hist">
@@ -165,7 +180,7 @@ export function WorkTaskDetail({
           <p className="muted">No notes yet.</p>
         )}
         <form
-          className="acts"
+          className="wk-acts"
           data-reset="1"
           key={`n${notes.length}`}
           onSubmit={(e) => submit(e, (f) => addNoteAction(task.id, s(f, "body")))}
@@ -177,7 +192,7 @@ export function WorkTaskDetail({
         </form>
       </div>
 
-      <div className="sec">
+      <div className="wk-sec">
         <h3>Links</h3>
         {links.length ? (
           <ul>
@@ -193,7 +208,7 @@ export function WorkTaskDetail({
           <p className="muted">No links yet.</p>
         )}
         <form
-          className="acts"
+          className="wk-acts"
           data-reset="1"
           key={`l${links.length}`}
           onSubmit={(e) => submit(e, (f) => addLinkAction(task.id, s(f, "label"), s(f, "url")))}

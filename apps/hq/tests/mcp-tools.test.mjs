@@ -17,7 +17,6 @@ const T_CLAUDE = "33333333-3333-4333-8333-333333333332";
 const T_BRANDON = "33333333-3333-4333-8333-333333333333";
 const TRACK = "44444444-4444-4444-8444-444444444441";
 const ADMIN = { id: "55555555-5555-4555-8555-555555555555", handle: "brandon" };
-const STAFF = ACTOR; // nate, role staff
 const byName = Object.fromEntries(TOOLS.map((t) => [t.name, t]));
 const call = (sb, name, args = {}) => byName[name].run({ sb, actor: ACTOR }, args);
 
