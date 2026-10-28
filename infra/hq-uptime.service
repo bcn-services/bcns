@@ -14,6 +14,8 @@ ConditionPathExists=/srv/hq/current
 [Service]
 Type=oneshot
 DynamicUser=yes
+# /srv/hq is 750 hq:hq; a DynamicUser cannot enter it without the group (same as hq-job@).
+SupplementaryGroups=hq
 WorkingDirectory=/srv/hq/current
 EnvironmentFile=/srv/hq/jobs.env
 ExecStart=/usr/bin/node jobs/run.mjs uptime
