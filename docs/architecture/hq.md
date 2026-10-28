@@ -48,7 +48,7 @@ From `/Users/nateseluga/bcns/.claude/orchestrator/notes/hq-review-2026-10-27.md`
 - **H1** `decide_proposal` raises 42501 unless `is_admin()` (security definer, execute to authenticated only); the UI hides approve/reject for staff. 0034 extends it to kind `client` and makes `clients` insert/update admin-only.
 - **H2** Direct `finance_inputs` insert/update is revoked from `authenticated` and the policies are admin-only; writes go through `decide_proposal`.
 - **M1** `jobs/lib/claude.mjs` gives the CLI no tools for `qualify` (`--tools ""`) and only `Read,Glob,Grep,Write,Edit` for deliverables (`--permission-mode dontAsk --allowedTools`), with `--strict-mcp-config` and `--setting-sources ""`. The child env is only `PATH`, `HOME`, `CLAUDE_CODE_OAUTH_TOKEN`; the token is read from `$CREDENTIALS_DIRECTORY/claude-<handle>` and an unknown handle is refused before spawn. Needs the claude CLI at 2.1.312 or later.
-- **M2** `infra/hq-job@.service`: `DynamicUser=yes`, `SupplementaryGroups=hq`, `LoadCredential` for the two Claude tokens and the deploy key, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`, `UMask=0002`, `MemoryMax=384M`, `OOMPolicy=continue`, `CPUQuota=50%`; `/srv/hq/os` is read-only except `clients/`, `.git` and `/srv/hq/jobs-state`. Jobs use the dedicated `hq_jobs` role (grants in the 0032 and 0034 footers, step 16), not the owner connection. Not shipped: a capability bounding set and a syscall filter.
+- **M2** `infra/hq-job@.service`: `DynamicUser=yes`, `SupplementaryGroups=hq`, `LoadCredential` for the two Claude tokens and the deploy key, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`, `UMask=0002`, `MemoryMax=384M`, `OOMPolicy=continue`, `CPUQuota=50%`; `/srv/hq/os` is read-only except `clients/`, `.git` and `/srv/hq/jobs-state`. Jobs use the dedicated `hq_jobs` role (grants in the 0032 and 0034 footers, step 16), not the owner connection. Not shipped: `CapabilityBoundingSet`, `SystemCallFilter`, `PrivateDevices`, `ProtectKernel*` and `RestrictAddressFamilies` (neither this unit nor `hq-uptime.service` sets them).
 - **M3** `jobs/lib/fetch-page.mjs` validates the address at connect time (`guardedLookup`), which closes the DNS-rebinding gap, and the blocklist is wider (198.18/15, 224/4, 240/4, 64:ff9b::, hex `::ffff:`, CGNAT) and refuses localhost, `.internal` and metadata hostnames.
 - **L1** `events` update is revoked (append-only); `proposals.old` and `via` are set by a server-side trigger.
 - **L2** Shipped as a test only: `platform/test/hq-ops-ro.test.ts` checks the role attributes and a privilege matrix (SELECT on `ops.*` only, nothing elsewhere; named exceptions are the PUBLIC-extension objects `extensions.pg_stat_statements*`, `net.http_request_queue`, `net._http_response`). The migration is unchanged. If pg_net is ever enabled on the platform project it gives PUBLIC, so `hq_ops_ro`, rights on `net.*` (absent today).
@@ -111,7 +111,7 @@ Details: `apps/hq/supabase/README.md`.
 
 ### 3. Platform database: `hq_ops_ro` (project `cnsxbglhredokjbvudfd`) — done
 
-v2 forces `sslmode=verify-full` in code whatever the URL says, so the URLs below use it; HQ needs `NODE_EXTRA_CA_CERTS` (step 24).
+v2 forces `sslmode=verify-full` in code whatever the URL says, so the URLs below use it; HQ needs `NODE_EXTRA_CA_CERTS` (step 13).
 
 ```bash
 supabase link --workdir platform --project-ref cnsxbglhredokjbvudfd   # only if platform/supabase/.temp/project-ref is missing in this checkout (a bare .temp/ dir is not linked)
@@ -270,7 +270,7 @@ supabase db push --workdir apps/hq --dry-run       # must list exactly 0031, 003
 supabase db push --workdir apps/hq
 ```
 
-Order inside the push is by number, which is what 0034 needs (after 0031-0033). 0035 must be live **before #184 merges** or every task insert writes `track_id` and `/work` returns 500. 0033 must be live before #185 (the Clients select reads `mercury_customer_id, aliases`). If PR-G adds a migration (PR-G), push it before merging PR-G the same way. After 0031 every Claude connector must sign in once more: the old in-memory tokens are gone; after that, tokens persist across deploys (step 19).
+Order inside the push is by number, which is what 0034 needs (after 0031-0033). 0035 must be live **before #184 merges** or every task insert writes `track_id` and `/work` returns 500. 0033 must be live before #185 (the Clients select reads `mercury_customer_id, aliases`). If PR-G adds a migration (PR-G), push it before merging PR-G the same way. Connectors sign out once, at the first v2 deploy (the token store moves from memory to the database); after that, tokens persist across deploys (step 19).
 
 ### 12. Supabase Auth settings (HQ project dashboard; before #186 merges)
 
@@ -294,7 +294,7 @@ nano /srv/hq/env      # NAME=value, no quotes; add the names below
 | `MERCURY_INVOICING`                                              | `1` **only if you buy the paid Mercury plan** that includes the Invoicing API. Free route: leave unset; billing status then falls back to the last matching incoming transaction plus the client's `billing_note`.                                                                                                                                                                                         |
 | `GOOGLE_SA_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `GOOGLE_CALENDAR_ID` | step 14. The private key is the PEM on one line with literal `\n` between lines.                                                                                                                                                                                                                                                                                                                           |
 
-Also in `/srv/hq/jobs.env`: `HQ_OS_DIR=/srv/hq/os`. `/srv/hq/env` must also keep `NODE_OPTIONS=--dns-result-order=ipv4first` if it was set at go-live (Mercury and Places allow IPv4 only). Then `chmod 600` both files and `chown hq:hq` them if you created them as root.
+Also in `/srv/hq/jobs.env`: `HQ_OS_DIR=/srv/hq/os`. `/srv/hq/env` must also keep `NODE_OPTIONS=--dns-result-order=ipv4first` if it was set at go-live (Mercury and Places allow IPv4 only). Then `/srv/hq/env` stays `hq:hq`, mode 600 (the app reads it), and `/srv/hq/jobs.env` becomes root-owned: `chown root:root /srv/hq/jobs.env && chmod 600 /srv/hq/jobs.env`. systemd reads the unit's `EnvironmentFile` as root before dropping to the dynamic user, and this closes the app user's read of the jobs database password (M2).
 
 ### 14. Google Calendar (free)
 
@@ -330,6 +330,7 @@ All three credential files (`claude-nate`, `claude-brandon`, `os-deploy-key`) mu
    git -C /srv/hq/os config core.sharedRepository group
    chown -R hq:hq /srv/hq/os
    mkdir -p /srv/hq/jobs-state/claude-home && chown -R hq:hq /srv/hq/jobs-state && chmod -R g+rwX /srv/hq/jobs-state
+   find /srv/hq/jobs-state -type d -exec chmod g+s {} +      # qualify and deliverable run as different dynamic users
    chgrp -R hq /srv/hq/os/clients /srv/hq/os/.git && chmod -R g+rwX /srv/hq/os/clients /srv/hq/os/.git
    find /srv/hq/os/clients /srv/hq/os/.git -type d -exec chmod g+s {} +
    ```
@@ -363,15 +364,14 @@ create policy jobs_insert on uptime_checks for insert to hq_jobs with check (tru
 create policy jobs_delete on uptime_checks for delete to hq_jobs using (true);
 ```
 
-Check, in the same editor:
+Check, in the same editor (read-only; the editor's `postgres` user is not a member of `hq_jobs`, so `set role hq_jobs` fails there, and never test with a `delete`):
 
 ```sql
-set role hq_jobs; select count(*) from businesses;      -- works
-select count(*) from uptime_checks;                      -- works
-delete from businesses;                                  -- permission denied
-select * from finance_inputs;                            -- permission denied
-update uptime_checks set ok = true;                      -- permission denied
-reset role;
+select has_table_privilege('hq_jobs','businesses','select')      as biz_select,                    -- true
+       has_table_privilege('hq_jobs','businesses','delete')      as biz_delete_should_be_false,    -- false
+       has_table_privilege('hq_jobs','finance_inputs','select')  as finance_should_be_false,       -- false
+       has_table_privilege('hq_jobs','uptime_checks','insert')   as uptime_insert,                 -- true
+       has_table_privilege('hq_jobs','uptime_checks','update')   as uptime_update_should_be_false; -- false
 ```
 
 The jobs `DATABASE_URL` for step 19 is the session pooler with the project-ref suffix on the user, otherwise "Tenant or user not found":
@@ -390,7 +390,7 @@ curl -4 -s -H "Authorization: Bearer $MERCURY_KEY" https://api.mercury.com/api/v
 unset MERCURY_KEY
 ```
 
-If it returns 403 (no paid plan), skip the ids and put the exact Mercury customer name in `aliases` through the Edit form instead; matching falls back to it. Then:
+If it returns 403 (no paid plan), skip the ids and put the payer name exactly as it appears on the client's incoming Mercury transactions into `aliases` through the Edit form (one per line). Without invoicing, payments match only that transaction counterparty name; with `MERCURY_INVOICING=1` the customer id matches invoices. Then:
 
 ```sql
 update clients set billing_source='mercury', mercury_customer_id='<TA id from Mercury /ar/customers>', monthly_rate_cents=10000 where slug='technology-associates';
@@ -425,7 +425,11 @@ Switch `DATABASE_URL` in `/srv/hq/jobs.env` to the `hq_jobs` URL from step 16, a
 
 ```bash
 systemctl start hq-job@qualify;     journalctl -u hq-job@qualify -n 40 --no-pager
-systemctl start hq-uptime;          journalctl -u hq-uptime -n 20 --no-pager
+mkdir -p /etc/systemd/system/hq-uptime.service.d
+printf '[Service]\nSupplementaryGroups=hq\n' > /etc/systemd/system/hq-uptime.service.d/group.conf
+systemctl daemon-reload                                  # drop-in: /srv/hq is 750 hq:hq, the unit has no group yet (see Follow-ups)
+systemctl start hq-uptime.service;  systemctl show hq-uptime.service -p Result     # Result=success
+journalctl -u hq-uptime -n 20 --no-pager
 systemctl show hq-job@qualify -p Result,MemoryPeak       # Result=success; under the 384M cap
 systemctl enable --now hq-source.timer hq-qualify.timer hq-deliverable.timer hq-uptime.timer
 systemctl list-timers 'hq-*'                             # must list all FOUR timers
@@ -437,7 +441,8 @@ Smoke test:
 
 ```bash
 curl -s https://hq.bcn-services.com/api/health                      # {"ok":true,"app":"hq"}
-curl -si -X POST https://hq.bcn-services.com/mcp | head -3          # 401 with a WWW-Authenticate header (503 = MCP_TOKEN_KEY unset)
+curl -si -X POST https://hq.bcn-services.com/mcp | head -3          # 401 with a WWW-Authenticate header (no bearer: refused before any token lookup)
+curl -si -X POST -H 'Authorization: Bearer probe' https://hq.bcn-services.com/mcp | head -1   # 401 = MCP_TOKEN_KEY set; 503 = unset or token store down
 curl -sI https://hq.bcn-services.com/login | grep -i 'content-security-policy\|strict-transport'
 curl -s https://hq.bcn-services.com/.well-known/oauth-protected-resource   # names hq.bcn-services.com
 ```
@@ -446,7 +451,7 @@ Sign in at `https://hq.bcn-services.com/login` as Nate and as Brandon, and try "
 
 ### 20. os: the `/hq` skill (an os edit; Nate-run)
 
-In `~/os/skills/hq/SKILL.md`, replace the line-14 note that every HQ deploy or restart drops the tokens with "tokens persist across deploys; reconnect only on a 401", and list the new tools (`add_task_note`, `list_board`, `create_track`, `move_track`, `update_track`, `propose_client`). The `claude mcp add` line comes from the hq-mcp-connect docs PR (step 9 here). The orchestrator rule change in `~/os/agents/window-orchestrator.md` stays out of v2.
+In `~/os/skills/hq/SKILL.md`, replace the line-14 note that every HQ deploy or restart drops the tokens with "tokens persist across deploys; reconnect only on a 401", and list the new tools (`add_task_note`, `list_board`, `create_track`, `move_track`, `update_track`, `propose_client`). Also replace the done rule at line 18 ("only on tasks owned by claude; HQ refuses done on a human's task"), which is stale: an admin may close any task, staff only their own and claude's. Add no `claude mcp add` line: step 9 says claude.ai connectors already load into Claude Code. The orchestrator rule change in `~/os/agents/window-orchestrator.md` stays out of v2.
 
 ### 21. Seed the GTM tracks (optional; idempotent)
 
@@ -477,7 +482,7 @@ Old pipeline stays on (Cloud Scheduler, launchd, digest); `HQ_LATE_STAGES` stays
 - [ ] Nate approves at least one proposal with `a` and rejects one with `r`; a stage change from Claude arrives only as a proposal, and Brandon (staff) cannot approve.
 - [ ] `hq-source.timer` and `hq-qualify.timer` fired each weekday: Numbers -> Ops shows the runs, no failures; `hq-uptime.timer` shows no red target.
 - [ ] Places calls this month are under the cap (Numbers -> Ops).
-- [ ] `/srv/hq/jobs.env` and `/srv/hq/env` permissions still `600` and owned by `hq`.
+- [ ] `/srv/hq/env` still `600` owned by `hq`; `/srv/hq/jobs.env` still `600` owned by `root`.
 - [ ] Weekly finance computes itself; spot-check one week against the old numbers.
 - [ ] D2 check run (below) and every row is `ok`, or the exceptions are understood.
 - [ ] Brandon agrees to switch off.
@@ -580,5 +585,6 @@ Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemc
 - "No answer" on a call sets the next contact +1 business day ET. For +2 change `n` in `nextBusinessDay` (`apps/hq/lib/leads.ts`).
 - Open Minors on #174: an ops task shown only under Fires on Today cannot be marked done there (use Work); `taskFires` errors are silent; Today fetches proposals twice and 500s on one failed read; `listTasks` caps at 500.
 - Open Minors from v2: the deliverable git guard cannot see a planted `.git` gitfile (the job is safe through pinned `GIT_DIR`; a tamper marker fails one queued row per tick); the Money month boundary is UTC (C); a staff member echoing an unchanged owner is refused, `update_task` cannot unassign, and a partial `seed-gtm` run does not back-fill (E).
+- Code fix, item D: add `SupplementaryGroups=hq` to `infra/hq-uptime.service` (the unit cannot enter `/srv/hq/current` without it), then delete the step 19 drop-in `/etc/systemd/system/hq-uptime.service.d/group.conf`.
 - Today (Nate) reuses Work's simpler `TrackCard`; the prototype's card with progress bar, owner chip and "n of m" is not built. Your call.
 - Process: `dt-review` edited `STANDARDS.md` against its read-only brief in two items (reverted). Suggested `~/os/agents/dt-review.md` line: "write only your report file; STANDARDS suggestions go in the report."
