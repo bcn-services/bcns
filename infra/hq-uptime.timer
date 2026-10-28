@@ -4,7 +4,7 @@ Description=Ping /api/health on sb, connect, mcp, hq and ta every 5 minutes
 [Timer]
 OnCalendar=*:0/5
 Persistent=true
-Unit=hq-job@uptime.service
+Unit=hq-uptime.service
 
 [Install]
 WantedBy=timers.target

@@ -100,12 +100,12 @@ test("run.mjs: a successful uptime run writes no run event, a failed one does", 
   );
 });
 
-test("infra/hq-uptime.timer fires hq-job@uptime.service every 5 minutes", () => {
+test("infra/hq-uptime.timer fires hq-uptime.service every 5 minutes", () => {
   const t = readFileSync(
     fileURLToPath(new URL("../../../../infra/hq-uptime.timer", import.meta.url)),
     "utf8"
   );
   assert.match(t, /^OnCalendar=\*:0\/5$/m);
-  assert.match(t, /^Unit=hq-job@uptime\.service$/m);
+  assert.match(t, /^Unit=hq-uptime\.service$/m);
   assert.match(t, /^WantedBy=timers\.target$/m);
 });
