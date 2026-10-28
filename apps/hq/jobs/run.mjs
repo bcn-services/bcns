@@ -1,4 +1,4 @@
-// node jobs/run.mjs <source|qualify|deliverable|uptime>
+// node jobs/run.mjs <source|qualify|deliverable|uptime|tickets>
 //
 // One entry point for the systemd units (infra/hq-job@.service). Writes one
 // events row per run, {job, kind:'run', via:'job', detail:{ok, ms, error}},
@@ -12,7 +12,7 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const JOBS = ["source", "qualify", "deliverable", "uptime"];
+export const JOBS = ["source", "qualify", "deliverable", "uptime", "tickets"];
 
 // systemd's TimeoutStartSec is 25 min; this is the point after which a job
 // stops taking on new work, leaving room for the last row and the db close.
@@ -33,6 +33,7 @@ const num = (env, key) => {
 // What each job is handed, built from env alone.
 export async function jobDeps(name, { env, sql, db }) {
   if (name === "uptime") return {}; // fetch + the db are all it needs
+  if (name === "tickets") return (await import("./tickets.mjs")).ticketsDeps(env);
   if (name === "source") {
     if (!env.GOOGLE_PLACES_API_KEY) throw new Error("GOOGLE_PLACES_API_KEY is not set");
     const [{ createPlaces }, { createReadBudget }, { GRID }] = await Promise.all([

@@ -239,6 +239,9 @@ check "hq-uptime.service: no LoadCredential, no os paths" "$(grep -cE '^(LoadCre
 check "hq-uptime.service: runs the uptime job, short timeout" "$(unitval "$usv" ExecStart) $(unitval "$usv" TimeoutStartSec)" "/usr/bin/node jobs/run.mjs uptime 2min"
 check "hq-uptime.service: hardening matches hq-job@" "$(unitval "$usv" ProtectSystem) $(unitval "$usv" PrivateTmp) $(unitval "$usv" NoNewPrivileges) $(unitval "$usv" ProtectHome)" "strict true true true"
 check "hq-uptime.timer: installs into timers.target" "$(unitval "$upt" WantedBy)" "timers.target"
+tkt="$here/hq-tickets.timer"
+unitcheck "$tkt" Unit Timer Install && ok "hq-tickets.timer parses" || bad "hq-tickets.timer has a malformed line or section"
+check "hq-tickets.timer: every 15 minutes, starts hq-job@tickets" "$(unitval "$tkt" OnCalendar) $(unitval "$tkt" Unit)" "*:0/15 hq-job@tickets.service"
 
 echo "syntax"
 for f in "$here"/*.sh; do

@@ -233,6 +233,56 @@ test("createOpsTask is idempotent on alert_key while a task is open", async () =
   );
 });
 
+test("createOpsTask: ops:ticket:<id> is ticket:platform:<id>; a done+synced task is returned, not re-spawned", async () => {
+  const sb = fakeSb();
+  const a = await T.createOpsTask(
+    sb,
+    ACTOR,
+    "ui",
+    { alertKey: "ops:ticket:u1", title: "Ticket" },
+    NOW
+  );
+  assert.equal(a.alert_key, "ticket:platform:u1"); // the job's key, so the fire button and the job share a task
+  assert.equal(
+    (await T.createOpsTask(sb, ACTOR, "ui", { alertKey: "ticket:platform:u1", title: "t" }, NOW))
+      .id,
+    a.id
+  );
+  // done in HQ but not yet pushed: a fire may still open a new task (the pre-sync behaviour)
+  await T.updateTask(sb, ACTOR, "ui", a.id, { status: "done" }, NOW);
+  const b = await T.createOpsTask(
+    sb,
+    ACTOR,
+    "ui",
+    { alertKey: "ops:ticket:u1", title: "Ticket" },
+    NOW
+  );
+  assert.notEqual(b.id, a.id);
+  // done and pushed: the next fire for the same ticket returns it and inserts nothing
+  const sb2 = fakeSb({
+    tasks: [
+      {
+        id: "t-old",
+        alert_key: "ticket:platform:u2",
+        status: "done",
+        synced_at: "2026-10-27T12:00:00Z",
+      },
+    ],
+  });
+  const got = await T.createOpsTask(
+    sb2,
+    ACTOR,
+    "ui",
+    { alertKey: "ops:ticket:u2", title: "Ticket" },
+    NOW
+  );
+  assert.equal(got.id, "t-old");
+  assert.equal(sb2.db.tasks.length, 1);
+  // a non-ticket key is untouched
+  const c = await T.createOpsTask(sb2, ACTOR, "ui", { alertKey: "ops:job:x", title: "x" }, NOW);
+  assert.equal(c.alert_key, "ops:job:x");
+});
+
 test("addLink accepts https only; addNote / addLink need exactly one target", async () => {
   const sb = fakeSb();
   for (const url of [
@@ -324,6 +374,7 @@ test("createOpsTask: the loser of a race (23505 on the open-alert index) gets th
         eq: () => q,
         neq: () => q,
         limit: () => q,
+        order: () => q,
         maybeSingle: async () => ({ data: ++selects === 1 ? null : winner, error: null }), // winner commits between the two reads
         insert: () => q,
         single: async () => ({
@@ -343,6 +394,7 @@ test("createOpsTask: the loser of a race (23505 on the open-alert index) gets th
       eq: () => q,
       neq: () => q,
       limit: () => q,
+      order: () => q,
       insert: () => q,
       maybeSingle: async () => ({ data: null, error: null }),
       single: async () => ({ data: null, error: { code: "42501", message: "denied" } }),
