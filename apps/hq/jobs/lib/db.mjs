@@ -106,3 +106,66 @@ export function promotedToday(sql) {
       and created_at >= date_trunc('day', now() at time zone 'UTC') at time zone 'UTC'
   `;
 }
+
+// --- deliverables ----------------------------------------------------------
+// One queued row at a time. `for update skip locked` in the subselect means a
+// second runner (a manual start beside the timer) gets the next row or none,
+// never the same one. Moves it to running in the same statement.
+export function claimDeliverable(sql) {
+  return sql`
+    update deliverables set status = 'running', started_at = now()
+    where id = (
+      select id from deliverables where status = 'queued'
+      order by created_at for update skip locked limit 1
+    )
+    returning *
+  `;
+}
+
+// A run is killed (OOM, reboot) leaves its row `running`; the unit's hard stop is
+// 25 min, so anything older than 30 is dead.
+export function failStaleDeliverables(sql) {
+  return sql`
+    update deliverables
+    set status = 'failed', error = 'stale run', finished_at = now()
+    where status = 'running' and started_at < now() - interval '30 minutes'
+    returning id
+  `;
+}
+
+export function otherRunning(sql, id) {
+  return sql`select id from deliverables where status = 'running' and id <> ${id} limit 1`;
+}
+
+export function requeueDeliverable(sql, id) {
+  return sql`
+    update deliverables set status = 'queued', started_at = null
+    where id = ${id} and status = 'running'
+    returning id
+  `;
+}
+
+export function finishDeliverable(sql, id, { status, paths = [], error = null }) {
+  return sql`
+    update deliverables
+    set status = ${status}, paths = ${paths}, error = ${error}, finished_at = now()
+    where id = ${id}
+    returning id
+  `;
+}
+
+export function profileHandle(sql, userId) {
+  return sql`select handle from profiles where id = ${userId} limit 1`;
+}
+
+// What the prompt may know about the lead/client behind a slug. No email column.
+export function leadForSlug(sql, slug) {
+  return sql`
+    select b.name, b.domain, b.phone, b.address, b.town, b.state, b.trade, b.stage, b.research
+    from businesses b where b.os_slug = ${slug} limit 1
+  `;
+}
+
+export function clientForSlug(sql, slug) {
+  return sql`select slug, display_name, notes from clients where slug = ${slug} limit 1`;
+}
