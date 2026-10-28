@@ -150,7 +150,7 @@ test("jobDeps reads env for each job", async () => {
   assert.equal(typeof s.places.search, "function");
   assert.deepEqual(await s.loadCells(), [{ c: 1 }]);
   assert.deepEqual(calls, [["upsert", true]]);
-  assert.deepEqual(JOBS, ["source", "qualify", "deliverable"]);
+  assert.deepEqual(JOBS, ["source", "qualify", "deliverable", "uptime"]);
 });
 
 // --- env numbers: an explicit value wins, junk fails the run ---------------

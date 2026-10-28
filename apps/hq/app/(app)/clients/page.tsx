@@ -1,47 +1,41 @@
-import {
-  clientBilling,
-  invoicingEnabled,
-  isUnavailable,
-  mercuryInvoices,
-  mercurySummary,
-} from "@/lib/money";
+import "../../clients.css";
+import { buildCards, CLIENT_SELECT, loadHealthSources, type ClientBase } from "@/lib/clients/load";
+import { isAdmin } from "@/lib/proposals";
 import { createSupabaseServer } from "@/lib/supabase";
-import { updateClient } from "./actions";
-import { ClientsView, type ClientRow } from "./View";
+import { addClientTask, updateClient } from "./actions";
+import { ClientsView } from "./View";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
   const sb = createSupabaseServer();
   if (!sb) return <p className="lpad muted">Not configured.</p>;
-  const [cl, lk, mercury, invoices] = await Promise.all([
-    sb
-      .from("clients")
-      .select(
-        "slug, display_name, kind, stage, health, owner, channel, billing_note, repo_url, monthly_rate_cents, churn_date"
-      )
-      .is("churn_date", null)
-      .order("display_name"),
+  const [cl, lk, tk, sources, admin] = await Promise.all([
+    sb.from("clients").select(CLIENT_SELECT).is("churn_date", null).order("display_name"),
     sb.from("links").select("client_slug, label, url").not("client_slug", "is", null),
-    mercurySummary(),
-    mercuryInvoices(),
+    sb
+      .from("tasks")
+      .select("client_slug, title, status, due")
+      .not("client_slug", "is", null)
+      .limit(1000),
+    loadHealthSources(sb),
+    isAdmin(sb),
   ]);
   if (cl.error) return <p className="lpad muted">Clients unavailable.</p>;
-  const links = new Map<string, { label: string | null; url: string }[]>();
-  for (const l of lk.data ?? [])
-    links.set(l.client_slug, [...(links.get(l.client_slug) ?? []), { label: l.label, url: l.url }]);
-  const txns = isUnavailable(mercury) ? mercury : mercury.txns;
-  const clients: ClientRow[] = (cl.data ?? []).map((c) => ({
-    ...c,
-    links: links.get(c.slug) ?? [],
-    billing: clientBilling(c, txns, invoices),
-  }));
+  // The client is untyped; the columns are exactly CLIENT_SELECT / the selects above.
+  const cards = buildCards(
+    (cl.data ?? []) as unknown as ClientBase[],
+    sources,
+    (lk.data ?? []) as { client_slug: string; label: string | null; url: string }[],
+    (tk.data ?? []) as { client_slug: string; title: string; status: string; due: string | null }[]
+  );
   return (
     <ClientsView
-      clients={clients}
-      mercuryUnavailable={isUnavailable(mercury)}
-      invoicing={invoicingEnabled()}
-      action={updateClient}
+      cards={cards}
+      admin={admin}
+      month={new Date().toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })}
+      editAction={updateClient}
+      taskAction={addClientTask}
     />
   );
 }

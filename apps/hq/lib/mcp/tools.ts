@@ -1,5 +1,5 @@
 /**
- * tools.ts — the HQ MCP's tool surface: 17 tools, each a thin wrapper over the same lib
+ * tools.ts — the HQ MCP's tool surface: 18 tools, each a thin wrapper over the same lib
  * functions the UI uses (via='mcp', actor = the connecting user, so the audit shows "Claude (<handle>)").
  * Claude may only PROPOSE: there is no tool that writes businesses.stage or finance_inputs, decides a
  * proposal, or deletes anything. Pure of next/* so tests import it with a fake Supabase client.
@@ -15,6 +15,9 @@ import {
   parseResearch,
   type Actor,
 } from "../leads";
+import { CLIENT_FIELDS } from "../clients/fields";
+import { deriveFor, loadHealthSources, type ClientBase } from "../clients/load";
+import { proposeClient } from "../clients/propose";
 import { listPendingProposals } from "../proposals";
 import {
   addDays,
@@ -450,12 +453,44 @@ export const TOOLS: ToolDef[] = [
           .limit(50),
         sb.from("links").select("url, label, created_at").eq("client_slug", a.slug).limit(50),
       ]);
+      // health is derived (uptime + connectors + payment), never the clients.health column; the row is untyped
+      const { derived } = deriveFor(client as ClientBase, await loadHealthSources(sb));
       return stripContacts({
-        client,
+        client: { ...(client as object), health: derived.health },
+        health: { state: derived.health, why: derived.why, sources: derived.sources },
         tasks: read(tasks, "tasks"),
         notes: read(notes, "notes"),
         links: read(links, "links"),
       });
+    },
+  }),
+
+  tool({
+    name: "propose_client",
+    title: "Propose a client field change",
+    description: `Propose a change to one client field (${CLIENT_FIELDS.join(", ")}). monthly_rate_cents is whole cents; aliases is a list of exact payer names. Only files a pending proposal; an admin approves it. Health is derived and cannot be proposed.`,
+    readOnly: false,
+    shape: {
+      slug: z
+        .string()
+        .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+        .max(100),
+      field: z.enum(CLIENT_FIELDS),
+      value: z.union([z.string().max(2000), z.number(), z.array(z.string().max(100)).max(20)]),
+      reason: z.string().max(1000).optional(),
+    },
+    async run({ sb, actor }, a) {
+      try {
+        const p = await proposeClient(sb, actor.id, "mcp", {
+          slug: a.slug,
+          field: a.field,
+          value: a.value,
+          reason: a.reason,
+        });
+        return { proposal_id: p.id, status: "pending", field: p.field, old: p.old, new: p.new };
+      } catch (e) {
+        throw new ToolError(e instanceof Error ? e.message : "could not file the proposal");
+      }
     },
   }),
 

@@ -226,6 +226,19 @@ unitcheck "$work/badunit" Unit Service && bad "unit parser accepted a malformed 
 printf '[Bogus]\nA=b\n' > "$work/badsec"
 unitcheck "$work/badsec" Unit Service && bad "unit parser accepted an unknown section" || ok "unit parser rejects an unknown section"
 
+# hq-uptime: its own service, not hq-job@uptime (the template needs credentials and the os clone).
+upt="$here/hq-uptime.timer"
+unitcheck "$upt" Unit Timer Install && ok "hq-uptime.timer parses" || bad "hq-uptime.timer has a malformed line or section"
+check "hq-uptime.timer: every 5 minutes" "$(unitval "$upt" OnCalendar)" "*:0/5"
+check "hq-uptime.timer: starts hq-uptime.service" "$(unitval "$upt" Unit)" "hq-uptime.service"
+usv="$here/hq-uptime.service"
+unitcheck "$usv" Unit Service && ok "hq-uptime.service parses as Unit/Service" || bad "hq-uptime.service has a malformed line or section"
+check "hq-uptime.service: oneshot, DynamicUser, env file" "$(unitval "$usv" Type) $(unitval "$usv" DynamicUser) $(unitval "$usv" EnvironmentFile)" "oneshot yes /srv/hq/jobs.env"
+check "hq-uptime.service: no LoadCredential, no os paths" "$(grep -cE '^(LoadCredential|ReadWritePaths|ReadOnlyPaths|SupplementaryGroups)=' "$usv" | tr -d ' ')" "0"
+check "hq-uptime.service: runs the uptime job, short timeout" "$(unitval "$usv" ExecStart) $(unitval "$usv" TimeoutStartSec)" "/usr/bin/node jobs/run.mjs uptime 2min"
+check "hq-uptime.service: hardening matches hq-job@" "$(unitval "$usv" ProtectSystem) $(unitval "$usv" PrivateTmp) $(unitval "$usv" NoNewPrivileges) $(unitval "$usv" ProtectHome)" "strict true true true"
+check "hq-uptime.timer: installs into timers.target" "$(unitval "$upt" WantedBy)" "timers.target"
+
 echo "syntax"
 for f in "$here"/*.sh; do
   bash -n "$f" 2>/dev/null && ok "$(basename "$f") parses" || bad "$(basename "$f") syntax error"
