@@ -55,9 +55,10 @@ alter table proposals add constraint proposals_client_shape check (
       when 'monthly_rate_cents' then jsonb_typeof(new) = 'number' and (new #>> '{}') ~ '^[0-9]{1,10}$'
       when 'billing_source'     then new in ('"mercury"'::jsonb, '"stripe"'::jsonb, '"none"'::jsonb)
       when 'mercury_customer_id' then jsonb_typeof(new) = 'string' and (new #>> '{}') ~ '^[A-Za-z0-9_-]{1,100}$'
-      -- every element a string of 1-100 chars (like checkField); `.type()` first so a number or object is caught
+      -- every element a string of 1-100 chars (like checkField); `.type()` first so a number or object is caught;
+      -- `strict` so a nested array ([["SB"]]) is an element, not auto-unwrapped by lax mode
       when 'aliases'            then jsonb_typeof(new) = 'array' and jsonb_array_length(new) <= 20
-                                     and not jsonb_path_exists(new, '$[*] ? (@.type() != "string" || !(@ like_regex "^.{1,100}$"))')
+                                     and not jsonb_path_exists(new, 'strict $[*] ? (@.type() != "string" || !(@ like_regex "^.{1,100}$"))')
       when 'repo_url'           then jsonb_typeof(new) = 'string' and (new #>> '{}') ~ '^https://[^[:space:]]+$' and length(new #>> '{}') <= 300
       -- `@?` swallows the parse error and returns NULL, which a CHECK passes: coalesce to false so "2026-02-31" is refused
       when 'launch_date'        then jsonb_typeof(new) = 'string' and (new #>> '{}') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
@@ -220,3 +221,19 @@ drop policy hq_insert on clients;
 create policy hq_insert on clients for insert to authenticated with check (public.is_admin());
 
 commit;
+
+-- ---------------------------------------------------------------------------
+-- NATE RUNS THIS BY HAND, after the hq_jobs role from 0032's footer exists (never from a migration).
+-- jobs/uptime.mjs inserts one row per target and prunes rows over 7 days old. The prune's WHERE
+-- reads checked_at, so DELETE needs SELECT too. uptime_checks has no serial column, so no sequence
+-- grant. RLS is on, so the role needs a policy per command. Without these lines every uptime run
+-- fails "permission denied" the moment /srv/hq/jobs.env DATABASE_URL points at hq_jobs.
+--
+--   grant select, insert, delete on uptime_checks to hq_jobs;
+--   create policy jobs_select on uptime_checks for select to hq_jobs using (true);
+--   create policy jobs_insert on uptime_checks for insert to hq_jobs with check (true);
+--   create policy jobs_delete on uptime_checks for delete to hq_jobs using (true);
+--
+-- Check afterwards: `set role hq_jobs; select count(*) from uptime_checks;` works,
+-- `update uptime_checks set ok = true;` is "permission denied".
+-- ---------------------------------------------------------------------------

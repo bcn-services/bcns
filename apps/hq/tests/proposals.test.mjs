@@ -418,6 +418,7 @@ test("integration: the database refuses a client proposal outside the whitelist 
     ["aliases", '[""]'],
     ["aliases", `["${"x".repeat(101)}"]`], // 1-100 chars each
     ["aliases", '["ok", null]'],
+    ["aliases", '[["SB"]]'], // a nested array is an element, not unwrapped (strict jsonpath)
   ]) {
     const r = asClientAdmin(`
 insert into proposals (kind, target_id, field, new, status, created_by)

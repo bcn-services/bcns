@@ -85,9 +85,12 @@ export const appUrl = (slug: string) =>
 
 /**
  * What the client has paid us in total. A readable Mercury invoice list wins: the sum of this client's
- * Paid invoices (same customer-id-then-alias match clientBilling uses). Otherwise monthly_rate x whole months
- * from launch_date to churn_date or today, flagged `est`. Null when neither exists.
- * ponytail: the estimate assumes the full rate was paid every month (no discounts, gaps or one-offs), and
+ * Paid invoices (same customer-id-then-alias match clientBilling uses). Otherwise monthly_rate x billing
+ * periods started (billing is in advance, so launch day starts the first) from launch_date to churn_date
+ * or today, flagged `est`. If the oldest matched invoice is over a month after launch_date the list is
+ * missing history: show max(sum, estimate) flagged `est`, never an exact-looking undercount. Null when
+ * neither exists.
+ * ponytail: the estimate assumes the full rate was paid every period (no discounts, gaps or one-offs), and
  * invoices exist only with MERCURY_INVOICING=1; upgrade when Mercury transactions are stored past their
  * 120-day window.
  */
@@ -96,6 +99,18 @@ export function lifetime(
   invoices: MercuryInvoice[] | Unavailable,
   now: Date = new Date()
 ): { cents: number; est: boolean } | null {
+  const rate = c.monthly_rate_cents ?? 0;
+  const from = c.launch_date ? new Date(`${c.launch_date}T00:00:00Z`) : null;
+  let est: number | null = null;
+  if (from && !Number.isNaN(from.getTime()) && rate > 0 && c.billing_source !== "none") {
+    const churn = c.churn_date ? new Date(`${c.churn_date}T00:00:00Z`) : null;
+    const to = churn && churn < now ? churn : now;
+    const months =
+      (to.getUTCFullYear() - from.getUTCFullYear()) * 12 +
+      (to.getUTCMonth() - from.getUTCMonth()) -
+      (to.getUTCDate() < from.getUTCDate() ? 1 : 0);
+    if (months >= 0) est = rate * (months + 1);
+  }
   if (!isUnavailable(invoices)) {
     const norm = (v: string) => v.trim().toLowerCase();
     const mine = invoices.filter(
@@ -105,19 +120,17 @@ export function lifetime(
           ? i.customerId === c.mercury_customer_id
           : !!i.customer && !!c.aliases?.some((a) => norm(a) === norm(i.customer)))
     );
-    if (mine.length) return { cents: mine.reduce((t, i) => t + i.amountCents, 0), est: false };
+    if (mine.length) {
+      const sum = mine.reduce((t, i) => t + i.amountCents, 0);
+      const oldest = Math.min(...mine.map((i) => new Date(i.dueDate).getTime()));
+      const grace = from ? new Date(from) : null;
+      grace?.setUTCMonth(grace.getUTCMonth() + 1);
+      if (est !== null && grace && oldest > grace.getTime())
+        return { cents: Math.max(sum, est), est: true };
+      return { cents: sum, est: false };
+    }
   }
-  const rate = c.monthly_rate_cents ?? 0;
-  const from = c.launch_date ? new Date(`${c.launch_date}T00:00:00Z`) : null;
-  if (!from || Number.isNaN(from.getTime()) || rate <= 0 || c.billing_source === "none")
-    return null;
-  const churn = c.churn_date ? new Date(`${c.churn_date}T00:00:00Z`) : null;
-  const to = churn && churn < now ? churn : now;
-  const months =
-    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 +
-    (to.getUTCMonth() - from.getUTCMonth()) -
-    (to.getUTCDate() < from.getUTCDate() ? 1 : 0);
-  return months > 0 ? { cents: rate * months, est: true } : null;
+  return est === null ? null : { cents: est, est: true };
 }
 
 // ---- the Work tile ------------------------------------------------------------------------------

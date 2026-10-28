@@ -547,7 +547,7 @@ test("Money tile third stat is '$N lifetime' (proto), not 'last payment'", () =>
   assert.match(est, /· no match key set/);
 });
 
-test("lifetime: paid Mercury invoices when readable, else rate x whole months since launch (est.)", () => {
+test("lifetime: paid Mercury invoices when readable, else rate x billing periods started since launch (est.)", () => {
   const inv = (customer, customerId, status, amountCents) => ({
     number: "1",
     status,
@@ -557,6 +557,7 @@ test("lifetime: paid Mercury invoices when readable, else rate x whole months si
     customerId,
   });
   const c = base({ launch_date: "2026-01-15", aliases: ["SAUNA BOY INC"] });
+  const exact = { ...c, launch_date: "2026-08-20" }; // oldest invoice within a month of launch: complete
   // alias match, Paid only, other customers ignored
   const invoices = [
     inv("SAUNA BOY INC", "c1", "Paid", 11000),
@@ -564,21 +565,41 @@ test("lifetime: paid Mercury invoices when readable, else rate x whole months si
     inv("SAUNA BOY INC", "c1", "Unpaid", 11000),
     inv("OTHER LLC", "c2", "Paid", 99999),
   ];
-  assert.deepEqual(lifetime(c, invoices, NOW), { cents: 22000, est: false });
+  assert.deepEqual(lifetime(exact, invoices, NOW), { cents: 22000, est: false });
   // a customer id, when set, is the key (alias matches stop counting)
-  assert.deepEqual(lifetime({ ...c, mercury_customer_id: "c2" }, invoices, NOW), {
+  assert.deepEqual(lifetime({ ...exact, mercury_customer_id: "c2" }, invoices, NOW), {
     cents: 99999,
     est: false,
   });
-  // invoicing off or no paid match: 9 whole months Jan 15 -> Oct 27 = 9 x $110
-  assert.deepEqual(lifetime(c, unavailable, NOW), { cents: 99000, est: true });
-  assert.deepEqual(lifetime(c, [], NOW), { cents: 99000, est: true });
-  // churned clients stop accruing; day-of-month counts (Jan 15 -> Feb 14 is 0 months)
-  assert.deepEqual(lifetime({ ...c, churn_date: "2026-04-20" }, unavailable, NOW), {
-    cents: 33000,
+  // invoicing off or no paid match: billing is in advance, so Jan 15 -> Oct 27 has started 10 periods
+  assert.deepEqual(lifetime(c, unavailable, NOW), { cents: 110000, est: true });
+  assert.deepEqual(lifetime(c, [], NOW), { cents: 110000, est: true });
+  // the invoice list starts Sep 1, 7 months after launch: it is missing history, so max(sum, estimate), est
+  assert.deepEqual(lifetime(c, invoices, NOW), { cents: 110000, est: true });
+  // ...but a sum above the estimate stays the sum (still flagged est)
+  assert.deepEqual(lifetime({ ...c, mercury_customer_id: "c2" }, invoices, NOW), {
+    cents: 110000,
     est: true,
   });
-  assert.equal(lifetime({ ...c, launch_date: "2026-10-01" }, unavailable, NOW), null);
+  assert.deepEqual(
+    lifetime({ ...c, mercury_customer_id: "c2" }, [inv("X", "c2", "Paid", 500000)], NOW),
+    { cents: 500000, est: true }
+  );
+  // exactly one month after launch is still within the window
+  assert.deepEqual(
+    lifetime({ ...c, launch_date: "2026-08-01" }, [inv("SAUNA BOY INC", "c1", "Paid", 11000)], NOW),
+    { cents: 11000, est: false }
+  );
+  // churned clients stop accruing; day-of-month counts (Jan 15 -> Feb 14 is still period 1)
+  assert.deepEqual(lifetime({ ...c, churn_date: "2026-04-20" }, unavailable, NOW), {
+    cents: 44000,
+    est: true,
+  });
+  assert.deepEqual(lifetime({ ...c, launch_date: "2026-10-01" }, unavailable, NOW), {
+    cents: 11000,
+    est: true,
+  });
+  assert.equal(lifetime({ ...c, launch_date: "2026-11-01" }, unavailable, NOW), null);
   // nothing to estimate from
   for (const over of [
     { launch_date: null },
