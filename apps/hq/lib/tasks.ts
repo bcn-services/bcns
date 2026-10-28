@@ -504,8 +504,9 @@ export async function createOpsTask(
   };
   const existing = await open();
   if (existing) return existing;
-  // No open task: if the newest one is done AND already pushed to the source, the ticket is handled;
-  // a new task would just be re-spawned by the next fire (the job opens one itself on a real reopen).
+  // No open task. For a ticket key the newest task, if done, is the answer whether or not the job has
+  // pushed it yet: a fresh task would hide the done one's resolution from the job (it reads only the
+  // newest task per key) and the fire would re-spawn it. The job opens a new task itself on a real reopen.
   const last = await sb
     .from("tasks")
     .select("*")
@@ -514,8 +515,8 @@ export async function createOpsTask(
     .limit(1)
     .maybeSingle();
   if (last.error) throw new Error(`tasks: ${last.error.message}`);
-  const prev = last.data as (Task & { synced_at?: string | null }) | null;
-  if (prev?.status === "done" && prev.synced_at) return prev;
+  const prev = last.data as Task | null;
+  if (alertKey.startsWith("ticket:") && prev?.status === "done") return prev;
   // The partial unique index tasks_alert_key_open_idx (0031) is the real guard: of two simultaneous
   // presses the loser gets 23505 and returns the winner's task.
   try {

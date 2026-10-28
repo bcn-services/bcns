@@ -248,7 +248,7 @@ test("createOpsTask: ops:ticket:<id> is ticket:platform:<id>; a done+synced task
       .id,
     a.id
   );
-  // done in HQ but not yet pushed: a fire may still open a new task (the pre-sync behaviour)
+  // done in HQ but not yet pushed: still that task (a new one would bury its resolution from the job)
   await T.updateTask(sb, ACTOR, "ui", a.id, { status: "done" }, NOW);
   const b = await T.createOpsTask(
     sb,
@@ -257,7 +257,8 @@ test("createOpsTask: ops:ticket:<id> is ticket:platform:<id>; a done+synced task
     { alertKey: "ops:ticket:u1", title: "Ticket" },
     NOW
   );
-  assert.notEqual(b.id, a.id);
+  assert.equal(b.id, a.id);
+  assert.equal(sb.db.tasks.length, 1);
   // done and pushed: the next fire for the same ticket returns it and inserts nothing
   const sb2 = fakeSb({
     tasks: [
