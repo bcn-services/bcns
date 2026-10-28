@@ -41,6 +41,7 @@ revoke all on schema ops from public;
 -- Every non-closed ticket, plus closed ones updated in the last 90 days (the window bounds closed
 -- tickets only, so an old open ticket still gets its reply), with the workspace slug. HQ closes its
 -- task when a ticket it knows has status 'closed' here.
+-- ponytail: no row limit; open backlog is tens of rows. Add keyset paging if it reaches thousands.
 create or replace function ops.hq_tickets_pull()
 returns table (id uuid, slug text, subject text, body text, severity text, status text,
                created_at timestamptz, updated_at timestamptz)
