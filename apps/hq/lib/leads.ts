@@ -341,7 +341,7 @@ export async function addLeadNote(
 
 // ---- reads ---------------------------------------------------------------
 export const LEAD_COLS =
-  "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, research";
+  "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, research, os_slug";
 export interface Lead {
   id: string;
   name: string;
@@ -358,6 +358,8 @@ export interface Lead {
   phone: string | null;
   domain: string | null;
   research: unknown;
+  /** ~/os/clients/<slug>; set by the first pitch request (lib/deliverables.ts). */
+  os_slug?: string | null;
 }
 export interface CallRow {
   business_id: string;
@@ -400,6 +402,29 @@ export async function loadExtras(sb: Sb, ids: string[]): Promise<Map<string, Ext
     for (const r of (must(l).data ?? []) as LinkRow[]) out.get(r.business_id)?.links.push(r);
   }
   return out;
+}
+
+const TRADE_PAGE = 1000; // PostgREST max_rows in apps/hq/supabase/config.toml: a bigger .limit() is silently cut to this
+const TRADE_PAGES = 20;
+
+/** Distinct trades for the Leads filter: pages `businesses.trade` in ordered 1000-row ranges until a short page. */
+export async function loadTrades(sb: Sb): Promise<{ trades: string[]; error: string }> {
+  const seen = new Set<string>();
+  // ponytail: scans the column page by page, 20 pages = 20k businesses, then the list is cut short; a view or rpc past that
+  for (let p = 0; p < TRADE_PAGES; p++) {
+    const res = await sb
+      .from("businesses")
+      .select("trade")
+      .is("suppressed_at", null)
+      .not("trade", "is", null)
+      .order("id")
+      .range(p * TRADE_PAGE, (p + 1) * TRADE_PAGE - 1);
+    if (res.error) return { trades: [...seen].sort(), error: res.error.message };
+    const rows = (res.data ?? []) as { trade: string }[]; // untyped client: the select is the shape
+    for (const r of rows) seen.add(r.trade);
+    if (rows.length < TRADE_PAGE) break;
+  }
+  return { trades: [...seen].sort(), error: "" };
 }
 
 export interface TaskRow {
@@ -530,3 +555,80 @@ export function leadRow(l: Lead, x: Extras | undefined, kind: "call" | "follow" 
     ];
   return row;
 }
+
+// ---- Leads page row model (pure; the client table renders this) --------------------------------
+/** "Oct 23" (New York). */
+export function fmtShort(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "short", day: "numeric" }).format(d);
+}
+
+/** "Oct 29 2pm" / "Oct 29 2:30pm" (New York). */
+export function fmtConsult(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const t = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).format(d);
+  return `${fmtShort(iso)} ${t.replace(":00", "").replace(" ", "").toLowerCase()}`;
+}
+
+/** Next-contact cell: `today` (warn chip) when due today or overdue, or a call_due lead with no date. */
+export function nextCell(l: Pick<Lead, "stage" | "next_contact_at">, now = new Date()): { text: string; today: boolean } {
+  if (l.next_contact_at) {
+    const due = new Date(l.next_contact_at).getTime() < startOfTomorrowET(now).getTime();
+    return due ? { text: "today", today: true } : { text: fmtShort(l.next_contact_at), today: false };
+  }
+  return l.stage === "call_due" ? { text: "today", today: true } : { text: "", today: false };
+}
+
+export interface LeadItem {
+  id: string;
+  name: string;
+  trade: string;
+  town: string;
+  state: string;
+  stage: string;
+  stageLabel: string;
+  fit: number | null;
+  assigned: string;
+  phone: string;
+  canLog: boolean;
+  domain: string;
+  /** Last call / next contact / consult, as the table shows them. */
+  last: string;
+  /** What the last call's note said (one line, cut at 80), or "". */
+  lastNote: string;
+  next: { text: string; today: boolean };
+  consult: string;
+  consultIso: string | null;
+  /** os_slug, once HQ or onboarding has named the lead's ~/os folder. */
+  slug: string | null;
+}
+export function leadItem(l: Lead, x: Extras | undefined, now = new Date()): LeadItem {
+  return {
+    id: l.id,
+    name: l.name,
+    trade: l.trade ?? "",
+    town: l.town ?? "",
+    state: l.state ?? "",
+    stage: l.stage,
+    stageLabel: stageLabel(l.stage),
+    fit: fitOf(l),
+    assigned: l.assigned_to,
+    phone: l.phone ?? "",
+    domain: l.domain ?? "",
+    canLog: canLog(l.stage),
+    last: fmtShort(x?.calls[0]?.at),
+    lastNote: (x?.calls[0]?.note ?? "").replace(/\s+/g, " ").trim().slice(0, 80),
+    next: nextCell(l, now),
+    consult: fmtConsult(l.consult_at),
+    consultIso: l.consult_at,
+    slug: l.os_slug ?? null,
+  };
+}
+
+/** Step 1's sub-line: the stage and what the last call said, never a claim the log doesn't back. */
+export const callSummary = (l: Pick<LeadItem, "stageLabel" | "last" | "lastNote">): string =>
+  `${l.stageLabel} · ${l.lastNote || (l.last ? `last call ${l.last}` : "no call logged yet")}`;
