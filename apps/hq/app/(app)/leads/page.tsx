@@ -1,20 +1,23 @@
-import { LeadBoard } from "@/components/TodayBrandonBoard";
-import { LeadBody } from "@/components/TodayBrandonLead";
-import type { Section } from "@/components/Board";
+import "../../leads.css";
+import type { ReactNode } from "react";
+import { LeadDrawerCalls } from "@/components/LeadDrawerCalls";
+import { LeadDrawerDetails } from "@/components/LeadDrawerDetails";
+import { loadDeliverables, leadSlug, type Deliverable } from "@/lib/deliverables";
 import { createSupabaseServer } from "@/lib/supabase";
-import { ALL_STAGES, LEAD_COLS, leadRow, loadExtras, stageLabel, type Lead } from "@/lib/leads";
+import { ALL_STAGES, LEAD_COLS, leadItem, loadExtras, stageLabel, type Lead } from "@/lib/leads";
+import { LeadsView, type Col } from "./View";
 
 const PAGE = 150;
-// header click -> column. ponytail: "last call" sorts by updated_at (bumped by every call, but also by other edits); a real last_call_at needs a column or view.
+// key, header, DB column. ponytail: "last call" sorts by updated_at (bumped by every call, but also by other edits); a real last_call_at needs a column or view.
 const COLS = [
   ["name", "Business", "name"],
   ["trade", "Trade", "trade"],
   ["town", "Town", "town"],
   ["stage", "Stage", "stage"],
   ["fit", "Fit", "fit_score"],
-  ["assigned", "Assigned", "assigned_to"],
+  ["assigned", "Owner", "assigned_to"],
   ["last", "Last call", "updated_at"],
-  ["next", "Next contact", "next_contact_at"],
+  ["next", "Next", "next_contact_at"],
   ["consult", "Consult", "consult_at"],
 ] as const;
 const HIDDEN_BY_DEFAULT = ["lost", "sourced", "qualified", "no_email"];
@@ -31,103 +34,81 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
   const asked = one(searchParams.dir);
   const dir = asked === "asc" || asked === "desc" ? asked : firstDir(sortKey[0]);
   const f = {
+    q: one(searchParams.q).slice(0, 60),
     stage: one(searchParams.stage),
-    trade: one(searchParams.trade).slice(0, 60),
-    town: one(searchParams.town).slice(0, 60),
     assigned: one(searchParams.assigned),
-    minfit: one(searchParams.minfit),
+    trade: one(searchParams.trade).slice(0, 60),
   };
-  const minfit = Number(f.minfit);
 
   let q = sb.from("businesses").select(LEAD_COLS, { count: "exact" }).is("suppressed_at", null);
+  // "" hides lost and unworked leads; "any" shows everything
   if (f.stage === "any") {
-    // everything, lost and unworked included
+    // everything
   } else if (ALL_STAGES.includes(f.stage)) q = q.eq("stage", f.stage);
   else q = q.not("stage", "in", `(${HIDDEN_BY_DEFAULT.join(",")})`);
-  if (f.trade) q = q.ilike("trade", `%${f.trade}%`);
-  if (f.town) q = q.ilike("town", `%${f.town}%`);
+  // the search text goes into a PostgREST filter string: drop its separators and wildcards
+  const needle = f.q.replace(/[,()%*\\]/g, " ").trim();
+  if (needle) q = q.or(`name.ilike.%${needle}%,town.ilike.%${needle}%`);
+  if (f.trade) q = q.eq("trade", f.trade);
   if (f.assigned === "nate" || f.assigned === "brandon") q = q.eq("assigned_to", f.assigned);
-  if (f.minfit && Number.isFinite(minfit)) q = q.gte("fit_score", minfit);
-  const { data, count, error } = await q
-    .order(sortKey[2], { ascending: dir === "asc", nullsFirst: false })
-    .order("name")
-    .limit(PAGE);
-  if (error) return <p className="lpad muted">Could not load leads: {error.message}</p>;
+  const [res, tradeRes] = await Promise.all([
+    q.order(sortKey[2], { ascending: dir === "asc", nullsFirst: false }).order("name").limit(PAGE),
+    // ponytail: distinct trades by scanning the column; a view or rpc when the table outgrows PostgREST's row cap
+    sb.from("businesses").select("trade").is("suppressed_at", null).not("trade", "is", null).limit(2000),
+  ]);
+  if (res.error) return <p className="lpad muted">Could not load leads: {res.error.message}</p>;
 
   // untyped client: LEAD_COLS is the shape
-  const leads = (data ?? []) as Lead[];
+  const leads = (res.data ?? []) as Lead[];
+  const trades = [...new Set(((tradeRes.data ?? []) as { trade: string }[]).map((r) => r.trade))].sort();
+  if (f.trade && !trades.includes(f.trade)) trades.unshift(f.trade);
   const extras = await loadExtras(sb, leads.map((l) => l.id));
+
+  // Pitch rows by lead; a lead with no folder yet has none. Without the table (0032 not applied) the tab just starts empty.
+  const slugs = leads.flatMap((l) => leadSlug(l) ?? []);
+  let bySlug = new Map<string, Deliverable[]>();
+  try {
+    bySlug = await loadDeliverables(sb, slugs);
+  } catch {
+    // Pitch tab shows no history; a request then fails with its own message
+  }
 
   const keep = Object.entries(f).filter(([, v]) => v);
   const href = (sort: string, d: string) => `/leads?${new URLSearchParams([...keep, ["sort", sort], ["dir", d]])}`;
-  const sections: Section[] = [
-    {
-      id: "grid",
-      title: "Leads",
-      sub: count && count > leads.length ? `showing ${leads.length} of ${count}` : undefined,
-      columns: COLS.map(([k, label]) => ({
-        label,
-        href: href(k, k === sortKey[0] ? (dir === "asc" ? "desc" : "asc") : firstDir(k)),
-        mark: k === sortKey[0] ? (dir === "asc" ? "▲" : "▼") : undefined,
-      })),
-      rows: leads.map((l) => leadRow(l, extras.get(l.id), "grid")),
-    },
-  ];
-  const details: Record<string, React.ReactNode> = {};
-  for (const l of leads) details[l.id] = <LeadBody lead={l} x={extras.get(l.id)} />;
+  const cols: Col[] = COLS.map(([key, label]) => ({
+    key,
+    label,
+    href: href(key, key === sortKey[0] ? (dir === "asc" ? "desc" : "asc") : firstDir(key)),
+    mark: key === sortKey[0] ? (dir === "asc" ? "▲" : "▼") : undefined,
+  }));
+  const details: Record<string, ReactNode> = {};
+  const calls: Record<string, ReactNode> = {};
+  const rows: Record<string, Deliverable[]> = {};
+  for (const l of leads) {
+    details[l.id] = <LeadDrawerDetails lead={l} x={extras.get(l.id)} />;
+    calls[l.id] = <LeadDrawerCalls x={extras.get(l.id)} />;
+    const s = leadSlug(l);
+    if (s) rows[l.id] = bySlug.get(s) ?? [];
+  }
+  const now = new Date();
 
   return (
-    <LeadBoard
-      head={
-        <>
-          <h1>Leads</h1>
-          <form className="filters" method="get" action="/leads">
-            <input type="hidden" name="sort" value={sortKey[0]} />
-            <input type="hidden" name="dir" value={dir} />
-            <label>
-              Status
-              <select name="stage" defaultValue={f.stage}>
-                <option value="">Active</option>
-                <option value="any">Any</option>
-                {ALL_STAGES.map((s) => (
-                  <option key={s} value={s}>
-                    {stageLabel(s)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Trade
-              <input name="trade" defaultValue={f.trade} />
-            </label>
-            <label>
-              Town
-              <input name="town" defaultValue={f.town} />
-            </label>
-            <label>
-              Assigned
-              <select name="assigned" defaultValue={f.assigned}>
-                <option value="">Anyone</option>
-                <option value="brandon">Brandon</option>
-                <option value="nate">Nate</option>
-              </select>
-            </label>
-            <label>
-              Min fit
-              <input name="minfit" type="number" min={0} max={100} defaultValue={f.minfit} />
-            </label>
-            <button className="btn" type="submit">
-              Filter
-            </button>
-            <a className="lnkb" href="/leads">
-              Reset
-            </a>
-          </form>
-        </>
-      }
-      sections={sections}
+    <LeadsView
+      items={leads.map((l) => leadItem(l, extras.get(l.id), now))}
+      cols={cols}
+      filters={f}
+      stages={[
+        { value: "", label: "Any stage" },
+        ...ALL_STAGES.map((s) => ({ value: s, label: stageLabel(s) })),
+        { value: "any", label: "Everything, lost too" },
+      ]}
+      trades={trades}
+      sub={`${leads.length} of ${res.count ?? leads.length} · sorted by ${sortKey[1].toLowerCase()}`}
+      sort={sortKey[0]}
+      dir={dir}
       details={details}
-      emptyText="No leads match."
+      calls={calls}
+      rows={rows}
     />
   );
 }

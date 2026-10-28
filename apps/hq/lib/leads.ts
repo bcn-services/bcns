@@ -341,7 +341,7 @@ export async function addLeadNote(
 
 // ---- reads ---------------------------------------------------------------
 export const LEAD_COLS =
-  "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, research";
+  "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, research, os_slug";
 export interface Lead {
   id: string;
   name: string;
@@ -358,6 +358,8 @@ export interface Lead {
   phone: string | null;
   domain: string | null;
   research: unknown;
+  /** ~/os/clients/<slug>; set by the first pitch request (lib/deliverables.ts). */
+  os_slug?: string | null;
 }
 export interface CallRow {
   business_id: string;
@@ -529,4 +531,72 @@ export function leadRow(l: Lead, x: Extras | undefined, kind: "call" | "follow" 
       fmtET(l.consult_at, true),
     ];
   return row;
+}
+
+// ---- Leads page row model (pure; the client table renders this) --------------------------------
+/** "Oct 23" (New York). */
+export function fmtShort(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "short", day: "numeric" }).format(d);
+}
+
+/** "Oct 29 2pm" / "Oct 29 2:30pm" (New York). */
+export function fmtConsult(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const t = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).format(d);
+  return `${fmtShort(iso)} ${t.replace(":00", "").replace(" ", "").toLowerCase()}`;
+}
+
+/** Next-contact cell: `today` (warn chip) when due today or overdue, or a call_due lead with no date. */
+export function nextCell(l: Pick<Lead, "stage" | "next_contact_at">, now = new Date()): { text: string; today: boolean } {
+  if (l.next_contact_at) {
+    const due = new Date(l.next_contact_at).getTime() < startOfTomorrowET(now).getTime();
+    return due ? { text: "today", today: true } : { text: fmtShort(l.next_contact_at), today: false };
+  }
+  return l.stage === "call_due" ? { text: "today", today: true } : { text: "", today: false };
+}
+
+export interface LeadItem {
+  id: string;
+  name: string;
+  trade: string;
+  town: string;
+  state: string;
+  stage: string;
+  stageLabel: string;
+  fit: number | null;
+  assigned: string;
+  phone: string;
+  canLog: boolean;
+  /** Last call / next contact / consult, as the table shows them. */
+  last: string;
+  next: { text: string; today: boolean };
+  consult: string;
+  consultIso: string | null;
+  /** os_slug, once HQ or onboarding has named the lead's ~/os folder. */
+  slug: string | null;
+}
+export function leadItem(l: Lead, x: Extras | undefined, now = new Date()): LeadItem {
+  return {
+    id: l.id,
+    name: l.name,
+    trade: l.trade ?? "",
+    town: l.town ?? "",
+    state: l.state ?? "",
+    stage: l.stage,
+    stageLabel: stageLabel(l.stage),
+    fit: fitOf(l),
+    assigned: l.assigned_to,
+    phone: l.phone ?? "",
+    canLog: canLog(l.stage),
+    last: fmtShort(x?.calls[0]?.at),
+    next: nextCell(l, now),
+    consult: fmtConsult(l.consult_at),
+    consultIso: l.consult_at,
+    slug: l.os_slug ?? null,
+  };
 }
