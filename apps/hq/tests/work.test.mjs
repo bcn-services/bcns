@@ -313,3 +313,44 @@ test("UI guards: manual-only create action, waiting_on-driven status, no fire re
   );
   assert.match(read("components/TodayNate.tsx"), /!asFire\.has\(`task:\$\{t\.id\}`\)/);
 });
+
+test("createOpsTask: the loser of a race (23505 on the open-alert index) gets the winner's task back", async () => {
+  const winner = { id: "t-win", alert_key: "ops:job:x", status: "todo" };
+  let selects = 0;
+  const sb = {
+    from: () => {
+      const q = {
+        select: () => q,
+        eq: () => q,
+        neq: () => q,
+        limit: () => q,
+        maybeSingle: async () => ({ data: ++selects === 1 ? null : winner, error: null }), // winner commits between the two reads
+        insert: () => q,
+        single: async () => ({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      };
+      return q;
+    },
+  };
+  const got = await T.createOpsTask(sb, ACTOR, "ui", { alertKey: "ops:job:x", title: "x" }, NOW);
+  assert.equal(got.id, "t-win");
+  // any other insert failure still throws
+  sb.from = () => {
+    const q = {
+      select: () => q,
+      eq: () => q,
+      neq: () => q,
+      limit: () => q,
+      insert: () => q,
+      maybeSingle: async () => ({ data: null, error: null }),
+      single: async () => ({ data: null, error: { code: "42501", message: "denied" } }),
+    };
+    return q;
+  };
+  await assert.rejects(
+    () => T.createOpsTask(sb, ACTOR, "ui", { alertKey: "ops:job:y", title: "y" }, NOW),
+    /denied/
+  );
+});

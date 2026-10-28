@@ -104,6 +104,22 @@ export function ticketRow(r: Record<string, unknown>): OpsSnapshot["tickets"][nu
   };
 }
 
+/**
+ * Why a query failed, for the log. Supabase's pooler cert chains to Supabase's own root CA, which
+ * Node does not ship, so verify-full fails until that CA is trusted: say so (Nate-run step).
+ */
+export function failureReason(e: unknown): string {
+  if (!(e instanceof Error)) return "error";
+  const code = (e as { code?: unknown }).code;
+  const tls =
+    /^(SELF_SIGNED_CERT|DEPTH_ZERO_SELF_SIGNED|UNABLE_TO_(VERIFY_LEAF|GET_ISSUER)|CERT_|ERR_TLS_CERT)/.test(
+      typeof code === "string" ? code : ""
+    ) || /self[- ]signed|certificate/i.test(e.message);
+  return tls
+    ? `${e.message} (TLS verification: trust the Supabase root CA on the droplet via NODE_EXTRA_CA_CERTS)`
+    : e.message;
+}
+
 async function loadSnapshot(): Promise<OpsSnapshot> {
   const q = db();
   if (!q) return noData(["config"]);
@@ -121,9 +137,7 @@ async function loadSnapshot(): Promise<OpsSnapshot> {
   const rows = res.map((r, i) => {
     if (r.status === "fulfilled") return [...r.value] as Record<string, unknown>[];
     failed.push(names[i] ?? "query");
-    console.error(
-      `[ops] ${names[i] ?? "query"} query failed: ${r.reason instanceof Error ? r.reason.message : "error"}`
-    );
+    console.error(`[ops] ${names[i] ?? "query"} query failed: ${failureReason(r.reason)}`);
     return [];
   });
   const map = <T>(i: number, f: (r: Record<string, unknown>) => T) => (rows[i] ?? []).map(f);

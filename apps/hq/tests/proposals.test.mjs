@@ -305,3 +305,10 @@ rollback;`);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /permission denied/);
 });
+
+test("useDecide: the a/r shortcuts do nothing for a viewer who cannot decide (guard sits before the RPC)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../components/ProposalDecide.tsx", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("function decide("), src.indexOf("decideProposal(p.id"));
+  assert.match(body, /if \(busy \|\| !p\.canDecide\) return/);
+});

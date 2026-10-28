@@ -138,7 +138,8 @@ export async function authorizeMcp(req: Request, rt: McpRuntime): Promise<McpCal
   let hit: Awaited<ReturnType<OAuth["resolve"]>>;
   try {
     hit = await rt.oauth.resolve(opaque);
-  } catch {
+  } catch (e) {
+    console.error(`[mcp] token lookup failed: ${e instanceof Error ? e.message : "error"}`); // names MCP_TOKEN_KEY when that is the cause
     return err(503, "temporarily_unavailable"); // token store down: not a 401, the connector must not drop its tokens
   }
   if (!hit) return UNAUTHORIZED(); // unknown or expired: the connector refreshes

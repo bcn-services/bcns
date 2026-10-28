@@ -4,12 +4,20 @@
 // Difference that matters: apps/mcp hands the connector the plain Supabase session. HQ must not.
 // A profiles user can UPDATE businesses.stage and call decide_proposal straight through PostgREST,
 // so the Supabase JWT never leaves this process: /token returns random opaque tokens, and the
-// real session is mapped server-side in public.mcp_tokens (migration 0031): keyed by the sha256 of
-// the opaque token, with an expiry, so a deploy or restart no longer signs every connector out.
+// real session is mapped server-side in public.mcp_tokens (migration 0031): keyed by an
+// HMAC-SHA256 of the opaque token under the server-only MCP_TOKEN_KEY, with an expiry, so a deploy
+// or restart no longer signs every connector out. Plain sha256 would let a bearer holder compute
+// the row key and read the session back through the anon-callable lookup; without the key nothing
+// is issued and nothing resolves.
 //
 // Cookies are ignored on purpose: HQ's own session cookie reaches this host, and nothing here may
 // read or reuse it.
-import { createHash, randomBytes as nodeRandomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes as nodeRandomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 import { isIP } from "node:net";
 import { forget } from "./limit";
 
@@ -85,7 +93,7 @@ export interface OAuthDeps {
 
 // ---- Token store ----------------------------------------------------------------------------
 
-/** One stored opaque token. `hash` is sha256 hex of the token; the token itself is never stored. */
+/** One stored opaque token. `hash` is HMAC-SHA256 hex of the token (see TokenStore.id); the token itself is never stored. */
 export interface TokenRow {
   hash: string;
   kind: "access" | "refresh";
@@ -96,6 +104,8 @@ export interface TokenRow {
 }
 
 export interface TokenStore {
+  /** The row key for an opaque token. Throws when the store has no usable key: fail closed, never a bare sha256. */
+  id(token: string): string;
   /** Insert or re-point a row. `jwt` is that user's Supabase access token (the DB checks it is theirs). */
   put(jwt: string, row: TokenRow): Promise<void>;
   /** null = unknown or expired. Throws when the store is unreachable: an outage is not "invalid". */
@@ -105,16 +115,21 @@ export interface TokenStore {
   delUser(jwt: string, userId: string): Promise<void>;
 }
 
-export const tokenHash = (token: string): string =>
-  createHash("sha256").update(token).digest("hex");
+/** Shortest MCP_TOKEN_KEY accepted. */
+export const MIN_TOKEN_KEY_LENGTH = 32;
+
+const hmacId = (key: string, token: string): string =>
+  createHmac("sha256", key).update(token).digest("hex");
 
 /** In-process store: the default for tests, bounded like the old Maps. */
 export function memoryTokenStore(now: () => number = Date.now): TokenStore & {
   rows: Map<string, TokenRow>;
 } {
   const rows = new Map<string, TokenRow>();
+  const key = nodeRandomBytes(32).toString("hex"); // per instance: a memory store dies with its process anyway
   return {
     rows,
+    id: (token) => hmacId(key, token),
     async put(_jwt, row) {
       forget(rows, row.hash);
       while (rows.size >= MAX_TOKEN_PAIRS * 2) forget(rows, rows.keys().next().value as string);
@@ -142,7 +157,7 @@ export function memoryTokenStore(now: () => number = Date.now): TokenStore & {
  */
 export function supabaseTokenStore(
   env: SupabaseEnv,
-  opts: { timeoutMs?: number; fetch?: typeof fetch } = {}
+  opts: { timeoutMs?: number; fetch?: typeof fetch; key?: string } = {}
 ): TokenStore {
   const doFetch = opts.fetch ?? fetch;
   const base = `${env.url.replace(/\/+$/, "")}/rest/v1/rpc/`;
@@ -168,6 +183,12 @@ export function supabaseTokenStore(
     return text ? JSON.parse(text) : null;
   }
   return {
+    id(token) {
+      const key = opts.key ?? process.env.MCP_TOKEN_KEY; // read per call: set on the droplet, never in a file
+      if (!key || key.length < MIN_TOKEN_KEY_LENGTH)
+        throw new Error(`MCP_TOKEN_KEY is unset or shorter than ${MIN_TOKEN_KEY_LENGTH} chars`);
+      return hmacId(key, token);
+    },
     async put(jwt, r) {
       await rpc(
         "mcp_token_store",
@@ -584,10 +605,11 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
     const now = deps.now();
     const accessToken = deps.randomBytes(32).toString("base64url");
     const refreshToken = deps.randomBytes(32).toString("base64url");
-    const ah = tokenHash(accessToken);
-    const rh = tokenHash(refreshToken);
     const ttl = Math.max(1, session.expires_in - TOKEN_MARGIN_SECONDS);
+    let rh: string | undefined;
     try {
+      const ah = tokens.id(accessToken);
+      rh = tokens.id(refreshToken);
       // refresh first: an access token whose refresh row is missing would strand the connector at expiry
       await tokens.put(session.access_token, {
         hash: rh,
@@ -603,8 +625,9 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
         payload: { jwt: session.access_token, handle: member.handle, refresh_hash: rh },
         expiresAt: now + ttl * 1000,
       });
-    } catch {
-      await tokens.del(rh).catch(() => {});
+    } catch (e) {
+      console.error(`[mcp] token issue failed: ${e instanceof Error ? e.message : "error"}`);
+      if (rh) await tokens.del(rh).catch(() => {});
       return null;
     }
     return {
@@ -716,9 +739,10 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
         ? deps.allowKnownIpRefresh(ip)
         : deps.allowUnknownIpRefresh(ip) && deps.allowUnknownRefresh();
       if (!admitted) return unavailable();
-      const rh = tokenHash(opaque);
+      let rh: string;
       let rec: TokenRow | null;
       try {
+        rh = tokens.id(opaque);
         rec = await tokens.get(rh);
       } catch {
         return unavailable(RETRY_AFTER_BLIP_SECONDS);
@@ -852,7 +876,7 @@ export function createOAuth(deps: OAuthDeps, state: State = oauthState()) {
    * Throws when the token store is unreachable: that is a 503, not a 401.
    */
   async function resolve(opaque: string): Promise<{ jwt: string; member: Member } | null> {
-    const rec = await tokens.get(tokenHash(opaque));
+    const rec = await tokens.get(tokens.id(opaque));
     if (!rec || rec.kind !== "access" || rec.expiresAt <= deps.now()) return null;
     const { jwt, handle } = rec.payload;
     if (typeof jwt !== "string") return null;

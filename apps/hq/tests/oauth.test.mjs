@@ -5,7 +5,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
   createOAuth,
@@ -17,7 +17,6 @@ import {
   realRandomBytes,
   supabaseSessionDeps,
   supabaseTokenStore,
-  tokenHash,
   CODE_TTL_MS,
   MAX_CODES,
   MAX_BODY_BYTES,
@@ -32,6 +31,8 @@ import { authorizeMcp, originAllowed, revokeMcpTokens } from "../lib/mcp/auth.ts
 import { fakeTokenDb } from "./_token-db.mjs";
 
 delete process.env.HQ_PUBLIC_ORIGIN;
+const TEST_KEY = "test-key-".padEnd(48, "k"); // stands in for MCP_TOKEN_KEY; a throwaway, not a secret
+process.env.MCP_TOKEN_KEY = TEST_KEY;
 const ISS = "https://hq.bcn-services.com";
 const RESOURCE = `${ISS}/mcp`;
 const CLAUDE = "https://claude.ai/api/mcp/auth_callback";
@@ -694,14 +695,19 @@ test("tokens persist: a restart (fresh process state) still resolves the bearer,
   assert.ok(await after.resolve(second.access_token));
 });
 
-test("tokens are stored as sha256 hex with an expiry, never in the clear", async () => {
+test("tokens are stored under an HMAC hex key with an expiry, never in the clear", async () => {
   const t = boot({ randomBytes: realRandomBytes });
   const j = await connect(t);
   assert.equal(t.db.rows.size, 2);
-  const ah = tokenHash(j.access_token);
-  const rh = tokenHash(j.refresh_token);
+  const ah = createHmac("sha256", TEST_KEY).update(j.access_token).digest("hex");
+  const rh = createHmac("sha256", TEST_KEY).update(j.refresh_token).digest("hex");
   assert.match(ah, /^[0-9a-f]{64}$/);
-  assert.equal(ah, createHash("sha256").update(j.access_token).digest("hex"));
+  assert.equal(t.deps.tokens.id(j.access_token), ah);
+  assert.notEqual(
+    ah,
+    createHash("sha256").update(j.access_token).digest("hex"),
+    "not a bare sha256"
+  );
   assert.deepEqual([...t.db.rows.keys()].sort(), [ah, rh].sort());
   const a = t.db.rows.get(ah);
   const r = t.db.rows.get(rh);
@@ -1068,4 +1074,75 @@ test("real deps: unreachable, hung and malformed answers are status 0 and log on
   }
   assert.equal(JSON.parse(lines[0]).event, "gotrue_signin_failed");
   assert.equal(JSON.parse(lines[1]).event, "gotrue_refresh_failed");
+});
+
+test("MCP_TOKEN_KEY: a row key derived from the bearer alone (plain sha256) misses; the key is required", async () => {
+  const t = boot({ randomBytes: realRandomBytes });
+  const j = await connect(t);
+  // what a bearer holder can compute with no server secret: the public anon-callable lookup finds nothing
+  const sha = (x) => createHash("sha256").update(x).digest("hex");
+  const rpc = async (hash) =>
+    (
+      await t.db.fetch("https://sb.test/rest/v1/rpc/mcp_token_lookup", {
+        method: "POST",
+        headers: {
+          apikey: "anon-key",
+          authorization: "Bearer anon-key",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ p_hash: hash }),
+      })
+    ).json();
+  assert.equal(await rpc(sha(j.access_token)), null);
+  assert.equal(await rpc(sha(j.refresh_token)), null);
+  assert.notEqual(
+    await rpc(t.deps.tokens.id(j.access_token)),
+    null,
+    "control: the keyed hash does hit"
+  );
+  // a restart with the key still set resolves it
+  globalThis.__hqOAuthState = undefined;
+  assert.ok(await createOAuth(t.deps).resolve(j.access_token));
+  // another key (or none) cannot resolve it
+  for (const key of ["", "short", "x".repeat(64)]) {
+    const other = createOAuth({
+      ...t.deps,
+      tokens: supabaseTokenStore(
+        { url: "https://sb.test", anonKey: "anon-key" },
+        { fetch: t.db.fetch, key }
+      ),
+    });
+    if (key.length < 32) await assert.rejects(other.resolve(j.access_token), /MCP_TOKEN_KEY/);
+    else assert.equal(await other.resolve(j.access_token), null);
+  }
+});
+
+test("MCP_TOKEN_KEY unset or short: nothing is issued (503), refresh is 503, bearer is a 503, no row is written", async () => {
+  const saved = process.env.MCP_TOKEN_KEY;
+  try {
+    const t = boot({ randomBytes: realRandomBytes });
+    const good = await connect(t);
+    const rowsBefore = t.db.rows.size;
+    for (const v of [undefined, "", "k".repeat(31)]) {
+      if (v === undefined) delete process.env.MCP_TOKEN_KEY;
+      else process.env.MCP_TOKEN_KEY = v;
+      const res = await t.oauth.token(exchange(await getCode(t)));
+      assert.equal(res.status, 503, `issue refused with key ${JSON.stringify(v)}`);
+      const refresh = await t.oauth.token(refreshReq(good.refresh_token));
+      assert.equal(refresh.status, 503);
+      await assert.rejects(t.oauth.resolve(good.access_token), /MCP_TOKEN_KEY/);
+      const rt = { oauth: t.oauth, limiter: { allow: () => true }, client: () => ({}) };
+      const r = await authorizeMcp(
+        new Request(`${ISS}/mcp`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${good.access_token}` },
+        }),
+        rt
+      );
+      assert.equal(r.status, 503);
+      assert.equal(t.db.rows.size, rowsBefore, "no row written while the key is missing");
+    }
+  } finally {
+    process.env.MCP_TOKEN_KEY = saved;
+  }
 });

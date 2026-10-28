@@ -8,8 +8,8 @@
 --   * proposals.old / proposals.via are set by a trigger from the live value and the request,
 --     never trusted from the caller.
 --   * one open ops task per alert_key (the check-then-insert in createOpsTask raced).
---   * mcp_tokens: HQ's OAuth access/refresh tokens, stored as sha256 only, reachable ONLY through
---     the security-definer mcp_token_* functions (HQ holds no service-role key). Auth codes (60 s)
+--   * mcp_tokens: HQ's OAuth access/refresh tokens, keyed by HMAC-SHA256(MCP_TOKEN_KEY, token), reachable
+--     ONLY through the security-definer mcp_token_* functions (HQ holds no service-role key). Auth codes (60 s)
 --     stay in process memory.
 -- Nate-run precondition: profiles.role must be 'admin' for whoever approves (Nate), or nobody can.
 -- ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ create unique index tasks_alert_key_open_idx on tasks (alert_key) where status <
 
 -- ---- MCP OAuth tokens ---------------------------------------------------------------
 create table mcp_tokens (
-  hash       text primary key check (hash ~ '^[0-9a-f]{64}$'),  -- sha256 hex of the opaque token
+  hash       text primary key check (hash ~ '^[0-9a-f]{64}$'),  -- hex HMAC-SHA256 of the opaque token, keyed by the server-only MCP_TOKEN_KEY
   kind       text not null check (kind in ('access', 'refresh')),
   user_id    uuid not null references auth.users (id) on delete cascade,
   payload    jsonb not null,
@@ -187,7 +187,8 @@ begin
 end $$;
 
 -- Called with the anon key: the only credential the caller has is the token itself. A hit needs the
--- sha256 of a 256-bit random token; an expired row is a miss.
+-- HMAC (server-only key) of a 256-bit random token: a bearer holder cannot compute its own row key, so
+-- this anon-callable lookup cannot be used to read the session behind a token. An expired row is a miss.
 create function public.mcp_token_lookup(p_hash text) returns jsonb
 language sql stable security definer set search_path = public, pg_temp
 as $$

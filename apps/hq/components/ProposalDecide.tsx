@@ -9,7 +9,7 @@ export function useDecide() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
   function decide(p: ProposalView, approve: boolean) {
-    if (busy) return;
+    if (busy || !p.canDecide) return; // staff: the a/r shortcuts must not reach the RPC
     start(async () => {
       const r = await decideProposal(p.id, approve);
       setMsg(

@@ -249,3 +249,20 @@ test("opsSnapshot rows: ticket subject is cut to 80 chars at the read path", asy
   });
   assert.equal(t.subject.length, 80);
 });
+
+test("failureReason: a certificate verification failure names NODE_EXTRA_CA_CERTS, other errors stay plain", async () => {
+  const { failureReason } = await import("../lib/ops.ts");
+  const cert = Object.assign(new Error("self-signed certificate in certificate chain"), {
+    code: "SELF_SIGNED_CERT_IN_CHAIN",
+  });
+  assert.match(failureReason(cert), /NODE_EXTRA_CA_CERTS/);
+  assert.match(
+    failureReason(Object.assign(new Error("x"), { code: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" })),
+    /NODE_EXTRA_CA_CERTS/
+  );
+  assert.equal(
+    failureReason(new Error("connect ECONNREFUSED 127.0.0.1:1")),
+    "connect ECONNREFUSED 127.0.0.1:1"
+  );
+  assert.equal(failureReason("nope"), "error");
+});
