@@ -407,5 +407,54 @@ do $$ begin
   assert (select count(*) from mcp_tokens where user_id = '00000000-0000-0000-0000-0000000000a3') = 1, 'revoke_user touched another user';
 end $$;
 
+-- ---- 0031 QA: store cap, hash hijack, bounds, anon direct access ------------------------------------
+set local role anon;
+do $$ begin
+  begin
+    perform count(*) from mcp_tokens;
+    raise exception 'anon selected mcp_tokens';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+-- user a3 holds one token (hash c...). a1 stores 105 rows: the cap keeps a1's newest 100, never touches a3's
+insert into mcp_tokens (hash, kind, user_id, payload, expires_at, created_at)
+  select lpad(to_hex(i), 64, '0'), 'access', '00000000-0000-0000-0000-0000000000a1', '{}', now() + interval '1 hour',
+         now() - make_interval(secs => 1000 - i)
+    from generate_series(1, 105) i;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  perform mcp_token_store(repeat('d', 64), 'access', auth.uid(), '{}', now() + interval '1 hour');
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from mcp_tokens where user_id = '00000000-0000-0000-0000-0000000000a1') = 100, 'per-user cap is 100: ' || (select count(*) from mcp_tokens where user_id = '00000000-0000-0000-0000-0000000000a1');
+  assert exists (select 1 from mcp_tokens where hash = repeat('d', 64)), 'newest row survives the cap';
+  assert not exists (select 1 from mcp_tokens where hash = lpad(to_hex(1), 64, '0')), 'oldest row is evicted by the cap';
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  -- a1 may not take over a3's row by storing its hash
+  perform mcp_token_store(repeat('c', 64), 'access', auth.uid(), '{"jwt":"stolen"}', now() + interval '1 hour');
+  begin
+    perform mcp_token_store(repeat('e', 64), 'access', auth.uid(), '{}', now() + interval '91 days');
+    raise exception 'stored a 91-day token';
+  exception when raise_exception then if sqlerrm <> 'bad expiry' then raise; end if; end;
+  begin
+    perform mcp_token_store(repeat('e', 64), 'access', auth.uid(), jsonb_build_object('x', repeat('x', 9000)), now() + interval '1 hour');
+    raise exception 'stored an oversize payload';
+  exception when raise_exception then if sqlerrm <> 'payload too large' then raise; end if; end;
+  begin
+    perform mcp_token_store(repeat('e', 64), 'bogus', auth.uid(), '{}', now() + interval '1 hour');
+    raise exception 'stored a bad kind';
+  exception when check_violation then null; end;
+end $$;
+reset role;
+do $$ begin
+  assert (select user_id from mcp_tokens where hash = repeat('c', 64)) = '00000000-0000-0000-0000-0000000000a3', 'a1 hijacked a3 hash';
+  assert (select payload from mcp_tokens where hash = repeat('c', 64)) = '{}'::jsonb, 'a1 overwrote a3 payload';
+end $$;
+
 rollback;
 \echo rls.sql: PASS
