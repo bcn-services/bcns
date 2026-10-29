@@ -152,13 +152,14 @@ export const isMissingTable = (e: unknown): boolean => e instanceof Error && "co
 export async function loadDeliverables(sb: Sb, slugs: string[]): Promise<Map<string, Deliverable[]>> {
   const out = new Map<string, Deliverable[]>();
   const uniq = [...new Set(slugs)];
-  for (let i = 0; i < uniq.length; i += 100) {
-    const res = must(
-      await sb.from("deliverables").select(DELIVERABLE_COLS).in("slug", uniq.slice(i, i + 100)).order("created_at", { ascending: false })
-    );
+  const parts: string[][] = [];
+  for (let i = 0; i < uniq.length; i += 100) parts.push(uniq.slice(i, i + 100));
+  const res = await Promise.all(
+    parts.map((part) => sb.from("deliverables").select(DELIVERABLE_COLS).in("slug", part).order("created_at", { ascending: false }))
+  );
+  for (const r of res)
     // untyped client: DELIVERABLE_COLS is the shape
-    for (const r of (res.data ?? []) as Deliverable[]) (out.get(r.slug) ?? out.set(r.slug, []).get(r.slug)!).push(r);
-  }
+    for (const d of (must(r).data ?? []) as Deliverable[]) (out.get(d.slug) ?? out.set(d.slug, []).get(d.slug)!).push(d);
   return out;
 }
 

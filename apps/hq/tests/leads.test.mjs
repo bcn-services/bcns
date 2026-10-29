@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const L = await import("../lib/leads.ts");
-const { OUTCOMES, ALL_STAGES, canLog, nextBusinessDay, weekStartET, etLocalToDate, parseResearch, logCall, updateLead, callSummary, loadTrades } = L;
+const { OUTCOMES, ALL_STAGES, canLog, nextBusinessDay, weekStartET, etLocalToDate, parseResearch, logCall, updateLead, callSummary, scanTrades } = L;
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const ACTOR = { id: "22222222-2222-4222-8222-222222222222", handle: "brandon" };
@@ -257,7 +257,7 @@ test("callSummary: the stage plus what the log says, never a claim it doesn't ba
   assert.doesNotMatch(callSummary(it), /wants to see/);
 });
 
-test("loadTrades pages the column in ordered 1000-row ranges, stops at a short page, caps at 20 pages", async () => {
+test("scanTrades pages the column in ordered 1000-row ranges, stops at a short page, caps at 20 pages", async () => {
   const calls = [];
   const fake = (pages, failAt = -1) => ({
     from: () => {
@@ -277,16 +277,16 @@ test("loadTrades pages the column in ordered 1000-row ranges, stops at a short p
       return b;
     },
   });
-  const r = await loadTrades(fake([1000, 1000, 40]));
+  const r = await scanTrades(fake([1000, 1000, 40]));
   assert.deepEqual(calls.filter((c) => c[0] === "range"), [["range", 0, 999], ["range", 1000, 1999], ["range", 2000, 2999]]);
   assert.ok(calls.some((c) => c[0] === "order" && c[1] === "id"), "ordered, so pages don't overlap");
   assert.equal(r.error, "");
   assert.ok(r.trades.includes("late-trade"), "a trade that only appears past row 1000 is listed");
   assert.deepEqual(r.trades, [...r.trades].sort());
   calls.length = 0;
-  await loadTrades(fake([1000])); // never a short page
+  await scanTrades(fake([1000])); // never a short page
   assert.equal(calls.filter((c) => c[0] === "range").length, 20);
-  const bad = await loadTrades(fake([1000, 1000], 1));
+  const bad = await scanTrades(fake([1000, 1000], 1));
   assert.equal(bad.error, "timeout");
   assert.ok(bad.trades.length > 0, "what was read is kept");
 });

@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { hardenCookie, sessionCookieOptions } from "./lib/cookie-options";
 import { getConfig } from "./lib/env";
 import { gate, type Check } from "./lib/gate";
+import { encodeSession, SESSION_HEADER, type Profile } from "./lib/session-header";
 
 // Session AND profiles row. getUser() validates the JWT with Supabase Auth (getSession() would trust the cookie).
 const check: Check = async (request) => {
@@ -27,10 +28,20 @@ const check: Check = async (request) => {
   if (!data.user) return { ok: false, response };
   const { data: row } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, handle, role, display_name")
     .eq("id", data.user.id)
     .maybeSingle();
-  return { ok: !!row, response };
+  if (!row) return { ok: false, response };
+  // Forward what was just validated so getSession() skips its own getUser() + profiles; set() overwrites any client-sent copy.
+  const forwarded = new Headers(request.headers);
+  // untyped client: the select above is the shape
+  forwarded.set(
+    SESSION_HEADER,
+    encodeSession({ user: { id: data.user.id, email: data.user.email }, profile: row as Profile })
+  );
+  const admitted = NextResponse.next({ request: { headers: forwarded } });
+  response.cookies.getAll().forEach((c) => admitted.cookies.set(c)); // refreshed session cookies, already hardened
+  return { ok: true, response: admitted };
 };
 
 export const middleware = (request: NextRequest) => gate(request, check);
