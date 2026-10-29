@@ -180,15 +180,35 @@ export function byDue(a: { due: string | null }, b: { due: string | null }): num
   return (a.due ?? "9999").localeCompare(b.due ?? "9999");
 }
 
-/** The steps one person works today: theirs, due by today or in progress, plus what they finished today. */
-export function todaySteps<T extends Task>(tasks: T[], me: string, today: string): T[] {
-  return tasks.filter(
-    (t) =>
-      t.owner === me &&
-      (t.status === "done"
-        ? !!t.done_at && isoDay(new Date(t.done_at)) >= today
-        : t.status === "doing" || (!!t.due && t.due <= today))
+export const QUEUE_CAP = 8;
+const QUEUE_DUE_DAYS = 7;
+const QUEUE_DONE_DAYS = 7; // same window as tracks.ts DONE_WINDOW_DAYS (tracks imports tasks, so no import back)
+
+/**
+ * One person's Today, derived (nothing is "pulled in"): their open tasks, split into
+ * queue (unblocked: due within 7 days soonest first, then the rest oldest-created first, top 8),
+ * waiting (status waiting or a waiting_on), and done in the last 7 days.
+ */
+export function todayQueue<T extends Task>(
+  tasks: T[],
+  me: string,
+  today: string
+): { queue: T[]; waiting: T[]; done: T[] } {
+  const mine = tasks.filter((t) => t.owner === me);
+  const open = mine.filter((t) => t.status !== "done");
+  const isWaiting = (t: T) => t.status === "waiting" || !!t.waiting_on?.trim();
+  const horizon = addDays(today, QUEUE_DUE_DAYS);
+  const soon = (t: T) => !!t.due && t.due <= horizon;
+  const byAge = (a: T, b: T) => a.created_at.localeCompare(b.created_at);
+  const queue = open
+    .filter((t) => !isWaiting(t))
+    .sort((a, b) => Number(soon(b)) - Number(soon(a)) || (soon(a) ? byDue(a, b) : 0) || byAge(a, b))
+    .slice(0, QUEUE_CAP);
+  const since = addDays(today, -QUEUE_DONE_DAYS);
+  const done = mine.filter(
+    (t) => t.status === "done" && !!t.done_at && isoDay(new Date(t.done_at)) >= since
   );
+  return { queue, waiting: open.filter(isWaiting), done };
 }
 
 const byRank = (a: Task, b: Task) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDue(a, b);

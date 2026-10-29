@@ -3,7 +3,7 @@ import { getFires } from "@/lib/fires";
 import { listPendingProposals } from "@/lib/proposals";
 import { getSession } from "@/lib/session";
 import { createSupabaseServer } from "@/lib/supabase";
-import { byDue, isoDay, todaySteps } from "@/lib/tasks";
+import { byDue, isoDay, todayQueue } from "@/lib/tasks";
 import { buildBoard, COLUMNS } from "@/lib/tracks";
 import { loadWorkData } from "@/lib/work-data";
 import { TodayCalendar } from "./TodayCalendar";
@@ -32,13 +32,13 @@ export async function TodayNate() {
   const asFire = new Set(shown.map((f) => f.key));
   const listed = open.filter((t) => !asFire.has(`task:${t.id}`));
   const trackName = new Map(tracks.map((t) => [t.id, t.name]));
-  // the board is only today's steps for the signed-in person; tracks with none drop out
-  const steps = todaySteps(tasks, me, today);
-  const board = buildBoard(tracks, steps, now);
+  // the board is a derived queue of the signed-in person's open tasks (top 8 up, waiting, done in 7 days); tracks with none drop out
+  const q = todayQueue(tasks, me, today);
+  const board = buildBoard(tracks, [...q.queue, ...q.waiting, ...q.done], now);
   for (const c of COLUMNS) board[c] = board[c].filter((card) => card.steps.length);
-  // count what the board draws (steps on a shown track), not every todaySteps result
-  const onBoard = COLUMNS.flatMap((c) => board[c].flatMap((card) => card.steps));
-  const stepsDone = onBoard.filter((t) => t.status === "done").length;
+  // count what the board draws (steps on a shown track), not every todayQueue result
+  const drawn = new Set(COLUMNS.flatMap((c) => board[c].flatMap((card) => card.steps.map((t) => t.id))));
+  const count = (list: { id: string }[]) => list.filter((t) => drawn.has(t.id)).length;
 
   return (
     <TodayNateBoard
@@ -61,7 +61,7 @@ export async function TodayNate() {
         .sort(byDue)}
       calendar={<TodayCalendar cal={cal} now={now} />}
       board={board}
-      boardSub={`${onBoard.length} step${onBoard.length === 1 ? "" : "s"} · ${stepsDone} done`}
+      boardSub={`${count(q.queue)} up · ${count(q.waiting)} waiting · ${count(q.done)} done`}
     />
   );
 }
