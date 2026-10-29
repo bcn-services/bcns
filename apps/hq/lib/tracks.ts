@@ -18,6 +18,21 @@ export const COLUMN_LABEL: Record<Column, string> = {
 };
 export const DONE_WINDOW_DAYS = 7;
 
+/** The board's only tracks. Nobody creates or deletes one; new work is a task under one of these. */
+export const FIXED_TRACKS = ["Software", "Outreach", "Marketing", "Clients", "Ops"] as const;
+export const FIXED_TRACK_DESC: Record<(typeof FIXED_TRACKS)[number], string> = {
+  Software: "client builds + platform + HQ itself",
+  Outreach: "calls, leads, demos, GTM channels",
+  Marketing: "site, SEO, ads, content",
+  Clients: "support, invoicing, onboarding for signed clients",
+  Ops: "admin, finance, infra, housekeeping",
+};
+
+function assertFixed(name: string) {
+  if (!(FIXED_TRACKS as readonly string[]).includes(name))
+    throw new Error(`tracks are fixed: ${FIXED_TRACKS.join(", ")}`);
+}
+
 export interface Track {
   id: string;
   name: string;
@@ -27,6 +42,9 @@ export interface Track {
   done_at: string | null;
   created_at: string;
 }
+
+/** Synthetic id of the Miscellaneous card; no tracks row has it (tracks.id is a uuid). */
+export const UNASSIGNED_ID = "unassigned";
 
 export interface BoardCard {
   track: Track;
@@ -73,7 +91,7 @@ export async function listTracks(sb: Sb): Promise<Track[]> {
 }
 
 /**
- * The board: tracks per column with their steps (open first). The Done column keeps only tracks
+ * The board: tracks per column with their steps (open first), plus a Miscellaneous card for open tasks with no track. The Done column keeps only tracks
  * finished in the last 7 days. Pure, so the page, TrackBoard's callers (Today) and tests share it.
  */
 export function buildBoard(
@@ -90,6 +108,22 @@ export function buildBoard(
       .sort((a, b) => Number(a.status === "done") - Number(b.status === "done"));
     board[track.column].push({ track, steps });
   }
+  // Open tasks with no track would sit nowhere on the board: one synthetic card, last in Now, never stored.
+  const orphans = tasks.filter((t) => !t.track_id && t.status !== "done");
+  if (orphans.length) {
+    board.now.push({
+      track: {
+        id: UNASSIGNED_ID,
+        name: "Miscellaneous",
+        area: null,
+        client_slug: null,
+        column: "now",
+        done_at: null,
+        created_at: now.toISOString(),
+      },
+      steps: orphans,
+    });
+  }
   return board;
 }
 
@@ -103,6 +137,7 @@ export async function createTrack(
   now: Date = new Date()
 ): Promise<Track> {
   const fields = cleanFields({ ...t, name: t.name ?? "" });
+  assertFixed(String(fields.name));
   const row = must<Track>(
     await sb
       .from("tracks")
@@ -141,6 +176,7 @@ export async function updateTrack(
 ): Promise<Track> {
   const set = cleanFields(f);
   if (!Object.keys(set).length) throw new Error("nothing to update");
+  if (set.name !== undefined) assertFixed(String(set.name));
   const row = must<Track>(await sb.from("tracks").update(set).eq("id", id).select().single(), "tracks update");
   await logEvent(sb, actor, via, "track.updated", { track_id: id, ...set });
   return row;

@@ -136,7 +136,7 @@ test("QA fix-round-2: filter selects are fixed at the prototype's 93px; Save can
   assert.match(d, /<option value=\{task\.client_slug\}>/);
 });
 
-test("Today (Nate) matches Work: same 420px split, a selected task or board step opens WorkTaskDetail on the right, board = todaySteps for the signed-in handle", () => {
+test("Today (Nate) matches Work: same 420px split, a selected task or board step opens WorkTaskDetail on the right, board = todayQueue for the signed-in handle", () => {
   const css = src("app/globals.css");
   assert.match(css, /\.td-lay \{[^}]*grid-template-columns: 420px minmax\(0, 1fr\)/);
   assert.doesNotMatch(css, /\.td-lay \{\s*grid-template-columns: 340px/); // no narrow override Work lacks
@@ -146,7 +146,9 @@ test("Today (Nate) matches Work: same 420px split, a selected task or board step
   assert.match(b, /onBack=\{\(\) => setSel\(null\)\}/);
   assert.match(b, /<TrackBoard board=\{board\} onStep=\{\(id\) => setSel\(`t:\$\{id\}`\)\}/);
   const n = src("components/TodayNate.tsx");
-  assert.match(n, /todaySteps\(tasks, me, today\)/);
+  assert.match(n, /todayQueue\([\s\S]*?\bme,\s*today\s*\)/);
+  assert.match(b, /Nothing up\. Add a task or assign yourself one on Work\./); // empty state
+  assert.match(n, /!t\.track_id \|\| shownTracks\.has\(t\.track_id\)/); // hidden-track tasks take no queue slots
   assert.match(n, /const me = profile\.handle/);
   assert.match(n, /filter\(\(card\) => card\.steps\.length\)/); // empty tracks drop off Today
   // Work and Today load the detail data through one loader
