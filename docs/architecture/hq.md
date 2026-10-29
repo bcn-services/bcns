@@ -565,7 +565,7 @@ Do in this order, same day.
   ```
   The Supabase project stays: it is HQ's database.
 
-### 25. Tickets: platform database, `hq_tickets` role (project `cnsxbglhredokjbvudfd`) — pending
+### 25. Tickets: platform database, `hq_tickets` role (project `cnsxbglhredokjbvudfd`) — done 2026-10-29
 
 Two-way ticket sync (`jobs/tickets.mjs`, PRs: A HQ job + 0036, B HQ UI/MCP resolution stacked on A, C platform migration + Connect view, D TA migration). **Migrations first, merges after**: steps 25-27 push, step 28 onward merges. Laptop commands run from a checkout of the C branch `ticket-sync-platform` (the CLI only sees migrations on disk), after `pnpm install --frozen-lockfile`:
 
@@ -595,7 +595,7 @@ postgresql://hq_tickets.cnsxbglhredokjbvudfd:<password>@<pooler-host>:5432/postg
 
 Check (read-only, same editor): `select has_function_privilege('hq_tickets','ops.hq_tickets_pull()','execute'), has_table_privilege('hq_tickets','data.tickets','select');` is `true, false`.
 
-### 26. Tickets: Technology Associates database — pending
+### 26. Tickets: Technology Associates database — done 2026-10-29
 
 Take the TA project ref and pooler host from the TA Supabase dashboard (Connect -> Session pooler); nothing here looks them up. Merge the TA PR `hq-tickets` (migration 0016; the TA CI runs it on a shadow stack, and `deploy.yml` applies it with `supabase db push` on the merge to `main`):
 
@@ -619,7 +619,7 @@ postgresql://hq_tickets.<ta-project-ref>:<password>@<pooler-host>:5432/postgres?
 
 If `hq_tickets` does not exist after the deploy, or 0016's header lists hand-run grants (TA migrations grant nothing, `DEPLOY.md`), run those lines in the same editor first.
 
-### 27. HQ database: push 0036 and grant `hq_jobs` on `tasks` — pending
+### 27. HQ database: push 0036 and grant `hq_jobs` on `tasks` — done 2026-10-29
 
 From a checkout of `ticket-sync-job` (PR A), after steps 11 and 16:
 
@@ -640,9 +640,9 @@ create policy jobs_update on tasks for update to hq_jobs using (true) with check
 
 Check: `select has_table_privilege('hq_jobs','tasks','insert') as ins, has_table_privilege('hq_jobs','tasks','delete') as del_should_be_false;` is `true, false`.
 
-### 28. Merge the HQ PRs A then B — pending
+### 28. Merge the HQ PRs A then B — done 2026-10-29
 
-A touches `apps/hq/**`, so the merge redeploys sb, connect, mcp and hq (step 18). B is stacked on A (its base is `ticket-sync-job`), so after A merges, retarget B to `main` and confirm before merging it, otherwise B merges into the dead branch and never reaches `main`. Always `--merge`, never squash:
+A touches `apps/hq/**`, so the merge redeploys sb, connect, mcp and hq (step 18). B is stacked on A (its base is `ticket-sync-job`), so after A merges, retarget B to `main` and confirm before merging it, otherwise B merges into the dead branch and never reaches `main`. Merge A **without** `--delete-branch`: deleting the base auto-closes B, and GitHub refuses to reopen or retarget a closed PR whose base is gone (#191 died this way; #201 replaced it). Delete `ticket-sync-job` after B is in. Always `--merge`, never squash:
 
 ```bash
 GITHUB_TOKEN= gh pr ready <A> -R bcn-services/bcns && GITHUB_TOKEN= gh pr merge <A> --merge -R bcn-services/bcns
@@ -665,7 +665,9 @@ select count(*) from tasks where alert_key like 'ops:ticket:%' and status <> 'do
 
 Mark any task the last query still counts done by hand (its ticket already has an open `ticket:platform:` task). Done tasks keep their old key; a later fire for those ticket ids makes a fresh task, which is the pre-sync behaviour.
 
-### 29. Droplet: the `tickets` timer — pending
+### 29. Droplet: the `tickets` timer — done 2026-10-29
+
+Done with a one-off wizard (`~/.claude/skills/wizard`): it generated each `hq_tickets` password, put the `alter role` statement on the clipboard for the project's SQL editor, probed the login through the session pooler, then wrote both URLs to `jobs.env` over ssh stdin. Nothing secret crossed a transcript. Session pooler host for both projects is `aws-0-us-east-1.pooler.supabase.com`; `aws-1-…` answers "tenant/user not found". First real run: `{"pulled":7,"created":5,"closed":0,"pushed":0,"failed":[]}`.
 
 ```bash
 scp infra/hq-tickets.timer root@104.236.20.89:/root/
@@ -683,7 +685,7 @@ systemctl enable --now hq-tickets.timer
 systemctl list-timers 'hq-*'                       # five timers now
 ```
 
-### 30. Merge the platform / Connect PR (C) — pending
+### 30. Merge the platform / Connect PR (C) — done 2026-10-29
 
 After steps 25 and 29 (the function and role exist and the job runs). C touches `apps/connect/**`, so it redeploys sb, connect and mcp:
 
@@ -691,7 +693,7 @@ After steps 25 and 29 (the function and role exist and the job runs). C touches 
 GITHUB_TOKEN= gh pr ready <C> -R bcn-services/bcns && GITHUB_TOKEN= gh pr merge <C> --merge -R bcn-services/bcns
 ```
 
-### 31. Tickets: live acceptance — pending
+### 31. Tickets: live acceptance — in progress (first run 2026-10-29: 5 TA tickets became tasks; resolution round-trip not yet exercised)
 
 - [ ] Submit a ticket in Connect (Support) and one in the TA app; within one timer run (15 minutes, or `systemctl start hq-job@tickets`) both appear in HQ Work as `Ticket: <subject>` tasks (owner nate, area ops, client set), with the ticket body in the task body.
 - [ ] Run it again: no duplicate tasks.
