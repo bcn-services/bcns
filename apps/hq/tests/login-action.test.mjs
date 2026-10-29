@@ -221,6 +221,26 @@ test("setNewPassword: short or mismatched password never spends the code; good o
   assert.equal((await goAgain()).to, "/login?mode=forgot&error=expired");
 });
 
+test("setNewPassword: updateUser fails -> only a local logout (other sessions survive), back to forgot?error=failed", async () => {
+  fakeSupabase();
+  const { jar } = await run("staff@example.test", "", requestPasswordReset);
+  const inner = globalThis.fetch;
+  const logouts = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u.includes("/auth/v1/logout")) logouts.push(new URL(u).searchParams.get("scope"));
+    if (u.includes("/auth/v1/user") && init.method === "PUT")
+      return new Response(JSON.stringify({ error_code: "weak_password", msg: "weak" }), {
+        status: 422,
+        headers: { "content-type": "application/json" },
+      });
+    return inner(url, init);
+  };
+  const res = await run("", "longenough1", setNewPassword, { code: "abc", confirm: "longenough1" }, jar);
+  assert.equal(res.to, "/login?mode=forgot&error=failed");
+  assert.deepEqual(logouts, ["local"]);
+});
+
 test("POST /signout: Supabase logout fails (5xx) -> still 303 /login with every sb-* cookie expired", async () => {
   const cookie =
     "sb-hq-test-auth-token=base64-" + Buffer.from(JSON.stringify(TOKEN)).toString("base64url");

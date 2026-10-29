@@ -21,7 +21,7 @@ export async function setNewPassword(form: FormData): Promise<void> {
   if (exErr) redirect(to({ mode: "forgot", error: "expired" }));
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" }); // global would revoke the user's other sessions, incl. the MCP connectors'
     redirect(to({ mode: "forgot", error: "failed" }));
   }
   redirect("/"); // the gate checks the profiles row; a stranger with a reset link but no profile is bounced to /login
