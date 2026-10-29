@@ -71,7 +71,7 @@ From `/Users/nateseluga/bcns/.claude/orchestrator/notes/hq-review-2026-10-27.md`
 
 ## Nate-run steps, in order
 
-Everything below is run by Nate. Secrets are typed by Nate and never pasted into a Claude window; this document lists variable **names** only. `<droplet>` is `root@104.236.20.89` (`bcns-web-apps-nyc`, nyc3). Steps 1-9 are v1 and ran on 2026-10-27; they stay as reference with the lines v2 made false patched. Steps 10-24 are v2.
+Everything below is run by Nate. Secrets are typed by Nate and never pasted into a Claude window; this document lists variable **names** only. `<droplet>` is `root@104.236.20.89` (`bcns-web-apps-nyc`, nyc3). Steps 1-9 are v1 and ran on 2026-10-27; they stay as reference with the lines v2 made false patched. Steps 10-24 are v2; steps 25-31 add the two-way ticket sync (post-v2, each marked pending until Nate runs it).
 
 **Order.** A merge that touches `apps/hq/**` deploys immediately (all four apps), so the order is: **pre-merge** steps 10-17, **merge** step 18, **post-merge** steps 19-21. This supersedes the earlier "db push after merging" order: a deploy that lands before its migration or its env breaks `/work` (0035), `/mcp` (503 without `MCP_TOKEN_KEY`) and the new hq-job units (missing credentials).
 
@@ -564,6 +564,140 @@ Do in this order, same day.
   ```
   The Supabase project stays: it is HQ's database.
 
+### 25. Tickets: platform database, `hq_tickets` role (project `cnsxbglhredokjbvudfd`) — pending
+
+Two-way ticket sync (`jobs/tickets.mjs`, PRs: A HQ job + 0036, B HQ UI/MCP resolution stacked on A, C platform migration + Connect view, D TA migration). **Migrations first, merges after**: steps 25-27 push, step 28 onward merges. Laptop commands run from a checkout of the C branch `ticket-sync-platform` (the CLI only sees migrations on disk), after `pnpm install --frozen-lockfile`:
+
+```bash
+supabase link --workdir platform --project-ref cnsxbglhredokjbvudfd   # only if platform/supabase/.temp/project-ref is missing
+supabase db push --workdir platform --dry-run      # expect only the ticket-resolution migration (tickets.resolution, ops.hq_tickets_pull / hq_ticket_resolve, role hq_tickets); read anything else
+supabase db push --workdir platform
+```
+
+Set the role's password by hand. Generate (URL-safe: no `%`, `#`, `@`) and copy it:
+
+```bash
+openssl rand -hex 24 | pbcopy
+```
+
+Platform dashboard -> SQL Editor, typing the password between the quotes:
+
+```sql
+alter role hq_tickets password '<paste>';
+```
+
+`PLATFORM_TICKETS_URL` for step 29 (session pooler; the user carries the project ref, otherwise "Tenant or user not found"):
+
+```
+postgresql://hq_tickets.cnsxbglhredokjbvudfd:<password>@<pooler-host>:5432/postgres?sslmode=verify-full
+```
+
+Check (read-only, same editor): `select has_function_privilege('hq_tickets','ops.hq_tickets_pull()','execute'), has_table_privilege('hq_tickets','data.tickets','select');` is `true, false`.
+
+### 26. Tickets: Technology Associates database — pending
+
+Take the TA project ref and pooler host from the TA Supabase dashboard (Connect -> Session pooler); nothing here looks them up. Merge the TA PR `hq-tickets` (migration 0016; the TA CI runs it on a shadow stack, and `deploy.yml` applies it with `supabase db push` on the merge to `main`):
+
+```bash
+GITHUB_TOKEN= gh pr ready <n> -R bcn-services/bcns-client-technology-associates
+GITHUB_TOKEN= gh pr merge <n> --merge -R bcn-services/bcns-client-technology-associates
+GITHUB_TOKEN= gh run list --workflow deploy.yml -L 1 -R bcn-services/bcns-client-technology-associates   # green: 0016 is applied
+```
+
+Then, in the TA dashboard SQL Editor, type the password (generate it as in step 25):
+
+```sql
+alter role hq_tickets password '<paste>';
+```
+
+`TA_TICKETS_URL` for step 29:
+
+```
+postgresql://hq_tickets.<ta-project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=verify-full
+```
+
+If `hq_tickets` does not exist after the deploy, or 0016's header lists hand-run grants (TA migrations grant nothing, `DEPLOY.md`), run those lines in the same editor first.
+
+### 27. HQ database: push 0036 and grant `hq_jobs` on `tasks` — pending
+
+From a checkout of `ticket-sync-job` (PR A), after steps 11 and 16:
+
+```bash
+supabase migration list --workdir apps/hq          # 0036 Local only
+supabase db push --workdir apps/hq --dry-run       # must list exactly 0036
+supabase db push --workdir apps/hq
+```
+
+0036 adds `tasks.resolution` and `tasks.synced_at`. Its footer is hand-run SQL (HQ SQL Editor); without it every `tickets` run fails "permission denied":
+
+```sql
+grant select, insert, update on tasks to hq_jobs;
+create policy jobs_select on tasks for select to hq_jobs using (true);
+create policy jobs_insert on tasks for insert to hq_jobs with check (true);
+create policy jobs_update on tasks for update to hq_jobs using (true) with check (true);
+```
+
+Check: `select has_table_privilege('hq_jobs','tasks','insert') as ins, has_table_privilege('hq_jobs','tasks','delete') as del_should_be_false;` is `true, false`.
+
+### 28. Merge the HQ PRs A then B — pending
+
+A touches `apps/hq/**`, so the merge redeploys sb, connect, mcp and hq (step 18). B is stacked on A (its base is `ticket-sync-job`), so after A merges, retarget B to `main` and confirm before merging it, otherwise B merges into the dead branch and never reaches `main`. Always `--merge`, never squash:
+
+```bash
+GITHUB_TOKEN= gh pr ready <A> -R bcn-services/bcns && GITHUB_TOKEN= gh pr merge <A> --merge -R bcn-services/bcns
+GITHUB_TOKEN= gh pr edit <B> --base main -R bcn-services/bcns
+GITHUB_TOKEN= gh pr view <B> --json baseRefName -R bcn-services/bcns     # must say "main"
+GITHUB_TOKEN= gh pr ready <B> -R bcn-services/bcns && GITHUB_TOKEN= gh pr merge <B> --merge -R bcn-services/bcns
+curl -s https://hq.bcn-services.com/api/health     # {"ok":true,"app":"hq"}
+```
+
+Rekey the open tasks the old fire button made (`ops:ticket:<id>`), or the job opens a duplicate `ticket:platform:<id>` beside each. Run this in the HQ SQL Editor after A is deployed (the old code keeps making `ops:ticket:` keys until then) and **before the first `systemctl start hq-job@tickets` in step 29**, since that manual start creates the duplicates as well as the timer. The id starts at character 12, after the 11-character prefix `ops:ticket:`. The `not exists` guard skips a row whose `ticket:platform:<id>` task is already open, which the unique index `tasks_alert_key_open_idx` would otherwise reject:
+
+```sql
+select count(*) from tasks where alert_key like 'ops:ticket:%' and status <> 'done';
+update tasks set alert_key = 'ticket:platform:' || substr(alert_key, 12)
+  where alert_key like 'ops:ticket:%' and status <> 'done'
+    and not exists (select 1 from tasks t2
+      where t2.alert_key = 'ticket:platform:' || substr(tasks.alert_key, 12) and t2.status <> 'done');
+select count(*) from tasks where alert_key like 'ops:ticket:%' and status <> 'done';   -- rows the guard skipped
+```
+
+Mark any task the last query still counts done by hand (its ticket already has an open `ticket:platform:` task). Done tasks keep their old key; a later fire for those ticket ids makes a fresh task, which is the pre-sync behaviour.
+
+### 29. Droplet: the `tickets` timer — pending
+
+```bash
+scp infra/hq-tickets.timer root@104.236.20.89:/root/
+ssh root@104.236.20.89
+cp /root/hq-tickets.timer /etc/systemd/system/
+```
+
+Append the two URLs from steps 25 and 26 to `/srv/hq/jobs.env` by typing them in an editor (`nano /srv/hq/jobs.env`; variable names only here, values never in a transcript): `PLATFORM_TICKETS_URL=` and `TA_TICKETS_URL=`. The file stays `600` owned by root. A missing name just skips that source with one log line. Run once by hand, then enable:
+
+```bash
+systemctl daemon-reload
+systemctl start hq-job@tickets
+journalctl -u hq-job@tickets -n 50 --no-pager      # {"pulled":N,"created":N,...,"failed":[]}
+systemctl enable --now hq-tickets.timer
+systemctl list-timers 'hq-*'                       # five timers now
+```
+
+### 30. Merge the platform / Connect PR (C) — pending
+
+After steps 25 and 29 (the function and role exist and the job runs). C touches `apps/connect/**`, so it redeploys sb, connect and mcp:
+
+```bash
+GITHUB_TOKEN= gh pr ready <C> -R bcn-services/bcns && GITHUB_TOKEN= gh pr merge <C> --merge -R bcn-services/bcns
+```
+
+### 31. Tickets: live acceptance — pending
+
+- [ ] Submit a ticket in Connect (Support) and one in the TA app; within one timer run (15 minutes, or `systemctl start hq-job@tickets`) both appear in HQ Work as `Ticket: <subject>` tasks (owner nate, area ops, client set), with the ticket body in the task body.
+- [ ] Run it again: no duplicate tasks.
+- [ ] Mark one task done with a Resolution typed in the Work detail, and one through Claude's `update_task` with `resolution`. After the next run each client's own view shows the resolution (Connect Support: the reply under the ticket; TA: a `bcns` message) and the ticket is closed.
+- [ ] Close a third ticket at the source: after the next run its HQ task is done with no push (journal shows `pushed` unchanged).
+- [ ] Pressing the fire button on an urgent ticket in Numbers -> Ops opens (or returns) the same task the job made; it never makes a second one after the ticket is done.
+
 ### Rollback
 
 HQ is additive on the DB, so the old pipeline can resume against it. Pause is reversible, delete is not, which is why step 24 pauses first.
@@ -580,7 +714,7 @@ If the repo was already archived: `GITHUB_TOKEN= gh repo unarchive bcn-services/
 
 ## After each HQ deploy
 
-Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemctl restart bcns-app@hq` or a droplet reboot no longer signs "bcns HQ" out (reconnect only when a call returns 401, e.g. after rotating `MCP_TOKEN_KEY` or signing out of HQ). A password reset, or signing out of HQ, revokes every GoTrue session, so each MCP connector (claude.ai, Claude Code) must authenticate once afterwards; this is expected, not a bug. Re-check `curl -s https://hq.bcn-services.com/api/health` and that `systemctl list-timers 'hq-*'` still shows all four timers (source, qualify, deliverable, uptime). A deploy never installs or changes systemd units; copy changed `infra/hq-*` files and `daemon-reload` by hand.
+Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemctl restart bcns-app@hq` or a droplet reboot no longer signs "bcns HQ" out (reconnect only when a call returns 401, e.g. after rotating `MCP_TOKEN_KEY` or signing out of HQ). A password reset, or signing out of HQ, revokes every GoTrue session, so each MCP connector (claude.ai, Claude Code) must authenticate once afterwards; this is expected, not a bug. Re-check `curl -s https://hq.bcn-services.com/api/health` and that `systemctl list-timers 'hq-*'` still shows all the timers (source, qualify, deliverable, uptime, plus tickets once step 29 is done). A deploy never installs or changes systemd units; copy changed `infra/hq-*` files and `daemon-reload` by hand.
 
 ## Follow-ups and decisions left for Nate
 

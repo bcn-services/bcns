@@ -508,7 +508,8 @@ export async function createOpsTask(
   i: { alertKey: string; title: string },
   now: Date = new Date()
 ): Promise<Task> {
-  const alertKey = i.alertKey?.trim();
+  // The fire button's key for a ticket is the key jobs/tickets.mjs uses, so both share one task.
+  const alertKey = i.alertKey?.trim().replace(/^ops:ticket:/, "ticket:platform:");
   if (!alertKey) throw new Error("alertKey required");
   const open = async (): Promise<Task | null> => {
     const r = await sb
@@ -523,6 +524,19 @@ export async function createOpsTask(
   };
   const existing = await open();
   if (existing) return existing;
+  // No open task. For a ticket key the newest task, if done, is the answer whether or not the job has
+  // pushed it yet: a fresh task would hide the done one's resolution from the job (it reads only the
+  // newest task per key) and the fire would re-spawn it. The job opens a new task itself on a real reopen.
+  const last = await sb
+    .from("tasks")
+    .select("*")
+    .eq("alert_key", alertKey)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (last.error) throw new Error(`tasks: ${last.error.message}`);
+  const prev = last.data as Task | null;
+  if (alertKey.startsWith("ticket:") && prev?.status === "done") return prev;
   // The partial unique index tasks_alert_key_open_idx (0031) is the real guard: of two simultaneous
   // presses the loser gets 23505 and returns the winner's task.
   try {
