@@ -580,7 +580,7 @@ If the repo was already archived: `GITHUB_TOKEN= gh repo unarchive bcn-services/
 
 ## After each HQ deploy
 
-Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemctl restart bcns-app@hq` or a droplet reboot no longer signs "bcns HQ" out (reconnect only when a call returns 401, e.g. after rotating `MCP_TOKEN_KEY` or signing out of HQ). Re-check `curl -s https://hq.bcn-services.com/api/health` and that `systemctl list-timers 'hq-*'` still shows all four timers (source, qualify, deliverable, uptime). A deploy never installs or changes systemd units; copy changed `infra/hq-*` files and `daemon-reload` by hand.
+Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemctl restart bcns-app@hq` or a droplet reboot no longer signs "bcns HQ" out (reconnect only when a call returns 401, e.g. after rotating `MCP_TOKEN_KEY` or signing out of HQ). A password reset, or signing out of HQ, revokes every GoTrue session, so each MCP connector (claude.ai, Claude Code) must authenticate once afterwards; this is expected, not a bug. Re-check `curl -s https://hq.bcn-services.com/api/health` and that `systemctl list-timers 'hq-*'` still shows all four timers (source, qualify, deliverable, uptime). A deploy never installs or changes systemd units; copy changed `infra/hq-*` files and `daemon-reload` by hand.
 
 ## Follow-ups and decisions left for Nate
 
