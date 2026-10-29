@@ -37,7 +37,7 @@ export type DbPing = (supabaseUrl: string, anonKey: string) => Promise<boolean>;
  */
 export const pingSupabase: DbPing = async (supabaseUrl, anonKey) => {
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/_health_probe?limit=1`, {
+    const res = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/rest/v1/_health_probe?limit=1`, {
       headers: { apikey: anonKey },
       signal: AbortSignal.timeout(5000),
     });
