@@ -101,6 +101,7 @@ cat <<EOF
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    large_client_header_buffers 4 32k;
     server_name www.$domain;
     ssl_certificate     $cert_file;
     ssl_certificate_key $key_file;
@@ -111,6 +112,7 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    large_client_header_buffers 4 32k;
     server_name $domain;
     ssl_certificate     $cert_file;
     ssl_certificate_key $key_file;
@@ -143,6 +145,7 @@ cat <<EOF
 server {
     listen 80;
     listen [::]:80;
+    large_client_header_buffers 4 32k;
     server_name $domain;
     location /.well-known/acme-challenge/ {
         root $acme_root;
@@ -160,6 +163,7 @@ cat <<EOF
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    large_client_header_buffers 4 32k;
     server_name $domain;
     ssl_certificate     $cert_file;
     ssl_certificate_key $key_file;

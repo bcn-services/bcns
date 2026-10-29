@@ -151,6 +151,7 @@ case "$sbv" in *'server_name www.'*) bad "certbot vhost must not add a www block
 case "$sbv" in *'/etc/ssl/cloudflare/'*) bad "certbot vhost must not reference the Cloudflare origin cert" ;; *) ok "certbot vhost never touches the Cloudflare cert" ;; esac
 case "$sbv" in *'proxy_pass http://127.0.0.1:3101;'*) ok "certbot vhost proxies to the registered port" ;; *) bad "proxy_pass port wrong" ;; esac
 case "$sbv" in *'proxy_buffer_size        16k;'*) ok "certbot vhost keeps the Supabase cookie buffers" ;; *) bad "proxy buffers missing" ;; esac
+check "certbot vhost: large_client_header_buffers in both server blocks (cookie header > 8k)" "$(printf %s "$sbv" | grep -c "large_client_header_buffers 4 32k;")" "2"
 check "certbot vhost: HSTS (no includeSubDomains/preload) on the 443 block" \
   "$(printf '%s\n' "$sbv" | grep -c '^    add_header Strict-Transport-Security "max-age=31536000" always;$')" "1"
 check "certbot vhost: per-server ssl_protocols line present once (effective on nginx >= 1.29.2; older nginx takes it from the 00-default server, see bootstrap.sh)" \
