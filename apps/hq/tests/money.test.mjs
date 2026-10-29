@@ -347,6 +347,51 @@ test("clientBilling invoices match by mercury_customer_id, alias only as the fal
   assert.deepEqual(byAlias.invoice, { nextDue: null, overdue: 1 });
 });
 
+test("clientBilling with a rate: only a rate-sized payment counts, one-time invoices do not", () => {
+  const c = {
+    display_name: "TA",
+    billing_note: null,
+    monthly_rate_cents: 10000,
+    mercury_customer_id: "c1",
+    aliases: ["Technology Associates LLC"],
+  };
+  const paid = (number, amountCents, dueDate) => ({
+    number,
+    status: "Paid",
+    amountCents,
+    dueDate,
+    customer: "Technology Associates LLC",
+    customerId: "c1",
+  });
+  // one-time $250 consult paid this month, no rate-sized payment: not the monthly payment
+  const oneOff = M.clientBilling(c, [], [paid("INV-1", 25000, "2026-10-05")], "2026-10-29");
+  assert.equal(oneOff.lastPaid, null);
+  // rate-sized invoice fallback counts, and wins over a newer one-off
+  const rated = M.clientBilling(
+    c,
+    [],
+    [paid("INV-1", 25000, "2026-10-05"), paid("INV-2", 10000, "2026-09-01")],
+    "2026-10-29"
+  );
+  assert.deepEqual(rated.lastPaid, { at: "2026-09-01", amountCents: 10000 });
+  // rate-sized txn counts; a bigger one-off txn is skipped
+  const txns = [
+    {
+      at: "2026-10-05",
+      amountCents: 25000,
+      counterparty: "Technology Associates LLC",
+      status: "sent",
+    },
+    {
+      at: "2026-10-01",
+      amountCents: 10000,
+      counterparty: "Technology Associates LLC",
+      status: "sent",
+    },
+  ];
+  assert.equal(M.clientBilling(c, txns).lastPaid.at, "2026-10-01");
+});
+
 test("clientBilling with Mercury unavailable keeps the note and says so", () => {
   const b = M.clientBilling(
     { display_name: "Sauna Boy", billing_note: "pays by check" },
