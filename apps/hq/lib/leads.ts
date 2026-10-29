@@ -342,6 +342,9 @@ export async function addLeadNote(
 // ---- reads ---------------------------------------------------------------
 export const LEAD_COLS =
   "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, research, os_slug";
+/** The grid's columns: LEAD_COLS without `research` (the big jsonb), which only the detail pane reads. */
+export const LIST_COLS =
+  "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, os_slug";
 export interface Lead {
   id: string;
   name: string;
@@ -402,6 +405,33 @@ export async function loadExtras(sb: Sb, ids: string[]): Promise<Map<string, Ext
     for (const r of (must(l).data ?? []) as LinkRow[]) out.get(r.business_id)?.links.push(r);
   }
   return out;
+}
+
+/**
+ * Just the latest call per lead, for the grid's "Last call" column: `calls` holds that one row, notes and links
+ * stay empty (loadLeadDetail has the rest). Two small column selects per 100 leads, newest first, first row wins.
+ */
+export async function loadLastCalls(sb: Sb, ids: string[]): Promise<Map<string, Extras>> {
+  const out = new Map<string, Extras>();
+  // ponytail: a 1000-row cap per chunk (PostgREST max_rows); if 100 leads log more calls than that, the oldest leads show no last call
+  const parts: string[][] = [];
+  for (let i = 0; i < ids.length; i += CHUNK) parts.push(ids.slice(i, i + CHUNK));
+  const res = await Promise.all(
+    parts.map((part) => sb.from("calls").select("business_id, by, at, outcome, note").in("business_id", part).order("at", { ascending: false }))
+  );
+  for (const r of res)
+    for (const c of (must(r).data ?? []) as CallRow[]) // untyped client: the select above is the shape
+      if (!out.has(c.business_id)) out.set(c.business_id, { calls: [c], notes: [], links: [] });
+  return out;
+}
+
+/** One lead's full row (with research) plus its calls, notes and links: what the detail pane renders. */
+export async function loadLeadDetail(sb: Sb, id: string): Promise<{ lead: Lead; x: Extras } | null> {
+  if (!isUuid(id)) return null;
+  const [b, extras] = await Promise.all([sb.from("businesses").select(LEAD_COLS).eq("id", id).maybeSingle(), loadExtras(sb, [id])]);
+  const lead = must(b).data as Lead | null; // untyped client: LEAD_COLS is the shape
+  const x = extras.get(id);
+  return lead && x ? { lead, x } : null;
 }
 
 const TRADE_PAGE = 1000; // PostgREST max_rows in apps/hq/supabase/config.toml: a bigger .limit() is silently cut to this

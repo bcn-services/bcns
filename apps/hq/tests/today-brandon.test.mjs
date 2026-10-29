@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { loadBrandonToday, loadExtras, leadRow, CALLS_LIMIT, FOLLOWUPS_LIMIT, startOfTomorrowET } = await import("../lib/leads.ts");
+const { loadBrandonToday, loadExtras, loadLastCalls, loadLeadDetail, leadRow, CALLS_LIMIT, FOLLOWUPS_LIMIT, startOfTomorrowET } = await import("../lib/leads.ts");
 
 // Tiny in-memory PostgREST: just the filters loadBrandonToday uses.
 function memSb(tables) {
@@ -157,6 +157,66 @@ test("loadExtras never sends more than 100 ids in one request, and still groups 
   assert.ok(seen.length >= 9 && seen.every(([, n]) => n <= 100), JSON.stringify(seen));
   assert.equal(m.size, 250);
   assert.ok(ids.every((id) => m.get(id).calls.length === 1));
+});
+
+// recording fake: every query's table + selected columns, rows per table
+const recSb = (rows) => {
+  const log = [];
+  return {
+    log,
+    from: (table) => {
+      const q = { table, cols: "" };
+      log.push(q);
+      const b = {
+        select: (c) => ((q.cols = c), b),
+        order: () => b,
+        eq: () => b,
+        in: () => b,
+        maybeSingle: () => b,
+        then: (res) => res({ data: table === "businesses" ? rows.businesses?.[0] ?? null : rows[table] ?? [], error: null }),
+      };
+      return b;
+    },
+  };
+};
+const ID = "11111111-1111-4111-8111-111111111111";
+
+test("loadLastCalls: one calls query, newest call per lead, no notes/links/research", async () => {
+  const sb = recSb({ calls: [
+    { business_id: "a", by: "brandon", at: "2026-10-27T00:00:00Z", outcome: "reached", note: "new" },
+    { business_id: "a", by: "brandon", at: "2026-10-01T00:00:00Z", outcome: "no_answer", note: "old" },
+  ] });
+  const m = await loadLastCalls(sb, ["a", "b"]);
+  assert.deepEqual(sb.log.map((q) => q.table), ["calls"]);
+  assert.ok(!/research|body|url/.test(sb.log[0].cols));
+  assert.equal(m.get("a").calls.length, 1);
+  assert.equal(m.get("a").calls[0].note, "new");
+  assert.equal(m.has("b"), false);
+});
+
+test("loadLeadDetail: the lead with research plus its calls, notes and links; a bad id queries nothing", async () => {
+  const sb = recSb({ businesses: [{ id: ID, name: "x", research: { reason: "r" } }], calls: [{ business_id: ID }], notes: [{ business_id: ID }], links: [{ business_id: ID }] });
+  const d = await loadLeadDetail(sb, ID);
+  assert.deepEqual(sb.log.map((q) => q.table).sort(), ["businesses", "calls", "links", "notes"]);
+  assert.match(sb.log.find((q) => q.table === "businesses").cols, /research/);
+  assert.equal(d.lead.id, ID);
+  assert.deepEqual([d.x.calls.length, d.x.notes.length, d.x.links.length], [1, 1, 1]);
+  const none = recSb({});
+  assert.equal(await loadLeadDetail(none, "nope"), null);
+  assert.equal(none.log.length, 0);
+});
+
+test("Leads list: slim columns, estimated count, no eager details; detail is a server action", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
+  const p = src("../app/(app)/leads/page.tsx");
+  assert.match(p, /LIST_COLS, \{ count: "estimated" \}/);
+  assert.doesNotMatch(p, /loadExtras|LeadDrawerDetails|LeadDrawerCalls|LEAD_COLS/);
+  assert.doesNotMatch((await import("../lib/leads.ts")).LIST_COLS, /research/);
+  const d = src("../app/(app)/leads/detail.tsx");
+  assert.match(d, /^"use server"/);
+  assert.match(d, /loadLeadDetail\(sb, id\)/);
+  assert.match(src("../app/(app)/leads/View.tsx"), /loadDetail\(drawerId\)/);
 });
 
 // ---- the progress rail's numbers (components/TodayBrandonStats.ts) ----
