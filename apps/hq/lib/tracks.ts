@@ -18,6 +18,21 @@ export const COLUMN_LABEL: Record<Column, string> = {
 };
 export const DONE_WINDOW_DAYS = 7;
 
+/** The board's only tracks. Nobody creates or deletes one; new work is a task under one of these. */
+export const FIXED_TRACKS = ["Software", "Outreach", "Marketing", "Clients", "Ops"] as const;
+export const FIXED_TRACK_DESC: Record<(typeof FIXED_TRACKS)[number], string> = {
+  Software: "client builds + platform + HQ itself",
+  Outreach: "calls, leads, demos, GTM channels",
+  Marketing: "site, SEO, ads, content",
+  Clients: "support, invoicing, onboarding for signed clients",
+  Ops: "admin, finance, infra, housekeeping",
+};
+
+function assertFixed(name: string) {
+  if (!(FIXED_TRACKS as readonly string[]).includes(name))
+    throw new Error(`tracks are fixed: ${FIXED_TRACKS.join(", ")}`);
+}
+
 export interface Track {
   id: string;
   name: string;
@@ -122,6 +137,7 @@ export async function createTrack(
   now: Date = new Date()
 ): Promise<Track> {
   const fields = cleanFields({ ...t, name: t.name ?? "" });
+  assertFixed(String(fields.name));
   const row = must<Track>(
     await sb
       .from("tracks")
@@ -160,6 +176,7 @@ export async function updateTrack(
 ): Promise<Track> {
   const set = cleanFields(f);
   if (!Object.keys(set).length) throw new Error("nothing to update");
+  if (set.name !== undefined) assertFixed(String(set.name));
   const row = must<Track>(await sb.from("tracks").update(set).eq("id", id).select().single(), "tracks update");
   await logEvent(sb, actor, via, "track.updated", { track_id: id, ...set });
   return row;
