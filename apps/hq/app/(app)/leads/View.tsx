@@ -62,10 +62,18 @@ export function LeadsView(props: {
   h.current = { items, current, drawer, tab, pending };
 
   const drawerId = open ? current?.id : undefined;
+  const lastId = useRef<string | undefined>(undefined);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (!drawerId) return;
+    if (!drawerId) {
+      lastId.current = undefined;
+      return;
+    }
+    // debounce only a switch from one open lead to another (held j/k would otherwise queue a server action per row);
+    // opening, and refetching the same lead after a call/note/save, go straight out
+    const wait = lastId.current && lastId.current !== drawerId ? 250 : 0;
+    lastId.current = drawerId;
     let live = true;
-    // debounced so holding j/k does not queue a server action per row passed
     const t = setTimeout(() => {
       loadDetail(drawerId).then(
         (r) => {
@@ -77,13 +85,16 @@ export function LeadsView(props: {
         },
         () => live && setDetailErr("Could not reach the server.")
       );
-    }, 120);
+    }, wait);
     return () => {
       live = false;
       clearTimeout(t);
     };
-  }, [drawerId, items]);
-  useEffect(() => setDetailErr(""), [drawerId]);
+  }, [drawerId, items, retry]);
+  useEffect(() => {
+    setDetailErr("");
+    focusNote.current = false; // a pending "n" belongs to the lead it was pressed on
+  }, [drawerId]);
   const shown = detail?.id === drawerId ? detail : null;
 
   // a different lead starts on Details with no prompt and no old error
@@ -299,6 +310,7 @@ export function LeadsView(props: {
             details={shown?.details}
             calls={shown?.calls}
             detailError={detailErr}
+            onRetry={() => setRetry((n) => n + 1)}
           />
         ) : null}
       </div>

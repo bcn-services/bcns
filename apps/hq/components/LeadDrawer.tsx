@@ -35,9 +35,10 @@ export function LeadDrawer(props: {
   details?: ReactNode;
   calls?: ReactNode;
   detailError?: string;
+  onRetry?: () => void;
 }) {
-  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls, detailError } = props;
-  const wait = <p className={detailError ? "perr" : "muted"} role={detailError ? "alert" : "status"}>{detailError || "Loading…"}</p>;
+  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls, detailError, onRetry } = props;
+  const wait = detailError ? null : <p className="muted" role="status">Loading…</p>;
   const [local, setLocal] = useState("");
   const [copied, setCopied] = useState(false);
   const where = [l.trade, l.town, l.fit != null ? `fit ${l.fit}` : ""].filter(Boolean).join(" · ");
@@ -56,6 +57,14 @@ export function LeadDrawer(props: {
           </button>
         ))}
       </div>
+      {detailError ? (
+        <div className="pmsg" role="alert">
+          Could not load this lead&apos;s detail{details ? " (what shows may be out of date)" : ""}: {detailError}{" "}
+          <button className="btn" type="button" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      ) : null}
       {msg ? (
         <div className="pmsg" role="alert">
           {msg}
