@@ -392,13 +392,18 @@ const CHUNK = 100;
 /** Call history, notes and links for a page of leads: three queries per 100 leads, grouped by lead. */
 export async function loadExtras(sb: Sb, ids: string[]): Promise<Map<string, Extras>> {
   const out = new Map<string, Extras>(ids.map((i) => [i, { calls: [], notes: [], links: [] }]));
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const part = ids.slice(i, i + CHUNK); // keeps the .in() URL short and the rows under PostgREST's cap
-    const [c, n, l] = await Promise.all([
-      sb.from("calls").select("business_id, by, at, outcome, note").in("business_id", part).order("at", { ascending: false }),
-      sb.from("notes").select("business_id, body, created_at").in("business_id", part).order("created_at", { ascending: false }),
-      sb.from("links").select("business_id, label, url").in("business_id", part).order("created_at", { ascending: false }),
-    ]);
+  const parts: string[][] = [];
+  for (let i = 0; i < ids.length; i += CHUNK) parts.push(ids.slice(i, i + CHUNK)); // keeps the .in() URL short and the rows under PostgREST's cap
+  const res = await Promise.all(
+    parts.map((part) =>
+      Promise.all([
+        sb.from("calls").select("business_id, by, at, outcome, note").in("business_id", part).order("at", { ascending: false }),
+        sb.from("notes").select("business_id, body, created_at").in("business_id", part).order("created_at", { ascending: false }),
+        sb.from("links").select("business_id, label, url").in("business_id", part).order("created_at", { ascending: false }),
+      ])
+    )
+  );
+  for (const [c, n, l] of res) {
     // untyped client: the selects above are the shapes
     for (const r of (must(c).data ?? []) as CallRow[]) out.get(r.business_id)?.calls.push(r);
     for (const r of (must(n).data ?? []) as NoteRow[]) out.get(r.business_id)?.notes.push(r);
@@ -438,7 +443,7 @@ const TRADE_PAGE = 1000; // PostgREST max_rows in apps/hq/supabase/config.toml: 
 const TRADE_PAGES = 20;
 
 /** Distinct trades for the Leads filter: pages `businesses.trade` in ordered 1000-row ranges until a short page. */
-export async function loadTrades(sb: Sb): Promise<{ trades: string[]; error: string }> {
+export async function scanTrades(sb: Sb): Promise<{ trades: string[]; error: string }> {
   const seen = new Set<string>();
   // ponytail: scans the column page by page, 20 pages = 20k businesses, then the list is cut short; a view or rpc past that
   for (let p = 0; p < TRADE_PAGES; p++) {
@@ -455,6 +460,28 @@ export async function loadTrades(sb: Sb): Promise<{ trades: string[]; error: str
     if (rows.length < TRADE_PAGE) break;
   }
   return { trades: [...seen].sort(), error: "" };
+}
+
+const TRADES_TTL = 3_600_000;
+type Trades = { trades: string[]; error: string };
+let tradesCache: { at: number; value: Promise<Trades> } | null = null;
+
+/**
+ * scanTrades, remembered per server process for an hour: the scan is ~3 sequential round trips and the list only
+ * changes when the sourcing job runs. Concurrent requests share one scan; a failed scan (partial list + error) is never kept.
+ * ponytail: per-process TTL (a new trade shows up within the hour, or on restart); a distinct-trades view or rpc if a miss ever hurts.
+ */
+export async function loadTrades(sb: Sb, now: number = Date.now()): Promise<Trades> {
+  if (!tradesCache || now - tradesCache.at >= TRADES_TTL) {
+    const value = scanTrades(sb).catch((e): Trades => ({ trades: [], error: e instanceof Error ? e.message : "could not load trades" }));
+    const entry = { at: now, value };
+    tradesCache = entry;
+    void entry.value.then((r) => {
+      if (r.error && tradesCache === entry) tradesCache = null;
+    });
+  }
+  const r = await tradesCache.value;
+  return { trades: [...r.trades], error: r.error }; // a copy: the page unshifts the active filter into it
 }
 
 export interface TaskRow {

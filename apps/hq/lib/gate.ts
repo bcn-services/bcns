@@ -5,6 +5,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_HEADER } from "./session-header";
 
 export const LOGIN_PATH = "/login";
 
@@ -51,7 +52,11 @@ export function toLogin(request: NextRequest, status: 303 | 307): NextResponse {
 }
 
 export async function gate(request: NextRequest, check: Check): Promise<NextResponse> {
-  if (isPublic(request.nextUrl.pathname)) return NextResponse.next();
+  if (isPublic(request.nextUrl.pathname)) {
+    // never forward a client-sent session header (filter, not a delete call: work.test bans those app-wide)
+    const headers = new Headers([...request.headers].filter(([k]) => k !== SESSION_HEADER));
+    return NextResponse.next({ request: { headers } });
+  }
   let result: Awaited<ReturnType<Check>> = null;
   try {
     result = await check(request);

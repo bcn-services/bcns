@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ClientOpt } from "@/components/NewTaskModal";
 import type { WorkLink, WorkNote, WorkTask } from "@/components/WorkTaskDetail";
-import { listTasks } from "./tasks";
+import { must, type Task } from "./tasks";
 import { listTracks, type Track } from "./tracks";
 
 export interface WorkData {
@@ -14,8 +14,13 @@ export interface WorkData {
 
 /** Everything the task detail pane needs; Work and Today (Nate) both load it. */
 export async function loadWorkData(sb: SupabaseClient): Promise<WorkData> {
-  const [all, tracks, clientRows, noteRows, linkRows] = await Promise.all([
-    listTasks(sb),
+  const [allRes, tracks, clientRows, noteRows, linkRows] = await Promise.all([
+    // same query as listTasks, with the linked lead's name embedded (tasks.business_id -> businesses): no second round trip
+    sb
+      .from("tasks")
+      .select("*, business:businesses(name)")
+      .order("created_at", { ascending: false })
+      .limit(500),
     listTracks(sb),
     sb.from("clients").select("slug, display_name").order("display_name"),
     // ponytail: newest 500 across all tasks, grouped here; fetch per selected task when this grows.
@@ -32,23 +37,15 @@ export async function loadWorkData(sb: SupabaseClient): Promise<WorkData> {
       .order("created_at", { ascending: false })
       .limit(500),
   ]);
-  const bizIds = [...new Set(all.map((t) => t.business_id).filter((x): x is string => !!x))];
-  const biz = bizIds.length
-    ? await sb.from("businesses").select("id, name").in("id", bizIds)
-    : { data: [] };
-  const names = new Map(
-    ((biz.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name])
-  );
+  // untyped client: the select above is the shape
+  const all = must<(Task & { business: { name: string } | null })[]>(allRes, "tasks");
   const group = <T extends { task_id: string }>(rows: T[] | null) => {
     const out: Record<string, T[]> = {};
     for (const r of rows ?? []) (out[r.task_id] ??= []).push(r);
     return out;
   };
   return {
-    tasks: all.map((t) => ({
-      ...t,
-      lead: t.business_id ? (names.get(t.business_id) ?? null) : null,
-    })),
+    tasks: all.map(({ business, ...t }) => ({ ...t, lead: business?.name ?? null })),
     tracks,
     clients: (clientRows.data ?? []) as ClientOpt[],
     notes: group((noteRows.data ?? []) as (WorkNote & { task_id: string })[]),
