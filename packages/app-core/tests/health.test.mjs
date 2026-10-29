@@ -6,11 +6,12 @@
  *  - no Supabase env → ok:true, db:"unconfigured" (keyless runs never look down)
  *  - configured + reachable ping → ok:true, db:"connected"
  *  - configured + failing ping → ok:false, db:"error" (route returns 503)
+ *  - a 401/403 from Supabase (rejected key) is a failing ping, other <500 stays up
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateHealth } from "../src/health.ts";
+import { evaluateHealth, pingSupabase } from "../src/health.ts";
 
 const base = { aiEnabled: false };
 
@@ -51,4 +52,27 @@ test("health: failing ping reports error and not-ok", async () => {
     async () => false,
   );
   assert.deepEqual(report, { ok: false, db: "error" });
+});
+
+test("pingSupabase: probes a nonexistent table; 401/403, 5xx and network errors are down", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    let seen;
+    const up = {};
+    for (const status of [200, 404, 401, 403, 500]) {
+      globalThis.fetch = async (url, init) => {
+        seen = [url, init.headers.apikey];
+        return new Response("", { status });
+      };
+      up[status] = await pingSupabase("https://x.supabase.co", "anon");
+    }
+    assert.deepEqual(up, { 200: true, 404: true, 401: false, 403: false, 500: false });
+    assert.deepEqual(seen, ["https://x.supabase.co/rest/v1/_health_probe?limit=1", "anon"]);
+    globalThis.fetch = async () => {
+      throw new Error("network");
+    };
+    assert.equal(await pingSupabase("https://x.supabase.co", "anon"), false);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

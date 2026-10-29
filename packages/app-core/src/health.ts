@@ -29,18 +29,19 @@ export interface HealthReport {
 export type DbPing = (supabaseUrl: string, anonKey: string) => Promise<boolean>;
 
 /**
- * Ping the Supabase REST endpoint with the anon key. Any response below 500
- * proves the project is reachable (an auth error still demonstrates
- * connectivity); only network failure or 5xx counts as down. Plain fetch —
- * no SDK dependency.
+ * Ping PostgREST with the anon key. The root (`/rest/v1/`) is OpenAPI and
+ * answers 401 to every non-secret key, so probe a table that does not exist:
+ * a valid key gets 404 (PGRST205), a rejected key gets 401. 401/403 count as
+ * down (reachable but the key is rejected, so every real query would fail);
+ * network failure and 5xx too. Other <500 means up. Plain fetch — no SDK.
  */
 export const pingSupabase: DbPing = async (supabaseUrl, anonKey) => {
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+    const res = await fetch(`${supabaseUrl}/rest/v1/_health_probe?limit=1`, {
       headers: { apikey: anonKey },
       signal: AbortSignal.timeout(5000),
     });
-    return res.status < 500;
+    return res.status < 500 && res.status !== 401 && res.status !== 403;
   } catch {
     return false;
   }
