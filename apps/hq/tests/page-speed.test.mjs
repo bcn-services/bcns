@@ -147,3 +147,23 @@ test("getSession reads the middleware header before asking Supabase; the files r
   assert.match(read("../app/files/[...path]/route.ts"), /getVerifiedSession\(\)/);
   assert.match(read("../middleware.ts"), /forwarded\.set\(\s*SESSION_HEADER/);
 });
+
+test("loadTrades: an empty scan (RLS hiding every row) is not kept", async () => {
+  let rows = [];
+  const sb = {
+    from: () => {
+      const b = {
+        select: () => b,
+        is: () => b,
+        not: () => b,
+        order: () => b,
+        range: async () => ({ data: rows, error: null }),
+      };
+      return b;
+    },
+  };
+  const t0 = 2_000_000_000_000; // past the 1 h window of the earlier test's entry
+  assert.deepEqual((await L.loadTrades(sb, t0)).trades, []);
+  rows = [{ trade: "plumbing" }];
+  assert.deepEqual((await L.loadTrades(sb, t0 + 1)).trades, ["plumbing"]);
+});
