@@ -42,7 +42,7 @@ pnpm --filter @bcn-services/web export   # opt-in static export -> apps/web/out/
 - `platform` tests (vitest): the DB-backed files skip, with a printed message, when the local stack at `127.0.0.1:54322` (or `DATABASE_URL`) is unreachable. A green local run without `supabase start` did not run them. CI starts the stack and never skips.
 - `apps/connect` and `apps/sb` tests import `packages/tenant/dist` and `packages/data-client/dist`; build both first (`pnpm --filter @bcn-services/tenant build`, same for data-client). Under turbo, `test` depends on `build`, so `pnpm test` does it for you.
 - App `test` scripts are hard-coded file lists (`tsx --test tests/a.test.mjs ...`) in `apps/{connect,sb,_template}/package.json`. A new test file does nothing until it is added to that list. `apps/mcp` runs `tsc && node --test tests/*.test.mjs`; `apps/web` runs `__tests__/*.mjs`.
-- `apps/hq` local stack (ports 553xx) has `enable_signup = false`, so password sign-in fails in a local browser check; use a magic link (`supabase --workdir apps/hq` Inbucket on :55324).
+- `apps/hq` local stack (ports 553xx) has `enable_signup = false`, so password sign-in fails in a local browser check; use a magic link (local mail UI on :55324).
 - `rm -rf apps/web/.next` before `apps/web` tests: `b3-copy-wiring` and `past-work-card-links` read `.next/server/app` and fail on a stale build.
 
 ## What a merge to `main` deploys
