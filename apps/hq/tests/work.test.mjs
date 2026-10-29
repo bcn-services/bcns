@@ -513,10 +513,30 @@ test("board: Done column = tracks with done_at in the last 7 days; steps ride th
   assert.deepEqual([b.next.length, b.wait.length], [1, 1]);
 });
 
+test("buildBoard: open orphan tasks form one Miscellaneous card, last in Now; none or only done -> no card", () => {
+  const tracks = [{ id: "now1", name: "now1", column: "now", done_at: null }];
+  const open = [
+    { id: "o1", track_id: "now1", status: "todo" },
+    { id: "o2", track_id: null, status: "doing" },
+    { id: "o3", track_id: null, status: "waiting" },
+    { id: "o4", track_id: null, status: "done" },
+  ];
+  const b = TR.buildBoard(tracks, open, NOW);
+  assert.deepEqual(b.now.map((c) => c.track.id), ["now1", TR.UNASSIGNED_ID]);
+  assert.equal(b.now[1].track.name, "Miscellaneous");
+  assert.deepEqual(b.now[1].steps.map((s) => s.id), ["o2", "o3"]);
+  for (const c of ["next", "wait", "done"]) assert.equal(b[c].length, 0);
+  // a task on a hidden (done > 7 days) track is not an orphan
+  const stale = [{ id: "old", name: "old", column: "done", done_at: "2020-01-01T00:00:00Z" }];
+  assert.equal(TR.buildBoard(stale, [{ id: "x", track_id: "old", status: "todo" }], NOW).now.length, 0);
+  const none = TR.buildBoard(tracks, [open[0], open[3]], NOW);
+  assert.deepEqual(none.now.map((c) => c.track.id), ["now1"]);
+});
+
 test("tracks: create / move / update write the row and an events row; done stamps done_at, leaving clears it; no delete", async () => {
   const sb = fakeSb();
-  const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Pilot ", area: "client" }, NOW);
-  assert.deepEqual([t.name, t.column, t.done_at], ["Pilot", "next", null]);
+  const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Software ", area: "client" }, NOW);
+  assert.deepEqual([t.name, t.column, t.done_at], ["Software", "next", null]);
   const done = await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", NOW);
   assert.equal(done.done_at, "2026-10-27T15:00:00.000Z");
   const later = new Date("2026-11-01T00:00:00Z"); // done -> done keeps done_at and writes no second event
@@ -527,7 +547,7 @@ test("tracks: create / move / update write the row and an events row; done stamp
   assert.equal(sb.db.events.filter((e) => e.kind === "track.moved").length, 1);
   assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "now", NOW)).done_at, null);
   assert.equal(
-    (await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot 2", client_slug: "acme-demo" }))
+    (await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Ops", client_slug: "acme-demo" }))
       .client_slug,
     "acme-demo"
   );
@@ -542,16 +562,18 @@ test("tracks: create / move / update write the row and an events row; done stamp
   );
   await assert.rejects(() => TR.moveTrack(sb, ACTOR, "ui", t.id, "later"), /column/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: " " }), /name/);
-  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "x", area: "bogus" }), /area/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", area: "bogus" }), /area/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Pilot" }), /tracks are fixed/);
+  await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot" }), /tracks are fixed/);
   await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
 });
 
-test("todaySteps: only mine, due by today or doing, plus done today; undated todo and others' tasks stay off", () => {
+test("todayQueue: mine only; queue = due within 7d soonest first then oldest created, cap 8; waiting split; done within 7 days", () => {
   const t = (o) => ({
     id: o.id,
     title: o.id,
     body: null,
-    owner: null,
+    owner: "nate",
     area: null,
     status: "todo",
     due: null,
@@ -562,34 +584,49 @@ test("todaySteps: only mine, due by today or doing, plus done today; undated tod
     alert_key: null,
     waiting_on: null,
     done_at: null,
-    created_at: "2026-10-01T00:00:00Z",
+    created_at: "2026-10-10T00:00:00Z",
     ...o,
   });
+  const ids = (l) => l.map((x) => x.id);
   const tasks = [
-    t({ id: "due-today", owner: "nate", due: "2026-10-28" }),
-    t({ id: "overdue", owner: "nate", due: "2026-10-20" }),
-    t({ id: "doing-undated", owner: "nate", status: "doing" }),
-    t({ id: "done-today", owner: "nate", status: "done", done_at: "2026-10-28T14:00:00Z" }),
-    t({ id: "done-yesterday", owner: "nate", status: "done", done_at: "2026-10-27T14:00:00Z" }),
-    // 11pm New York on Oct 27 is already Oct 28 in UTC: it belongs to the 27th
-    t({ id: "done-late-27", owner: "nate", status: "done", done_at: "2026-10-28T03:00:00Z" }),
-    t({ id: "tomorrow", owner: "nate", due: "2026-10-29" }),
-    t({ id: "undated-todo", owner: "nate" }),
+    t({ id: "old-undated", created_at: "2026-09-01T00:00:00Z" }),
+    t({ id: "new-undated", created_at: "2026-10-20T00:00:00Z" }),
+    t({ id: "due-in-7", due: "2026-11-04" }),
+    t({ id: "due-in-8", due: "2026-11-05", created_at: "2026-10-01T00:00:00Z" }),
+    t({ id: "overdue", due: "2026-10-20" }),
+    t({ id: "due-today", due: "2026-10-28", status: "doing" }),
+    t({ id: "waiting-status", status: "waiting", due: "2026-10-29" }),
+    t({ id: "waiting-on", waiting_on: "Brandon" }),
+    t({ id: "blank-waiting-on", waiting_on: "  ", created_at: "2026-10-25T00:00:00Z" }),
+    t({ id: "done-6d", status: "done", done_at: "2026-10-22T14:00:00Z" }),
+    t({ id: "done-8d", status: "done", done_at: "2026-10-20T14:00:00Z" }),
+    // 11pm New York on Oct 21 is already Oct 22 in UTC: it belongs to the 21st, which is inside the window
+    t({ id: "done-edge", status: "done", done_at: "2026-10-22T03:00:00Z" }),
     t({ id: "brandons", owner: "brandon", due: "2026-10-28" }),
-    t({ id: "unassigned", due: "2026-10-28" }),
+    t({ id: "unowned", owner: null, due: "2026-10-28" }),
   ];
-  assert.deepEqual(
-    T.todaySteps(tasks, "nate", "2026-10-28").map((x) => x.id),
-    ["due-today", "overdue", "doing-undated", "done-today"]
+  const r = T.todayQueue(tasks, "nate", "2026-10-28");
+  assert.deepEqual(ids(r.queue), [
+    "overdue",
+    "due-today",
+    "due-in-7",
+    "old-undated",
+    "due-in-8",
+    "new-undated",
+    "blank-waiting-on",
+  ]);
+  assert.deepEqual(ids(r.waiting), ["waiting-status", "waiting-on"]);
+  assert.deepEqual(ids(r.done), ["done-6d", "done-edge"]);
+  assert.deepEqual(ids(T.todayQueue(tasks, "brandon", "2026-10-28").queue), ["brandons"]);
+  // cap 8: the newest undated fall off, the due-soon ones stay
+  const many = Array.from({ length: 12 }, (_, i) =>
+    t({ id: `u${i}`, created_at: `2026-10-${String(i + 1).padStart(2, "0")}T00:00:00Z` })
   );
-  assert.deepEqual(
-    T.todaySteps(tasks, "brandon", "2026-10-28").map((x) => x.id),
-    ["brandons"]
-  );
-  assert.deepEqual(
-    T.todaySteps(tasks, "nate", "2026-10-27")
-      .filter((x) => x.status === "done")
-      .map((x) => x.id),
-    ["done-today", "done-yesterday", "done-late-27"]
-  );
+  const capped = T.todayQueue([...many, t({ id: "soon", due: "2026-10-30" })], "nate", "2026-10-28").queue;
+  assert.equal(capped.length, 8);
+  assert.deepEqual(ids(capped).slice(0, 3), ["soon", "u0", "u1"]);
+  assert.equal(ids(capped).at(-1), "u6");
+  // waiting is uncapped
+  const w = Array.from({ length: 12 }, (_, i) => t({ id: `w${i}`, status: "waiting" }));
+  assert.equal(T.todayQueue(w, "nate", "2026-10-28").waiting.length, 12);
 });

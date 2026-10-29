@@ -1,6 +1,7 @@
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    large_client_header_buffers 4 32k;
     server_name www.l2details.com;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
@@ -11,6 +12,7 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    large_client_header_buffers 4 32k;
     server_name l2details.com;
     ssl_certificate     /etc/ssl/cloudflare/origin.pem;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
