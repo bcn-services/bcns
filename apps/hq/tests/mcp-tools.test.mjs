@@ -290,7 +290,7 @@ test("board tools: create_track, move_track (done stamps done_at, leaving clears
   const warm = board.now.find((c) => c.id === TRACK);
   assert.deepEqual(warm.steps.map((x) => x.id), [T_NATE]);
   const last = board.now.at(-1);
-  assert.deepEqual([last.id, last.name], ["unassigned", "Unassigned"]); // open tasks with no track
+  assert.deepEqual([last.id, last.name], ["unassigned", "Miscellaneous"]); // open tasks with no track
   assert.ok(last.steps.length && !last.steps.some((x) => x.id === T_NATE));
   assert.ok(writes(fake).every((o) => o.op !== "delete"));
   for (const e of fake.db.events) assert.equal(e.via, "mcp");
