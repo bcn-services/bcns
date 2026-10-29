@@ -513,12 +513,12 @@ test("tracks: create / move / update write the row and an events row; done stamp
   await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
 });
 
-test("todaySteps: only mine, due by today or doing, plus done today; undated todo and others' tasks stay off", () => {
+test("todayQueue: mine only; queue = due within 7d soonest first then oldest created, cap 8; waiting split; done within 7 days", () => {
   const t = (o) => ({
     id: o.id,
     title: o.id,
     body: null,
-    owner: null,
+    owner: "nate",
     area: null,
     status: "todo",
     due: null,
@@ -529,34 +529,49 @@ test("todaySteps: only mine, due by today or doing, plus done today; undated tod
     alert_key: null,
     waiting_on: null,
     done_at: null,
-    created_at: "2026-10-01T00:00:00Z",
+    created_at: "2026-10-10T00:00:00Z",
     ...o,
   });
+  const ids = (l) => l.map((x) => x.id);
   const tasks = [
-    t({ id: "due-today", owner: "nate", due: "2026-10-28" }),
-    t({ id: "overdue", owner: "nate", due: "2026-10-20" }),
-    t({ id: "doing-undated", owner: "nate", status: "doing" }),
-    t({ id: "done-today", owner: "nate", status: "done", done_at: "2026-10-28T14:00:00Z" }),
-    t({ id: "done-yesterday", owner: "nate", status: "done", done_at: "2026-10-27T14:00:00Z" }),
-    // 11pm New York on Oct 27 is already Oct 28 in UTC: it belongs to the 27th
-    t({ id: "done-late-27", owner: "nate", status: "done", done_at: "2026-10-28T03:00:00Z" }),
-    t({ id: "tomorrow", owner: "nate", due: "2026-10-29" }),
-    t({ id: "undated-todo", owner: "nate" }),
+    t({ id: "old-undated", created_at: "2026-09-01T00:00:00Z" }),
+    t({ id: "new-undated", created_at: "2026-10-20T00:00:00Z" }),
+    t({ id: "due-in-7", due: "2026-11-04" }),
+    t({ id: "due-in-8", due: "2026-11-05", created_at: "2026-10-01T00:00:00Z" }),
+    t({ id: "overdue", due: "2026-10-20" }),
+    t({ id: "due-today", due: "2026-10-28", status: "doing" }),
+    t({ id: "waiting-status", status: "waiting", due: "2026-10-29" }),
+    t({ id: "waiting-on", waiting_on: "Brandon" }),
+    t({ id: "blank-waiting-on", waiting_on: "  ", created_at: "2026-10-25T00:00:00Z" }),
+    t({ id: "done-6d", status: "done", done_at: "2026-10-22T14:00:00Z" }),
+    t({ id: "done-8d", status: "done", done_at: "2026-10-20T14:00:00Z" }),
+    // 11pm New York on Oct 21 is already Oct 22 in UTC: it belongs to the 21st, which is inside the window
+    t({ id: "done-edge", status: "done", done_at: "2026-10-22T03:00:00Z" }),
     t({ id: "brandons", owner: "brandon", due: "2026-10-28" }),
-    t({ id: "unassigned", due: "2026-10-28" }),
+    t({ id: "unowned", owner: null, due: "2026-10-28" }),
   ];
-  assert.deepEqual(
-    T.todaySteps(tasks, "nate", "2026-10-28").map((x) => x.id),
-    ["due-today", "overdue", "doing-undated", "done-today"]
+  const r = T.todayQueue(tasks, "nate", "2026-10-28");
+  assert.deepEqual(ids(r.queue), [
+    "overdue",
+    "due-today",
+    "due-in-7",
+    "old-undated",
+    "due-in-8",
+    "new-undated",
+    "blank-waiting-on",
+  ]);
+  assert.deepEqual(ids(r.waiting), ["waiting-status", "waiting-on"]);
+  assert.deepEqual(ids(r.done), ["done-6d", "done-edge"]);
+  assert.deepEqual(ids(T.todayQueue(tasks, "brandon", "2026-10-28").queue), ["brandons"]);
+  // cap 8: the newest undated fall off, the due-soon ones stay
+  const many = Array.from({ length: 12 }, (_, i) =>
+    t({ id: `u${i}`, created_at: `2026-10-${String(i + 1).padStart(2, "0")}T00:00:00Z` })
   );
-  assert.deepEqual(
-    T.todaySteps(tasks, "brandon", "2026-10-28").map((x) => x.id),
-    ["brandons"]
-  );
-  assert.deepEqual(
-    T.todaySteps(tasks, "nate", "2026-10-27")
-      .filter((x) => x.status === "done")
-      .map((x) => x.id),
-    ["done-today", "done-yesterday", "done-late-27"]
-  );
+  const capped = T.todayQueue([...many, t({ id: "soon", due: "2026-10-30" })], "nate", "2026-10-28").queue;
+  assert.equal(capped.length, 8);
+  assert.deepEqual(ids(capped).slice(0, 3), ["soon", "u0", "u1"]);
+  assert.equal(ids(capped).at(-1), "u6");
+  // waiting is uncapped
+  const w = Array.from({ length: 12 }, (_, i) => t({ id: `w${i}`, status: "waiting" }));
+  assert.equal(T.todayQueue(w, "nate", "2026-10-28").waiting.length, 12);
 });

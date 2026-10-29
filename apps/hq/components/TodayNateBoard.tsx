@@ -279,7 +279,11 @@ export function TodayNateBoard(props: {
                 <h2>Your day</h2>
                 <span className="sub">{boardSub}</span>
               </div>
-              <TrackBoard board={board} onStep={(id) => setSel(`t:${id}`)} />
+              {Object.values(board).every((cards) => !cards.length) ? (
+                <div className="empty">Nothing up. Add a task or assign yourself one on Work.</div>
+              ) : (
+                <TrackBoard board={board} onStep={(id) => setSel(`t:${id}`)} />
+              )}
             </>
           )}
         </main>
