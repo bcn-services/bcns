@@ -1,5 +1,5 @@
 /**
- * tools.ts — the HQ MCP's tool surface: 18 tools, each a thin wrapper over the same lib
+ * tools.ts — the HQ MCP's tool surface: 17 tools, each a thin wrapper over the same lib
  * functions the UI uses (via='mcp', actor = the connecting user, so the audit shows "Claude (<handle>)").
  * Claude may only PROPOSE: there is no tool that writes businesses.stage or finance_inputs, decides a
  * proposal, or deletes anything. Pure of next/* so tests import it with a fake Supabase client.
@@ -166,7 +166,7 @@ export const TOOLS: ToolDef[] = [
     name: "create_task",
     title: "Create a task",
     description:
-      "Create a task, e.g. 'add A to B, due C'. owner: nate|brandon|claude (default claude); due: YYYY-MM-DD; client_slug links a client; track_id puts it on a board track (see list_board). Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Every task gets one; use track_id from list_board.",
+      "Create a task, e.g. 'add A to B, due C'. owner: nate|brandon|claude (default claude); due: YYYY-MM-DD; client_slug links a client; track_id puts it on a board track (see list_board). Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board.",
     readOnly: false,
     shape: {
       title: z.string().min(1).max(300),
@@ -197,7 +197,7 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status, body, waiting_on, client_slug, track_id. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Every task gets one; use track_id from list_board. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status, body, waiting_on, client_slug, track_id. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
@@ -259,7 +259,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_board",
     title: "List the board",
     description:
-      "List the Work board. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Every task gets one; use track_id from list_board. Tracks in Now, Next, Waiting, and Done (last 7 days), each with its steps (tasks). Open tasks with no track show on a \"Miscellaneous\" card (id \"unassigned\", last in Now).",
+      "List the Work board. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Tracks in Now, Next, Waiting, and Done (last 7 days), each with its steps (tasks). Open tasks with no track show on a \"Miscellaneous\" card (id \"unassigned\", last in Now).",
     readOnly: true,
     shape: {},
     async run({ sb }) {

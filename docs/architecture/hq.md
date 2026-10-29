@@ -455,7 +455,7 @@ Sign in at `https://hq.bcn-services.com/login` as Nate and as Brandon, and try "
 
 ### 20. os: the `/hq` skill (an os edit; Nate-run)
 
-In `~/os/skills/hq/SKILL.md`, replace the line-14 note that every HQ deploy or restart drops the tokens with "tokens persist across deploys; reconnect only on a 401", and list the new tools (`add_task_note`, `list_board`, `create_track`, `move_track`, `update_track`, `propose_client`). Also replace the done rule at line 18 ("only on tasks owned by claude; HQ refuses done on a human's task"), which is stale: an admin may close any task, staff only their own and claude's. Add no `claude mcp add` line: step 9 says claude.ai connectors already load into Claude Code. The orchestrator rule change in `~/os/agents/window-orchestrator.md` stays out of v2.
+In `~/os/skills/hq/SKILL.md`, replace the line-14 note that every HQ deploy or restart drops the tokens with "tokens persist across deploys; reconnect only on a 401", and list the new tools (`add_task_note`, `list_board`, `move_track`, `update_track`, `propose_client`). Also replace the done rule at line 18 ("only on tasks owned by claude; HQ refuses done on a human's task"), which is stale: an admin may close any task, staff only their own and claude's. Add no `claude mcp add` line: step 9 says claude.ai connectors already load into Claude Code. The orchestrator rule change in `~/os/agents/window-orchestrator.md` stays out of v2.
 
 ### 21. Seed the GTM tracks (optional; idempotent)
 
