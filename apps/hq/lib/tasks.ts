@@ -199,7 +199,7 @@ export function todayQueue<T extends Task>(
   const isWaiting = (t: T) => t.status === "waiting" || !!t.waiting_on?.trim();
   const horizon = addDays(today, QUEUE_DUE_DAYS);
   const soon = (t: T) => !!t.due && t.due <= horizon;
-  const byAge = (a: T, b: T) => a.created_at.localeCompare(b.created_at);
+  const byAge = (a: T, b: T) => Date.parse(a.created_at) - Date.parse(b.created_at);
   const queue = open
     .filter((t) => !isWaiting(t))
     .sort((a, b) => Number(soon(b)) - Number(soon(a)) || (soon(a) ? byDue(a, b) : 0) || byAge(a, b))

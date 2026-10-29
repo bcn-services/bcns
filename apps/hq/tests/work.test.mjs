@@ -571,4 +571,7 @@ test("todayQueue: mine only; queue = due within 7d soonest first then oldest cre
   assert.equal(capped.length, 8);
   assert.deepEqual(ids(capped).slice(0, 3), ["soon", "u0", "u1"]);
   assert.equal(ids(capped).at(-1), "u6");
+  // waiting is uncapped
+  const w = Array.from({ length: 12 }, (_, i) => t({ id: `w${i}`, status: "waiting" }));
+  assert.equal(T.todayQueue(w, "nate", "2026-10-28").waiting.length, 12);
 });

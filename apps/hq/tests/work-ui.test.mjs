@@ -146,8 +146,9 @@ test("Today (Nate) matches Work: same 420px split, a selected task or board step
   assert.match(b, /onBack=\{\(\) => setSel\(null\)\}/);
   assert.match(b, /<TrackBoard board=\{board\} onStep=\{\(id\) => setSel\(`t:\$\{id\}`\)\}/);
   const n = src("components/TodayNate.tsx");
-  assert.match(n, /todayQueue\(tasks, me, today\)/);
+  assert.match(n, /todayQueue\([\s\S]*?\bme,\s*today\s*\)/);
   assert.match(b, /Nothing up\. Add a task or assign yourself one on Work\./); // empty state
+  assert.match(n, /!t\.track_id \|\| shownTracks\.has\(t\.track_id\)/); // hidden-track tasks take no queue slots
   assert.match(n, /const me = profile\.handle/);
   assert.match(n, /filter\(\(card\) => card\.steps\.length\)/); // empty tracks drop off Today
   // Work and Today load the detail data through one loader

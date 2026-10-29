@@ -33,11 +33,21 @@ export async function TodayNate() {
   const listed = open.filter((t) => !asFire.has(`task:${t.id}`));
   const trackName = new Map(tracks.map((t) => [t.id, t.name]));
   // the board is a derived queue of the signed-in person's open tasks (top 8 up, waiting, done in 7 days); tracks with none drop out
-  const q = todayQueue(tasks, me, today);
+  // tasks on a hidden track (done > 7 days) never draw, so they must not take queue slots
+  const shownTracks = new Set(
+    COLUMNS.flatMap((c) => buildBoard(tracks, [], now)[c].map((card) => card.track.id))
+  );
+  const q = todayQueue(
+    tasks.filter((t) => !t.track_id || shownTracks.has(t.track_id)),
+    me,
+    today
+  );
   const board = buildBoard(tracks, [...q.queue, ...q.waiting, ...q.done], now);
   for (const c of COLUMNS) board[c] = board[c].filter((card) => card.steps.length);
   // count what the board draws (steps on a shown track), not every todayQueue result
-  const drawn = new Set(COLUMNS.flatMap((c) => board[c].flatMap((card) => card.steps.map((t) => t.id))));
+  const drawn = new Set(
+    COLUMNS.flatMap((c) => board[c].flatMap((card) => card.steps.map((t) => t.id)))
+  );
   const count = (list: { id: string }[]) => list.filter((t) => drawn.has(t.id)).length;
 
   return (
