@@ -1,7 +1,7 @@
 import { loadClient, requireHub } from "@/lib/session";
-import { UUID, ticketMailto, type TicketRow } from "@/lib/support";
+import { UUID, ticketMailto } from "@/lib/support";
 import { createTicketAction } from "./actions";
-import { SupportView } from "./view";
+import { SupportView, type SupportTicket } from "./view";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,10 @@ export default async function SupportPage({ searchParams }: { searchParams: { se
   // RLS scopes this to the caller's workspace; 50 is plenty for a hub that has one support contact.
   const { data, error } = await api
     .from("tickets_v1")
-    .select("id,subject,body,severity,status,created_at")
+    .select("id,subject,body,severity,status,created_at,resolution,resolved_at")
     .order("created_at", { ascending: false })
     .limit(50);
-  const tickets = error ? [] : ((data as TicketRow[] | null) ?? []);
+  const tickets = error ? [] : ((data as SupportTicket[] | null) ?? []);
 
   // The mailto: is rebuilt from the saved row, so the URL carries only its id.
   const saved = searchParams.t && UUID.test(searchParams.t) ? tickets.find((t) => t.id === searchParams.t) : undefined;
