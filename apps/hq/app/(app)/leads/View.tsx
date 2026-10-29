@@ -9,6 +9,7 @@ import type { Deliverable } from "@/lib/deliverables";
 import { ownsKeys } from "@/lib/keys";
 import type { LeadItem } from "@/lib/leads";
 import { logOutcome, reassign } from "./actions";
+import { loadDetail } from "./detail";
 
 export interface Col {
   key: string;
@@ -37,14 +38,12 @@ export function LeadsView(props: {
   sub: string;
   sort: string;
   dir: string;
-  details: Record<string, ReactNode>;
-  calls: Record<string, ReactNode>;
   rows: Record<string, Deliverable[]>;
   /** Why the Pitch rows did not load ("" = fine) and why the trade list is short ("" = fine). */
   pitchError: string;
   tradesError: string;
 }) {
-  const { items, cols, filters, stages, trades, sub, sort, dir, details, calls, rows, pitchError, tradesError } = props;
+  const { items, cols, filters, stages, trades, sub, sort, dir, rows, pitchError, tradesError } = props;
   const router = useRouter();
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -53,11 +52,39 @@ export function LeadsView(props: {
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   const focusNote = useRef(false);
+  // the open lead's Details / Calls bodies, fetched on select; `items` changing means the server re-rendered (a call, note or save), so refetch
+  const [detail, setDetail] = useState<{ id: string; details: ReactNode; calls: ReactNode } | null>(null);
+  const [detailErr, setDetailErr] = useState("");
 
   const current = items.find((l) => l.id === sel) ?? null;
   const drawer = open && current ? current : null;
   const h = useRef({ items, current, drawer, tab, pending });
   h.current = { items, current, drawer, tab, pending };
+
+  const drawerId = open ? current?.id : undefined;
+  useEffect(() => {
+    if (!drawerId) return;
+    let live = true;
+    // debounced so holding j/k does not queue a server action per row passed
+    const t = setTimeout(() => {
+      loadDetail(drawerId).then(
+        (r) => {
+          if (!live) return;
+          if (r.ok) {
+            setDetail({ id: drawerId, details: r.details, calls: r.calls });
+            setDetailErr("");
+          } else setDetailErr(r.error);
+        },
+        () => live && setDetailErr("Could not reach the server.")
+      );
+    }, 120);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [drawerId, items]);
+  useEffect(() => setDetailErr(""), [drawerId]);
+  const shown = detail?.id === drawerId ? detail : null;
 
   // a different lead starts on Details with no prompt and no old error
   useEffect(() => {
@@ -124,9 +151,10 @@ export function LeadsView(props: {
         if (e.key === "3") setConsultOpen(true);
         else logRef.current(drawer, Number(e.key) as 1 | 2 | 4);
       } else if (drawer && e.key === "n") {
-        focusNote.current = true;
+        const note = document.getElementById("note"); // on Details with the detail loaded
+        focusNote.current = !note || tab !== "details"; // otherwise the effect focuses it once the tab or the detail arrives
         setTab("details");
-        document.getElementById("note")?.focus(); // already on Details
+        if (tab === "details") note?.focus();
       } else if (current && e.key === "a") {
         actRef.current(() => reassign(current.id, current.assigned === "brandon" ? "nate" : "brandon"));
       } else return;
@@ -137,11 +165,12 @@ export function LeadsView(props: {
   }, []);
 
   useEffect(() => {
-    if (focusNote.current && tab === "details") {
+    const note = document.getElementById("note");
+    if (focusNote.current && tab === "details" && note) {
       focusNote.current = false;
-      document.getElementById("note")?.focus();
+      note.focus();
     }
-  }, [tab]);
+  }, [tab, detail]); // the note box arrives with the detail
   useEffect(() => {
     document.querySelector("tr.f")?.scrollIntoView({ block: "nearest" });
   }, [sel]);
@@ -267,8 +296,9 @@ export function LeadsView(props: {
             onConsultOpen={setConsultOpen}
             rows={rows[drawer.id] ?? []}
             pitchError={pitchError}
-            details={details[drawer.id]}
-            calls={calls[drawer.id]}
+            details={shown?.details}
+            calls={shown?.calls}
+            detailError={detailErr}
           />
         ) : null}
       </div>

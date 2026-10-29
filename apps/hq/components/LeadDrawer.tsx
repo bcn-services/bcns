@@ -31,10 +31,13 @@ export function LeadDrawer(props: {
   onConsultOpen: (open: boolean) => void;
   rows: Deliverable[];
   pitchError: string;
-  details: ReactNode;
-  calls: ReactNode;
+  /** Undefined while the lead's detail is loading (or failed: detailError). */
+  details?: ReactNode;
+  calls?: ReactNode;
+  detailError?: string;
 }) {
-  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls } = props;
+  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls, detailError } = props;
+  const wait = <p className={detailError ? "perr" : "muted"} role={detailError ? "alert" : "status"}>{detailError || "Loading…"}</p>;
   const [local, setLocal] = useState("");
   const [copied, setCopied] = useState(false);
   const where = [l.trade, l.town, l.fit != null ? `fit ${l.fit}` : ""].filter(Boolean).join(" · ");
@@ -156,10 +159,10 @@ export function LeadDrawer(props: {
               </button>
             </form>
           ) : null}
-          {details}
+          {details ?? wait}
         </>
       ) : tab === "calls" ? (
-        calls
+        (calls ?? wait)
       ) : (
         <PitchTab
           lead={l}

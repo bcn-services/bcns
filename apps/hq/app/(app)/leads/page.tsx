@@ -1,10 +1,7 @@
 import "../../leads.css";
-import type { ReactNode } from "react";
-import { LeadDrawerCalls } from "@/components/LeadDrawerCalls";
-import { LeadDrawerDetails } from "@/components/LeadDrawerDetails";
 import { leadSlug, loadPitchRows, type Deliverable } from "@/lib/deliverables";
 import { createSupabaseServer } from "@/lib/supabase";
-import { ALL_STAGES, LEAD_COLS, leadItem, loadExtras, loadTrades, stageLabel, type Lead } from "@/lib/leads";
+import { ALL_STAGES, LIST_COLS, leadItem, loadLastCalls, loadTrades, stageLabel, type Lead } from "@/lib/leads";
 import { LeadsView, type Col } from "./View";
 
 const PAGE = 150;
@@ -40,7 +37,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
     trade: one(searchParams.trade).slice(0, 60),
   };
 
-  let q = sb.from("businesses").select(LEAD_COLS, { count: "exact" }).is("suppressed_at", null);
+  let q = sb.from("businesses").select(LIST_COLS, { count: "estimated" }).is("suppressed_at", null);
   // "" hides lost and unworked leads; "any" shows everything
   if (f.stage === "any") {
     // everything
@@ -58,11 +55,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
   ]);
   if (res.error) return <p className="lpad muted">Could not load leads: {res.error.message}</p>;
 
-  // untyped client: LEAD_COLS is the shape
+  // untyped client: LIST_COLS is the shape (no research; the drawer fetches that on select)
   const leads = (res.data ?? []) as Lead[];
   const trades = tradeRes.trades;
   if (f.trade && !trades.includes(f.trade)) trades.unshift(f.trade);
-  const extras = await loadExtras(sb, leads.map((l) => l.id));
+  const extras = await loadLastCalls(sb, leads.map((l) => l.id));
 
   // Pitch rows by lead; a lead with no folder yet has none. Without the table (0032 not applied) the tab just
   // starts empty; any other failure is shown in the tab (steps off) instead of passing as an empty history.
@@ -76,16 +73,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
     href: href(key, key === sortKey[0] ? (dir === "asc" ? "desc" : "asc") : firstDir(key)),
     mark: key === sortKey[0] ? (dir === "asc" ? "▲" : "▼") : undefined,
   }));
-  const details: Record<string, ReactNode> = {};
-  const calls: Record<string, ReactNode> = {};
   const rows: Record<string, Deliverable[]> = {};
   for (const l of leads) {
-    details[l.id] = <LeadDrawerDetails lead={l} x={extras.get(l.id)} />;
-    calls[l.id] = <LeadDrawerCalls x={extras.get(l.id)} />;
     const s = leadSlug(l);
     if (s) rows[l.id] = bySlug.get(s) ?? [];
   }
   const now = new Date();
+  // the count is the planner's estimate: a short page is the whole list, a full one says "about"
+  const total = leads.length < PAGE ? String(leads.length) : `${leads.length} of about ${Math.max(res.count ?? 0, leads.length)}`;
 
   return (
     <LeadsView
@@ -98,11 +93,9 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
         { value: "any", label: "Everything, lost too" },
       ]}
       trades={trades}
-      sub={`${leads.length} of ${res.count ?? leads.length} · sorted by ${sortKey[1].toLowerCase()}`}
+      sub={`${total} · sorted by ${sortKey[1].toLowerCase()}`}
       sort={sortKey[0]}
       dir={dir}
-      details={details}
-      calls={calls}
       rows={rows}
       pitchError={pitchError}
       tradesError={tradeRes.error}
