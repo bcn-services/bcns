@@ -712,3 +712,30 @@ test("propose_client takes exactly the Edit whitelist: other fields, bad values 
   );
   assert.equal(fake.db.proposals.length, 0, "a refused proposal files nothing");
 });
+
+test("update_task takes a resolution (trimmed, clearable, max 4000) and its description tells Claude how to close a ticket", async () => {
+  const fake = seed();
+  const { task } = await call(fake, "update_task", { id: T_NATE, resolution: "  Done: reset.  ", status: "done" });
+  assert.equal(task.resolution, "Done: reset.");
+  assert.equal(task.status, "done");
+  assert.equal((await call(fake, "update_task", { id: T_NATE, resolution: null })).task.resolution, null);
+  const shape = byName.update_task.shape;
+  assert.ok(shape.resolution.safeParse("x".repeat(4000)).success);
+  assert.equal(shape.resolution.safeParse("x".repeat(4001)).success, false);
+  assert.ok(
+    byName.update_task.description.includes(
+      "Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync."
+    )
+  );
+});
+
+test("update_task resolution is owner-gated like a close: staff are refused on another human's task with no write; the owner and an admin may", async () => {
+  const fake = withTeam();
+  await assert.rejects(
+    call(fake, "update_task", { id: T_BRANDON, resolution: "changed" }),
+    /refused: this task is owned by brandon; only brandon or an admin can edit its resolution/
+  );
+  assert.equal(writes(fake).length, 0);
+  assert.equal((await as(ADMIN, fake, "update_task", { id: T_BRANDON, resolution: "mine" })).task.resolution, "mine");
+  assert.equal((await call(withTeam(), "update_task", { id: T_NATE, resolution: "ok" })).task.resolution, "ok");
+});

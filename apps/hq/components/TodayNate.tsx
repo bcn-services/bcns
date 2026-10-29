@@ -26,8 +26,10 @@ export async function TodayNate() {
   const { tasks, tracks } = data;
   const open = tasks.filter((t) => t.status !== "done");
   const taken = new Set(open.map((t) => t.alert_key).filter(Boolean));
+  // the ticket job owns ticket:platform:<id>; the Connect fire for the same ticket is ops:ticket:<id>
+  const isTaken = (key: string) => taken.has(key) || taken.has(key.replace(/^ops:ticket:/, "ticket:platform:"));
   // proposals have their own Approve section; a fire whose alert already has an open task shows as that task
-  const shown = fires.filter((f) => !f.key.startsWith("proposal:") && !taken.has(f.key));
+  const shown = fires.filter((f) => !f.key.startsWith("proposal:") && !isTaken(f.key));
   // a task already listed as a fire (key task:<id>) is not repeated under To assign / Your tasks
   const asFire = new Set(shown.map((f) => f.key));
   const listed = open.filter((t) => !asFire.has(`task:${t.id}`));
