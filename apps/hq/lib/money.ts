@@ -269,15 +269,24 @@ export interface ClientBilling {
 }
 
 export function clientBilling(
-  client: { display_name: string; billing_note: string | null } & BillingKeys,
+  client: {
+    display_name: string;
+    billing_note: string | null;
+    monthly_rate_cents?: number | null;
+  } & BillingKeys,
   txns: MercuryTxn[] | Unavailable,
   invoices: MercuryInvoice[] | Unavailable | null = null,
   today: string = new Date().toISOString().slice(0, 10)
 ): ClientBilling {
   const note = client.billing_note?.trim() || null;
   if (isUnavailable(txns)) return { mercury: false, lastPaid: null, invoice: null, note };
+  // ponytail: with a rate set only a payment of exactly that many cents is "the monthly payment"
+  // (Mercury marks no invoice as recurring, so one-off build fees/consults are told apart by amount);
+  // a rate change or a partial payment misses. Upgrade: a series id if Mercury ever exposes one.
+  const rate = client.monthly_rate_cents ?? 0;
+  const isMonthly = (cents: number) => cents > 0 && (rate <= 0 || cents === rate);
   let hit: { at: string; amountCents: number } | undefined = txns.find(
-    (t) => t.amountCents > 0 && aliasOf(client, t.counterparty)
+    (t) => isMonthly(t.amountCents) && aliasOf(client, t.counterparty)
   ); // newest first; Mercury transactions carry no customer id, so aliases are the only key
   let invoice: ClientBilling["invoice"] = null;
   if (invoices && !isUnavailable(invoices)) {
@@ -288,7 +297,7 @@ export function clientBilling(
     );
     // ponytail: an invoice has no paid date here, so its due date stands in when no transaction matched
     const paid = mine
-      .filter((i) => i.status === "Paid")
+      .filter((i) => i.status === "Paid" && isMonthly(i.amountCents))
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
     if (!hit && paid) hit = { at: paid.dueDate, amountCents: paid.amountCents };
     const unpaid = mine.filter((i) => i.status === "Unpaid");
