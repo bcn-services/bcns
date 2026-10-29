@@ -482,8 +482,8 @@ test("buildBoard: open orphan tasks form one Miscellaneous card, last in Now; no
 
 test("tracks: create / move / update write the row and an events row; done stamps done_at, leaving clears it; no delete", async () => {
   const sb = fakeSb();
-  const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Pilot ", area: "client" }, NOW);
-  assert.deepEqual([t.name, t.column, t.done_at], ["Pilot", "next", null]);
+  const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Software ", area: "client" }, NOW);
+  assert.deepEqual([t.name, t.column, t.done_at], ["Software", "next", null]);
   const done = await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", NOW);
   assert.equal(done.done_at, "2026-10-27T15:00:00.000Z");
   const later = new Date("2026-11-01T00:00:00Z"); // done -> done keeps done_at and writes no second event
@@ -494,7 +494,7 @@ test("tracks: create / move / update write the row and an events row; done stamp
   assert.equal(sb.db.events.filter((e) => e.kind === "track.moved").length, 1);
   assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "now", NOW)).done_at, null);
   assert.equal(
-    (await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot 2", client_slug: "acme-demo" }))
+    (await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Ops", client_slug: "acme-demo" }))
       .client_slug,
     "acme-demo"
   );
@@ -509,7 +509,9 @@ test("tracks: create / move / update write the row and an events row; done stamp
   );
   await assert.rejects(() => TR.moveTrack(sb, ACTOR, "ui", t.id, "later"), /column/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: " " }), /name/);
-  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "x", area: "bogus" }), /area/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", area: "bogus" }), /area/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Pilot" }), /tracks are fixed/);
+  await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot" }), /tracks are fixed/);
   await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
 });
 
