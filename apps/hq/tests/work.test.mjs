@@ -460,7 +460,7 @@ test("board: Done column = tracks with done_at in the last 7 days; steps ride th
   assert.deepEqual([b.next.length, b.wait.length], [1, 1]);
 });
 
-test("buildBoard: open orphan tasks form one Unassigned card, last in Now; none or only done -> no card", () => {
+test("buildBoard: open orphan tasks form one Miscellaneous card, last in Now; none or only done -> no card", () => {
   const tracks = [{ id: "now1", name: "now1", column: "now", done_at: null }];
   const open = [
     { id: "o1", track_id: "now1", status: "todo" },
@@ -470,7 +470,7 @@ test("buildBoard: open orphan tasks form one Unassigned card, last in Now; none 
   ];
   const b = TR.buildBoard(tracks, open, NOW);
   assert.deepEqual(b.now.map((c) => c.track.id), ["now1", TR.UNASSIGNED_ID]);
-  assert.equal(b.now[1].track.name, "Unassigned");
+  assert.equal(b.now[1].track.name, "Miscellaneous");
   assert.deepEqual(b.now[1].steps.map((s) => s.id), ["o2", "o3"]);
   for (const c of ["next", "wait", "done"]) assert.equal(b[c].length, 0);
   // a task on a hidden (done > 7 days) track is not an orphan

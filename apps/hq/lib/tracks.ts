@@ -28,7 +28,7 @@ export interface Track {
   created_at: string;
 }
 
-/** Synthetic id of the Unassigned card; no tracks row has it (tracks.id is a uuid). */
+/** Synthetic id of the Miscellaneous card; no tracks row has it (tracks.id is a uuid). */
 export const UNASSIGNED_ID = "unassigned";
 
 export interface BoardCard {
@@ -76,7 +76,7 @@ export async function listTracks(sb: Sb): Promise<Track[]> {
 }
 
 /**
- * The board: tracks per column with their steps (open first), plus an Unassigned card for open tasks with no track. The Done column keeps only tracks
+ * The board: tracks per column with their steps (open first), plus a Miscellaneous card for open tasks with no track. The Done column keeps only tracks
  * finished in the last 7 days. Pure, so the page, TrackBoard's callers (Today) and tests share it.
  */
 export function buildBoard(
@@ -99,7 +99,7 @@ export function buildBoard(
     board.now.push({
       track: {
         id: UNASSIGNED_ID,
-        name: "Unassigned",
+        name: "Miscellaneous",
         area: null,
         client_slug: null,
         column: "now",

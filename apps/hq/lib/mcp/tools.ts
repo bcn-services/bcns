@@ -259,7 +259,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_board",
     title: "List the board",
     description:
-      "List the Work board: tracks in Now, Next, Waiting, and Done (last 7 days), each with its steps (tasks). Open tasks with no track show on an \"Unassigned\" card (id \"unassigned\", last in Now).",
+      "List the Work board: tracks in Now, Next, Waiting, and Done (last 7 days), each with its steps (tasks). Open tasks with no track show on a \"Miscellaneous\" card (id \"unassigned\", last in Now).",
     readOnly: true,
     shape: {},
     async run({ sb }) {
