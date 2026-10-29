@@ -468,7 +468,7 @@ let tradesCache: { at: number; value: Promise<Trades> } | null = null;
 
 /**
  * scanTrades, remembered per server process for an hour: the scan is ~3 sequential round trips and the list only
- * changes when the sourcing job runs. Concurrent requests share one scan; a failed scan (partial list + error) is never kept.
+ * changes when the sourcing job runs. Concurrent requests share one scan; a failed or empty scan (e.g. RLS hiding every row) is never kept.
  * ponytail: per-process TTL (a new trade shows up within the hour, or on restart); a distinct-trades view or rpc if a miss ever hurts.
  */
 export async function loadTrades(sb: Sb, now: number = Date.now()): Promise<Trades> {
@@ -477,7 +477,7 @@ export async function loadTrades(sb: Sb, now: number = Date.now()): Promise<Trad
     const entry = { at: now, value };
     tradesCache = entry;
     void entry.value.then((r) => {
-      if (r.error && tradesCache === entry) tradesCache = null;
+      if ((r.error || !r.trades.length) && tradesCache === entry) tradesCache = null;
     });
   }
   const r = await tradesCache.value;

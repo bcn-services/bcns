@@ -117,10 +117,33 @@ test("gate: a client-sent session header is dropped on public paths", async () =
   );
 });
 
-test("getSession reads the middleware header before asking Supabase; middleware overwrites it", async () => {
+test("an admitted request carries the validated session, not a forged one, plus the refreshed cookies", async () => {
+  const { NextResponse } = await import("next/server");
+  const real = {
+    user: { id: "u1" },
+    profile: { id: "u1", handle: "nate", role: "admin", display_name: null },
+  };
+  const check = async (request) => {
+    const response = NextResponse.next({ request });
+    response.cookies.set("sb-x-auth-token", "rotated", { path: "/", httpOnly: true });
+    const forwarded = new Headers(request.headers);
+    forwarded.set(SESSION_HEADER, encodeSession(real)); // the same lines as middleware.ts
+    const admitted = NextResponse.next({ request: { headers: forwarded } });
+    response.cookies.getAll().forEach((c) => admitted.cookies.set(c));
+    return { ok: true, response: admitted };
+  };
+  const req = new NextRequest("http://localhost:3105/leads", {
+    headers: { [SESSION_HEADER]: encodeSession({ ...real, user: { id: "evil" } }) },
+  });
+  const res = await gate(req, check);
+  assert.deepEqual(decodeSession(res.headers.get("x-middleware-request-" + SESSION_HEADER)), real);
+  assert.match(res.headers.getSetCookie()[0], /^sb-x-auth-token=rotated; Path=\/; HttpOnly/);
+});
+
+test("getSession reads the middleware header before asking Supabase; the files route does not", async () => {
   const { readFileSync } = await import("node:fs");
-  const sess = readFileSync(new URL("../lib/session.ts", import.meta.url), "utf8");
-  assert.ok(sess.indexOf("decodeSession(") < sess.indexOf("auth.getUser()"));
-  const mw = readFileSync(new URL("../middleware.ts", import.meta.url), "utf8");
-  assert.match(mw, /forwarded\.set\(\s*SESSION_HEADER/);
+  const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.match(read("../lib/session.ts"), /getSession = cache\(\s*async \(\) => decodeSession\(/);
+  assert.match(read("../app/files/[...path]/route.ts"), /getVerifiedSession\(\)/);
+  assert.match(read("../middleware.ts"), /forwarded\.set\(\s*SESSION_HEADER/);
 });

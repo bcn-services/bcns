@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await getSession();
-  // The middleware already gates this; a second check so a matcher slip can't render the shell.
+  // The middleware already gates this (and forwards the session read here); every page query is still RLS-gated.
   if (!user || !profile) redirect("/login");
   const handle = profile.handle ?? profile.display_name ?? user.email ?? "you";
   return (
