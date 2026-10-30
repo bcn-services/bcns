@@ -154,6 +154,28 @@ export function finishDeliverable(sql, id, { status, paths = [], error = null })
   `;
 }
 
+// Links on the lead's open tasks (the Work drawer shows task links only); on the lead itself when it
+// has none. Skips a url the target already has. One call per run: urls[i] is labelled labels[i].
+export function linkDeliverableFiles(sql, slug, urls, labels) {
+  return sql`
+    with b as (select id from businesses where os_slug = ${slug} limit 1),
+    open as (select t.id from tasks t join b on t.business_id = b.id where t.status <> 'done'),
+    targets as (
+      select id as task_id, null::uuid as business_id from open
+      union all
+      select null::uuid, id from b where not exists (select 1 from open)
+    )
+    insert into links (task_id, business_id, url, label, via)
+    select t.task_id, t.business_id, f.url, f.label, 'hq-job'
+    from targets t cross join unnest(${urls}::text[], ${labels}::text[]) as f(url, label)
+    where not exists (
+      select 1 from links l
+      where l.url = f.url and l.task_id is not distinct from t.task_id and l.business_id is not distinct from t.business_id
+    )
+    returning id
+  `;
+}
+
 export function profileHandle(sql, userId) {
   return sql`select handle from profiles where id = ${userId} limit 1`;
 }
