@@ -551,11 +551,11 @@ test("a failed rebase is aborted before the reset to the upstream, and the push 
     osDir: "/srv/hq/os",
     run: async (_c, args) => {
       seen.push(args.slice(8).filter((x) => !x.startsWith("user.") && x !== "-c"));
-      if (args.includes("pull")) throw Object.assign(new Error("x"), { stderr: "CONFLICT (add/add): Merge conflict in clients/a-b/demo/demo.html\n" });
+      if (args.includes("pull")) throw Object.assign(new Error("x"), { stderr: "From github.com:o/os\n * branch main -> FETCH_HEAD\n   abc1234..def5678  main -> origin/main\nRebasing (1/1)\rerror: could not apply abc1234... hq: demo for a-b\n" });
       return { stdout: "" };
     },
   });
-  await assert.rejects(g.publish({ slug: "a-b", kind: "pitch" }), /git pull failed: CONFLICT/);
+  await assert.rejects(g.publish({ slug: "a-b", kind: "pitch" }), /git pull failed: error: could not apply/);
   assert.deepEqual(seen.slice(-3), [["pull", "--rebase", "origin", "main"], ["rebase", "--abort"], ["reset", "--hard", "-q", "@{u}"]]);
   assert.ok(!seen.some((a) => a[0] === "push"));
 });
@@ -595,7 +595,7 @@ test("origin moved with a conflicting file while Claude ran: rebase aborted, row
   const h = harness({ osDir, realSync: true, realPublish: true, writes: (d) => { demo(d); moveMain(osDir, "clients/blue-ridge/demo/demo.html", "<p>nate</p>"); } });
   const out = await h.go();
   assert.equal(out.status, "failed");
-  assert.match(out.error, /git pull failed/);
+  assert.match(out.error, /^git pull failed: error: could not apply/, "the real rebase stderr, not the From banner");
   assert.ok(!existsSync(join(osDir, ".git/rebase-merge")) && !existsSync(join(osDir, ".git/rebase-apply")));
   assert.equal(gitIn(osDir, "status", "--porcelain"), "");
   assert.equal(gitIn(osDir, "rev-list", "--count", "@{u}..HEAD").trim(), "0");

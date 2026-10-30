@@ -334,8 +334,8 @@ All three credential files (`claude-nate`, `claude-brandon`, `os-deploy-key`) mu
    chown -R hq:hq /srv/hq/os
    mkdir -p /srv/hq/jobs-state/claude-home && chown -R hq:hq /srv/hq/jobs-state && chmod -R g+rwX /srv/hq/jobs-state
    find /srv/hq/jobs-state -type d -exec chmod g+s {} +      # qualify and deliverable run as different dynamic users
-   chgrp -R hq /srv/hq/os/clients /srv/hq/os/.git && chmod -R g+rwX /srv/hq/os/clients /srv/hq/os/.git
-   find /srv/hq/os/clients /srv/hq/os/.git -type d -exec chmod g+s {} +
+   chgrp -R hq /srv/hq/os && chmod -R g+rwX /srv/hq/os      # whole clone, not just clients/ and .git: the job resets it to origin/main
+   find /srv/hq/os -type d -exec chmod g+s {} +
    ```
 6. `CLAUDE_CODE_OAUTH_TOKEN` no longer belongs in `jobs.env`: remove it if step 6 added it. `/srv/hq/claude-home` is unused now.
 

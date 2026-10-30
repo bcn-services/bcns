@@ -26,8 +26,8 @@
 #   install -m 0600 -o root /dev/stdin /srv/hq/creds/os-deploy-key    # write-scoped deploy key for the os repo
 #   ssh-keyscan github.com > /srv/hq/jobs-state/known_hosts           # pinned host key, StrictHostKeyChecking=yes
 #   mkdir -p /srv/hq/jobs-state/claude-home && chown -R hq:hq /srv/hq/jobs-state && chmod -R g+rwX /srv/hq/jobs-state
-#   chgrp -R hq /srv/hq/os/clients /srv/hq/os/.git && chmod -R g+rwX /srv/hq/os/clients /srv/hq/os/.git
-#   find /srv/hq/os/clients /srv/hq/os/.git -type d -exec chmod g+s {} +
+#   chgrp -R hq /srv/hq/os && chmod -R g+rwX /srv/hq/os     # the whole clone: the job resets it to origin/main, which can touch any path
+#   find /srv/hq/os -type d -exec chmod g+s {} +
 #   git -C /srv/hq/os config core.sharedRepository group              # new objects stay group-writable (UMask=0002 below)
 # DynamicUser has no fixed uid, so it writes the os clone through SupplementaryGroups=hq.
 [Unit]

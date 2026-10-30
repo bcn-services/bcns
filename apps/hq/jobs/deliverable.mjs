@@ -153,9 +153,12 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
   const go = async (opts, args) =>
     (await run("git", [...base, ...args], { env: genv, maxBuffer: 4 * 1024 * 1024, ...opts })).stdout;
   const git = (...args) => go({}, args);
-  // First line of git's stderr (past the "To <url>" banner) only: no env, no token, no argv.
+  // One line of git's stderr only: no env, no token, no argv. The first error-looking line, else the
+  // first line that is not a "To <url>" / "From <url>" / ref-update / rebase-progress banner.
   const netErr = (step, err) => {
-    const why = String(err?.stderr ?? "").split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("To "))?.slice(0, 200);
+    const lines = String(err?.stderr ?? "").split(/[\r\n]/).map((l) => l.trim()).filter(Boolean);
+    const why = (lines.find((l) => /^(error|fatal|CONFLICT|!|ssh:)/.test(l))
+      ?? lines.find((l) => !/^(To |From |\* |Rebasing|[0-9a-f]{7,}\.\.[0-9a-f]{7,})/.test(l)))?.slice(0, 200);
     return why ? new Error(`git ${step} failed: ${why}`) : err;
   };
   const ident = ["-c", "user.name=bcns-hq", "-c", "user.email=hq@bcn-services.com"];
