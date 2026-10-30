@@ -1,10 +1,21 @@
 /**
  * tracks.ts — the Work board's cards. A track is a named stream of work (a GTM channel, a client
- * project); its steps are the tasks whose track_id points at it. Same write path as tasks.ts
- * (sb first, actor + via, an events row per write). No delete anywhere (no grant, no policy).
+ * project); its steps are the tasks whose track_id points at it. Columns are task phases, so a track
+ * shows in every column it has steps in. Same write path as tasks.ts (sb first, actor + via, an
+ * events row per write). No delete anywhere (no grant, no policy).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AREAS, logEvent, must, type Area, type Task, type Via } from "./tasks";
+import {
+  addDays,
+  AREAS,
+  byDue,
+  isoDay,
+  logEvent,
+  must,
+  type Area,
+  type Task,
+  type Via,
+} from "./tasks";
 
 type Sb = SupabaseClient;
 
@@ -16,7 +27,9 @@ export const COLUMN_LABEL: Record<Column, string> = {
   wait: "Waiting",
   done: "Done · 7 days",
 };
-export const DONE_WINDOW_DAYS = 7;
+export const DONE_DAYS = 7;
+export const DONE_CAP = 5; // done steps per track
+const NOW_DAYS = 7; // same horizon as todayQueue
 
 /** The board's only tracks. Nobody creates or deletes one; new work is a task under one of these. */
 export const FIXED_TRACKS = ["Software", "Outreach", "Marketing", "Clients", "Ops"] as const;
@@ -38,7 +51,7 @@ export interface Track {
   name: string;
   area: string | null;
   client_slug: string | null;
-  column: Column;
+  column: Column; // stored but unused by the board (columns are task phases); the DB check still pairs it with done_at
   done_at: string | null;
   created_at: string;
 }
@@ -85,44 +98,56 @@ const columnPatch = (column: Column, now: Date) => ({
 // ---- reads ------------------------------------------------------------------------------
 
 export async function listTracks(sb: Sb): Promise<Track[]> {
-  // ponytail: whole table; buildBoard drops done tracks past 7 days. Filter in SQL when tracks pile up.
+  // ponytail: whole table; buildBoard keeps only the five fixed names. Fine while tracks stay a handful.
   const r = await sb.from("tracks").select("*").order("created_at", { ascending: true }).limit(500);
   return must<Track[]>(r, "tracks");
 }
 
 /**
- * The board: tracks per column with their steps (open first), plus a Miscellaneous card for open tasks with no track. The Done column keeps only tracks
- * finished in the last 7 days. Pure, so the page, TrackBoard's callers (Today) and tests share it.
+ * A task's board column on `today` (YYYY-MM-DD, NY): done within 7 days (older: null, off the board);
+ * wait = status waiting or a waiting_on; now = doing or due within 7 days (overdue too); else next.
+ */
+export function phase(t: Task, today: string): Column | null {
+  if (t.status === "done")
+    return t.done_at && isoDay(new Date(t.done_at)) >= addDays(today, -DONE_DAYS) ? "done" : null;
+  if (t.status === "waiting" || t.waiting_on?.trim()) return "wait";
+  if (t.status === "doing" || (t.due && t.due <= addDays(today, NOW_DAYS))) return "now";
+  return "next";
+}
+
+const newestDone = (a: Task, b: Task) => (b.done_at ?? "").localeCompare(a.done_at ?? "");
+
+/**
+ * The board: per column, one card per track with steps in that phase (FIXED_TRACKS order, then a
+ * synthetic, never-stored Miscellaneous card for tasks with no track). Steps sort by due; Done keeps the
+ * newest 5 per track. Tracks named outside FIXED_TRACKS are skipped. Pure, so Work, Today, MCP and tests share it.
  */
 export function buildBoard(
   tracks: Track[],
   tasks: Task[],
   now: Date = new Date()
 ): Record<Column, BoardCard[]> {
-  const cutoff = now.getTime() - DONE_WINDOW_DAYS * 86_400_000;
+  const today = isoDay(now);
+  const misc: Track = {
+    id: UNASSIGNED_ID,
+    name: "Miscellaneous",
+    area: null,
+    client_slug: null,
+    column: "now",
+    done_at: null,
+    created_at: now.toISOString(),
+  };
+  const cards = [...FIXED_TRACKS.flatMap((n) => tracks.filter((t) => t.name === n)), misc];
+  const phased = tasks.map((t) => ({ t, c: phase(t, today) })); // once per task: isoDay is a locale call
   const board: Record<Column, BoardCard[]> = { now: [], next: [], wait: [], done: [] };
-  for (const track of tracks) {
-    if (track.column === "done" && !(track.done_at && Date.parse(track.done_at) > cutoff)) continue;
-    const steps = tasks
-      .filter((t) => t.track_id === track.id)
-      .sort((a, b) => Number(a.status === "done") - Number(b.status === "done"));
-    board[track.column].push({ track, steps });
-  }
-  // Open tasks with no track would sit nowhere on the board: one synthetic card, last in Now, never stored.
-  const orphans = tasks.filter((t) => !t.track_id && t.status !== "done");
-  if (orphans.length) {
-    board.now.push({
-      track: {
-        id: UNASSIGNED_ID,
-        name: "Miscellaneous",
-        area: null,
-        client_slug: null,
-        column: "now",
-        done_at: null,
-        created_at: now.toISOString(),
-      },
-      steps: orphans,
-    });
+  for (const c of COLUMNS) {
+    for (const track of cards) {
+      const steps = phased
+        .filter((p) => p.c === c && (p.t.track_id ?? UNASSIGNED_ID) === track.id)
+        .map((p) => p.t);
+      if (steps.length)
+        board[c].push({ track, steps: c === "done" ? steps.sort(newestDone).slice(0, DONE_CAP) : steps.sort(byDue) });
+    }
   }
   return board;
 }
@@ -147,23 +172,6 @@ export async function createTrack(
     "tracks insert"
   );
   await logEvent(sb, actor, via, "track.created", { track_id: row.id, name: row.name, column: row.column });
-  return row;
-}
-
-export async function moveTrack(
-  sb: Sb,
-  actor: string,
-  via: Via,
-  id: string,
-  column: Column,
-  now: Date = new Date()
-): Promise<Track> {
-  const set = columnPatch(assertColumn(column), now);
-  // done -> done keeps the original done_at: a repeat must not restart the 7-day Done window.
-  const cur = must<Track>(await sb.from("tracks").select("*").eq("id", id).single(), "tracks read");
-  if (cur.column === "done" && column === "done") return cur;
-  const row = must<Track>(await sb.from("tracks").update(set).eq("id", id).select().single(), "tracks move");
-  await logEvent(sb, actor, via, "track.moved", { track_id: id, ...set });
   return row;
 }
 

@@ -3,9 +3,9 @@ import { COLUMNS, COLUMN_LABEL, type Column, type BoardCard } from "@/lib/tracks
 import { TrackCard } from "./TrackCard";
 
 /**
- * The track board: Now / Next / Waiting / Done · 7 days. Presentational, so Work (client) and
- * Today can both render it; pass onStep from a client parent, or omit it and steps link to
- * /work?task=<id>. `board` comes from buildBoard(tracks, tasks) in lib/tracks.ts.
+ * The track board: Now / Next / Waiting / Done · 7 days, columns by task phase, so one track can
+ * show in several. Presentational, so Work (client) and Today can both render it; pass onStep from
+ * a client parent, or omit it and steps link to /work?task=<id>. `board` comes from buildBoard(tracks, tasks) in lib/tracks.ts.
  */
 export function TrackBoard({
   board,

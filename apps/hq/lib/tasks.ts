@@ -189,7 +189,7 @@ export function byDue(a: { due: string | null }, b: { due: string | null }): num
 
 export const QUEUE_CAP = 8;
 const QUEUE_DUE_DAYS = 7;
-const QUEUE_DONE_DAYS = 7; // same window as tracks.ts DONE_WINDOW_DAYS (tracks imports tasks, so no import back)
+const QUEUE_DONE_DAYS = 7; // same window as tracks.ts DONE_DAYS (tracks imports tasks, so no import back)
 
 /**
  * One person's Today, derived (nothing is "pulled in"): their open tasks, split into

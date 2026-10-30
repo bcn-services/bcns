@@ -4,7 +4,7 @@ import { listPendingProposals } from "@/lib/proposals";
 import { getSession } from "@/lib/session";
 import { createSupabaseServer } from "@/lib/supabase";
 import { byDue, isoDay, todayQueue } from "@/lib/tasks";
-import { buildBoard, COLUMNS } from "@/lib/tracks";
+import { buildBoard, COLUMNS, FIXED_TRACKS } from "@/lib/tracks";
 import { loadWorkData } from "@/lib/work-data";
 import { TodayCalendar } from "./TodayCalendar";
 import { TodayNateBoard } from "./TodayNateBoard";
@@ -34,10 +34,10 @@ export async function TodayNate() {
   const asFire = new Set(shown.map((f) => f.key));
   const listed = open.filter((t) => !asFire.has(`task:${t.id}`));
   const trackName = new Map(tracks.map((t) => [t.id, t.name]));
-  // the board is a derived queue of the signed-in person's open tasks (top 8 up, waiting, done in 7 days); tracks with none drop out
-  // tasks on a hidden track (done > 7 days) never draw, so they must not take queue slots
+  // the board is a derived queue of the signed-in person's open tasks (top 8 up, waiting, done in 7 days); buildBoard puts each in its phase column
+  // tasks on a track buildBoard skips (name not one of the five) never draw, so they must not take queue slots
   const shownTracks = new Set(
-    COLUMNS.flatMap((c) => buildBoard(tracks, [], now)[c].map((card) => card.track.id))
+    tracks.filter((t) => (FIXED_TRACKS as readonly string[]).includes(t.name)).map((t) => t.id)
   );
   const q = todayQueue(
     tasks.filter((t) => !t.track_id || shownTracks.has(t.track_id)),

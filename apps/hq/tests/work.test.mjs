@@ -483,69 +483,11 @@ test("humanDay: today, a weekday within 6 days, else month + day", () => {
   assert.equal(T.humanDay("2026-10-24", "2026-10-27"), "Oct 24"); // overdue shows the date
 });
 
-test("board: Done column = tracks with done_at in the last 7 days; steps ride their track, open first", () => {
-  const day = 86_400_000;
-  const ago = (d) => new Date(NOW.getTime() - d * day).toISOString();
-  const track = (id, column, done_at = null) => ({ id, name: id, column, done_at });
-  const tracks = [
-    track("now1", "now"),
-    track("next1", "next"),
-    track("wait1", "wait"),
-    track("fresh", "done", ago(6.5)),
-    track("stale", "done", ago(7.5)),
-    track("nodate", "done"),
-  ];
-  const tasks = [
-    { id: "s1", track_id: "now1", status: "done" },
-    { id: "s2", track_id: "now1", status: "todo" },
-    { id: "s3", track_id: null, status: "todo" },
-  ];
-  const b = TR.buildBoard(tracks, tasks, NOW);
-  assert.deepEqual(Object.keys(b), ["now", "next", "wait", "done"]);
-  assert.deepEqual(
-    b.done.map((c) => c.track.id),
-    ["fresh"]
-  );
-  assert.deepEqual(
-    b.now[0].steps.map((s) => s.id),
-    ["s2", "s1"]
-  );
-  assert.deepEqual([b.next.length, b.wait.length], [1, 1]);
-});
-
-test("buildBoard: open orphan tasks form one Miscellaneous card, last in Now; none or only done -> no card", () => {
-  const tracks = [{ id: "now1", name: "now1", column: "now", done_at: null }];
-  const open = [
-    { id: "o1", track_id: "now1", status: "todo" },
-    { id: "o2", track_id: null, status: "doing" },
-    { id: "o3", track_id: null, status: "waiting" },
-    { id: "o4", track_id: null, status: "done" },
-  ];
-  const b = TR.buildBoard(tracks, open, NOW);
-  assert.deepEqual(b.now.map((c) => c.track.id), ["now1", TR.UNASSIGNED_ID]);
-  assert.equal(b.now[1].track.name, "Miscellaneous");
-  assert.deepEqual(b.now[1].steps.map((s) => s.id), ["o2", "o3"]);
-  for (const c of ["next", "wait", "done"]) assert.equal(b[c].length, 0);
-  // a task on a hidden (done > 7 days) track is not an orphan
-  const stale = [{ id: "old", name: "old", column: "done", done_at: "2020-01-01T00:00:00Z" }];
-  assert.equal(TR.buildBoard(stale, [{ id: "x", track_id: "old", status: "todo" }], NOW).now.length, 0);
-  const none = TR.buildBoard(tracks, [open[0], open[3]], NOW);
-  assert.deepEqual(none.now.map((c) => c.track.id), ["now1"]);
-});
-
-test("tracks: create / move / update write the row and an events row; done stamps done_at, leaving clears it; no delete", async () => {
+test("tracks: create / update write the row and an events row; fixed names only; no delete", async () => {
   const sb = fakeSb();
   const t = await TR.createTrack(sb, ACTOR, "mcp", { name: " Software ", area: "client" }, NOW);
   assert.deepEqual([t.name, t.column, t.done_at], ["Software", "next", null]);
-  const done = await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", NOW);
-  assert.equal(done.done_at, "2026-10-27T15:00:00.000Z");
-  const later = new Date("2026-11-01T00:00:00Z"); // done -> done keeps done_at and writes no second event
-  assert.equal(
-    (await TR.moveTrack(sb, ACTOR, "ui", t.id, "done", later)).done_at,
-    "2026-10-27T15:00:00.000Z"
-  );
-  assert.equal(sb.db.events.filter((e) => e.kind === "track.moved").length, 1);
-  assert.equal((await TR.moveTrack(sb, ACTOR, "ui", t.id, "now", NOW)).done_at, null);
+  assert.equal(TR.moveTrack, undefined); // columns are task phases; nothing moves a track
   assert.equal(
     (await TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Ops", client_slug: "acme-demo" }))
       .client_slug,
@@ -555,12 +497,10 @@ test("tracks: create / move / update write the row and an events row; done stamp
     sb.db.events.map((e) => [e.kind, e.via]),
     [
       ["track.created", "mcp"],
-      ["track.moved", "ui"],
-      ["track.moved", "ui"],
       ["track.updated", "ui"],
     ]
   );
-  await assert.rejects(() => TR.moveTrack(sb, ACTOR, "ui", t.id, "later"), /column/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", column: "later" }), /column/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: " " }), /name/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", area: "bogus" }), /area/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Pilot" }), /tracks are fixed/);

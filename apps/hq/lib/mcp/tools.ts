@@ -37,7 +37,7 @@ import {
   type Status,
   type Task,
 } from "../tasks";
-import { buildBoard, COLUMNS, listTracks, moveTrack, updateTrack } from "../tracks";
+import { buildBoard, COLUMNS, listTracks, updateTrack } from "../tracks";
 
 export interface Ctx {
   sb: SupabaseClient;
@@ -197,7 +197,7 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status, body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status (doing = Now on the board), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
@@ -260,7 +260,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_board",
     title: "List the board",
     description:
-      "List the Work board. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Tracks in Now, Next, Waiting, and Done (last 7 days), each with its steps (tasks). Open tasks with no track show on a \"Miscellaneous\" card (id \"unassigned\", last in Now).",
+      "List the Work board. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Columns are task phases: Now (status doing, or due within 7 days incl. overdue), Next (other open tasks), Waiting (status waiting or a waiting_on), Done (done in the last 7 days, newest 5 per track). A track appears in every column it has tasks in; each card lists only that column's steps (tasks). Tasks with no track show on a \"Miscellaneous\" card (id \"unassigned\", last in each column). To move work between columns, update the task (update_task status/due/waiting_on).",
     readOnly: true,
     shape: {},
     async run({ sb }) {
@@ -271,22 +271,19 @@ export const TOOLS: ToolDef[] = [
             c,
             board[c].map(({ track, steps }) => ({
               ...track,
-              steps: steps.map((t) => ({ id: t.id, title: t.title, status: t.status, owner: t.owner, due: t.due })),
+              column: c, // the phase column this card sits in, not the unused stored one
+              steps: steps.map((t) => ({
+                id: t.id,
+                title: t.title,
+                status: t.status,
+                owner: t.owner,
+                due: t.due,
+                client_slug: t.client_slug,
+              })),
             })),
           ])
         ),
       };
-    },
-  }),
-
-  tool({
-    name: "move_track",
-    title: "Move a track",
-    description: "Move a board track to now, next, wait or done. Moving to done starts its 7-day stay on the board.",
-    readOnly: false,
-    shape: { id: uuid, column: z.enum(COLUMNS) },
-    async run({ sb, actor }, a) {
-      return { track: await moveTrack(sb, actor.id, "mcp", a.id, a.column) };
     },
   }),
 

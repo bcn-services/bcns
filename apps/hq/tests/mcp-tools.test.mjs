@@ -131,7 +131,7 @@ const withTeam = () => {
 };
 const as = (actor, sb, name, args = {}) => byName[name].run({ sb, actor }, args);
 
-test("exactly the 17 tools, and none is named like an approve / decide / delete", () => {
+test("exactly the 16 tools, and none is named like an approve / decide / delete", () => {
   assert.deepEqual(TOOLS.map((t) => t.name).sort(), [
     "add_link",
     "add_task_note",
@@ -142,7 +142,6 @@ test("exactly the 17 tools, and none is named like an approve / decide / delete"
     "list_board",
     "list_tasks",
     "log_lead_note",
-    "move_track",
     "propose_client",
     "propose_finance",
     "propose_lead_stage",
@@ -151,7 +150,7 @@ test("exactly the 17 tools, and none is named like an approve / decide / delete"
     "update_task",
     "update_track",
   ]);
-  assert.equal(TOOLS.length, 17);
+  assert.equal(TOOLS.length, 16);
   assert.equal(TOOLS.filter((t) => /approve|decide|delete/i.test(t.name)).length, 0);
 });
 
@@ -272,26 +271,26 @@ test("create_task takes client_slug and track_id; add_task_note writes notes(tas
   await assert.rejects(call(fake, "create_task", { title: "x", track_id: "nope" }));
 });
 
-test("board tools: no create_track, move_track (done stamps done_at, leaving clears it), update_track, list_board; none deletes", async () => {
+test("board tools: no create_track or move_track, update_track, list_board by task phase; none deletes", async () => {
   const fake = withTeam();
   assert.equal(byName.create_track, undefined);
-  const track = { id: TRACK }; // seeded "Warm contacts"
-  const moved = await call(fake, "move_track", { id: track.id, column: "done" });
-  assert.ok(moved.track.done_at);
-  assert.equal((await call(fake, "move_track", { id: track.id, column: "now" })).track.done_at, null);
+  assert.equal(byName.move_track, undefined);
+  const track = { id: TRACK }; // seeded "Warm contacts": not a fixed name, so off the board until renamed
+  assert.ok(!(await call(fake, "list_board")).board.now.some((c) => c.id === TRACK));
   const renamed = await call(fake, "update_track", { id: track.id, name: "Marketing", client_slug: null });
   assert.equal(renamed.track.name, "Marketing");
   await assert.rejects(call(fake, "update_track", { id: track.id, name: "Q4 pilot" }), /tracks are fixed/);
   await assert.rejects(call(fake, "update_track", { id: track.id }), /nothing to update/);
-  await assert.rejects(call(fake, "move_track", { id: track.id, column: "later" }));
-  await call(fake, "update_task", { id: T_NATE, track_id: TRACK });
+  await call(fake, "update_task", { id: T_NATE, track_id: TRACK, client_slug: "acme-demo" });
   const { board } = await call(fake, "list_board");
   assert.deepEqual(Object.keys(board), ["now", "next", "wait", "done"]);
-  const warm = board.now.find((c) => c.id === TRACK);
-  assert.deepEqual(warm.steps.map((x) => x.id), [T_NATE]);
+  const warm = board.now.find((c) => c.id === TRACK); // T_NATE is overdue -> Now
+  assert.equal(warm.column, "now");
+  assert.deepEqual(warm.steps.map((x) => [x.id, x.client_slug]), [[T_NATE, "acme-demo"]]);
   const last = board.now.at(-1);
-  assert.deepEqual([last.id, last.name], ["unassigned", "Miscellaneous"]); // open tasks with no track
-  assert.ok(last.steps.length && !last.steps.some((x) => x.id === T_NATE));
+  assert.deepEqual([last.id, last.name], ["unassigned", "Miscellaneous"]); // tasks with no track
+  assert.deepEqual(last.steps.map((x) => x.id), [T_CLAUDE]); // due 2026-10-02: overdue -> Now
+  assert.deepEqual(board.next.map((c) => [c.id, c.column, c.steps.map((x) => x.id)]), [["unassigned", "next", [T_BRANDON]]]); // no due
   assert.ok(writes(fake).every((o) => o.op !== "delete"));
   for (const e of fake.db.events) assert.equal(e.via, "mcp");
 });
@@ -313,7 +312,7 @@ test("tools/list: create_task, update_task, add_task_note open with an imperativ
   }
   for (const name of ["create_task", "update_task", "list_board"])
     assert.match(rows.find(([n]) => n === name)[1], /Tracks are fixed: Software, Outreach, Marketing, Clients, Ops/, name);
-  for (const name of ["list_board", "move_track", "update_track"])
+  for (const name of ["list_board", "update_track"])
     assert.ok(rows.some(([n]) => n === name), name);
 });
 
@@ -623,7 +622,6 @@ test("no tool, with plausible args, ever writes businesses, finance_inputs, prof
     update_task: { id: T_CLAUDE, status: "done" },
     add_task_note: { id: T_NATE, body: "n" },
     list_board: {},
-    move_track: { id: TRACK, column: "wait" },
     update_track: { id: TRACK, name: "Ops" },
     search_leads: { name: "h" },
     get_lead: { id: BIZ },
