@@ -40,7 +40,7 @@ test("Work page (v2-work A): 420px list grouped Unassigned/Nate/Brandon/Claude, 
   for (const t of ["← Board", "✓ Done", "Save", "Waiting on", "Description"])
     assert.ok(d.includes(t), t);
   assert.match(d, /<OwnerChecks defaultValue=\{task\.owners\}/); // owners are checkboxes
-  assert.match(d, /owners: assertOwners\(f\.getAll\("owner"\)\)/);
+  assert.match(d, /assertOwners\(f\.getAll\("owner"\)\)/);
   assert.match(d, /track_id: s\(f, "track"\) \|\| null/);
   assert.match(d, /client_slug: s\(f, "client"\) \|\| null/);
   assert.match(src("app/(app)/work/page.tsx"), /import "\.\.\/\.\.\/work\.css"/);

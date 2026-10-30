@@ -21,6 +21,8 @@ export interface WorkLink {
   url: string;
 }
 
+const sameOwners = (a: string[], b: string[]) =>
+  a.length === b.length && b.every((o) => a.includes(o));
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** An open task (replaces the board): fields, description, Done / Save, then notes and links. */
@@ -79,6 +81,7 @@ export function WorkTaskDetail(props: {
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
+            const ticked = assertOwners(f.getAll("owner"));
             const picked = (s(f, "status") || task.status) as Status; // no select once done
             // a changed Status select wins (leaving waiting clears waiting_on, else the board keeps it in Waiting);
             // otherwise status follows waiting_on only when the waiting text itself changed
@@ -90,7 +93,7 @@ export function WorkTaskDetail(props: {
                 : picked;
             return updateTaskAction(task.id, {
               status: status as Status,
-              owners: assertOwners(f.getAll("owner")),
+              owners: sameOwners(task.owners, ticked) ? task.owners : ticked, // DOM order must not reshuffle the lead owner
               due: s(f, "due") || null,
               waiting_on: pickChanged && picked !== "waiting" ? null : waiting || null,
               body: s(f, "body") || null,

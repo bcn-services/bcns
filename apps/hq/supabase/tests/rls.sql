@@ -122,6 +122,9 @@ begin
   assert (select owner from tasks where id = t1) = 'nate', 'owner follows the first of owners';
   update tasks set owner = 'claude' where id = t1;  -- old code writing owner only
   assert (select owners from tasks where id = t1) = '{claude}', 'owners follows a lone owner write';
+  update tasks set owner = null where id = t1;  -- old code unassigning
+  assert (select owners from tasks where id = t1) = '{}', 'a null owner write clears owners';
+  update tasks set owners = '{nate}' where id = t1;
   update tasks set owners = '{}' where id = t1;
   assert (select owner from tasks where id = t1) is null, 'no owners clears owner';
   begin insert into tasks (title, owners) values ('bad owner', '{nobody}'); raise exception 'bad owners';

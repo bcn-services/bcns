@@ -23,7 +23,7 @@ language plpgsql set search_path = public, pg_temp
 as $$
 begin
   if tg_op = 'UPDATE' and new.owners = old.owners and new.owner is distinct from old.owner then
-    new.owners := coalesce(array[new.owner], '{}');  -- old code wrote `owner` only
+    new.owners := case when new.owner is null then '{}' else array[new.owner] end;  -- old code wrote `owner` only
   elsif tg_op = 'INSERT' and new.owners = '{}' and new.owner is not null then
     new.owners := array[new.owner];
   end if;
