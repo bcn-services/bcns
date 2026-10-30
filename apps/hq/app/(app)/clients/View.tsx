@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DOT, type Dot } from "@/lib/clients/health";
 import { BILLING_SOURCES } from "@/lib/clients/fields";
 import type { ClientCard } from "@/lib/clients/load";
-import { OWNERS } from "@/lib/tasks";
+import { OwnerChecks } from "@/components/OwnerChecks";
 import type { ActionResult } from "./actions";
 
 type Act = (fd: FormData) => Promise<ActionResult>;
@@ -139,11 +139,7 @@ function Work({ c, action }: { c: ClientCard; action: Act }) {
               aria-label="Task title"
               autoFocus
             />
-            <select name="owner" defaultValue="nate" aria-label="Owner">
-              {OWNERS.map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
+            <OwnerChecks defaultValue={["nate"]} />
             <button className="btn pri" type="submit">
               Add
             </button>

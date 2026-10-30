@@ -16,7 +16,7 @@ import {
   AREAS,
   LISTS,
   LIST_STATUSES,
-  assertOwner,
+  assertOwners,
   buildTaskRow,
   statusPatch,
   type ListName,
@@ -27,7 +27,7 @@ import { COLUMNS, type Column } from "../lib/tracks";
 
 export interface SeedStep {
   title: string;
-  owner: string;
+  owner: string | string[]; // one owner or several; seed-gtm.json stays `owner`
   status: string;
   due?: string;
   waiting_on?: string;
@@ -61,7 +61,7 @@ export function planSeed(seed: Seed) {
     return t.steps.map((s) => ({
       track: t.name,
       title: s.title,
-      owner: assertOwner(s.owner),
+      owners: assertOwners(s.owner),
       area: t.area,
       status: statusPatch(s.status, new Date()).status,
       due: s.due ?? null,
@@ -96,7 +96,7 @@ export async function seedGtm(
   );
   for (const t of tracks) log(`  track ${t.area}: ${t.name} [${t.column}]`);
   for (const t of tasks)
-    log(`  task  ${t.area}: ${t.title} [${t.owner}, ${t.status}${t.due ? `, due ${t.due}` : ""}]`);
+    log(`  task  ${t.area}: ${t.title} [${t.owners.join("+") || "unassigned"}, ${t.status}${t.due ? `, due ${t.due}` : ""}]`);
   for (const i of items) log(`  list  ${i.list}: ${i.business} [${i.status}]`);
   if (!sb) {
     log("dry run: nothing inserted. Re-run with --apply (HQ_SEED_EMAIL, HQ_SEED_PASSWORD in env).");

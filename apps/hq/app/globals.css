@@ -1029,6 +1029,17 @@ table.grid td select {
   background: #f1ecfb;
   color: #5a3ea6;
 }
+.oc {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.oc label {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
 .tb {
   flex: 1;
   min-height: 0;

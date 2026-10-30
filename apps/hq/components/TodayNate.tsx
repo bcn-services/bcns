@@ -65,11 +65,11 @@ export async function TodayNate() {
       proposals={proposals}
       fires={shown}
       toAssign={listed
-        .filter((t) => !t.owner)
+        .filter((t) => !t.owners.length)
         .sort(byDue)
         .map((t) => ({ task: t, from: t.track_id ? (trackName.get(t.track_id) ?? null) : null }))}
       mine={listed
-        .filter((t) => t.owner === me || t.waiting_on?.trim().toLowerCase() === me)
+        .filter((t) => t.owners.some((o) => o === me) || t.waiting_on?.trim().toLowerCase() === me)
         .sort(byDue)}
       calendar={<TodayCalendar cal={cal} now={now} />}
       board={board}

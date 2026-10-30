@@ -26,7 +26,7 @@ const seed = () =>
       {
         id: T_NATE,
         title: "send quote",
-        owner: "nate",
+        owners: ["nate"],
         status: "todo",
         area: "ops",
         due: "2026-10-01",
@@ -36,7 +36,7 @@ const seed = () =>
       {
         id: T_CLAUDE,
         title: "draft notes",
-        owner: "claude",
+        owners: ["claude"],
         status: "todo",
         area: "ops",
         due: "2026-10-02",
@@ -113,7 +113,7 @@ const withTeam = () => {
   fake.db.tasks.push({
     id: T_BRANDON,
     title: "call the supplier",
-    owner: "brandon",
+    owners: ["brandon"],
     status: "todo",
     area: "ops",
     due: null,
@@ -170,11 +170,11 @@ test("update_task: staff reassigning another human's task is refused (so a refus
     call(fake, "update_task", { id: T_BRANDON, owner: "nate" }), // nate (staff) takes brandon's task
     /refused: this task is owned by brandon; only brandon or an admin can reassign it/
   );
-  assert.equal(fake.db.tasks.find((t) => t.id === T_BRANDON).owner, "brandon");
+  assert.deepEqual(fake.db.tasks.find((t) => t.id === T_BRANDON).owners, ["brandon"]);
   assert.equal(writes(fake).length, 0);
   const other = withTeam(); // brandon (admin) may reassign nate's task; staff may hand off their own
-  assert.equal((await as(ADMIN, other, "update_task", { id: T_NATE, owner: "brandon" })).task.owner, "brandon");
-  assert.equal((await call(withTeam(), "update_task", { id: T_NATE, owner: "claude" })).task.owner, "claude");
+  assert.deepEqual((await as(ADMIN, other, "update_task", { id: T_NATE, owner: "brandon" })).task.owners, ["brandon"]);
+  assert.deepEqual((await call(withTeam(), "update_task", { id: T_NATE, owner: "claude" })).task.owners, ["claude"]);
 });
 
 test("update_task -> done: an admin closes brandon's task; staff close their own; a role-less caller is staff", async () => {
@@ -187,7 +187,7 @@ test("update_task -> done: an admin closes brandon's task; staff close their own
   const own = withTeam(); // nate (staff) closes his own
   assert.equal((await call(own, "update_task", { id: T_NATE, status: "done" })).task.status, "done");
   const noProfile = seed(); // no profiles row at all: staff, so another human's task is refused
-  noProfile.db.tasks.find((t) => t.id === T_CLAUDE).owner = "brandon";
+  noProfile.db.tasks.find((t) => t.id === T_CLAUDE).owners = ["brandon"];
   await assert.rejects(call(noProfile, "update_task", { id: T_CLAUDE, status: "done" }), /owned by brandon/);
 });
 
@@ -204,7 +204,7 @@ test("update_task -> done is allowed for a task owned by claude, as via=mcp", as
 
 test("update_task reads the CURRENT owner: a task reassigned to brandon is refused, an unknown id is not found", async () => {
   const fake = seed();
-  fake.db.tasks.find((t) => t.id === T_CLAUDE).owner = "brandon";
+  fake.db.tasks.find((t) => t.id === T_CLAUDE).owners = ["brandon"];
   await assert.rejects(
     call(fake, "update_task", { id: T_CLAUDE, status: "done" }),
     /owned by brandon/
@@ -229,7 +229,7 @@ test("update_task: non-done changes on anyone's task are allowed; invalid input 
   await assert.rejects(call(fake, "update_task", { id: T_NATE, status: "archived" }));
   assert.equal(fake.ops.length, before, "nothing was queried");
   const strict = await call(fake, "update_task", { id: T_NATE, assigned_to: "claude", status: "todo" }); // unknown keys are dropped, not applied
-  assert.equal(strict.task.owner, "nate");
+  assert.deepEqual(strict.task.owners, ["nate"]);
   await assert.rejects(call(fake, "update_task", { id: T_NATE, owner: "mallory" })); // owner is nate|brandon|claude
 });
 
@@ -241,7 +241,7 @@ test("update_task reassigns nate -> brandon and sets client_slug / track_id, via
     client_slug: "acme-demo",
     track_id: TRACK,
   });
-  assert.equal(task.owner, "brandon");
+  assert.deepEqual(task.owners, ["brandon"]);
   assert.equal(task.client_slug, "acme-demo");
   assert.equal(task.track_id, TRACK);
   const ev = fake.db.events.find((e) => e.kind === "task.updated");
@@ -260,7 +260,7 @@ test("create_task takes client_slug and track_id; add_task_note writes notes(tas
     client_slug: "acme-demo",
     track_id: TRACK,
   });
-  assert.deepEqual([task.owner, task.client_slug, task.track_id, task.due, task.via], ["brandon", "acme-demo", TRACK, "2026-10-30", "mcp"]);
+  assert.deepEqual([task.owners, task.client_slug, task.track_id, task.due, task.via], [["brandon"], "acme-demo", TRACK, "2026-10-30", "mcp"]);
   await call(fake, "add_task_note", { id: task.id, body: "waiting on PO number" });
   const row = fake.db.notes.find((n) => n.body === "waiting on PO number");
   assert.deepEqual([row.task_id, row.actor, row.via], [task.id, ACTOR.id, "mcp"]);
@@ -598,7 +598,7 @@ test("get_task / get_client / list_tasks / today read; list_tasks defaults to cl
 test("writes: create_task, log_lead_note, add_link all carry via=mcp and the connecting user as actor", async () => {
   const fake = seed();
   const { task } = await call(fake, "create_task", { title: "follow up", due: "2026-10-09" });
-  assert.equal(task.owner, "claude");
+  assert.deepEqual(task.owners, ["claude"]);
   assert.equal(task.via, "mcp");
   await call(fake, "log_lead_note", { business_id: BIZ, body: "left a voicemail" });
   const note = fake.db.notes.find((n) => n.body === "left a voicemail");
@@ -736,4 +736,37 @@ test("update_task resolution is owner-gated like a close: staff are refused on a
   assert.equal(writes(fake).length, 0);
   assert.equal((await as(ADMIN, fake, "update_task", { id: T_BRANDON, resolution: "mine" })).task.resolution, "mine");
   assert.equal((await call(withTeam(), "update_task", { id: T_NATE, resolution: "ok" })).task.resolution, "ok");
+});
+
+test("owner takes a string or an array: both land as owners[]; [] unassigns; list_tasks and today match any co-owner", async () => {
+  const fake = withTeam();
+  const one = (await call(fake, "create_task", { title: "old shape", owner: "brandon" })).task;
+  assert.deepEqual(one.owners, ["brandon"]);
+  const two = (await call(fake, "create_task", { title: "both", owner: ["nate", "brandon"] })).task;
+  assert.deepEqual(two.owners, ["nate", "brandon"]);
+  assert.deepEqual((await call(fake, "create_task", { title: "default" })).task.owners, ["claude"]);
+  await assert.rejects(call(fake, "create_task", { title: "x", owner: ["nate", "mallory"] }));
+  const ids = async (owner) => (await call(fake, "list_tasks", { owner })).tasks.map((t) => t.id);
+  assert.ok((await ids("brandon")).includes(two.id), "co-owned task is brandon's");
+  assert.ok((await ids("nate")).includes(two.id), "and nate's");
+  assert.ok(!(await ids("claude")).includes(two.id));
+  assert.ok((await call(fake, "today")).nate_tasks.some((t) => t.id === two.id));
+  // update_task: a string, an array, and [] to unassign
+  assert.deepEqual((await call(fake, "update_task", { id: two.id, owner: "claude" })).task.owners, ["claude"]);
+  assert.deepEqual((await call(fake, "update_task", { id: two.id, owner: ["brandon", "claude"] })).task.owners, ["brandon", "claude"]);
+  assert.deepEqual((await as(ADMIN, fake, "update_task", { id: two.id, owner: [] })).task.owners, []); // brandon is an admin
+  await assert.rejects(call(fake, "update_task", { id: two.id, owner: ["mallory"] }));
+});
+
+test("update_task owner rule with several owners: staff may act when they co-own it or only claude / nobody does; a task with another human on it is refused", async () => {
+  const fake = withTeam();
+  const mk = (owners) => fake.db.tasks.push({ id: `66666666-6666-4666-8666-66666666666${fake.db.tasks.length}`, title: "t", owners, status: "todo", area: "ops", due: null, waiting_on: null, created_at: "2026-09-01T00:00:00Z" }) && fake.db.tasks.at(-1);
+  const coOwned = mk(["brandon", "nate"]); // nate (staff) is on it
+  assert.equal((await call(fake, "update_task", { id: coOwned.id, status: "done" })).task.status, "done");
+  const withClaude = mk(["claude"]);
+  assert.equal((await call(fake, "update_task", { id: withClaude.id, status: "done" })).task.status, "done");
+  const theirs = mk(["brandon", "claude"]); // brandon + claude, not nate: another human is on it
+  await assert.rejects(call(fake, "update_task", { id: theirs.id, status: "done" }), /refused: this task is owned by brandon and claude; only brandon or an admin/);
+  const none = mk([]);
+  assert.equal((await call(fake, "update_task", { id: none.id, status: "done" })).task.status, "done");
 });

@@ -134,6 +134,23 @@ test("planSeed derives the column: all steps done -> done, all waiting -> wait",
   assert.deepEqual(plan.tracks.map((t) => t.column), ["done", "wait", "next"]);
 });
 
+test("planSeed: a step's owner is one name or a list; both become owners[]", () => {
+  const plan = planSeed({
+    lists: {},
+    tracks: [
+      {
+        area: "warm",
+        name: "w",
+        steps: [
+          { title: "a", owner: "nate", status: "todo" },
+          { title: "b", owner: ["nate", "brandon"], status: "todo" },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(plan.tasks.map((t) => t.owners), [["nate"], ["nate", "brandon"]]);
+});
+
 test("planSeed rejects an unknown owner, track, list or status", () => {
   const bad = (patch) => () => planSeed({ tracks: [], lists: {}, ...patch });
   assert.throws(

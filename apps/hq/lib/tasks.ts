@@ -54,7 +54,7 @@ export interface Task {
   id: string;
   title: string;
   body: string | null;
-  owner: Owner | null;
+  owners: Owner[]; // [] = unassigned
   area: string | null;
   status: Status;
   due: string | null;
@@ -94,9 +94,10 @@ function assertStatus(s: unknown): Status {
   return s as Status;
 }
 
-/** null / "" = unassigned (tasks.owner is nullable); anything else must be a real owner. */
-export function assertOwnerOrNull(o: unknown): Owner | null {
-  return o === null || o === "" ? null : assertOwner(o);
+/** Owners as a list: null / "" / [] = unassigned, a string = one owner, an array = each must be a real owner (deduped). */
+export function assertOwners(o: unknown): Owner[] {
+  if (o === null || o === undefined || o === "") return [];
+  return [...new Set((Array.isArray(o) ? o : [o]).map(assertOwner))];
 }
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -129,7 +130,7 @@ export function statusPatch(
 
 export interface TaskPatch {
   status?: Status;
-  owner?: Owner | null;
+  owners?: Owner[];
   client_slug?: string | null;
   track_id?: string | null;
   due?: string | null;
@@ -142,7 +143,7 @@ export interface TaskPatch {
 export function buildTaskPatch(p: TaskPatch, now: Date): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (p.status !== undefined) Object.assign(out, statusPatch(p.status, now));
-  if (p.owner !== undefined) out.owner = assertOwnerOrNull(p.owner);
+  if (p.owners !== undefined) out.owners = assertOwners(p.owners);
   if (p.client_slug !== undefined) out.client_slug = assertSlug(p.client_slug);
   if (p.track_id !== undefined) out.track_id = assertTrackId(p.track_id);
   if (p.due !== undefined) out.due = p.due === null || p.due === "" ? null : assertDay(p.due);
@@ -163,8 +164,10 @@ export function waitingStatus(text: string, current: Status): Status | undefined
   return current === "waiting" ? "todo" : undefined;
 }
 
-export function nextOwner(o: Owner | null): Owner {
-  return OWNERS[(OWNERS.indexOf(o as Owner) + 1) % OWNERS.length] ?? "nate";
+/** The `o` key: step the first owner along nate -> brandon -> claude, keep any others. */
+export function nextOwner(os: Owner[]): Owner[] {
+  const next = OWNERS[(OWNERS.indexOf(os[0] as Owner) + 1) % OWNERS.length] ?? "nate";
+  return [next, ...os.slice(1).filter((o) => o !== next)];
 }
 
 export function nextListStatus(s: ListStatus): ListStatus {
@@ -201,7 +204,7 @@ export function todayQueue<T extends Task>(
   me: string,
   today: string
 ): { queue: T[]; waiting: T[]; done: T[] } {
-  const mine = tasks.filter((t) => t.owner === me);
+  const mine = tasks.filter((t) => t.owners.includes(me as Owner));
   const open = mine.filter((t) => t.status !== "done");
   const isWaiting = (t: T) => t.status === "waiting" || !!t.waiting_on?.trim();
   const horizon = addDays(today, QUEUE_DUE_DAYS);
@@ -224,15 +227,15 @@ export function todayQueue<T extends Task>(
 
 const byRank = (a: Task, b: Task) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDue(a, b);
 
-/** Owner sections (Nate, Brandon, Claude), each ordered by status then due. */
+/** Owner sections (Nate, Brandon, Claude), each ordered by status then due. A multi-owner task sits under its first owner only (one row, one key). */
 export function groupByOwner<T extends Task>(tasks: T[]): { owner: Owner; tasks: T[] }[] {
   return OWNERS.map((owner) => ({
     owner,
-    tasks: tasks.filter((t) => t.owner === owner).sort(byRank),
+    tasks: tasks.filter((t) => t.owners[0] === owner).sort(byRank),
   }));
 }
 
-/** Work's left list: Unassigned first (owner null), then Nate / Brandon / Claude; empty groups are left out. */
+/** Work's left list: Unassigned first (no owners), then Nate / Brandon / Claude; empty groups are left out. */
 export function workGroups<T extends Task>(
   tasks: T[]
 ): { key: "unassigned" | Owner; label: string; tasks: T[] }[] {
@@ -240,7 +243,7 @@ export function workGroups<T extends Task>(
     {
       key: "unassigned" as const,
       label: "Unassigned",
-      tasks: tasks.filter((t) => !t.owner).sort(byRank),
+      tasks: tasks.filter((t) => !t.owners.length).sort(byRank),
     },
     ...groupByOwner(tasks).map((g) => ({
       key: g.owner,
@@ -260,7 +263,7 @@ export function filterTasks(tasks: Task[], f: TaskFilter): Task[] {
   return tasks.filter(
     (t) =>
       (!f.area || t.area === f.area) &&
-      (!f.owner || t.owner === f.owner) &&
+      (!f.owner || t.owners.includes(f.owner as Owner)) &&
       (f.status === "all" || (f.status ? t.status === f.status : t.status !== "done"))
   );
 }
@@ -304,7 +307,7 @@ export async function listTasks(sb: Sb): Promise<Task[]> {
 
 export interface NewTask {
   title: string;
-  owner: Owner | null; // null = unassigned
+  owners: Owner[]; // [] = unassigned
   area?: string | null;
   due?: string | null;
   body?: string | null;
@@ -325,7 +328,7 @@ export function buildTaskRow(actor: string, via: Via, t: NewTask, now: Date = ne
   if (t.source && !SOURCES.includes(t.source)) throw new Error(`unknown source ${t.source}`);
   const row = {
     title,
-    owner: assertOwnerOrNull(t.owner),
+    owners: assertOwners(t.owners),
     area: t.area || null,
     due: t.due ? assertDay(t.due) : null,
     body: t.body?.trim() || null,
@@ -355,7 +358,7 @@ export async function createTask(
   await logEvent(sb, actor, via, "task.created", {
     task_id: task.id,
     title,
-    owner: row.owner,
+    owners: row.owners,
     source: row.source,
   });
   return task;
@@ -501,7 +504,7 @@ export async function createLeadTask(
     via,
     {
       title: `${verb} ${biz.name}`,
-      owner: "claude",
+      owners: ["claude"],
       area: "leads",
       source: "lead",
       businessId: i.businessId,
@@ -557,7 +560,7 @@ export async function createOpsTask(
       via,
       {
         title: i.title,
-        owner: "nate",
+        owners: ["nate"],
         area: "ops",
         source: "alert",
         alertKey,

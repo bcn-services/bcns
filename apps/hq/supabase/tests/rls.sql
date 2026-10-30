@@ -118,7 +118,21 @@ begin
   assert (select fit_score from businesses where name = 'Signed In Test Roofing') = 5, 'authenticated write computes fit_score';
 
   -- tasks: insert/update ok, delete matches 0 rows
-  insert into tasks (title, owner) values ('write seed', 'nate') returning id into t1;
+  insert into tasks (title, owners) values ('write seed', '{nate,brandon}') returning id into t1;
+  assert (select owner from tasks where id = t1) = 'nate', 'owner follows the first of owners';
+  update tasks set owner = 'claude' where id = t1;  -- old code writing owner only
+  assert (select owners from tasks where id = t1) = '{claude}', 'owners follows a lone owner write';
+  update tasks set owner = null where id = t1;  -- old code unassigning
+  assert (select owners from tasks where id = t1) = '{}', 'a null owner write clears owners';
+  update tasks set owners = '{nate}' where id = t1;
+  update tasks set owners = '{}' where id = t1;
+  insert into tasks (title, owner) values ('old insert', 'nate');  -- old code creating
+  assert (select owners from tasks where title = 'old insert') = '{nate}', 'old-code insert fills owners';
+  insert into tasks (title, owner) values ('old insert none', null);
+  assert (select owners from tasks where title = 'old insert none') = '{}', 'old-code null insert stays unassigned';
+  assert (select owner from tasks where id = t1) is null, 'no owners clears owner';
+  begin insert into tasks (title, owners) values ('bad owner', '{nobody}'); raise exception 'bad owners';
+  exception when check_violation then null; end;
   update tasks set status = 'doing' where id = t1;
   assert (select status from tasks where id = t1) = 'doing', 'task update';
   -- delete is denied: 0 rows (RLS, no delete policy) or no DELETE privilege (0027 revokes it)

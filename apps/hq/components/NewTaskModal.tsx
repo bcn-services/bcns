@@ -2,15 +2,14 @@
 
 import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { createTaskAction } from "@/app/(app)/work/actions";
-import { OWNERS, type Owner } from "@/lib/tasks";
+import { assertOwners } from "@/lib/tasks";
+import { OwnerChecks } from "./OwnerChecks";
 import type { Track } from "@/lib/tracks";
 
 export interface ClientOpt {
   slug: string;
   display_name: string;
 }
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** "+ New task": Title, Description, owner, date, track, client. Esc or the scrim closes it. */
 export function NewTaskModal(props: {
@@ -37,7 +36,7 @@ export function NewTaskModal(props: {
       const r = await createTaskAction({
         title: s("title"),
         body: s("body") || null,
-        owner: (s("owner") || null) as Owner | null,
+        owners: assertOwners(f.getAll("owner")),
         due: s("due") || null,
         trackId: s("track") || null,
         clientSlug: s("client") || null,
@@ -73,14 +72,7 @@ export function NewTaskModal(props: {
         />
         <textarea name="body" placeholder="Description" aria-label="Description" />
         <div className="wk-g">
-          <select name="owner" aria-label="Owner" defaultValue="">
-            <option value="">Unassigned</option>
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {cap(o)}
-              </option>
-            ))}
-          </select>
+          <OwnerChecks />
           <input type="date" name="due" aria-label="Date" />
           <select name="track" aria-label="Track" defaultValue="">
             <option value="">No track</option>

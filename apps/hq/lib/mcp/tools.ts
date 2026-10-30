@@ -32,6 +32,7 @@ import {
   propose,
   STATUSES,
   addNote,
+  assertOwners,
   updateTask,
   waitingStatus,
   type Status,
@@ -97,6 +98,8 @@ export function stripContacts(v: unknown): unknown {
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+/** One owner or several: a string is a one-element list (the old shape keeps working). */
+const owners = z.union([z.enum(OWNERS), z.array(z.enum(OWNERS))]);
 const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "client slug");
 
 /** Read result or throw; the row type is named by the caller (the client is untyped). */
@@ -112,7 +115,7 @@ const clean = (s: string) =>
     .slice(0, 100);
 
 const TASK_COLS =
-  "id, title, body, owner, area, status, due, waiting_on, business_id, client_slug, created_at";
+  "id, title, body, owners, area, status, due, waiting_on, business_id, client_slug, created_at";
 
 // ---- tools --------------------------------------------------------------------------------
 
@@ -121,7 +124,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_tasks",
     title: "List tasks",
     description:
-      "List HQ tasks. Defaults to open tasks owned by claude. owner: nate|brandon|claude|all; status: open|todo|doing|waiting|done|all.",
+      "List HQ tasks. Defaults to open tasks owned by claude. owner: nate|brandon|claude|all (tasks that include that owner); status: open|todo|doing|waiting|done|all.",
     readOnly: true,
     shape: {
       owner: z.enum([...OWNERS, "all"]).default("claude"),
@@ -166,11 +169,11 @@ export const TOOLS: ToolDef[] = [
     name: "create_task",
     title: "Create a task",
     description:
-      "Create a task, e.g. 'add A to B, due C'. owner: nate|brandon|claude (default claude); due: YYYY-MM-DD; client_slug links a client; track_id puts it on a board track (see list_board). Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board.",
+      "Create a task, e.g. 'add A to B, due C'. owner: nate|brandon|claude, or an array of them for several people (default claude); due: YYYY-MM-DD; client_slug links a client; track_id puts it on a board track (see list_board). Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board.",
     readOnly: false,
     shape: {
       title: z.string().min(1).max(300),
-      owner: z.enum(OWNERS).default("claude"),
+      owner: owners.default("claude"),
       area: z.enum(AREAS).optional(),
       due: day.optional(),
       body: z.string().max(5000).optional(),
@@ -181,7 +184,7 @@ export const TOOLS: ToolDef[] = [
     async run({ sb, actor }, a) {
       const t = await createTask(sb, actor.id, "mcp", {
         title: a.title,
-        owner: a.owner,
+        owners: assertOwners(a.owner),
         area: a.area,
         due: a.due,
         body: a.body,
@@ -197,12 +200,12 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status (doing = Now on the board; a non-empty waiting_on keeps it in Waiting, so clear it), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude, or an array of them for several people ([] unassigns); due: YYYY-MM-DD (null clears); also status (doing = Now on the board; a non-empty waiting_on keeps it in Waiting, so clear it), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner list: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
       status: z.enum(STATUSES).optional(),
-      owner: z.enum(OWNERS).optional(),
+      owner: owners.optional(),
       client_slug: slug.nullable().optional(),
       track_id: uuid.nullable().optional(),
       body: z.string().max(5000).nullable().optional(),
@@ -211,33 +214,34 @@ export const TOOLS: ToolDef[] = [
       resolution: z.string().max(4000).nullable().optional(),
     },
     async run({ sb, actor }, a) {
-      const { id, ...patch } = a;
+      const { id, owner, ...patch } = a;
+      const owners = owner === undefined ? undefined : assertOwners(owner);
       // Read the CURRENT row when the owner gates a close or a reassign, or when waiting_on alone must pick the status (as the UI does).
       const byWaiting = a.status === undefined && a.waiting_on !== undefined;
-      const gated = a.status === "done" || a.owner !== undefined || a.resolution !== undefined;
+      const gated = a.status === "done" || owner !== undefined || a.resolution !== undefined;
       if (gated || byWaiting) {
-        const cur = read<{ owner: string | null; status: Status } | null>(
-          await sb.from("tasks").select("owner, status").eq("id", id).maybeSingle(),
+        const cur = read<{ owners: string[]; status: Status } | null>(
+          await sb.from("tasks").select("owners, status").eq("id", id).maybeSingle(),
           "task"
         );
         if (!cur) throw new ToolError("task not found");
-        // The owner rule: an admin changes anything; staff close or reassign their own, claude's and unowned tasks only.
+        // The owner rule: an admin changes anything; staff close or reassign tasks they co-own, claude's alone and unowned ones only.
         // Reassigning is gated like closing, or a refused close could be dodged by taking the task first.
-        if (gated && cur.owner && cur.owner !== "claude" && cur.owner !== actor.handle) {
+        if (gated && cur.owners.some((o) => o !== "claude") && !cur.owners.includes(actor.handle ?? "")) {
           const me = read<{ role: string } | null>(
             await sb.from("profiles").select("role").eq("id", actor.id).maybeSingle(),
             "profile"
           );
           if (me?.role !== "admin")
             throw new ToolError(
-              `refused: this task is owned by ${cur.owner}; only ${cur.owner} or an admin can ${
-                a.status === "done" ? "mark it done" : a.owner !== undefined ? "reassign it" : "edit its resolution"
+              `refused: this task is owned by ${cur.owners.join(" and ")}; only ${cur.owners.filter((o) => o !== "claude").join(" or ")} or an admin can ${
+                a.status === "done" ? "mark it done" : owner !== undefined ? "reassign it" : "edit its resolution"
               }. Tell the user and leave it.`
             );
         }
         if (byWaiting) patch.status = waitingStatus(a.waiting_on ?? "", cur.status);
       }
-      return { task: await updateTask(sb, actor.id, "mcp", id, patch) };
+      return { task: await updateTask(sb, actor.id, "mcp", id, { ...patch, owners }) };
     },
   }),
 
@@ -276,7 +280,7 @@ export const TOOLS: ToolDef[] = [
                 id: t.id,
                 title: t.title,
                 status: t.status,
-                owner: t.owner,
+                owners: t.owners,
                 due: t.due,
                 client_slug: t.client_slug,
               })),
@@ -517,7 +521,7 @@ export const TOOLS: ToolDef[] = [
         waiting_on_nate: open
           .filter((t) => t.waiting_on?.trim().toLowerCase() === "nate")
           .sort(byDue),
-        nate_tasks: open.filter((t) => t.owner === "nate").sort(byDue),
+        nate_tasks: open.filter((t) => t.owners.includes("nate")).sort(byDue),
         // health is derived (uptime + connectors + payment), never the clients.health column
         clients: read<ClientBase[]>(clients, "clients").map((c) => ({
           slug: c.slug,
