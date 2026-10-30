@@ -103,6 +103,7 @@ test("pulls both sources, one task per open ticket; second run inserts nothing",
   assert.equal(tasks[0].body, "platform · urgent\n\nbu1");
   assert.equal(tasks[1].client_slug, "technology-associates");
   assert.match(tasks[0].text, /'{nate}', 'ops', 'todo', 'alert'.*'job'/);
+  assert.match(tasks[0].text, /\(select id from tracks where name = 'Ops'\)/);
   const second = await run({ sql, sources: mk() });
   assert.deepEqual(second, { pulled: 3, created: 0, closed: 0, pushed: 0, replied: 0, failed: [] });
   assert.equal(tasks.length, 2);

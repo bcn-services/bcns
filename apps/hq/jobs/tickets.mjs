@@ -70,10 +70,11 @@ async function insertTask(sql, src, r) {
   const body = `${src} · ${r.severity}\n\n${r.body ?? ""}`.slice(0, BODY_MAX);
   try {
     await sql`
-      insert into tasks (title, body, owners, area, status, source, client_slug, alert_key, due, via)
+      insert into tasks (title, body, owners, area, status, source, client_slug, alert_key, due, via, track_id)
       values (${`Ticket: ${String(r.subject).slice(0, SUBJECT_MAX)}`}, ${body},
               '{nate}', 'ops', 'todo', 'alert', ${r.slug ?? null}, ${key(src, r)},
-              (now() at time zone 'America/New_York')::date + 2, 'job')
+              (now() at time zone 'America/New_York')::date + 2, 'job',
+              (select id from tracks where name = 'Ops'))
     `;
     return true;
   } catch (e) {
