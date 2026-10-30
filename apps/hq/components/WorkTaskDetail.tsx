@@ -79,16 +79,19 @@ export function WorkTaskDetail(props: {
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
             const picked = (s(f, "status") || task.status) as Status; // no select once done
-            // status follows waiting_on only when the waiting text itself changed
-            const status =
-              waiting.trim() !== (task.waiting_on ?? "").trim()
+            // a changed Status select wins (leaving waiting clears waiting_on, else the board keeps it in Waiting);
+            // otherwise status follows waiting_on only when the waiting text itself changed
+            const pickChanged = picked !== task.status;
+            const status = pickChanged
+              ? picked
+              : waiting.trim() !== (task.waiting_on ?? "").trim()
                 ? (waitingStatus(waiting, picked) ?? picked)
                 : picked;
             return updateTaskAction(task.id, {
               status: status as Status,
               owner: (s(f, "owner") || null) as Owner | null,
               due: s(f, "due") || null,
-              waiting_on: waiting || null,
+              waiting_on: pickChanged && picked !== "waiting" ? null : waiting || null,
               body: s(f, "body") || null,
               ...(isTicket && resChanged(s(f, "resolution"))
                 ? { resolution: s(f, "resolution") || null }

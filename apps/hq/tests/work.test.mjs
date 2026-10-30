@@ -508,7 +508,7 @@ test("tracks: create / update write the row and an events row; fixed names only;
   await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
 });
 
-test("todayQueue: mine only; queue = due within 7d soonest first then oldest created, cap 8; waiting split; done within 7 days", () => {
+test("todayQueue: mine only; queue = doing first, then due within 7d soonest first then oldest created, cap 8; waiting split; done within 7 days", () => {
   const t = (o) => ({
     id: o.id,
     title: o.id,
@@ -547,8 +547,8 @@ test("todayQueue: mine only; queue = due within 7d soonest first then oldest cre
   ];
   const r = T.todayQueue(tasks, "nate", "2026-10-28");
   assert.deepEqual(ids(r.queue), [
+    "due-today", // doing ranks first
     "overdue",
-    "due-today",
     "due-in-7",
     "old-undated",
     "due-in-8",
@@ -566,6 +566,9 @@ test("todayQueue: mine only; queue = due within 7d soonest first then oldest cre
   assert.equal(capped.length, 8);
   assert.deepEqual(ids(capped).slice(0, 3), ["soon", "u0", "u1"]);
   assert.equal(ids(capped).at(-1), "u6");
+  // an undated doing task (Now on the board) never falls past the cap
+  const withDoing = T.todayQueue([...many, t({ id: "doing-new", status: "doing", created_at: "2026-10-27T00:00:00Z" })], "nate", "2026-10-28").queue;
+  assert.equal(ids(withDoing)[0], "doing-new");
   // waiting is uncapped
   const w = Array.from({ length: 12 }, (_, i) => t({ id: `w${i}`, status: "waiting" }));
   assert.equal(T.todayQueue(w, "nate", "2026-10-28").waiting.length, 12);

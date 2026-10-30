@@ -197,7 +197,7 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status (doing = Now on the board), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude; due: YYYY-MM-DD (null clears); also status (doing = Now on the board; a non-empty waiting_on keeps it in Waiting, so clear it), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
