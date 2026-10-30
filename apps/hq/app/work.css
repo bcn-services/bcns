@@ -107,7 +107,6 @@
 .wk-tt {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 .wk-rt {
   font-weight: 500;
@@ -231,6 +230,7 @@
 .wk-step-t {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .wk-step .chip {
   flex: none;
