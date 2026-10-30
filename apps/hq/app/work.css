@@ -189,6 +189,12 @@
   padding: 0;
   font-size: 13px;
 }
+.wk-card li {
+  border-bottom: 1px solid var(--line2);
+}
+.wk-card li:last-child {
+  border-bottom: 0;
+}
 .wk-none {
   margin: 8px 0 0;
   font-size: 13px;
@@ -199,7 +205,7 @@
   gap: 6px;
   align-items: center;
   width: 100%;
-  padding: 2px 0;
+  padding: 6px 0;
   border: 0;
   background: none;
   font: inherit;
