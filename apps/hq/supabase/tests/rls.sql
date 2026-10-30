@@ -126,6 +126,10 @@ begin
   assert (select owners from tasks where id = t1) = '{}', 'a null owner write clears owners';
   update tasks set owners = '{nate}' where id = t1;
   update tasks set owners = '{}' where id = t1;
+  insert into tasks (title, owner) values ('old insert', 'nate');  -- old code creating
+  assert (select owners from tasks where title = 'old insert') = '{nate}', 'old-code insert fills owners';
+  insert into tasks (title, owner) values ('old insert none', null);
+  assert (select owners from tasks where title = 'old insert none') = '{}', 'old-code null insert stays unassigned';
   assert (select owner from tasks where id = t1) is null, 'no owners clears owner';
   begin insert into tasks (title, owners) values ('bad owner', '{nobody}'); raise exception 'bad owners';
   exception when check_violation then null; end;

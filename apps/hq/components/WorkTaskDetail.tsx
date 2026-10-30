@@ -21,8 +21,6 @@ export interface WorkLink {
   url: string;
 }
 
-const sameOwners = (a: string[], b: string[]) =>
-  a.length === b.length && b.every((o) => a.includes(o));
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** An open task (replaces the board): fields, description, Done / Save, then notes and links. */
@@ -93,7 +91,10 @@ export function WorkTaskDetail(props: {
                 : picked;
             return updateTaskAction(task.id, {
               status: status as Status,
-              owners: sameOwners(task.owners, ticked) ? task.owners : ticked, // DOM order must not reshuffle the lead owner
+              owners: [
+                ...task.owners.filter((o) => ticked.includes(o)),
+                ...ticked.filter((o) => !task.owners.includes(o)),
+              ], // keep existing order: the first owner is the board group
               due: s(f, "due") || null,
               waiting_on: pickChanged && picked !== "waiting" ? null : waiting || null,
               body: s(f, "body") || null,
