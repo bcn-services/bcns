@@ -210,7 +210,7 @@ export function PitchTab({
           failed(protos)
         ) : (
           <>
-            {redoFailed && <div className="perr">Redo failed, showing the last good prototypes: {redoFailed.error || "no reason recorded"}</div>}
+            {redoFailed && review && <div className="perr">Redo failed, showing the last good prototypes: {redoFailed.error || "no reason recorded"}</div>}
             <div className="protos">
               {PROTOS.map((p) => {
                 const path = slug ? pathFor(slug, protos, `demo-${p}.html`, "demo") : null;

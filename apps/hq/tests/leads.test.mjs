@@ -606,6 +606,8 @@ test("PitchTab: Consult booked shows only for the 'book' offer, a load error tur
   assert.match(t, /offer === "book" \? \([\s\S]*?Consult booked →/);
   assert.match(t, /offer === "stage" \?[\s\S]*?Stage and owner/);
   assert.equal((t.match(/Consult booked →/g) ?? []).length, 1, "one button, behind the offer");
+  assert.match(t, /"redo", false, \{ feedback: fb \}, !fb\.trim\(\)\)/);
+  assert.match(t, /redoFailed && review &&/);
   assert.match(t, /disabled=\{pending \|\| !!loadError \|\| !st\.can\[step\] \|\| off\}/);
   assert.match(t, /Could not load this lead&apos;s pitch history: \{loadError\}/);
   assert.match(t, /const lit = review \? pick : \(st\.picked \?\? pick\)/);
