@@ -8,12 +8,14 @@ import { createSupabaseServer } from "@/lib/supabase";
 import { requestStep } from "@/lib/deliverables";
 import {
   addLeadNote,
+  createLead,
   etLocalToDate,
   logCall,
   updateLead,
   type Actor,
   type Handle,
   type LeadPatch,
+  type NewLead,
   type OutcomeKey,
 } from "@/lib/leads";
 
@@ -52,6 +54,18 @@ export async function logOutcome(
     const { sb, actor } = await ctx();
     await logCall(sb, actor, "ui", { businessId, outcome: n as OutcomeKey, note: opts.note, consultAt });
   });
+}
+
+/** "+ New lead": returns the new id so the page can open its drawer. */
+export async function createLeadAction(input: NewLead): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  try {
+    const { sb, actor } = await ctx();
+    const id = await createLead(sb, actor, "ui", input);
+    revalidatePath("/", "layout");
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "failed" };
+  }
 }
 
 export async function addNote(form: FormData): Promise<void> {

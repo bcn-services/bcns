@@ -339,6 +339,92 @@ export async function addLeadNote(
   });
 }
 
+export interface NewLead {
+  name: string;
+  trade?: string | null;
+  town?: string | null;
+  state?: string | null;
+  phone?: string | null;
+  domain?: string | null;
+  stage?: string;
+  assigned_to?: Handle;
+  note?: string | null;
+}
+
+/** "https://www.JamSpot.com/about" -> "jamspot.com"; loose on purpose (a typo'd domain is Nate's to fix, not ours to refuse). */
+export const cleanDomain = (s: string): string =>
+  s.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").split(/[/?#\s]/)[0];
+
+/** ilike pattern for "this exact text, any case": % _ \ are the pattern's own characters. */
+const exactIlike = (s: string) => s.replace(/[\\%_]/g, "\\$&");
+
+/**
+ * A lead typed in by hand (UI "+ New lead", MCP create_lead). Provenance is `source_query = 'manual'`.
+ * Same rules as updateLead (stage list, late stages off, nate|brandon); refuses a name+town already on file
+ * so a double submit or a re-typed shop does not make a twin. Returns the new id.
+ */
+export async function createLead(
+  sb: Sb,
+  actor: Actor,
+  via: Via,
+  input: NewLead,
+  env?: Record<string, string | undefined>
+): Promise<string> {
+  const text = (v: string | null | undefined, max: number, what: string) => {
+    const t = v?.trim() ?? "";
+    if (t.length > max) throw new Error(`${what} too long`);
+    return t || null;
+  };
+  const name = text(input.name, 200, "name");
+  if (!name) throw new Error("name is required");
+  const town = text(input.town, 100, "town");
+  const stage = input.stage || "reached";
+  if (!ALL_STAGES.includes(stage)) throw new Error("unknown stage");
+  if ((LATE_STAGES as readonly string[]).includes(stage) && !lateStagesOn(env))
+    throw new Error(`moves to ${stage} are off (HQ_LATE_STAGES)`);
+  const assigned = input.assigned_to ?? "nate";
+  if (assigned !== "nate" && assigned !== "brandon") throw new Error("assigned_to must be nate or brandon");
+  const phone = text(input.phone, 40, "phone");
+  if (phone && !/\d/.test(phone)) throw new Error("phone needs a digit");
+  const domain = input.domain?.trim() ? cleanDomain(input.domain).slice(0, 200) : null;
+  const note = text(input.note, 5000, "note");
+
+  let twin = sb.from("businesses").select("name, town").ilike("name", exactIlike(name));
+  twin = town ? twin.ilike("town", exactIlike(town)) : twin.is("town", null);
+  const dupe = must(await twin.limit(1)).data as { name: string; town: string | null }[] | null;
+  if (dupe?.length) throw new Error(`looks like ${dupe[0].name}${dupe[0].town ? ` (${dupe[0].town})` : ""} already exists`);
+
+  const made = await sb
+    .from("businesses")
+    .insert({
+      name,
+      trade: text(input.trade, 100, "trade"),
+      town,
+      state: text(input.state, 40, "state"),
+      phone,
+      domain,
+      stage,
+      assigned_to: assigned,
+      source_query: "manual",
+    })
+    .select("id")
+    .single();
+  if (made.error) {
+    // unique (domain-derived email / place_id / os_slug) -> a message, not a 500
+    if (made.error.code === "23505") throw new Error("a lead with that email, place or slug already exists");
+    throw new Error(made.error.message);
+  }
+  const id = (made.data as { id: string }).id;
+  await logEvent(sb, actor, via, "lead_created", id, { name, stage, assigned_to: assigned });
+  if (note) {
+    // the lead exists now: say so, or a retry reads as "nothing happened" (the dupe guard stops a twin anyway)
+    await addLeadNote(sb, actor, via, { businessId: id, body: note }).catch((e) => {
+      throw new Error(`lead created, but the note failed: ${e instanceof Error ? e.message : "error"}`);
+    });
+  }
+  return id;
+}
+
 // ---- reads ---------------------------------------------------------------
 export const LEAD_COLS =
   "id, name, trade, town, state, stage, fit_score, assigned_to, next_contact_at, consult_at, deal_value_cents, waiting_on, phone, domain, research, os_slug";

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HintBar } from "@/components/HintBar";
+import { NewLeadModal } from "@/components/NewLeadModal";
 import { LeadDrawer, stageChip, type DrawerTab } from "@/components/LeadDrawer";
 import type { Deliverable } from "@/lib/deliverables";
 import { ownsKeys } from "@/lib/keys";
@@ -27,7 +28,7 @@ export interface Filters {
 /**
  * The Leads page (v2-leads variant A): a full-width 9-column table and a 540px drawer that pushes it
  * (Trade and Consult hide while it is open). Keys: j/k move, enter open, esc close, 1-4 log a call,
- * n note, a reassign. The server page renders the per-lead Details / Calls bodies and hands them in as slots.
+ * n note, a reassign, c new lead. The server page renders the per-lead Details / Calls bodies and hands them in as slots.
  */
 export function LeadsView(props: {
   items: LeadItem[];
@@ -35,6 +36,8 @@ export function LeadsView(props: {
   filters: Filters;
   stages: { value: string; label: string }[];
   trades: string[];
+  /** Stages a hand-made lead may start in (late ones only when HQ_LATE_STAGES is on). */
+  newStages: { value: string; label: string }[];
   sub: string;
   sort: string;
   dir: string;
@@ -43,7 +46,7 @@ export function LeadsView(props: {
   pitchError: string;
   tradesError: string;
 }) {
-  const { items, cols, filters, stages, trades, sub, sort, dir, rows, pitchError, tradesError } = props;
+  const { items, cols, filters, stages, trades, newStages, sub, sort, dir, rows, pitchError, tradesError } = props;
   const router = useRouter();
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -51,6 +54,7 @@ export function LeadsView(props: {
   const [consultOpen, setConsultOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
+  const [newOpen, setNewOpen] = useState(false);
   const focusNote = useRef(false);
   // the open lead's Details / Calls bodies, fetched on select; `items` changing means the server re-rendered (a call, note or save), so refetch
   const [detail, setDetail] = useState<{ id: string; details: ReactNode; calls: ReactNode } | null>(null);
@@ -58,8 +62,8 @@ export function LeadsView(props: {
 
   const current = items.find((l) => l.id === sel) ?? null;
   const drawer = open && current ? current : null;
-  const h = useRef({ items, current, drawer, tab, pending });
-  h.current = { items, current, drawer, tab, pending };
+  const h = useRef({ items, current, drawer, tab, pending, newOpen });
+  h.current = { items, current, drawer, tab, pending, newOpen };
 
   const drawerId = open ? current?.id : undefined;
   const lastId = useRef<string | undefined>(undefined);
@@ -144,7 +148,8 @@ export function LeadsView(props: {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (ownsKeys(e.target as HTMLElement | null, e.key)) return;
-      const { items, current, drawer, tab, pending } = h.current;
+      const { items, current, drawer, tab, pending, newOpen } = h.current;
+      if (newOpen) return; // the New lead modal owns the keyboard
       const i = current ? items.indexOf(current) : -1;
       if (e.key === "j" || e.key === "k") {
         if (!items.length) return;
@@ -166,6 +171,8 @@ export function LeadsView(props: {
         focusNote.current = !note || tab !== "details"; // otherwise the effect focuses it once the tab or the detail arrives
         setTab("details");
         if (tab === "details") note?.focus();
+      } else if (e.key === "c") {
+        setNewOpen(true);
       } else if (current && e.key === "a") {
         actRef.current(() => reassign(current.id, current.assigned === "brandon" ? "nate" : "brandon"));
       } else return;
@@ -199,7 +206,12 @@ export function LeadsView(props: {
     <div className="lx">
       <div className={`lx-body${drawer ? " dr" : ""}`}>
         <main className="lx-main">
-          <h1>Leads</h1>
+          <div className="wk-top">
+            <h1>Leads</h1>
+            <button className="btn pri" type="button" onClick={() => setNewOpen(true)}>
+              + New lead <span className="k">c</span>
+            </button>
+          </div>
           <p className="sub">{sub}</p>
           <form
             className="lx-filters"
@@ -314,6 +326,18 @@ export function LeadsView(props: {
           />
         ) : null}
       </div>
+      {newOpen ? (
+        <NewLeadModal
+          trades={trades}
+          stages={newStages}
+          onClose={() => setNewOpen(false)}
+          onCreated={(id) => {
+            setNewOpen(false);
+            setSel(id);
+            setOpen(true);
+          }}
+        />
+      ) : null}
       <HintBar
         hints={[
           [["j", "k"], "move"],
@@ -321,6 +345,7 @@ export function LeadsView(props: {
           [["1–4"], "log call"],
           [["n"], "note"],
           [["a"], "reassign"],
+          [["c"], "new lead"],
           [["esc"], "close"],
         ]}
       />

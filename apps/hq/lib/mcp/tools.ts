@@ -1,7 +1,7 @@
 /**
  * tools.ts — the HQ MCP's tool surface: 17 tools, each a thin wrapper over the same lib
  * functions the UI uses (via='mcp', actor = the connecting user, so the audit shows "Claude (<handle>)").
- * Claude may only PROPOSE: there is no tool that writes businesses.stage or finance_inputs, decides a
+ * Claude may only PROPOSE: there is no tool that updates businesses.stage (create_lead only inserts a new lead) or writes finance_inputs, decides a
  * proposal, or deletes anything. Pure of next/* so tests import it with a fake Supabase client.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -9,6 +9,7 @@ import { z, type ZodRawShape } from "zod";
 import {
   addLeadNote,
   ALL_STAGES,
+  createLead,
   LATE_STAGES,
   lateStagesOn,
   loadExtras,
@@ -362,6 +363,34 @@ export const TOOLS: ToolDef[] = [
         notes: x?.notes ?? [],
         links: x?.links ?? [],
       });
+    },
+  }),
+
+  tool({
+    name: "create_lead",
+    title: "Create a lead",
+    description:
+      "Add a business to Leads by hand, e.g. 'add JamSpot, music venue in Pomona'. Refuses a name+town already on file (search_leads first). stage defaults to reached; assigned_to to nate. Then use the returned id with create_task (business_id) or log_lead_note. Business names only in note: no personal names, phone or email.",
+    readOnly: false,
+    shape: {
+      name: z.string().min(1).max(200),
+      trade: z.string().max(100).optional(),
+      town: z.string().max(100).optional(),
+      state: z.string().max(40).optional(),
+      phone: z.string().max(40).optional(),
+      domain: z.string().max(200).optional(),
+      stage: z.string().refine((s) => ALL_STAGES.includes(s), "unknown stage").default("reached"),
+      assigned_to: z.enum(["nate", "brandon"]).default("nate"),
+      note: z.string().max(5000).optional(),
+    },
+    async run({ sb, actor }, a) {
+      try {
+        const id = await createLead(sb, actor, "mcp", a);
+        return { id, name: a.name };
+      } catch (e) {
+        // createLead's refusals (duplicate, late stage, bad phone) are for the model to read as-is
+        throw e instanceof ToolError ? e : new ToolError(e instanceof Error ? e.message : "failed");
+      }
     },
   }),
 

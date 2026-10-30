@@ -1,7 +1,8 @@
 import "../../leads.css";
+import "../../work.css"; // the New lead modal reuses the Work modal styles
 import { leadSlug, loadPitchRows, type Deliverable } from "@/lib/deliverables";
 import { createSupabaseServer } from "@/lib/supabase";
-import { ALL_STAGES, LIST_COLS, leadItem, loadLastCalls, loadTrades, stageLabel, type Lead } from "@/lib/leads";
+import { ALL_STAGES, LIST_COLS, leadItem, loadLastCalls, loadTrades, stageLabel, stageOptions, type Lead } from "@/lib/leads";
 import { LeadsView, type Col } from "./View";
 
 const PAGE = 150;
@@ -93,6 +94,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
         { value: "any", label: "Everything, lost too" },
       ]}
       trades={trades}
+      newStages={stageOptions().map((s) => ({ value: s, label: stageLabel(s) }))}
       sub={`${total} · sorted by ${sortKey[1].toLowerCase()}`}
       sort={sortKey[0]}
       dir={dir}
