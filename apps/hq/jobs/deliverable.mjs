@@ -19,9 +19,10 @@
 // for Nate). Every git call also pins GIT_DIR and GIT_COMMON_DIR, so a planted
 // .git/commondir cannot redirect git's config read.
 //
-// ponytail: the os clone is private to HQ and read-only except clients/ and
-// .git, so it is not pulled here. A non-fast-forward push fails the row;
-// Nate refreshes the clone by hand.
+// The clone has nothing of its own, so each run starts by fetching origin/main and
+// hard-resetting to it, and the commit is rebased onto origin/main right before the
+// push (Nate commits to the same main while Claude runs). Never a force push. A
+// failed fetch or rebase fails the row; the rebase is aborted and the clone reset.
 // ponytail: Read/Glob/Grep cover the whole os clone (knowledge/, other clients/),
 // so an injected lead page could pull other os files into a demo that is shown
 // only inside HQ. Narrow Read only if /demo and /quote stop needing those paths.
@@ -39,7 +40,7 @@ const exec = promisify(execFile);
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const TOOLS = "Read,Glob,Grep,Write,Edit";
 export const CLAUDE_TIMEOUT_MS = 18 * 60 * 1000; // inside the unit's 25 min, after run.mjs's 22 min process budget
-const PUSH_TIMEOUT_MS = 120_000; // a stalled push must fail here, not at the unit's 25 min SIGKILL
+const NET_TIMEOUT_MS = 120_000; // a stalled fetch/pull/push must fail here, not at the unit's 25 min SIGKILL
 const SKILL = { pitch: "skills/demo/SKILL.md", quote: "skills/quote/SKILL.md" };
 const PROMPT_DATA_MAX = 12_000;
 
@@ -152,6 +153,15 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
   const go = async (opts, args) =>
     (await run("git", [...base, ...args], { env: genv, maxBuffer: 4 * 1024 * 1024, ...opts })).stdout;
   const git = (...args) => go({}, args);
+  // One line of git's stderr only: no env, no token, no argv. The first error-looking line, else the
+  // first line that is not a "To <url>" / "From <url>" / ref-update / rebase-progress banner.
+  const netErr = (step, err) => {
+    const lines = String(err?.stderr ?? "").split(/[\r\n]/).map((l) => l.trim()).filter(Boolean);
+    const why = (lines.find((l) => /^(error|fatal|CONFLICT|!|ssh:)/.test(l))
+      ?? lines.find((l) => !/^(To |From |\* |Rebasing|[0-9a-f]{7,}\.\.[0-9a-f]{7,})/.test(l)))?.slice(0, 200);
+    return why ? new Error(`git ${step} failed: ${why}`) : err;
+  };
+  const ident = ["-c", "user.name=bcns-hq", "-c", "user.email=hq@bcn-services.com"];
   return {
     // --ignored=matching: ignored files outside clients/<slug>/ count too.
     changed: async () => parsePorcelain(await git("status", "--porcelain", "-z", "--untracked-files=all", "--ignored=matching")),
@@ -163,6 +173,12 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
       await git("reset", "--hard", "-q", "@{u}").catch(() => git("reset", "--hard", "-q"));
       await git("clean", "-ffdxq");
     },
+    // Start of a run: the clone has nothing of its own, so it becomes origin/main (never a pull,
+    // never a force). The tree is clean here (changed/ahead/discard ran first).
+    sync: async () => {
+      await go({ timeout: NET_TIMEOUT_MS }, ["fetch", "origin", "main"]).catch((err) => { throw netErr("fetch", err); });
+      await git("reset", "--hard", "-q", "origin/main");
+    },
     // Throws while the lock marker from an earlier tamper is still there.
     meta: async () => {
       if (existsSync(marker))
@@ -172,22 +188,24 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
     lock: () => writeFile(marker, `${new Date().toISOString()}\n`),
     publish: async ({ slug, kind }) => {
       await git("add", "--", `clients/${slug}`);
-      await git("-c", "user.name=bcns-hq", "-c", "user.email=hq@bcn-services.com",
-        "commit", "-m", `hq: ${kind === "pitch" ? "demo" : "quote"} for ${slug}`);
+      await git(...ident, "commit", "-m", `hq: ${kind === "pitch" ? "demo" : "quote"} for ${slug}`);
+      let step = "pull";
       try {
-        await go({ timeout: PUSH_TIMEOUT_MS }, ["push"]);
+        // Nate may have pushed while Claude ran: rebase the one commit onto origin/main first.
+        await go({ timeout: NET_TIMEOUT_MS }, [...ident, "pull", "--rebase", "origin", "main"]);
+        step = "push";
+        await go({ timeout: NET_TIMEOUT_MS }, ["push"]);
       } catch (err) {
-        // Drop the unpushed commit so it cannot ride out with the next run.
+        // Drop the unpushed commit so it cannot ride out with the next run (abort first: a conflicted rebase is mid-flight).
+        await git("rebase", "--abort").catch(() => {});
         await git("reset", "--hard", "-q", "@{u}").catch(() => {});
-        // First line of git's stderr (past the "To <url>" banner) only: no env, no token, no argv.
-        const why = String(err?.stderr ?? "").split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("To "))?.slice(0, 200);
-        throw why ? new Error(`git push failed: ${why}`) : err;
+        throw netErr(step, err);
       }
     },
   };
 }
 
-// deps: claudeFor(handle) -> {ask}, git {changed, discard, publish}, osDir.
+// deps: claudeFor(handle) -> {ask}, git {changed, ahead, discard, sync, publish}, osDir.
 // All default from env in run.mjs jobDeps.
 export async function run({ sql, db, claudeFor, git, osDir }) {
   const stale = (await db.failStaleDeliverables(sql)).map((r) => r.id);
@@ -220,6 +238,7 @@ export async function run({ sql, db, claudeFor, git, osDir }) {
       }
       await git.discard(); // a killed run's leftovers
     }
+    await git.sync(); // fetch + reset to origin/main; a failure fails the row (nothing of Claude's is in the tree yet)
 
     const [[lead], [client]] = await Promise.all([db.leadForSlug(sql, row.slug), db.clientForSlug(sql, row.slug)]);
     dirty = true;

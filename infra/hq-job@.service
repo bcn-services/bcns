@@ -26,8 +26,8 @@
 #   install -m 0600 -o root /dev/stdin /srv/hq/creds/os-deploy-key    # write-scoped deploy key for the os repo
 #   ssh-keyscan github.com > /srv/hq/jobs-state/known_hosts           # pinned host key, StrictHostKeyChecking=yes
 #   mkdir -p /srv/hq/jobs-state/claude-home && chown -R hq:hq /srv/hq/jobs-state && chmod -R g+rwX /srv/hq/jobs-state
-#   chgrp -R hq /srv/hq/os/clients /srv/hq/os/.git && chmod -R g+rwX /srv/hq/os/clients /srv/hq/os/.git
-#   find /srv/hq/os/clients /srv/hq/os/.git -type d -exec chmod g+s {} +
+#   chgrp -R hq /srv/hq/os && chmod -R g+rwX /srv/hq/os     # the whole clone: the job resets it to origin/main, which can touch any path
+#   find /srv/hq/os -type d -exec chmod g+s {} +
 #   git -C /srv/hq/os config core.sharedRepository group              # new objects stay group-writable (UMask=0002 below)
 # DynamicUser has no fixed uid, so it writes the os clone through SupplementaryGroups=hq.
 [Unit]
@@ -64,13 +64,12 @@ OOMPolicy=continue
 # New files in the shared clone stay group-writable for the hq group.
 UMask=0002
 CPUQuota=50%
-# Hardening: read-only OS, private /tmp, no privilege escalation. The os clone is
-# read-only except clients/ (what the deliverable job writes) and .git (its commit
-# step: Claude has no Bash and git hooks are nulled).
+# Hardening: read-only OS, private /tmp, no privilege escalation. The whole os clone
+# is writable because the deliverable job fetches and resets it to origin/main each
+# run (a moved main touches any path). Claude still writes only clients/<slug>/:
+# its allow rules and the job's post-run guard enforce that, not the filesystem.
 ProtectSystem=strict
-ReadOnlyPaths=/srv/hq/os
-ReadWritePaths=/srv/hq/os/clients /srv/hq/jobs-state
-ReadWritePaths=/srv/hq/os/.git
+ReadWritePaths=/srv/hq/os /srv/hq/jobs-state
 PrivateTmp=true
 NoNewPrivileges=true
 ProtectHome=true
