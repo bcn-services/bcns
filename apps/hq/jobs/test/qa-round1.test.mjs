@@ -159,10 +159,11 @@ test("push rejected (pre-receive refuses): the commit and files are dropped, the
   assert.equal(gitIn(r.d, "status", "--porcelain", "--ignored"), "");
   assert.ok(!existsSync(join(r.d, "clients/blue-ridge")));
   const a = h.after();
-  assert.equal(a[a.indexOf("push") + 1], "reset --hard -q @{u}", `the command right after the failed push is the reset to the upstream: ${a}`);
+  const i = a.indexOf("push");
+  assert.deepEqual(a.slice(i + 1, i + 3), ["rebase --abort", "reset --hard -q @{u}"], `after the failed push: abort any rebase, then reset to the upstream: ${a}`);
 });
 
-test("push rejected as non-fast-forward (origin moved): same cleanup, and a later run is not poisoned by the dropped commit", async () => {
+test("origin moved before the run: the clone is synced first, so the push fast-forwards and publishes only the row's own file", async () => {
   const r = repo();
   const other = tmp("qa-other-");
   execFileSync("git", ["clone", "-q", r.bare, other]);
@@ -172,17 +173,11 @@ test("push rejected as non-fast-forward (origin moved): same cleanup, and a late
   gitIn(other, "push", "-q");
   const h = rig(r, { writes: demo });
   const out = await h.go();
-  assert.equal(out.status, "failed");
-  // Round 2: the row now carries git's own first stderr line instead of the bare "Command failed: git ... push".
-  assert.match(out.error, /^git push failed: ! \[rejected\]\s+\S+ -> \S+ \(fetch first\)$/);
+  assert.equal(out.status, "done", JSON.stringify(out));
   assert.equal(gitIn(r.d, "rev-list", "--count", "@{u}..HEAD").trim(), "0");
   assert.equal(gitIn(r.d, "status", "--porcelain", "--ignored"), "");
-  // Nate refreshes the clone by hand; the next run publishes only its own file.
-  gitIn(r.d, "pull", "-q", "--ff-only");
-  const next = rig(r, { writes: demo });
-  const o2 = await next.go();
-  assert.equal(o2.status, "done");
   assert.equal(gitIn(r.d, "show", "--stat", "--format=", "HEAD").trim().split("\n").length, 2); // one file + summary line
+  assert.ok(existsSync(join(r.d, "x.txt")), "someone else's commit is in the clone, nothing was force-pushed over it");
 });
 
 test("dirty at start, no other row running: leftovers (untracked, modified, ignored) are discarded BEFORE claude runs and never published", async () => {

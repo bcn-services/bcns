@@ -64,13 +64,12 @@ OOMPolicy=continue
 # New files in the shared clone stay group-writable for the hq group.
 UMask=0002
 CPUQuota=50%
-# Hardening: read-only OS, private /tmp, no privilege escalation. The os clone is
-# read-only except clients/ (what the deliverable job writes) and .git (its commit
-# step: Claude has no Bash and git hooks are nulled).
+# Hardening: read-only OS, private /tmp, no privilege escalation. The whole os clone
+# is writable because the deliverable job fetches and resets it to origin/main each
+# run (a moved main touches any path). Claude still writes only clients/<slug>/:
+# its allow rules and the job's post-run guard enforce that, not the filesystem.
 ProtectSystem=strict
-ReadOnlyPaths=/srv/hq/os
-ReadWritePaths=/srv/hq/os/clients /srv/hq/jobs-state
-ReadWritePaths=/srv/hq/os/.git
+ReadWritePaths=/srv/hq/os /srv/hq/jobs-state
 PrivateTmp=true
 NoNewPrivileges=true
 ProtectHome=true
