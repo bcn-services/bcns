@@ -233,7 +233,7 @@ export function WorkTaskDetail(props: {
           <button className="btn" disabled={busy}>
             Save
           </button>
-          {props.admin ? (
+          {props.admin && !isTicket ? (
             <button
               type="button"
               className="btn"
@@ -242,6 +242,7 @@ export function WorkTaskDetail(props: {
                 if (!sure) return setSure(true);
                 start(async () => {
                   const r = await deleteTaskAction(task.id);
+                  setSure(false);
                   if (!r.ok) setMsg(r.error);
                   else onBack();
                 });
