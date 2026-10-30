@@ -344,14 +344,16 @@ test("list items: add and set status write events", async () => {
   assert.equal(sb.db.events.length, 2);
 });
 
-test("no delete path anywhere in the work code", () => {
+test("no delete path in the work code except deleteTask (lib/tasks.ts), which only the admin action calls", () => {
   const root = fileURLToPath(new URL("../", import.meta.url));
   const files = ["app", "lib", "components"].flatMap((d) =>
     readdirSync(root + d, { recursive: true })
       .filter((n) => /\.tsx?$/.test(n))
       .map((n) => root + d + "/" + n)
   );
-  for (const f of files) assert.doesNotMatch(readFileSync(f, "utf8"), /\.delete\(/, f);
+  for (const f of files.filter((f) => !f.endsWith("/lib/tasks.ts")))
+    assert.doesNotMatch(readFileSync(f, "utf8"), /\.delete\(/, f);
+  assert.equal(readFileSync(root + "lib/tasks.ts", "utf8").match(/\.delete\(/g)?.length, 1); // the one loop in deleteTask
 });
 
 test("updateTask: done_at marks the move INTO done; re-saving a done task keeps it", async () => {

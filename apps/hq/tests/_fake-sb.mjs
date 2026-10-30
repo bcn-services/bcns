@@ -16,6 +16,7 @@ export function fakeSb(initial = {}, { failOn = {} } = {}) {
     const api = {
       select: () => api,
       insert: (p) => ((q.op = "insert"), (q.payload = p), api),
+      delete: () => ((q.op = "delete"), api),
       update: (p) => ((q.op = "update"), (q.payload = p), api),
       eq: (c, v) => (q.filters.push((r) => r[c] === v), api),
       neq: (c, v) => (q.filters.push((r) => r[c] !== v), api),
@@ -51,6 +52,10 @@ export function fakeSb(initial = {}, { failOn = {} } = {}) {
         if (q.op === "update") {
           out.forEach((r) => Object.assign(r, q.payload));
           captured.push({ table, op: "update", payload: { ...q.payload } });
+        }
+        if (q.op === "delete") {
+          for (const r of out) rows.splice(rows.indexOf(r), 1);
+          captured.push({ table, op: "delete" });
         }
         if (q.lim != null) out = out.slice(0, q.lim);
       }

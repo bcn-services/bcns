@@ -17,6 +17,7 @@ export function WorkBoard(props: {
   notes: Record<string, WorkNote[]>;
   links: Record<string, WorkLink[]>;
   today: string;
+  admin?: boolean;
   initialTask?: string | null;
 }) {
   const { tasks, tracks, clients, notes, links, today } = props;
@@ -177,6 +178,7 @@ export function WorkBoard(props: {
               links={links[open.id] ?? []}
               tracks={tracks}
               clients={clients}
+              admin={props.admin}
               onBack={() => setSel(null)}
             />
           ) : (
