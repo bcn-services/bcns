@@ -200,7 +200,7 @@ test("Leads page: + New lead button and c key open NewLeadModal, which creates v
   assert.match(v, /\+ New lead/);
   assert.match(v, /e\.key === "c"\) \{\s*setNewOpen\(true\)/);
   assert.match(v, /newOpen: newOpen \|\| taskOpen/); // modals own the keyboard
-  assert.match(v, /onCreated=\{\(id\) => \{[^}]*setSel\(id\);[^}]*setOpen\(true\)/s);
+  assert.match(v, /onCreated=\{\(id, name\) => \{[^}]*setSel\(id\);[^}]*setOpen\(true\);[^}]*router\.push/s);
   const m = src("components/NewLeadModal.tsx");
   assert.match(m, /createLeadAction\(/);
   for (const f of ["name", "trade", "town", "state", "phone", "domain", "stage", "assigned_to", "note"]) assert.ok(m.includes(`name="${f}"`), f);
@@ -228,4 +228,8 @@ test("New task modal on Work: optional Lead search (searchLeadsAction), hidden o
   assert.match(src("app/(app)/work/actions.ts"), /export async function searchLeadsAction[\s\S]*?await ctx\(\)/);
   assert.match(src("components/WorkBoard.tsx"), /clientName\.get\(t\.client_slug\) \?\? t\.client_slug\) : t\.lead/);
   assert.match(src("components/TrackCard.tsx"), /t\.client_slug \?\? t\.lead/);
+});
+
+test("Lead search: Enter picks the first hit instead of submitting the task", () => {
+  assert.match(src("components/NewTaskModal.tsx"), /e\.key !== "Enter"\) return;\s*e\.preventDefault\(\)/);
 });

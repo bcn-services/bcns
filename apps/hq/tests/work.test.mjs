@@ -607,3 +607,12 @@ test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an o
   await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { resolution: "x".repeat(4001) }, NOW), /resolution/);
   assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
 });
+
+test("a task with a business is source lead; with a business AND a client it is refused", async () => {
+  const sb = fakeSb();
+  const BIZ = "33333333-3333-4333-8333-333333333333";
+  const t = await T.createTask(sb, ACTOR, "ui", { title: "Call John", businessId: BIZ });
+  assert.equal(t.source, "lead");
+  assert.equal(t.business_id, BIZ);
+  await assert.rejects(T.createTask(sb, ACTOR, "ui", { title: "x", businessId: BIZ, clientSlug: "acme" }), /lead or a client/);
+});

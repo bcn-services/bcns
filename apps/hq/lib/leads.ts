@@ -356,7 +356,7 @@ export const cleanDomain = (s: string): string =>
   s.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").split(/[/?#\s]/)[0] ?? "";
 
 /** ilike pattern for "this exact text, any case": % _ \ are the pattern's own characters. */
-const exactIlike = (s: string) => s.replace(/[\\%_]/g, "\\$&");
+const exactIlike = (s: string) => s.replace(/[\\%_]/g, "\\$&").replace(/\*/g, "_");
 
 /**
  * A lead typed in by hand (UI "+ New lead", MCP create_lead). Provenance is `source_query = 'manual'`.
@@ -386,7 +386,7 @@ export async function createLead(
   if (assigned !== "nate" && assigned !== "brandon") throw new Error("assigned_to must be nate or brandon");
   const phone = text(input.phone, 40, "phone");
   if (phone && !/\d/.test(phone)) throw new Error("phone needs a digit");
-  const domain = input.domain?.trim() ? cleanDomain(input.domain).slice(0, 200) : null;
+  const domain = cleanDomain(input.domain ?? "").slice(0, 200) || null;
   const note = text(input.note, 5000, "note");
 
   let twin = sb.from("businesses").select("name, town").ilike("name", exactIlike(name));

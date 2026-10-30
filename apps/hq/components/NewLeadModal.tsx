@@ -10,7 +10,7 @@ export function NewLeadModal(props: {
   trades: string[];
   stages: { value: string; label: string }[];
   onClose: () => void;
-  onCreated: (id: string) => void;
+  onCreated: (id: string, name: string) => void;
 }) {
   const { trades, stages, onClose, onCreated } = props;
   const [msg, setMsg] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function NewLeadModal(props: {
           assigned_to: s("assigned_to") === "brandon" ? "brandon" : "nate",
           note: s("note") || null,
         });
-        if (r.ok) onCreated(r.id);
+        if (r.ok) onCreated(r.id, s("name").trim());
         else setMsg(r.error);
       } catch {
         setMsg("Could not reach the server. Check the Leads list before trying again.");

@@ -340,10 +340,12 @@ export function LeadsView(props: {
           trades={trades}
           stages={newStages}
           onClose={() => setNewOpen(false)}
-          onCreated={(id) => {
+          onCreated={(id, name) => {
             setNewOpen(false);
             setSel(id);
             setOpen(true);
+            // the new lead has no fit score and may not match the current filters: show it by name, any stage
+            router.push(`/leads?${new URLSearchParams({ q: name, stage: "any" })}`);
           }}
         />
       ) : null}

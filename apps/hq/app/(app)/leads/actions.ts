@@ -61,10 +61,11 @@ export async function createLeadAction(input: NewLead): Promise<{ ok: true; id: 
   try {
     const { sb, actor } = await ctx();
     const id = await createLead(sb, actor, "ui", input);
-    revalidatePath("/", "layout");
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "failed" };
+  } finally {
+    revalidatePath("/", "layout"); // also after "lead created, but the note failed": the row exists
   }
 }
 

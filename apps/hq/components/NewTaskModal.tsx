@@ -61,7 +61,7 @@ export function NewTaskModal(props: {
         trackId: s("track") || null,
         clientSlug: the ? null : client || null,
         businessId: the?.id ?? null,
-        area: track?.area ?? null, // a track's area carries to its steps
+        area: track?.area ?? (lead ? "leads" : null), // a track's area carries to its steps; a lead's drawer task is a leads task
       });
       if (r.ok) onClose();
       else setMsg(r.error);
@@ -104,7 +104,10 @@ export function NewTaskModal(props: {
             ))}
           </select>
           {the ? null : (
-            <select name="client" aria-label="Client" value={client} onChange={(e) => setClient(e.target.value)}>
+            <select name="client" aria-label="Client" value={client} onChange={(e) => {
+                setClient(e.target.value);
+                setQ("");
+              }}>
               <option value="">No client</option>
               {clients.map((c) => (
                 <option key={c.slug} value={c.slug}>
@@ -128,6 +131,15 @@ export function NewTaskModal(props: {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault(); // Enter picks the first hit; it must not submit the task without the lead
+                const h = hits[0];
+                if (h && q.trim()) {
+                  setPicked({ id: h.id, name: h.name });
+                  setQ("");
+                }
+              }}
               placeholder="Lead (optional): search by business name"
               aria-label="Lead"
               autoComplete="off"
