@@ -1,5 +1,5 @@
-// HQ's ticket sync role (migration *_hq_tickets.sql): hq_tickets can execute ops.hq_tickets_pull and
-// ops.hq_ticket_resolve and nothing else; ticket bodies and the reply leave the DB only through them.
+// HQ's ticket sync role (migrations *_hq_tickets.sql, *_hq_ticket_reply.sql): hq_tickets can execute
+// ops.hq_tickets_pull, ops.hq_ticket_resolve and ops.hq_ticket_reply and nothing else; ticket bodies and the reply leave the DB only through them.
 // A local test-only password is set here and removed after; the real one is Nate's (alter role by
 // hand). Synthetic client + ticket, so the shared seed is untouched. Needs the local stack.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -117,7 +117,26 @@ describe("hq_tickets", () => {
     expect((await sql(`select status from data.tickets where id = $1`, [b])).rows[0].status).toBe("open");
   });
 
-  it("is denied data.tickets, ops.tickets_open and writes; may execute exactly the two functions", async () => {
+  it("reply sets resolution and status=answered without closing; an empty close keeps it; a closed ticket returns 0", async () => {
+    const cl = await mkClient();
+    const id = await mkTicket(cl.id);
+    const c = await asRole();
+    expect((await c.query(`select ops.hq_ticket_reply($1, 'Looking into it.') n`, [id])).rows[0].n).toBe(1);
+    expect((await sql(`select resolution, resolved_at, status from data.tickets where id = $1`, [id])).rows[0]).toEqual({
+      resolution: "Looking into it.",
+      resolved_at: null,
+      status: "answered",
+    });
+    expect((await c.query(`select ops.hq_ticket_resolve($1, '') n`, [id])).rows[0].n).toBe(1);
+    expect((await sql(`select resolution, status from data.tickets where id = $1`, [id])).rows[0]).toEqual({
+      resolution: "Looking into it.",
+      status: "closed",
+    });
+    expect((await c.query(`select ops.hq_ticket_reply($1, 'late') n`, [id])).rows[0].n).toBe(0);
+    expect((await sql(`select resolution from data.tickets where id = $1`, [id])).rows[0].resolution).toBe("Looking into it.");
+  });
+
+  it("is denied data.tickets, ops.tickets_open and writes; may execute exactly the three functions", async () => {
     const c = await asRole();
     await expect(c.query("select 1 from data.tickets")).rejects.toThrow(/permission denied/);
     await expect(c.query("select 1 from data.clients")).rejects.toThrow(/permission denied/);
@@ -138,17 +157,21 @@ describe("hq_tickets", () => {
       `select p.oid::regprocedure::text f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname in ('ops','api','data','public') and has_function_privilege('hq_tickets', p.oid, 'execute')`
     );
-    expect(fn.rows.map((x) => x.f).sort()).toEqual(["ops.hq_ticket_resolve(uuid,text)", "ops.hq_tickets_pull()"]);
+    expect(fn.rows.map((x) => x.f).sort()).toEqual([
+      "ops.hq_ticket_reply(uuid,text)",
+      "ops.hq_ticket_resolve(uuid,text)",
+      "ops.hq_tickets_pull()",
+    ]);
     for (const role of ["anon", "authenticated", "service_role"])
       expect(
-        (await sql(`select has_function_privilege($1, 'ops.hq_tickets_pull()', 'execute') a, has_function_privilege($1, 'ops.hq_ticket_resolve(uuid,text)', 'execute') b`, [role])).rows[0],
+        (await sql(`select has_function_privilege($1, 'ops.hq_tickets_pull()', 'execute') a, has_function_privilege($1, 'ops.hq_ticket_resolve(uuid,text)', 'execute') b, has_function_privilege($1, 'ops.hq_ticket_reply(uuid,text)', 'execute') c`, [role])).rows[0],
         role
-      ).toEqual({ a: false, b: false });
+      ).toEqual({ a: false, b: false, c: false });
     expect((await sql(`select has_schema_privilege('hq_tickets', 'data', 'usage') u`)).rows[0].u).toBe(false);
   });
 
   it("does not widen hq_ops_ro: it cannot execute the functions", async () => {
-    for (const f of ["ops.hq_tickets_pull()", "ops.hq_ticket_resolve(uuid,text)"])
+    for (const f of ["ops.hq_tickets_pull()", "ops.hq_ticket_resolve(uuid,text)", "ops.hq_ticket_reply(uuid,text)"])
       expect((await sql(`select has_function_privilege('hq_ops_ro', $1, 'execute') ok`, [f])).rows[0].ok, f).toBe(false);
   });
 

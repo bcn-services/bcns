@@ -240,7 +240,9 @@ export function WorkTaskDetail(props: {
               disabled={busy || !resText.trim()}
               onClick={() =>
                 start(async () => {
-                  const r = await updateTaskAction(task.id, { reply: resText.trim() });
+                  // clears resolution in the same patch: the blur just saved this text there, and Done must not close with an interim reply
+                  const r = await updateTaskAction(task.id, { reply: resText.trim(), resolution: null });
+                  if (r.ok) setResText("");
                   setMsg(r.ok ? "Reply queued." : r.error);
                 })
               }

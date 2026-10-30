@@ -110,7 +110,8 @@ async function syncSource(sql, s, out, log) {
           // a failed reply stays queued for the next run and never fails this one (the RPC may not be pushed yet)
           try {
             await s.reply(r.id, t.reply);
-            await sql`update tasks set reply = null, updated_at = now() where id = ${t.id}`;
+            // only the text just sent: a reply queued meanwhile stays for the next run
+            await sql`update tasks set reply = null, updated_at = now() where id = ${t.id} and reply = ${t.reply}`;
             out.replied++;
           } catch (e) {
             log(`tickets: reply failed ${t.id} ${String(e?.message ?? e)}`);

@@ -228,6 +228,9 @@ export const TOOLS: ToolDef[] = [
           "task"
         );
         if (!cur) throw new ToolError("task not found");
+        // the job sends a reply only for an open task; on a done one it would be stored and never sent
+        if (a.reply && (a.status === "done" || cur.status === "done"))
+          throw new ToolError("a reply goes out only on an open ticket task; use resolution with status done to close it");
         // The owner rule: an admin changes anything; staff close or reassign tasks they co-own, claude's alone and unowned ones only.
         // Reassigning is gated like closing, or a refused close could be dodged by taking the task first.
         if (gated && cur.owners.some((o) => o !== "claude") && !cur.owners.includes(actor.handle ?? "")) {

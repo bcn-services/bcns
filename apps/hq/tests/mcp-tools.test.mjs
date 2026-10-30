@@ -759,6 +759,17 @@ test("update_task resolution is owner-gated like a close: staff are refused on a
   assert.equal((await call(withTeam(), "update_task", { id: T_NATE, resolution: "ok" })).task.resolution, "ok");
 });
 
+test("update_task reply is owner-gated like resolution and refused on a done task", async () => {
+  const fake = withTeam();
+  await assert.rejects(
+    call(fake, "update_task", { id: T_BRANDON, reply: "hi" }),
+    /refused: this task is owned by brandon; only brandon or an admin can reply to its ticket/
+  );
+  assert.equal(writes(fake).length, 0);
+  assert.equal((await as(ADMIN, fake, "update_task", { id: T_BRANDON, reply: " on it " })).task.reply, "on it");
+  await assert.rejects(call(withTeam(), "update_task", { id: T_NATE, reply: "x", status: "done" }), /only on an open/);
+});
+
 test("owner takes a string or an array: both land as owners[]; [] unassigns; list_tasks and today match any co-owner", async () => {
   const fake = withTeam();
   const one = (await call(fake, "create_task", { title: "old shape", owner: "brandon" })).task;
