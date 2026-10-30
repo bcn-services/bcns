@@ -229,6 +229,15 @@
 }
 .wk-step-t {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wk-step .chip {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  align-self: flex-start;
 }
 .wk-step-t.done {
   text-decoration: line-through;
