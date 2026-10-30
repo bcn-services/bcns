@@ -369,9 +369,9 @@ test("updateTask: done_at marks the move INTO done; re-saving a done task keeps 
   assert.equal(sb.db.tasks[0].done_at, null);
 });
 
-test("UI guards: manual-only create action, waiting_on-driven status, no fire repeated in Your tasks", () => {
+test("UI guards: create action pins source (manual, or lead with a business), waiting_on-driven status, no fire repeated in Your tasks", () => {
   const read = (p) => readFileSync(fileURLToPath(new URL("../" + p, import.meta.url)), "utf8");
-  assert.match(read("app/(app)/work/actions.ts"), /source: "manual", alertKey: null/);
+  assert.match(read("app/(app)/work/actions.ts"), /source: t\.businessId \? "lead" : "manual", alertKey: null/);
   assert.match(
     read("components/WorkTaskDetail.tsx"),
     /waiting\.trim\(\) !== \(task\.waiting_on \?\? ""\)\.trim\(\)/
@@ -462,7 +462,7 @@ test("createTask / updateTask accept client_slug and track_id (and an unassigned
     fileURLToPath(new URL("../app/(app)/work/actions.ts", import.meta.url)),
     "utf8"
   );
-  assert.match(actions, /\.\.\.t, source: "manual"/);
+  assert.match(actions, /\.\.\.t, source: t\.businessId \? "lead" : "manual"/);
 });
 
 test("workGroups: Unassigned first, then nate / brandon / claude; empty groups are left out", () => {

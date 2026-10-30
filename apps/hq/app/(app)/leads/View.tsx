@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HintBar } from "@/components/HintBar";
 import { NewLeadModal } from "@/components/NewLeadModal";
+import { NewTaskModal } from "@/components/NewTaskModal";
 import { LeadDrawer, stageChip, type DrawerTab } from "@/components/LeadDrawer";
 import type { Deliverable } from "@/lib/deliverables";
 import { ownsKeys } from "@/lib/keys";
+import type { Track } from "@/lib/tracks";
 import type { LeadItem } from "@/lib/leads";
 import { logOutcome, reassign } from "./actions";
 import { loadDetail } from "./detail";
@@ -38,6 +40,8 @@ export function LeadsView(props: {
   trades: string[];
   /** Stages a hand-made lead may start in (late ones only when HQ_LATE_STAGES is on). */
   newStages: { value: string; label: string }[];
+  /** For "+ Task for this lead". */
+  tracks: Track[];
   sub: string;
   sort: string;
   dir: string;
@@ -46,7 +50,7 @@ export function LeadsView(props: {
   pitchError: string;
   tradesError: string;
 }) {
-  const { items, cols, filters, stages, trades, newStages, sub, sort, dir, rows, pitchError, tradesError } = props;
+  const { items, cols, filters, stages, trades, newStages, tracks, sub, sort, dir, rows, pitchError, tradesError } = props;
   const router = useRouter();
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -55,6 +59,7 @@ export function LeadsView(props: {
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   const [newOpen, setNewOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
   const focusNote = useRef(false);
   // the open lead's Details / Calls bodies, fetched on select; `items` changing means the server re-rendered (a call, note or save), so refetch
   const [detail, setDetail] = useState<{ id: string; details: ReactNode; calls: ReactNode } | null>(null);
@@ -63,7 +68,7 @@ export function LeadsView(props: {
   const current = items.find((l) => l.id === sel) ?? null;
   const drawer = open && current ? current : null;
   const h = useRef({ items, current, drawer, tab, pending, newOpen });
-  h.current = { items, current, drawer, tab, pending, newOpen };
+  h.current = { items, current, drawer, tab, pending, newOpen: newOpen || taskOpen };
 
   const drawerId = open ? current?.id : undefined;
   const lastId = useRef<string | undefined>(undefined);
@@ -149,7 +154,7 @@ export function LeadsView(props: {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (ownsKeys(e.target as HTMLElement | null, e.key)) return;
       const { items, current, drawer, tab, pending, newOpen } = h.current;
-      if (newOpen) return; // the New lead modal owns the keyboard
+      if (newOpen) return; // a modal (New lead / New task) owns the keyboard
       const i = current ? items.indexOf(current) : -1;
       if (e.key === "j" || e.key === "k") {
         if (!items.length) return;
@@ -312,6 +317,7 @@ export function LeadsView(props: {
             tab={tab}
             onTab={setTab}
             onClose={() => setOpen(false)}
+            onTask={() => setTaskOpen(true)}
             onLog={(n, local) => log(drawer, n, local)}
             pending={pending}
             msg={msg}
@@ -326,6 +332,9 @@ export function LeadsView(props: {
           />
         ) : null}
       </div>
+      {taskOpen && drawer ? (
+        <NewTaskModal tracks={tracks} clients={[]} lead={{ id: drawer.id, name: drawer.name }} onClose={() => setTaskOpen(false)} />
+      ) : null}
       {newOpen ? (
         <NewLeadModal
           trades={trades}

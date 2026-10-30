@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const L = await import("../lib/leads.ts");
-const { createLead, cleanDomain, OUTCOMES, ALL_STAGES, canLog, nextBusinessDay, weekStartET, etLocalToDate, parseResearch, logCall, updateLead, callSummary, scanTrades } = L;
+const { createLead, findLeads, cleanDomain, OUTCOMES, ALL_STAGES, canLog, nextBusinessDay, weekStartET, etLocalToDate, parseResearch, logCall, updateLead, callSummary, scanTrades } = L;
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const ACTOR = { id: "22222222-2222-4222-8222-222222222222", handle: "brandon" };
@@ -685,4 +685,13 @@ test("createLead turns a unique violation into a message, not a raw DB error", a
 test("cleanDomain keeps the host only", () => {
   assert.equal(cleanDomain(" http://WWW.Foo.co/a?b#c "), "foo.co");
   assert.equal(cleanDomain("foo.co"), "foo.co");
+});
+
+test("findLeads: name contains, any case, at most 10, blank asks nothing", async () => {
+  const sb = mcpFake({ businesses: Array.from({ length: 12 }, (_, i) => ({ id: `b${i}`, name: `Jam ${i}`, town: "X", suppressed_at: null })).concat([{ id: "z", name: "Other", town: null, suppressed_at: null }]) });
+  assert.equal((await findLeads(sb, "jam")).length, 10);
+  assert.deepEqual(await findLeads(sb, "oth"), [{ id: "z", name: "Other", town: null }]);
+  const before = sb.ops.length;
+  assert.deepEqual(await findLeads(sb, "  "), []);
+  assert.equal(sb.ops.length, before, "blank query never reaches the database");
 });

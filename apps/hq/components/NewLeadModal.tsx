@@ -49,14 +49,27 @@ export function NewLeadModal(props: {
 
   return (
     <div className="wk-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <form className="wk-modal" role="dialog" aria-modal="true" aria-label="New lead" onSubmit={submit}>
+      <form
+        className="wk-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="New lead"
+        onSubmit={submit}
+      >
         <div className="wk-hdr">
           <h2>New lead</h2>
           <button type="button" className="btn" aria-label="Close" onClick={onClose}>
             ✕
           </button>
         </div>
-        <input name="name" className="wk-title-in" placeholder="Business name" aria-label="Business name" required autoFocus />
+        <input
+          name="name"
+          className="wk-title-in"
+          placeholder="Business name"
+          aria-label="Business name"
+          required
+          autoFocus
+        />
         <div className="wk-g">
           <input name="trade" list="new-lead-trades" placeholder="Trade" aria-label="Trade" />
           <datalist id="new-lead-trades">

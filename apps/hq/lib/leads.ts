@@ -353,7 +353,7 @@ export interface NewLead {
 
 /** "https://www.JamSpot.com/about" -> "jamspot.com"; loose on purpose (a typo'd domain is Nate's to fix, not ours to refuse). */
 export const cleanDomain = (s: string): string =>
-  s.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").split(/[/?#\s]/)[0];
+  s.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").split(/[/?#\s]/)[0] ?? "";
 
 /** ilike pattern for "this exact text, any case": % _ \ are the pattern's own characters. */
 const exactIlike = (s: string) => s.replace(/[\\%_]/g, "\\$&");
@@ -391,8 +391,8 @@ export async function createLead(
 
   let twin = sb.from("businesses").select("name, town").ilike("name", exactIlike(name));
   twin = town ? twin.ilike("town", exactIlike(town)) : twin.is("town", null);
-  const dupe = must(await twin.limit(1)).data as { name: string; town: string | null }[] | null;
-  if (dupe?.length) throw new Error(`looks like ${dupe[0].name}${dupe[0].town ? ` (${dupe[0].town})` : ""} already exists`);
+  const [dupe] = (must(await twin.limit(1)).data ?? []) as { name: string; town: string | null }[];
+  if (dupe) throw new Error(`looks like ${dupe.name}${dupe.town ? ` (${dupe.town})` : ""} already exists`);
 
   const made = await sb
     .from("businesses")
@@ -423,6 +423,16 @@ export async function createLead(
     });
   }
   return id;
+}
+
+/** Lead picker search: name contains `q` (any case), at most 10, suppressed leads left out. */
+export async function findLeads(sb: Sb, q: string): Promise<{ id: string; name: string; town: string | null }[]> {
+  const t = q.trim().slice(0, 100);
+  if (!t) return [];
+  const res = must(
+    await sb.from("businesses").select("id, name, town").is("suppressed_at", null).ilike("name", `%${exactIlike(t)}%`).order("name").limit(10)
+  );
+  return (res.data ?? []) as { id: string; name: string; town: string | null }[]; // untyped client: the select is the shape
 }
 
 // ---- reads ---------------------------------------------------------------

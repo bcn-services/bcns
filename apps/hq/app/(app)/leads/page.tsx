@@ -2,6 +2,7 @@ import "../../leads.css";
 import "../../work.css"; // the New lead modal reuses the Work modal styles
 import { leadSlug, loadPitchRows, type Deliverable } from "@/lib/deliverables";
 import { createSupabaseServer } from "@/lib/supabase";
+import { listTracks } from "@/lib/tracks";
 import { ALL_STAGES, LIST_COLS, leadItem, loadLastCalls, loadTrades, stageLabel, stageOptions, type Lead } from "@/lib/leads";
 import { LeadsView, type Col } from "./View";
 
@@ -49,10 +50,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
   if (needle) q = q.or(`name.ilike.%${needle}%,town.ilike.%${needle}%`);
   if (f.trade) q = q.eq("trade", f.trade);
   if (f.assigned === "nate" || f.assigned === "brandon") q = q.eq("assigned_to", f.assigned);
-  const [res, tradeRes] = await Promise.all([
+  const [res, tradeRes, tracks] = await Promise.all([
     // name then id break ties, so equal values keep one order between reloads
     q.order(sortKey[2], { ascending: dir === "asc", nullsFirst: false }).order("name").order("id").limit(PAGE),
     loadTrades(sb),
+    listTracks(sb).catch(() => []), // only the task modal's track list: a failure leaves it empty, not the page broken
   ]);
   if (res.error) return <p className="lpad muted">Could not load leads: {res.error.message}</p>;
 
@@ -94,6 +96,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
         { value: "any", label: "Everything, lost too" },
       ]}
       trades={trades}
+      tracks={tracks}
       newStages={stageOptions().map((s) => ({ value: s, label: stageLabel(s) }))}
       sub={`${total} · sorted by ${sortKey[1].toLowerCase()}`}
       sort={sortKey[0]}

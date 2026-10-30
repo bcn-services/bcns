@@ -128,7 +128,7 @@ export function WorkBoard(props: {
                 const sub = [
                   (t.track_id && trackName.get(t.track_id)) ||
                     (t.area ? (AREA_LABEL[t.area as Area] ?? t.area) : null),
-                  t.client_slug ? (clientName.get(t.client_slug) ?? t.client_slug) : null,
+                  t.client_slug ? (clientName.get(t.client_slug) ?? t.client_slug) : t.lead,
                 ]
                   .filter(Boolean)
                   .join(" · ");

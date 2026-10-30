@@ -59,9 +59,9 @@ export interface Track {
 /** Synthetic id of the Miscellaneous card; no tracks row has it (tracks.id is a uuid). */
 export const UNASSIGNED_ID = "unassigned";
 
-export interface BoardCard {
+export interface BoardCard<T extends Task = Task> {
   track: Track;
-  steps: Task[];
+  steps: T[];
 }
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -122,11 +122,11 @@ const newestDone = (a: Task, b: Task) => (b.done_at ?? "").localeCompare(a.done_
  * synthetic, never-stored Miscellaneous card for tasks with no track). Steps sort by due; Done keeps the
  * newest 5 per track. Tracks named outside FIXED_TRACKS are skipped. Pure, so Work, Today, MCP and tests share it.
  */
-export function buildBoard(
+export function buildBoard<T extends Task>(
   tracks: Track[],
-  tasks: Task[],
+  tasks: T[],
   now: Date = new Date()
-): Record<Column, BoardCard[]> {
+): Record<Column, BoardCard<T>[]> {
   const today = isoDay(now);
   const misc: Track = {
     id: UNASSIGNED_ID,
@@ -139,7 +139,7 @@ export function buildBoard(
   };
   const cards = [...FIXED_TRACKS.flatMap((n) => tracks.filter((t) => t.name === n)), misc];
   const phased = tasks.map((t) => ({ t, c: phase(t, today) })); // once per task: isoDay is a locale call
-  const board: Record<Column, BoardCard[]> = { now: [], next: [], wait: [], done: [] };
+  const board: Record<Column, BoardCard<T>[]> = { now: [], next: [], wait: [], done: [] };
   for (const c of COLUMNS) {
     for (const track of cards) {
       const steps = phased

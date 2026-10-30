@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Task } from "@/lib/tasks";
 import type { BoardCard } from "@/lib/tracks";
 
 /** One board card: the track name and its steps (tagged with client_slug when set). A step opens its task (onStep) or links to /work?task=. */
@@ -6,7 +7,7 @@ export function TrackCard({
   card,
   onStep,
 }: {
-  card: BoardCard;
+  card: BoardCard<Task & { lead?: string | null }>; // `lead`: the linked business name, when the page loaded it
   onStep?: (taskId: string) => void;
 }) {
   const { track, steps } = card;
@@ -23,7 +24,7 @@ export function TrackCard({
                   {done ? "✓" : ""}
                 </span>
                 <span className={`wk-step-t${done ? " done" : ""}`}>{t.title}</span>
-                {t.client_slug ? <span className="chip">{t.client_slug}</span> : null}
+                {t.client_slug || t.lead ? <span className="chip">{t.client_slug ?? t.lead}</span> : null}
               </>
             );
             return (

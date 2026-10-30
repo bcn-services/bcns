@@ -324,6 +324,30 @@
 .wk-modal textarea {
   margin-top: 10px;
 }
+.wk-pick {
+  margin-top: 10px;
+}
+.wk-pick ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+.wk-pick li button {
+  all: unset;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.wk-pick li button:hover,
+.wk-pick li button:focus-visible {
+  background: var(--tint);
+}
 .wk-g {
   display: grid;
   grid-template-columns: 1fr 1fr;
