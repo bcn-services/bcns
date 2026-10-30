@@ -360,3 +360,18 @@
   gap: 10px;
   margin-top: 10px;
 }
+
+/* owner colour: Nate green, Brandon purple (= .chip.brandon); Claude and unassigned stay plain */
+.wk-tr,
+.wk-step {
+  --own-nate: var(--ok);
+  --own-brandon: #5a3ea6;
+}
+.wk-tr.own-nate,
+.wk-step.own-nate {
+  border-left: 3px solid var(--own-nate);
+}
+.wk-tr.own-brandon,
+.wk-step.own-brandon {
+  border-left: 3px solid var(--own-brandon);
+}

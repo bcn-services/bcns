@@ -26,6 +26,7 @@ export function WorkBoard(props: {
   const [q, setQ] = useState("");
   const [trackF, setTrackF] = useState("");
   const [clientF, setClientF] = useState("");
+  const [ownerF, setOwnerF] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
 
@@ -34,10 +35,18 @@ export function WorkBoard(props: {
     () => new Map(clients.map((c) => [c.slug, c.display_name])),
     [clients]
   );
+  // "" = anyone, "none" = unassigned, else a named owner
+  const shown = useMemo(
+    () =>
+      tasks.filter((t) =>
+        !ownerF ? true : ownerF === "none" ? !t.owners.length : t.owners.some((o) => o === ownerF)
+      ),
+    [tasks, ownerF]
+  );
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return workGroups(
-      tasks.filter(
+      shown.filter(
         (t) =>
           t.status !== "done" &&
           (!needle || t.title.toLowerCase().includes(needle)) &&
@@ -45,8 +54,8 @@ export function WorkBoard(props: {
           (!clientF || t.client_slug === clientF)
       )
     );
-  }, [tasks, q, trackF, clientF]);
-  const board = useMemo(() => buildBoard(tracks, tasks), [tracks, tasks]);
+  }, [shown, q, trackF, clientF]);
+  const board = useMemo(() => buildBoard(tracks, shown), [tracks, shown]);
   const open = tasks.find((t) => t.id === sel);
 
   const act = (f: () => Promise<{ ok: boolean; error?: string }>) =>
@@ -110,6 +119,13 @@ export function WorkBoard(props: {
                 </option>
               ))}
             </select>
+            <select aria-label="Owner" value={ownerF} onChange={(e) => setOwnerF(e.target.value)}>
+              <option value="">Anyone</option>
+              <option value="nate">Nate</option>
+              <option value="brandon">Brandon</option>
+              <option value="claude">Claude</option>
+              <option value="none">Unassigned</option>
+            </select>
           </div>
           {msg ? (
             <p className="note err" role="alert">
@@ -136,7 +152,7 @@ export function WorkBoard(props: {
                 return (
                   <div
                     key={t.id}
-                    className={`wk-tr${sel === t.id ? " f" : ""}`}
+                    className={`wk-tr own-${t.owners[0] ?? "none"}${sel === t.id ? " f" : ""}`}
                     role="button"
                     tabIndex={0}
                     aria-current={sel === t.id ? "true" : undefined}
