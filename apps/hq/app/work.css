@@ -205,8 +205,9 @@
   gap: 6px;
   align-items: center;
   width: 100%;
-  padding: 6px 0;
+  padding: 6px 8px;
   border: 0;
+  border-radius: 8px; /* same as .wk-tr so the owner stripe curves */
   background: none;
   font: inherit;
   text-align: left;
@@ -361,11 +362,12 @@
   margin-top: 10px;
 }
 
-/* owner colour: Nate green, Brandon purple (= .chip.brandon); Claude and unassigned stay plain */
+/* owner colour: Nate green, Brandon purple (= .chip.brandon), Claude orange; unassigned stays plain */
 .wk-tr,
 .wk-step {
   --own-nate: var(--ok);
   --own-brandon: #5a3ea6;
+  --own-claude: #d9822b;
   border-left: 3px solid transparent; /* every row keeps the 3px so columns line up */
 }
 .wk-tr.own-nate,
@@ -375,4 +377,8 @@
 .wk-tr.own-brandon,
 .wk-step.own-brandon {
   border-left: 3px solid var(--own-brandon);
+}
+.wk-tr.own-claude,
+.wk-step.own-claude {
+  border-left: 3px solid var(--own-claude);
 }
