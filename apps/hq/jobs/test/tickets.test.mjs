@@ -6,7 +6,13 @@ import { main, JOBS } from "../run.mjs";
 // An in-memory `tasks` table behind a sql tag. It answers only the four statements the job issues;
 // the open-alert unique index is modelled, so a double insert raises 23505 like the real one.
 function fakeSql(seed = []) {
-  const tasks = seed.map((t, i) => ({ synced_at: null, resolution: null, ...t, n: i }));
+  const tasks = seed.map((t, i) => ({
+    synced_at: null,
+    resolution: null,
+    reply: null,
+    ...t,
+    n: i,
+  }));
   const calls = [];
   const sql = async (strings, ...v) => {
     const text = strings.join("?").replace(/\s+/g, " ").trim();
@@ -36,6 +42,7 @@ function fakeSql(seed = []) {
     if (text.startsWith("update tasks set status = 'done'"))
       Object.assign(t, { status: "done", synced_at: new Date() });
     else if (text.startsWith("update tasks set synced_at")) t.synced_at = new Date();
+    else if (text.startsWith("update tasks set reply = null")) t.reply = null;
     else throw new Error(`unexpected sql: ${text}`);
     return [];
   };
@@ -53,11 +60,13 @@ const ticket = (id, o = {}) => ({
   updated_at: "2026-10-28T10:00:00Z",
   ...o,
 });
-function fakeSource(name, rows, { failPull = false, failResolve = null } = {}) {
+function fakeSource(name, rows, { failPull = false, failResolve = null, failReply = false } = {}) {
   const resolved = [];
+  const replied = [];
   const src = {
     name,
     resolved,
+    replied,
     closed: 0,
     pull: async () => {
       if (failPull) throw new Error(`${name} down`);
@@ -66,6 +75,10 @@ function fakeSource(name, rows, { failPull = false, failResolve = null } = {}) {
     resolve: async (id, text) => {
       if (failResolve === id) throw new Error("resolve boom");
       resolved.push([id, text]);
+    },
+    reply: async (id, text) => {
+      if (failReply) throw new Error("function public.hq_ticket_reply does not exist");
+      replied.push([id, text]);
     },
     close: async () => {
       src.closed++;
@@ -84,7 +97,7 @@ test("pulls both sources, one task per open ticket; second run inserts nothing",
     fakeSource("ta", [ticket(7, { slug: "technology-associates", status: "answered" })]),
   ];
   const first = await run({ sql, sources: mk() });
-  assert.deepEqual(first, { pulled: 3, created: 2, closed: 0, pushed: 0, failed: [] });
+  assert.deepEqual(first, { pulled: 3, created: 2, closed: 0, pushed: 0, replied: 0, failed: [] });
   assert.deepEqual(
     tasks.map((t) => t.alert_key),
     ["ticket:platform:u1", "ticket:ta:7"]
@@ -92,9 +105,9 @@ test("pulls both sources, one task per open ticket; second run inserts nothing",
   assert.equal(tasks[0].title, "Ticket: su1");
   assert.equal(tasks[0].body, "platform · urgent\n\nbu1");
   assert.equal(tasks[1].client_slug, "technology-associates");
-  assert.match(tasks[0].text, /'nate', 'ops', 'todo', 'alert'.*'job'/);
+  assert.match(tasks[0].text, /'{nate}', 'ops', 'todo', 'alert'.*'job'/);
   const second = await run({ sql, sources: mk() });
-  assert.deepEqual(second, { pulled: 3, created: 0, closed: 0, pushed: 0, failed: [] });
+  assert.deepEqual(second, { pulled: 3, created: 0, closed: 0, pushed: 0, replied: 0, failed: [] });
   assert.equal(tasks.length, 2);
 });
 
@@ -141,6 +154,7 @@ test("done and unsynced pushes once with the resolution, then never again", asyn
     created: 0,
     closed: 0,
     pushed: 0,
+    replied: 0,
     failed: [],
   });
   assert.deepEqual(again.resolved, []);
@@ -189,7 +203,7 @@ test("a unique violation on insert means the task is already there", async () =>
   // the job's lookup is stale: pretend it saw no task, then the index refuses the insert
   const racy = async (s, ...v) => (s.join("?").includes("select id, status") ? [] : sql(s, ...v));
   const out = await run({ sql: racy, sources: [fakeSource("ta", [ticket(1)])] });
-  assert.deepEqual(out, { pulled: 1, created: 0, closed: 0, pushed: 0, failed: [] });
+  assert.deepEqual(out, { pulled: 1, created: 0, closed: 0, pushed: 0, replied: 0, failed: [] });
   assert.equal(tasks.length, 1);
 });
 
@@ -246,6 +260,8 @@ test("ticketsDeps: verify-full forced, max 1, 5s connect; a missing URL skips wi
   assert.equal(made[0].pg.q[0], "select * from public.hq_tickets_pull()");
   await sources[0].resolve(7, "done");
   assert.deepEqual(made[0].pg.q, ["select public.hq_ticket_resolve($1::int, $2)", [7, "done"]]);
+  await sources[0].reply(7, "hi");
+  assert.deepEqual(made[0].pg.q, ["select public.hq_ticket_reply($1::int, $2)", [7, "hi"]]);
 
   const both = await ticketsDeps(
     { PLATFORM_TICKETS_URL: "postgresql://u:p@h/db", TA_TICKETS_URL: "x" },
@@ -280,4 +296,54 @@ test("tickets is on the run.mjs allow-list and a failed run is logged ok:false",
   assert.equal(code, 1);
   assert.equal(events[0].job, "tickets");
   assert.equal(events[0].detail.ok, false);
+});
+
+test("a queued reply on an open task is pushed once and cleared; task and ticket stay open", async () => {
+  const { sql, tasks } = fakeSql([
+    { id: "a", status: "todo", alert_key: "ticket:platform:u1", reply: "Looking into it." },
+  ]);
+  const p = fakeSource("platform", [ticket("u1")]);
+  const out = await run({ sql, sources: [p] });
+  assert.equal(out.replied, 1);
+  assert.deepEqual(p.replied, [["u1", "Looking into it."]]);
+  assert.deepEqual(p.resolved, []);
+  assert.equal(tasks[0].reply, null);
+  assert.equal(tasks[0].status, "todo");
+  assert.equal(tasks[0].synced_at, null);
+  const again = fakeSource("platform", [ticket("u1", { status: "answered" })]);
+  assert.equal((await run({ sql, sources: [again] })).replied, 0);
+  assert.deepEqual(again.replied, []);
+});
+
+test("a failed reply is logged, stays queued, and does not fail the run", async () => {
+  const { sql, tasks } = fakeSql([
+    { id: "a", status: "doing", alert_key: "ticket:ta:3", reply: "On it." },
+  ]);
+  const logs = [];
+  const out = await run({
+    sql,
+    sources: [fakeSource("ta", [ticket(3)], { failReply: true })],
+    log: (m) => logs.push(m),
+  });
+  assert.equal(out.replied, 0);
+  assert.deepEqual(out.failed, []);
+  assert.equal(tasks[0].reply, "On it.");
+  assert.deepEqual(logs, [
+    "tickets: reply failed a function public.hq_ticket_reply does not exist",
+  ]);
+});
+
+test("a closed ticket gets no reply (its task closes instead); a done task's reply is never sent", async () => {
+  const { sql, tasks } = fakeSql([
+    { id: "a", status: "todo", alert_key: "ticket:ta:3", reply: "late" },
+    { id: "b", status: "done", alert_key: "ticket:ta:4", reply: "too late", synced_at: new Date() },
+  ]);
+  const ta = fakeSource("ta", [
+    ticket(3, { status: "closed" }),
+    ticket(4, { updated_at: "2020-01-01T00:00:00Z" }),
+  ]);
+  const out = await run({ sql, sources: [ta] });
+  assert.equal(out.replied, 0);
+  assert.deepEqual(ta.replied, []);
+  assert.equal(tasks[0].status, "done");
 });

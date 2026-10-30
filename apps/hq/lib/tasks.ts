@@ -66,6 +66,7 @@ export interface Task {
   alert_key: string | null;
   waiting_on: string | null;
   resolution: string | null; // ticket tasks: sent to the client's ticket when done (jobs/tickets.mjs)
+  reply: string | null; // ticket tasks: queued reply, pushed without closing on the next sync, then null
   done_at: string | null;
   created_at: string;
 }
@@ -138,6 +139,7 @@ export interface TaskPatch {
   waiting_on?: string | null;
   body?: string | null;
   resolution?: string | null;
+  reply?: string | null;
 }
 
 /** Validated DB patch for updateTask; only the keys present are touched. */
@@ -154,6 +156,11 @@ export function buildTaskPatch(p: TaskPatch, now: Date): Record<string, unknown>
     const r = p.resolution?.trim() || null;
     if (r && r.length > 4000) throw new Error("resolution is over 4000 characters");
     out.resolution = r;
+  }
+  if (p.reply !== undefined) {
+    const r = p.reply?.trim() || null;
+    if (r && r.length > 4000) throw new Error("reply is over 4000 characters");
+    out.reply = r;
   }
   if (!Object.keys(out).length) throw new Error("nothing to update");
   return { ...out, updated_at: now.toISOString() };

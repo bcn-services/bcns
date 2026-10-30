@@ -74,7 +74,8 @@ function tool<S extends ZodRawShape>(def: {
 // ---- contact stripping --------------------------------------------------------------------
 
 // next_contact_at is a date, not a contact detail: only name/person/info keys and bare "contact(s)" go.
-const CONTACT_KEY = /phone|e-?mail|mobile|fax|^tel$|^contacts?$|contact_(name|person|info|detail)|owner_name|person_name|decision_maker/i;
+const CONTACT_KEY =
+  /phone|e-?mail|mobile|fax|^tel$|^contacts?$|contact_(name|person|info|detail)|owner_name|person_name|decision_maker/i;
 const EMAIL_IN_TEXT = /[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[A-Za-z]{2,}/g;
 // ponytail: 10-digit NANP (optional +1, parens, space/dot/dash) or +country-code runs; the lookbehind keeps dates,
 // timestamps and ids intact. Other local formats (e.g. 8-digit numbers without +) pass — extend if one shows up.
@@ -201,7 +202,7 @@ export const TOOLS: ToolDef[] = [
     name: "update_task",
     title: "Update a task",
     description:
-      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude, or an array of them for several people ([] unassigns); due: YYYY-MM-DD (null clears); also status (doing = Now on the board; a non-empty waiting_on keeps it in Waiting, so clear it), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. status=done or a new owner list: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
+      "Reassign, reschedule or close a task, e.g. 'assign X to Y', 'mark D done'. Find the id with list_tasks. owner: nate|brandon|claude, or an array of them for several people ([] unassigns); due: YYYY-MM-DD (null clears); also status (doing = Now on the board; a non-empty waiting_on keeps it in Waiting, so clear it), body, waiting_on, client_slug, track_id, resolution. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Ideally every task gets one; use track_id from list_board. Ticket tasks (alert_key `ticket:…`): set `resolution` and `status: done` to close the client's ticket with that text on the next sync. Ticket tasks: set `reply` to post that text to the client's ticket on the next sync without closing it (TA → In review). status=done or a new owner list: an admin may do it to any task; anyone else only to their own, claude's or unowned tasks, and is refused on another person's task.",
     readOnly: false,
     shape: {
       id: uuid,
@@ -213,13 +214,18 @@ export const TOOLS: ToolDef[] = [
       waiting_on: z.string().max(200).nullable().optional(),
       due: day.nullable().optional(),
       resolution: z.string().max(4000).nullable().optional(),
+      reply: z.string().max(4000).nullable().optional(),
     },
     async run({ sb, actor }, a) {
       const { id, owner, ...patch } = a;
       const owners = owner === undefined ? undefined : assertOwners(owner);
       // Read the CURRENT row when the owner gates a close or a reassign, or when waiting_on alone must pick the status (as the UI does).
       const byWaiting = a.status === undefined && a.waiting_on !== undefined;
-      const gated = a.status === "done" || owner !== undefined || a.resolution !== undefined;
+      const gated =
+        a.status === "done" ||
+        owner !== undefined ||
+        a.resolution !== undefined ||
+        a.reply !== undefined;
       if (gated || byWaiting) {
         const cur = read<{ owners: string[]; status: Status } | null>(
           await sb.from("tasks").select("owners, status").eq("id", id).maybeSingle(),
@@ -228,7 +234,11 @@ export const TOOLS: ToolDef[] = [
         if (!cur) throw new ToolError("task not found");
         // The owner rule: an admin changes anything; staff close or reassign tasks they co-own, claude's alone and unowned ones only.
         // Reassigning is gated like closing, or a refused close could be dodged by taking the task first.
-        if (gated && cur.owners.some((o) => o !== "claude") && !cur.owners.includes(actor.handle ?? "")) {
+        if (
+          gated &&
+          cur.owners.some((o) => o !== "claude") &&
+          !cur.owners.includes(actor.handle ?? "")
+        ) {
           const me = read<{ role: string } | null>(
             await sb.from("profiles").select("role").eq("id", actor.id).maybeSingle(),
             "profile"
@@ -236,7 +246,13 @@ export const TOOLS: ToolDef[] = [
           if (me?.role !== "admin")
             throw new ToolError(
               `refused: this task is owned by ${cur.owners.join(" and ")}; only ${cur.owners.filter((o) => o !== "claude").join(" or ")} or an admin can ${
-                a.status === "done" ? "mark it done" : owner !== undefined ? "reassign it" : "edit its resolution"
+                a.status === "done"
+                  ? "mark it done"
+                  : owner !== undefined
+                    ? "reassign it"
+                    : a.reply !== undefined
+                      ? "reply to its ticket"
+                      : "edit its resolution"
               }. Tell the user and leave it.`
             );
         }
@@ -265,7 +281,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_board",
     title: "List the board",
     description:
-      "List the Work board. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Columns are task phases: Now (status doing, or due within 7 days incl. overdue), Next (other open tasks), Waiting (status waiting or a waiting_on), Done (done in the last 7 days, newest 5 per track). A track appears in every column it has tasks in; each card lists only that column's steps (tasks). Tasks with no track show on a \"Miscellaneous\" card (id \"unassigned\", last in each column). To move work between columns, update the task (update_task status/due/waiting_on).",
+      'List the Work board. Tracks are fixed: Software, Outreach, Marketing, Clients, Ops. Columns are task phases: Now (status doing, or due within 7 days incl. overdue), Next (other open tasks), Waiting (status waiting or a waiting_on), Done (done in the last 7 days, newest 5 per track). A track appears in every column it has tasks in; each card lists only that column\'s steps (tasks). Tasks with no track show on a "Miscellaneous" card (id "unassigned", last in each column). To move work between columns, update the task (update_task status/due/waiting_on).',
     readOnly: true,
     shape: {},
     async run({ sb }) {
@@ -295,7 +311,8 @@ export const TOOLS: ToolDef[] = [
   tool({
     name: "update_track",
     title: "Update a track",
-    description: "Change a board track's area or client_slug (null clears), or rename it to one of the fixed names (Software, Outreach, Marketing, Clients, Ops). Tracks cannot be created or deleted.",
+    description:
+      "Change a board track's area or client_slug (null clears), or rename it to one of the fixed names (Software, Outreach, Marketing, Clients, Ops). Tracks cannot be created or deleted.",
     readOnly: false,
     shape: {
       id: uuid,
@@ -379,7 +396,10 @@ export const TOOLS: ToolDef[] = [
       state: z.string().max(40).optional(),
       phone: z.string().max(40).optional(),
       domain: z.string().max(200).optional(),
-      stage: z.string().refine((s) => ALL_STAGES.includes(s), "unknown stage").default("reached"),
+      stage: z
+        .string()
+        .refine((s) => ALL_STAGES.includes(s), "unknown stage")
+        .default("reached"),
       assigned_to: z.enum(["nate", "brandon"]).default("nate"),
       note: z.string().max(5000).optional(),
     },
@@ -530,11 +550,7 @@ export const TOOLS: ToolDef[] = [
           .neq("status", "done")
           .lte("due", addDays(today, 7))
           .order("due"),
-        sb
-          .from("clients")
-          .select(CLIENT_SELECT)
-          .is("churn_date", null)
-          .order("display_name"),
+        sb.from("clients").select(CLIENT_SELECT).is("churn_date", null).order("display_name"),
         loadHealthSources(sb),
       ]);
       const open = tasks.filter((t) => t.status !== "done");
