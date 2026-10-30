@@ -18,6 +18,7 @@ function memSb(tables) {
         select: (_c, o) => ((head = !!o?.head), b),
         eq: (c, v) => ((rows = rows.filter((r) => r[c] === v)), b),
         neq: (c, v) => ((rows = rows.filter((r) => r[c] !== v)), b),
+        contains: (c, vs) => ((rows = rows.filter((r) => vs.every((v) => r[c]?.includes(v)))), b),
         is: (c, v) => ((rows = rows.filter((r) => (r[c] ?? null) === v)), b),
         in: (c, vs) => ((rows = rows.filter((r) => vs.includes(r[c]))), b),
         // only the shape loadBrandonToday sends: "col.is.null,col.lt.<iso>"
@@ -67,9 +68,9 @@ const tables = () => ({
     biz("hq3 lost one", { stage: "lost" }),
   ],
   tasks: [
-    { id: "t1", title: "mine open", owner: "brandon", status: "open", due: "2026-10-30" },
-    { id: "t2", title: "mine done", owner: "brandon", status: "done", due: null },
-    { id: "t3", title: "nates", owner: "nate", status: "open", due: null },
+    { id: "t1", title: "mine open", owners: ["brandon"], status: "open", due: "2026-10-30" },
+    { id: "t2", title: "mine done", owners: ["brandon"], status: "done", due: null },
+    { id: "t3", title: "nates", owners: ["nate"], status: "open", due: null },
   ],
   call_weeks: [
     { by: "brandon", week: "2026-10-26", calls: 12, reached: 5, consults: 2 },

@@ -351,7 +351,7 @@ test("+ Task for this client: createTask with clientSlug writes client_slug, via
   const fake = mcpFake({ tasks: [], events: [] });
   const t = await createTask(fake, "u1", "ui", {
     title: " Call about renewal ",
-    owner: "nate",
+    owners: ["nate"],
     area: "client",
     clientSlug: "sb",
   });

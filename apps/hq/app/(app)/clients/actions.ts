@@ -5,7 +5,7 @@ import { isAdmin } from "@/lib/proposals";
 import { getSession } from "@/lib/session";
 import { createSupabaseServer } from "@/lib/supabase";
 import { isSlug } from "@/lib/clients/fields";
-import { assertOwner, createTask } from "@/lib/tasks";
+import { assertOwners, createTask } from "@/lib/tasks";
 import { applyClientUpdate } from "./apply";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -34,7 +34,7 @@ export async function addClientTask(formData: FormData): Promise<ActionResult> {
     if (!isSlug(slug)) return { ok: false, error: "bad slug" };
     await createTask(sb, user.id, "ui", {
       title: String(formData.get("title") ?? ""),
-      owner: assertOwner(String(formData.get("owner") ?? "")),
+      owners: assertOwners(formData.getAll("owner")),
       area: "client",
       clientSlug: slug,
     });

@@ -9,7 +9,7 @@ const TODAY = "2026-10-27";
 
 const task = (o) => ({
   title: o.id,
-  owner: "nate",
+  owners: ["nate"],
   status: "todo",
   due: null,
   waiting_on: null,

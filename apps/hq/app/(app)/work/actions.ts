@@ -64,8 +64,8 @@ export async function markDone(id: string): Promise<ActionResult> {
   return updateTaskAction(id, { status: "done" });
 }
 
-export async function cycleOwner(id: string, current: Owner | null): Promise<ActionResult> {
-  return updateTaskAction(id, { owner: nextOwner(current) });
+export async function cycleOwner(id: string, current: Owner[]): Promise<ActionResult> {
+  return updateTaskAction(id, { owners: nextOwner(current) });
 }
 
 export async function addNoteAction(taskId: string, body: string): Promise<ActionResult> {

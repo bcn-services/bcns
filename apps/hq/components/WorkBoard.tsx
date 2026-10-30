@@ -65,7 +65,7 @@ export function WorkBoard(props: {
       : {
           n: () => setModal(true),
           d: (k) => byId(k) && act(() => markDone(k!)),
-          o: (k) => byId(k) && act(() => cycleOwner(k!, byId(k)!.owner)),
+          o: (k) => byId(k) && act(() => cycleOwner(k!, byId(k)!.owners)),
           w: (k) => byId(k) && setTimeout(() => document.getElementById("wk-waiting")?.focus(), 0),
         },
     modal ? undefined : () => document.getElementById("wk-board-pane")?.focus()

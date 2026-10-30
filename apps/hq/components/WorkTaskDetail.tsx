@@ -2,7 +2,8 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { addLinkAction, addNoteAction, markDone, updateTaskAction } from "@/app/(app)/work/actions";
-import { OWNERS, STATUSES, waitingStatus, type Owner, type Status, type Task } from "@/lib/tasks";
+import { assertOwners, STATUSES, waitingStatus, type Status, type Task } from "@/lib/tasks";
+import { OwnerChecks } from "./OwnerChecks";
 import type { Track } from "@/lib/tracks";
 import type { ClientOpt } from "./NewTaskModal";
 
@@ -74,7 +75,7 @@ export function WorkTaskDetail(props: {
       ) : null}
 
       <form
-        key={`${task.id}${task.status}${task.owner}${task.due}${task.waiting_on}${task.body}${task.track_id}${task.client_slug}`}
+        key={`${task.id}${task.status}${task.owners.join()}${task.due}${task.waiting_on}${task.body}${task.track_id}${task.client_slug}`}
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
@@ -89,7 +90,7 @@ export function WorkTaskDetail(props: {
                 : picked;
             return updateTaskAction(task.id, {
               status: status as Status,
-              owner: (s(f, "owner") || null) as Owner | null,
+              owners: assertOwners(f.getAll("owner")),
               due: s(f, "due") || null,
               waiting_on: pickChanged && picked !== "waiting" ? null : waiting || null,
               body: s(f, "body") || null,
@@ -120,14 +121,7 @@ export function WorkTaskDetail(props: {
           )}
           <dt>Owner</dt>
           <dd>
-            <select name="owner" aria-label="Owner" defaultValue={task.owner ?? ""}>
-              <option value="">Unassigned</option>
-              {OWNERS.map((x) => (
-                <option key={x} value={x}>
-                  {cap(x)}
-                </option>
-              ))}
-            </select>
+            <OwnerChecks defaultValue={task.owners} />
           </dd>
           <dt>Due</dt>
           <dd>

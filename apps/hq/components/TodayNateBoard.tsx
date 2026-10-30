@@ -4,7 +4,8 @@ import { useState, useTransition, type ReactNode } from "react";
 import { createTaskFromFire, markDone, updateTaskAction } from "@/app/(app)/work/actions";
 import type { Fire } from "@/lib/fires";
 import type { ProposalView } from "@/lib/proposals";
-import { humanDay, OWNERS, type Task } from "@/lib/tasks";
+import { humanDay, type Task } from "@/lib/tasks";
+import { OwnerChecks } from "./OwnerChecks";
 import type { BoardCard, Column, Track } from "@/lib/tracks";
 import { HintBar, type Hint } from "./HintBar";
 import type { ClientOpt } from "./NewTaskModal";
@@ -218,25 +219,18 @@ export function TodayNateBoard(props: {
                 `a:${t.id}`,
                 t.title,
                 from ? `from board · ${from}` : t.due ? humanDay(t.due, today) : "no date",
-                <select
-                  className="as"
-                  aria-label={`Assign ${t.title}`}
-                  value=""
+                // the first box ticked assigns (and moves the task out of this section); add more owners in the detail
+                <OwnerChecks
+                  label={`Assign ${t.title}`}
                   disabled={busy}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const owner = OWNERS.find((o) => o === e.target.value);
-                    if (owner)
-                      act(() => updateTaskAction(t.id, { owner }), `Assigned to ${cap(owner)}.`);
-                  }}
-                >
-                  <option value="">Assign…</option>
-                  {OWNERS.map((o) => (
-                    <option key={o} value={o}>
-                      {cap(o)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(owners) =>
+                    owners.length &&
+                    act(
+                      () => updateTaskAction(t.id, { owners }),
+                      `Assigned to ${owners.map(cap).join(" and ")}.`
+                    )
+                  }
+                />
               )
             ),
             toAssign.length
@@ -247,15 +241,19 @@ export function TodayNateBoard(props: {
               row(
                 `m:${t.id}`,
                 t.title,
-                t.waiting_on && t.owner !== "nate"
-                  ? `waiting on you · ${t.owner ?? "unassigned"}`
+                t.waiting_on && !t.owners.includes("nate")
+                  ? `waiting on you · ${t.owners.join(" + ") || "unassigned"}`
                   : t.waiting_on
                     ? `waiting on ${t.waiting_on}`
                     : undefined,
                 <>
-                  {t.owner && t.owner !== "nate" ? (
-                    <span className={`chip ${t.owner}`}>{cap(t.owner)}</span>
-                  ) : null}
+                  {t.owners
+                    .filter((o) => o !== "nate")
+                    .map((o) => (
+                      <span key={o} className={`chip ${o}`}>
+                        {cap(o)}
+                      </span>
+                    ))}
                   {dueChip(t)}
                 </>
               )

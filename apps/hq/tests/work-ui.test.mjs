@@ -37,8 +37,10 @@ test("Work page (v2-work A): 420px list grouped Unassigned/Nate/Brandon/Claude, 
   assert.match(b, /t\.status !== "done"/); // done tasks leave the list
   assert.match(b, /Mark done:/); // checkbox completes
   const d = src("components/WorkTaskDetail.tsx");
-  for (const t of ["← Board", "✓ Done", "Save", "Waiting on", "Unassigned", "Description"])
+  for (const t of ["← Board", "✓ Done", "Save", "Waiting on", "Description"])
     assert.ok(d.includes(t), t);
+  assert.match(d, /<OwnerChecks defaultValue=\{task\.owners\}/); // owners are checkboxes
+  assert.match(d, /owners: assertOwners\(f\.getAll\("owner"\)\)/);
   assert.match(d, /track_id: s\(f, "track"\) \|\| null/);
   assert.match(d, /client_slug: s\(f, "client"\) \|\| null/);
   assert.match(src("app/(app)/work/page.tsx"), /import "\.\.\/\.\.\/work\.css"/);
@@ -50,13 +52,15 @@ test("New task modal: Title, Description, owner, date, track, client; Esc closes
     "New task",
     "Title",
     "Description",
-    "Unassigned",
     "No track",
     "No client",
     "Create task",
     "Cancel",
   ])
     assert.ok(m.includes(t), t);
+  assert.match(m, /<OwnerChecks \/>/); // nothing ticked = unassigned
+  assert.match(m, /owners: assertOwners\(f\.getAll\("owner"\)\)/);
+  assert.match(src("components/OwnerChecks.tsx"), /Unassigned/);
   assert.match(m, /type="date"/);
   assert.match(m, /e\.key === "Escape"/);
   assert.match(m, /trackId: s\("track"\) \|\| null/);

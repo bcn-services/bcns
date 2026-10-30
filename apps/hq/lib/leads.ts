@@ -535,7 +535,7 @@ export async function loadBrandonToday(
       .limit(FOLLOWUPS_LIMIT),
     sb.from("businesses").select("id", { count: "exact", head: true }).eq("assigned_to", me).is("suppressed_at", null).in("stage", ["attempted", "reached"]).or(due),
     mine().eq("stage", "consult_scheduled").order("consult_at", { ascending: true, nullsFirst: false }),
-    sb.from("tasks").select("id, title, body, area, status, due, waiting_on").eq("owner", me).neq("status", "done").order("due", { ascending: true, nullsFirst: false }),
+    sb.from("tasks").select("id, title, body, area, status, due, waiting_on").contains("owners", [me]).neq("status", "done").order("due", { ascending: true, nullsFirst: false }),
     sb.from("call_weeks").select("calls, reached, consults").eq("by", me).eq("week", weekStartET(opts.now ?? new Date())).maybeSingle(),
     sb.from("calls").select("id", { count: "exact", head: true }).eq("by", me),
   ]);

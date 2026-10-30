@@ -44,7 +44,7 @@ function boot({ limit = 1000 } = {}) {
       {
         id: T_NATE,
         title: "send quote",
-        owner: "nate",
+        owners: ["nate"],
         status: "todo",
         area: "ops",
         created_at: "2026-09-01T00:00:00Z",
@@ -52,7 +52,7 @@ function boot({ limit = 1000 } = {}) {
       {
         id: T_CLAUDE,
         title: "draft notes",
-        owner: "claude",
+        owners: ["claude"],
         status: "todo",
         area: "ops",
         created_at: "2026-09-02T00:00:00Z",
