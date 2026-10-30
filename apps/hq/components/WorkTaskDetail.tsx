@@ -238,14 +238,17 @@ export function WorkTaskDetail(props: {
               type="button"
               className="btn"
               disabled={busy || !resText.trim()}
-              onClick={() =>
+              onClick={(e) => {
+                // send what is on screen, not component state
+                const text = e.currentTarget.form ? s(new FormData(e.currentTarget.form), "resolution").trim() : "";
+                if (!text) return;
                 start(async () => {
                   // clears resolution in the same patch: the blur just saved this text there, and Done must not close with an interim reply
-                  const r = await updateTaskAction(task.id, { reply: resText.trim(), resolution: null });
+                  const r = await updateTaskAction(task.id, { reply: text, resolution: null });
                   if (r.ok) setResText("");
                   setMsg(r.ok ? "Reply queued." : r.error);
-                })
-              }
+                });
+              }}
             >
               Reply
             </button>

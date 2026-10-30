@@ -619,6 +619,18 @@ test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an o
   assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
 });
 
+test("updateTask reply: queued on an open task; refused on a done one or with status done, nothing written", async () => {
+  const sb = fakeSb();
+  const t = await T.createTask(sb, ACTOR, "ui", { title: "ticket", owners: ["nate"] }, NOW);
+  await T.updateTask(sb, ACTOR, "ui", t.id, { reply: " On it. ", resolution: null }, NOW);
+  assert.equal(sb.db.tasks[0].reply, "On it.");
+  await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { reply: "x", status: "done" }, NOW), /only on an open/);
+  assert.equal(sb.db.tasks[0].status, "todo");
+  await T.updateTask(sb, ACTOR, "ui", t.id, { status: "done" }, NOW);
+  await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { reply: "late" }, NOW), /only on an open/);
+  assert.equal(sb.db.tasks[0].reply, "On it.");
+});
+
 test("a task with a business is source lead; with a business AND a client it is refused", async () => {
   const sb = fakeSb();
   const BIZ = "33333333-3333-4333-8333-333333333333";

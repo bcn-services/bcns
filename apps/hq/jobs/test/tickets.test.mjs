@@ -12,7 +12,8 @@ function fakeSql(seed = []) {
     const text = strings.join("?").replace(/\s+/g, " ").trim();
     calls.push({ text, v });
     if (text.startsWith("select id, status, alert_key")) {
-      return tasks.filter((t) => v[0].includes(t.alert_key)).sort((a, b) => b.n - a.n);
+      // copies, like a real result set: later writes must not show through the job's row
+      return tasks.filter((t) => v[0].includes(t.alert_key)).sort((a, b) => b.n - a.n).map((t) => ({ ...t }));
     }
     if (text.startsWith("insert into tasks")) {
       const [title, body, slug, alert_key] = v;
@@ -36,7 +37,9 @@ function fakeSql(seed = []) {
     if (text.startsWith("update tasks set status = 'done'"))
       Object.assign(t, { status: "done", synced_at: new Date() });
     else if (text.startsWith("update tasks set synced_at")) t.synced_at = new Date();
-    else if (text.startsWith("update tasks set reply = null")) t.reply = null;
+    else if (text.startsWith("update tasks set reply = null")) {
+      if (!text.includes("and reply =") || t.reply === v[1]) t.reply = null;
+    }
     else throw new Error(`unexpected sql: ${text}`);
     return [];
   };
@@ -335,4 +338,22 @@ test("a closed ticket gets no reply (its task closes instead); a done task's rep
   assert.equal(out.replied, 0);
   assert.deepEqual(ta.replied, []);
   assert.equal(tasks[0].status, "done");
+});
+
+test("a reply queued while the last one was being pushed stays queued and goes out next run", async () => {
+  const { sql, tasks } = fakeSql([
+    { id: "a", status: "todo", alert_key: "ticket:ta:3", reply: "first" },
+  ]);
+  const ta = fakeSource("ta", [ticket(3)]);
+  const send = ta.reply;
+  ta.reply = async (id, text) => {
+    await send(id, text);
+    tasks[0].reply = "second"; // Nate queues another before the clear runs
+  };
+  await run({ sql, sources: [ta] });
+  assert.equal(tasks[0].reply, "second");
+  const next = fakeSource("ta", [ticket(3, { status: "answered" })]);
+  await run({ sql, sources: [next] });
+  assert.deepEqual(next.replied, [[3, "second"]]);
+  assert.equal(tasks[0].reply, null);
 });

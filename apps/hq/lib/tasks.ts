@@ -386,13 +386,16 @@ export async function updateTask(
   now: Date = new Date()
 ): Promise<Task> {
   const set = buildTaskPatch(patch, now);
-  if (set.status === "done") {
-    // done_at marks the move INTO done: saving or pressing d on an already-done task keeps it
+  if (set.status === "done" || set.reply) {
     const cur = must<{ status: string } | null>(
       await sb.from("tasks").select("status").eq("id", id).maybeSingle(),
       "tasks read"
     );
-    if (cur?.status === "done") delete set.done_at;
+    // jobs/tickets.mjs sends a reply only while the task is open; on a done one it would never go out
+    if (set.reply && (set.status === "done" || cur?.status === "done"))
+      throw new Error("a reply goes out only on an open ticket task; use resolution with status done to close it");
+    // done_at marks the move INTO done: saving or pressing d on an already-done task keeps it
+    if (set.status === "done" && cur?.status === "done") delete set.done_at;
   }
   const task = must<Task>(
     await sb.from("tasks").update(set).eq("id", id).select().single(),
