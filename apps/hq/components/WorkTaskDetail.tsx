@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { addLinkAction, addNoteAction, markDone, updateTaskAction } from "@/app/(app)/work/actions";
-import { OWNERS, waitingStatus, type Owner, type Status, type Task } from "@/lib/tasks";
+import { OWNERS, STATUSES, waitingStatus, type Owner, type Status, type Task } from "@/lib/tasks";
 import type { Track } from "@/lib/tracks";
 import type { ClientOpt } from "./NewTaskModal";
 
@@ -78,16 +78,20 @@ export function WorkTaskDetail(props: {
         onSubmit={(e) =>
           submit(e, (f) => {
             const waiting = s(f, "waiting_on");
-            // status follows waiting_on only when the waiting text itself changed
-            const status =
-              waiting.trim() !== (task.waiting_on ?? "").trim()
-                ? (waitingStatus(waiting, task.status) ?? task.status)
-                : task.status;
+            const picked = (s(f, "status") || task.status) as Status; // no select once done
+            // a changed Status select wins (leaving waiting clears waiting_on, else the board keeps it in Waiting);
+            // otherwise status follows waiting_on only when the waiting text itself changed
+            const pickChanged = picked !== task.status;
+            const status = pickChanged
+              ? picked
+              : waiting.trim() !== (task.waiting_on ?? "").trim()
+                ? (waitingStatus(waiting, picked) ?? picked)
+                : picked;
             return updateTaskAction(task.id, {
               status: status as Status,
               owner: (s(f, "owner") || null) as Owner | null,
               due: s(f, "due") || null,
-              waiting_on: waiting || null,
+              waiting_on: pickChanged && picked !== "waiting" ? null : waiting || null,
               body: s(f, "body") || null,
               ...(isTicket && resChanged(s(f, "resolution"))
                 ? { resolution: s(f, "resolution") || null }
@@ -99,6 +103,21 @@ export function WorkTaskDetail(props: {
         }
       >
         <dl>
+          {done ? null : (
+            <>
+              {/* Done stays on its toggle below; doing puts the task in Now */}
+              <dt>Status</dt>
+              <dd>
+                <select name="status" aria-label="Status" defaultValue={task.status}>
+                  {STATUSES.filter((x) => x !== "done").map((x) => (
+                    <option key={x} value={x}>
+                      {cap(x)}
+                    </option>
+                  ))}
+                </select>
+              </dd>
+            </>
+          )}
           <dt>Owner</dt>
           <dd>
             <select name="owner" aria-label="Owner" defaultValue={task.owner ?? ""}>

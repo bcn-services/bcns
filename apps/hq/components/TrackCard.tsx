@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { BoardCard } from "@/lib/tracks";
 
-/** One board card: the track name and its steps. A step opens its task (onStep) or links to /work?task=. */
+/** One board card: the track name and its steps (tagged with client_slug when set). A step opens its task (onStep) or links to /work?task=. */
 export function TrackCard({
   card,
   onStep,
@@ -23,6 +23,7 @@ export function TrackCard({
                   {done ? "✓" : ""}
                 </span>
                 <span className={`wk-step-t${done ? " done" : ""}`}>{t.title}</span>
+                {t.client_slug ? <span className="chip">{t.client_slug}</span> : null}
               </>
             );
             return (

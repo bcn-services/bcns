@@ -189,11 +189,11 @@ export function byDue(a: { due: string | null }, b: { due: string | null }): num
 
 export const QUEUE_CAP = 8;
 const QUEUE_DUE_DAYS = 7;
-const QUEUE_DONE_DAYS = 7; // same window as tracks.ts DONE_WINDOW_DAYS (tracks imports tasks, so no import back)
+const QUEUE_DONE_DAYS = 7; // same window as tracks.ts DONE_DAYS (tracks imports tasks, so no import back)
 
 /**
  * One person's Today, derived (nothing is "pulled in"): their open tasks, split into
- * queue (unblocked: due within 7 days soonest first, then the rest oldest-created first, top 8),
+ * queue (unblocked: doing first, then due within 7 days soonest first, then the rest oldest-created first, top 8),
  * waiting (status waiting or a waiting_on), and done in the last 7 days.
  */
 export function todayQueue<T extends Task>(
@@ -206,10 +206,14 @@ export function todayQueue<T extends Task>(
   const isWaiting = (t: T) => t.status === "waiting" || !!t.waiting_on?.trim();
   const horizon = addDays(today, QUEUE_DUE_DAYS);
   const soon = (t: T) => !!t.due && t.due <= horizon;
+  const doing = (t: T) => Number(t.status === "doing"); // doing is Now on the board, so it never falls past the cap
   const byAge = (a: T, b: T) => Date.parse(a.created_at) - Date.parse(b.created_at);
   const queue = open
     .filter((t) => !isWaiting(t))
-    .sort((a, b) => Number(soon(b)) - Number(soon(a)) || (soon(a) ? byDue(a, b) : 0) || byAge(a, b))
+    .sort(
+      (a, b) =>
+        doing(b) - doing(a) || Number(soon(b)) - Number(soon(a)) || (soon(a) ? byDue(a, b) : 0) || byAge(a, b)
+    )
     .slice(0, QUEUE_CAP);
   const since = addDays(today, -QUEUE_DONE_DAYS);
   const done = mine.filter(
