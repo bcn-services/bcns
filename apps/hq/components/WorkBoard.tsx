@@ -17,6 +17,7 @@ export function WorkBoard(props: {
   notes: Record<string, WorkNote[]>;
   links: Record<string, WorkLink[]>;
   today: string;
+  admin?: boolean;
   initialTask?: string | null;
 }) {
   const { tasks, tracks, clients, notes, links, today } = props;
@@ -172,11 +173,13 @@ export function WorkBoard(props: {
         <main className="wk-r" id="wk-board-pane" aria-label="Board" tabIndex={-1}>
           {open ? (
             <WorkTaskDetail
+              key={open.id}
               task={open}
               notes={notes[open.id] ?? []}
               links={links[open.id] ?? []}
               tracks={tracks}
               clients={clients}
+              admin={props.admin}
               onBack={() => setSel(null)}
             />
           ) : (

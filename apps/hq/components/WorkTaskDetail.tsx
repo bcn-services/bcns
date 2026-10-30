@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { addLinkAction, addNoteAction, markDone, updateTaskAction } from "@/app/(app)/work/actions";
+import {
+  addLinkAction,
+  addNoteAction,
+  deleteTaskAction,
+  markDone,
+  updateTaskAction,
+} from "@/app/(app)/work/actions";
 import { assertOwners, STATUSES, waitingStatus, type Status, type Task } from "@/lib/tasks";
 import { OwnerChecks } from "./OwnerChecks";
 import type { Track } from "@/lib/tracks";
@@ -30,10 +36,12 @@ export function WorkTaskDetail(props: {
   links: WorkLink[];
   tracks: Track[];
   clients: ClientOpt[];
+  admin?: boolean;
   onBack: () => void;
 }) {
   const { task, notes, links, tracks, clients, onBack } = props;
   const [msg, setMsg] = useState<string | null>(null);
+  const [sure, setSure] = useState(false);
   const [busy, start] = useTransition();
   const done = task.status === "done";
   const isTicket = !!task.alert_key?.startsWith("ticket:");
@@ -225,6 +233,25 @@ export function WorkTaskDetail(props: {
           <button className="btn" disabled={busy}>
             Save
           </button>
+          {props.admin && !isTicket ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy}
+              onClick={() => {
+                if (!sure) return setSure(true);
+                start(async () => {
+                  const r = await deleteTaskAction(task.id);
+                  setSure(false);
+                  if (!r.ok) setMsg(r.error);
+                  else onBack();
+                });
+              }}
+              onBlur={() => setSure(false)}
+            >
+              {sure ? "Really delete?" : "Delete"}
+            </button>
+          ) : null}
           {msg ? <span className="note">{msg}</span> : null}
         </div>
       </form>

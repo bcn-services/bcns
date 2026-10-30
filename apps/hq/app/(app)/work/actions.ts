@@ -4,7 +4,7 @@
  * Server actions for Work, proposals and the lead/fire task buttons. Each resolves the signed-in
  * HQ user (actor = user id, via='ui') and calls the plain functions in lib/tasks.ts. Server actions
  * are public POST endpoints, so every one re-checks the session; RLS is the second wall.
- * Proposals: decideProposal calls ONLY the decide_proposal RPC. No delete action exists.
+ * Proposals: decideProposal calls ONLY the decide_proposal RPC. deleteTaskAction is the one delete (admin).
  */
 
 import { revalidatePath } from "next/cache";
@@ -18,6 +18,7 @@ import {
   createLeadTask,
   createOpsTask,
   createTask,
+  deleteTask,
   nextOwner,
   setListItemStatus,
   updateTask,
@@ -65,6 +66,10 @@ export async function searchLeadsAction(q: string): Promise<{ id: string; name: 
 
 export async function updateTaskAction(id: string, patch: TaskPatch): Promise<ActionResult> {
   return run(async (c) => void (await updateTask(c.sb, c.actor, "ui", id, patch)));
+}
+
+export async function deleteTaskAction(id: string): Promise<ActionResult> {
+  return run(async (c) => void (await deleteTask(c.sb, c.actor, "ui", id)));
 }
 
 export async function markDone(id: string): Promise<ActionResult> {

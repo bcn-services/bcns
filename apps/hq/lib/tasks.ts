@@ -1,10 +1,11 @@
 /**
  * tasks.ts — plain functions over a Supabase client (first arg), so the UI's server actions
  * (via='ui') and item 5's MCP (via='mcp') share one write path. Every write also inserts an
- * `events` row with actor + via. No delete anywhere (the DB has no delete grant either).
+ * `events` row with actor + via. The only delete is deleteTask (admin, UI only; 0038 grants it).
  * Server actions live in app/(app)/work/actions.ts, NOT here, so none of this is a public endpoint.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isAdmin } from "./proposals";
 
 type Sb = SupabaseClient;
 export type Via = "ui" | "mcp" | "job";
@@ -215,7 +216,10 @@ export function todayQueue<T extends Task>(
     .filter((t) => !isWaiting(t))
     .sort(
       (a, b) =>
-        doing(b) - doing(a) || Number(soon(b)) - Number(soon(a)) || (soon(a) ? byDue(a, b) : 0) || byAge(a, b)
+        doing(b) - doing(a) ||
+        Number(soon(b)) - Number(soon(a)) ||
+        (soon(a) ? byDue(a, b) : 0) ||
+        byAge(a, b)
     )
     .slice(0, QUEUE_CAP);
   const since = addDays(today, -QUEUE_DONE_DAYS);
@@ -325,7 +329,8 @@ export function buildTaskRow(actor: string, via: Via, t: NewTask, now: Date = ne
   const title = t.title?.trim();
   if (!title) throw new Error("title required");
   if (t.area && !AREAS.includes(t.area as Area)) throw new Error(`unknown area ${t.area}`);
-  if (t.businessId && t.clientSlug) throw new Error("a task hangs off a lead or a client, not both");
+  if (t.businessId && t.clientSlug)
+    throw new Error("a task hangs off a lead or a client, not both");
   if (t.source && !SOURCES.includes(t.source)) throw new Error(`unknown source ${t.source}`);
   const row = {
     title,
@@ -405,6 +410,29 @@ function targetCols(t: Target) {
     business_id: t.businessId ?? null,
     client_slug: t.clientSlug ?? null,
   };
+}
+
+/** Admin only (checked here, RLS and the 0038 grant are the second wall). notes and links have no ON DELETE, so they go first. */
+export async function deleteTask(sb: Sb, actor: string, via: Via, id: string): Promise<void> {
+  if (!(await isAdmin(sb))) throw new Error("only an admin can delete a task");
+  const read = await sb.from("tasks").select("title, alert_key").eq("id", id).maybeSingle();
+  if (read.error) throw new Error(`tasks read: ${read.error.message}`);
+  const t = read.data as { title: string; alert_key: string | null } | null;
+  if (!t) throw new Error("task not found");
+  // the tickets job re-creates a deleted ticket task from its alert_key and a done one never syncs: close those instead
+  if (t.alert_key?.startsWith("ticket:"))
+    throw new Error("ticket tasks can't be deleted; mark them done");
+  // deletes return no row, so check .error directly; the task goes last and must remove a row (RLS matches 0 rows silently)
+  for (const [table, col] of [
+    ["notes", "task_id"],
+    ["links", "task_id"],
+    ["tasks", "id"],
+  ] as const) {
+    const r = await sb.from(table).delete().eq(col, id).select("id");
+    if (r.error) throw new Error(`${table} delete: ${r.error.message}`);
+    if (table === "tasks" && !r.data?.length) throw new Error("task not deleted (no permission?)");
+  }
+  await logEvent(sb, actor, via, "task.deleted", { task_id: id, title: t.title }).catch(() => {}); // task is gone; a lost audit row must not fail the action
 }
 
 export async function addNote(sb: Sb, actor: string, via: Via, n: Target & { body: string }) {
