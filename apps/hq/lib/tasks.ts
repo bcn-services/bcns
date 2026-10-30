@@ -415,20 +415,24 @@ function targetCols(t: Target) {
 /** Admin only (checked here, RLS and the 0038 grant are the second wall). notes and links have no ON DELETE, so they go first. */
 export async function deleteTask(sb: Sb, actor: string, via: Via, id: string): Promise<void> {
   if (!(await isAdmin(sb))) throw new Error("only an admin can delete a task");
-  const read = await sb.from("tasks").select("title").eq("id", id).maybeSingle();
+  const read = await sb.from("tasks").select("title, alert_key").eq("id", id).maybeSingle();
   if (read.error) throw new Error(`tasks read: ${read.error.message}`);
-  const t = read.data as { title: string } | null;
+  const t = read.data as { title: string; alert_key: string | null } | null;
   if (!t) throw new Error("task not found");
-  // deletes return no row, so check .error directly (must() would call that "no row")
+  // the tickets job re-creates a deleted ticket task from its alert_key and a done one never syncs: close those instead
+  if (t.alert_key?.startsWith("ticket:"))
+    throw new Error("ticket tasks can't be deleted; mark them done");
+  // deletes return no row, so check .error directly; the task goes last and must remove a row (RLS matches 0 rows silently)
   for (const [table, col] of [
     ["notes", "task_id"],
     ["links", "task_id"],
     ["tasks", "id"],
   ] as const) {
-    const r = await sb.from(table).delete().eq(col, id);
+    const r = await sb.from(table).delete().eq(col, id).select("id");
     if (r.error) throw new Error(`${table} delete: ${r.error.message}`);
+    if (table === "tasks" && !r.data?.length) throw new Error("task not deleted (no permission?)");
   }
-  await logEvent(sb, actor, via, "task.deleted", { task_id: id, title: t.title });
+  await logEvent(sb, actor, via, "task.deleted", { task_id: id, title: t.title }).catch(() => {}); // task is gone; a lost audit row must not fail the action
 }
 
 export async function addNote(sb: Sb, actor: string, via: Via, n: Target & { body: string }) {

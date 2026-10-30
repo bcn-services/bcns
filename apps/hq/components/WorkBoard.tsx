@@ -173,6 +173,7 @@ export function WorkBoard(props: {
         <main className="wk-r" id="wk-board-pane" aria-label="Board" tabIndex={-1}>
           {open ? (
             <WorkTaskDetail
+              key={open.id}
               task={open}
               notes={notes[open.id] ?? []}
               links={links[open.id] ?? []}

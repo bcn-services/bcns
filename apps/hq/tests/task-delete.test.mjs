@@ -41,3 +41,11 @@ test("admin deletes the task with its notes and links, leaves others, logs an ev
   assert.equal(sb.db.events[0].kind, "task.deleted");
   await assert.rejects(deleteTask(sb, ACTOR, "ui", "t1"), /not found/);
 });
+
+test("a ticket task is refused; a delete that removes no row throws", async () => {
+  const sb = withRole(fakeSb({ tasks: [{ id: "t9", title: "T", alert_key: "ticket:a:1" }] }), true);
+  await assert.rejects(deleteTask(sb, ACTOR, "ui", "t9"), /ticket/);
+  const ghost = withRole(fakeSb(seed(), { failOn: {} }), true);
+  ghost.db.tasks.length = 0; // gone between read and delete
+  await assert.rejects(deleteTask(ghost, ACTOR, "ui", "t1"), /not found/);
+});
