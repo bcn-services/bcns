@@ -172,7 +172,11 @@ test("ticket tasks: the Resolution textarea shows only for alert_key ticket:*, a
   assert.match(d, /const isTicket = !!task\.alert_key\?\.startsWith\("ticket:"\)/);
   assert.match(d, /\{isTicket \? \(\s*<>\s*<textarea\s+key=\{[^}]*\}\s+name="resolution"/); // rendered only when gated
   assert.equal(d.split('name="resolution"').length, 2, "one resolution textarea, inside the gate");
-  assert.ok(d.includes("Sent to the client's ticket when this task is done. Saved when you leave the box or press Done."));
+  assert.ok(
+    d.includes(
+      "Sent to the client's ticket when this task is done. Saved when you leave the box or press Done."
+    )
+  );
   assert.ok(d.includes("Already sent if the ticket has synced; later edits are not pushed.")); // shown once done
   assert.match(d, /\{done\s*\? "Already sent/);
   assert.match(d, /updateTaskAction\(task\.id, \{ status: "done", resolution: res \|\| null \}\)/); // Done: one patch
@@ -180,11 +184,20 @@ test("ticket tasks: the Resolution textarea shows only for alert_key ticket:*, a
 
 test("ticket resolution: Save and Done send it only when the textarea changed (a stale open detail cannot blank an MCP-set one); leaving the box saves it", () => {
   const d = src("components/WorkTaskDetail.tsx");
-  assert.match(d, /const resChanged = \(v: string\) => v\.trim\(\) !== \(task\.resolution \?\? ""\)/);
-  assert.match(d, /isTicket && resChanged\(s\(f, "resolution"\)\)\s*\? \{ resolution: s\(f, "resolution"\) \|\| null \}\s*: \{\}/); // Save
+  assert.match(
+    d,
+    /const resChanged = \(v: string\) => v\.trim\(\) !== \(task\.resolution \?\? ""\)/
+  );
+  assert.match(
+    d,
+    /isTicket && resChanged\(s\(f, "resolution"\)\)\s*\? \{ resolution: s\(f, "resolution"\) \|\| null \}\s*: \{\}/
+  ); // Save
   assert.match(d, /const res = typed !== null && resChanged\(typed\) \? typed : null/); // Done: unchanged -> markDone
   assert.match(d, /res === null\s*\? await markDone\(task\.id\)/);
-  assert.match(d, /onBlur=\{async \(e\) => \{[\s\S]*?updateTaskAction\(task\.id, \{ resolution: v\.trim\(\) \|\| null \}\)/); // d key closes with the typed text
+  assert.match(
+    d,
+    /onBlur=\{async \(e\) => \{[\s\S]*?updateTaskAction\(task\.id, \{ resolution: v\.trim\(\) \|\| null \}\)/
+  ); // d key closes with the typed text
   assert.doesNotMatch(d, /\$\{task\.resolution\}/); // the blur save must not remount the whole form (it would eat a Done click)
 });
 
@@ -201,19 +214,39 @@ test("Leads page: + New lead button and c key open NewLeadModal, which creates v
   assert.match(v, /\+ New lead/);
   assert.match(v, /e\.key === "c"\) \{\s*setNewOpen\(true\)/);
   assert.match(v, /newOpen: newOpen \|\| taskOpen/); // modals own the keyboard
-  assert.match(v, /onCreated=\{\(id, name\) => \{[^}]*setSel\(id\);[^}]*setOpen\(true\);[^}]*router\.push/s);
+  assert.match(
+    v,
+    /onCreated=\{\(id, name\) => \{[^}]*setSel\(id\);[^}]*setOpen\(true\);[^}]*router\.push/s
+  );
   const m = src("components/NewLeadModal.tsx");
   assert.match(m, /createLeadAction\(/);
-  for (const f of ["name", "trade", "town", "state", "phone", "domain", "stage", "assigned_to", "note"]) assert.ok(m.includes(`name="${f}"`), f);
+  for (const f of [
+    "name",
+    "trade",
+    "town",
+    "state",
+    "phone",
+    "domain",
+    "stage",
+    "assigned_to",
+    "note",
+  ])
+    assert.ok(m.includes(`name="${f}"`), f);
   assert.match(m, /defaultValue="reached"/);
   assert.match(m, /defaultValue="nate"/);
   assert.match(m, /list="new-lead-trades"/); // trades come from loadTrades via the page
-  assert.match(src("app/(app)/leads/actions.ts"), /export async function createLeadAction[\s\S]*?await ctx\(\)/); // session re-checked
+  assert.match(
+    src("app/(app)/leads/actions.ts"),
+    /export async function createLeadAction[\s\S]*?await ctx\(\)/
+  ); // session re-checked
 });
 
 test("Lead drawer: '+ Task for this lead' opens NewTaskModal with the lead preset and no client field", () => {
   assert.match(src("components/LeadDrawer.tsx"), /\+ Task for this lead/);
-  assert.match(src("app/(app)/leads/View.tsx"), /<NewTaskModal tracks=\{tracks\} clients=\{\[\]\} lead=\{\{ id: drawer\.id, name: drawer\.name \}\}/);
+  assert.match(
+    src("app/(app)/leads/View.tsx"),
+    /<NewTaskModal tracks=\{tracks\} clients=\{\[\]\} lead=\{\{ id: drawer\.id, name: drawer\.name \}\}/
+  );
   const m = src("components/NewTaskModal.tsx");
   assert.match(m, /businessId: the\?\.id \?\? null/);
   assert.match(m, /clientSlug: the \? null : client \|\| null/); // lead and client are exclusive
@@ -226,11 +259,34 @@ test("New task modal on Work: optional Lead search (searchLeadsAction), hidden o
   assert.match(m, /searchLeadsAction\(q\)/);
   assert.match(m, /\) : client \? null : \(\s*<div className="wk-pick">/);
   assert.match(m, /if \(!q\.trim\(\)\) return setHits\(\[\]\)/); // blank asks nothing
-  assert.match(src("app/(app)/work/actions.ts"), /export async function searchLeadsAction[\s\S]*?await ctx\(\)/);
-  assert.match(src("components/WorkBoard.tsx"), /clientName\.get\(t\.client_slug\) \?\? t\.client_slug\) : t\.lead/);
+  assert.match(
+    src("app/(app)/work/actions.ts"),
+    /export async function searchLeadsAction[\s\S]*?await ctx\(\)/
+  );
+  assert.match(
+    src("components/WorkBoard.tsx"),
+    /clientName\.get\(t\.client_slug\) \?\? t\.client_slug\) : t\.lead/
+  );
   assert.match(src("components/TrackCard.tsx"), /t\.client_slug \?\? t\.lead/);
 });
 
 test("Lead search: Enter picks the first hit instead of submitting the task", () => {
-  assert.match(src("components/NewTaskModal.tsx"), /e\.key !== "Enter"\) return;\s*e\.preventDefault\(\)/);
+  assert.match(
+    src("components/NewTaskModal.tsx"),
+    /e\.key !== "Enter"\) return;\s*e\.preventDefault\(\)/
+  );
+});
+
+test("Work owner filter: Anyone select narrows the list AND the board; owner rows/steps get own-<owner> classes", () => {
+  const w = src("components/WorkBoard.tsx");
+  assert.match(w, /aria-label="Owner"/);
+  assert.match(w, />Anyone</);
+  assert.match(w, /buildBoard\(tracks, shown\)/);
+  assert.match(w, /shown\.filter\(/);
+  assert.match(w, /wk-tr own-\$\{t\.owners\[0\] \?\? "none"\}/);
+  assert.match(src("components/TrackCard.tsx"), /wk-step own-\$\{t\.owners\[0\] \?\? "none"\}/g);
+  assert.match(
+    src("app/work.css"),
+    /\.wk-tr\.own-brandon,[\s\S]*?border-left: 3px solid var\(--own-brandon\)/
+  );
 });

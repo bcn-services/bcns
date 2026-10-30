@@ -24,17 +24,26 @@ export function TrackCard({
                   {done ? "✓" : ""}
                 </span>
                 <span className={`wk-step-t${done ? " done" : ""}`}>{t.title}</span>
-                {t.client_slug || t.lead ? <span className="chip">{t.client_slug ?? t.lead}</span> : null}
+                {t.client_slug || t.lead ? (
+                  <span className="chip">{t.client_slug ?? t.lead}</span>
+                ) : null}
               </>
             );
             return (
               <li key={t.id}>
                 {onStep ? (
-                  <button type="button" className="wk-step" onClick={() => onStep(t.id)}>
+                  <button
+                    type="button"
+                    className={`wk-step own-${t.owners[0] ?? "none"}`}
+                    onClick={() => onStep(t.id)}
+                  >
                     {inner}
                   </button>
                 ) : (
-                  <Link className="wk-step" href={`/work?task=${t.id}`}>
+                  <Link
+                    className={`wk-step own-${t.owners[0] ?? "none"}`}
+                    href={`/work?task=${t.id}`}
+                  >
                     {inner}
                   </Link>
                 )}
