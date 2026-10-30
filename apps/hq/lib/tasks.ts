@@ -66,6 +66,7 @@ export interface Task {
   alert_key: string | null;
   waiting_on: string | null;
   resolution: string | null; // ticket tasks: sent to the client's ticket when done (jobs/tickets.mjs)
+  reply: string | null; // ticket tasks: queued reply, pushed without closing on the next sync, then null
   done_at: string | null;
   created_at: string;
 }
@@ -138,6 +139,7 @@ export interface TaskPatch {
   waiting_on?: string | null;
   body?: string | null;
   resolution?: string | null;
+  reply?: string | null;
 }
 
 /** Validated DB patch for updateTask; only the keys present are touched. */
@@ -154,6 +156,11 @@ export function buildTaskPatch(p: TaskPatch, now: Date): Record<string, unknown>
     const r = p.resolution?.trim() || null;
     if (r && r.length > 4000) throw new Error("resolution is over 4000 characters");
     out.resolution = r;
+  }
+  if (p.reply !== undefined) {
+    const r = p.reply?.trim() || null;
+    if (r && r.length > 4000) throw new Error("reply is over 4000 characters");
+    out.reply = r;
   }
   if (!Object.keys(out).length) throw new Error("nothing to update");
   return { ...out, updated_at: now.toISOString() };
@@ -379,13 +386,16 @@ export async function updateTask(
   now: Date = new Date()
 ): Promise<Task> {
   const set = buildTaskPatch(patch, now);
-  if (set.status === "done") {
-    // done_at marks the move INTO done: saving or pressing d on an already-done task keeps it
+  if (set.status === "done" || set.reply) {
     const cur = must<{ status: string } | null>(
       await sb.from("tasks").select("status").eq("id", id).maybeSingle(),
       "tasks read"
     );
-    if (cur?.status === "done") delete set.done_at;
+    // jobs/tickets.mjs sends a reply only while the task is open; on a done one it would never go out
+    if (set.reply && (set.status === "done" || cur?.status === "done"))
+      throw new Error("a reply goes out only on an open ticket task; use resolution with status done to close it");
+    // done_at marks the move INTO done: saving or pressing d on an already-done task keeps it
+    if (set.status === "done" && cur?.status === "done") delete set.done_at;
   }
   const task = must<Task>(
     await sb.from("tasks").update(set).eq("id", id).select().single(),

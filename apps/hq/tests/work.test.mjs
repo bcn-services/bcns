@@ -594,6 +594,15 @@ test("todayQueue: mine only; queue = doing first, then due within 7d soonest fir
   assert.equal(T.todayQueue(w, "nate", "2026-10-28").waiting.length, 12);
 });
 
+test("updateTask reply: trimmed, capped at 4000, null or blank clears", () => {
+  assert.equal(T.buildTaskPatch({ reply: "  on it \n" }, NOW).reply, "on it");
+  assert.equal(T.buildTaskPatch({ reply: "x".repeat(4000) }, NOW).reply.length, 4000);
+  assert.throws(() => T.buildTaskPatch({ reply: "x".repeat(4001) }, NOW), /reply/);
+  assert.equal(T.buildTaskPatch({ reply: null }, NOW).reply, null);
+  assert.equal(T.buildTaskPatch({ reply: "   " }, NOW).reply, null);
+  assert.equal("reply" in T.buildTaskPatch({ owners: ["nate"] }, NOW), false);
+});
+
 test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an over-cap value writes nothing", async () => {
   assert.equal(T.buildTaskPatch({ resolution: "  fixed it \n" }, NOW).resolution, "fixed it");
   assert.equal(T.buildTaskPatch({ resolution: "x".repeat(4000) }, NOW).resolution.length, 4000);
@@ -608,6 +617,18 @@ test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an o
   assert.equal(sb.db.tasks[0].status, "done");
   await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { resolution: "x".repeat(4001) }, NOW), /resolution/);
   assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
+});
+
+test("updateTask reply: queued on an open task; refused on a done one or with status done, nothing written", async () => {
+  const sb = fakeSb();
+  const t = await T.createTask(sb, ACTOR, "ui", { title: "ticket", owners: ["nate"] }, NOW);
+  await T.updateTask(sb, ACTOR, "ui", t.id, { reply: " On it. ", resolution: null }, NOW);
+  assert.equal(sb.db.tasks[0].reply, "On it.");
+  await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { reply: "x", status: "done" }, NOW), /only on an open/);
+  assert.equal(sb.db.tasks[0].status, "todo");
+  await T.updateTask(sb, ACTOR, "ui", t.id, { status: "done" }, NOW);
+  await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { reply: "late" }, NOW), /only on an open/);
+  assert.equal(sb.db.tasks[0].reply, "On it.");
 });
 
 test("a task with a business is source lead; with a business AND a client it is refused", async () => {

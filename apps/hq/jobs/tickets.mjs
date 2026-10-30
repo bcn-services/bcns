@@ -1,9 +1,10 @@
 // Tickets: every 15 minutes (infra/hq-tickets.timer) pull support tickets from the platform DB
 // (Connect) and the TA DB, keep one HQ task per ticket (alert_key 'ticket:<src>:<id>'), close the task
 // when the ticket closed at the source, and push tasks.resolution + a closed status back for done,
-// unsynced tasks. HQ never emails: the source apps own the customer-facing side.
+// unsynced tasks. A queued tasks.reply on an open task is pushed without closing anything (the source
+// marks the ticket answered / In review) and cleared. HQ never emails: the source apps own the customer-facing side.
 //
-// A source is {name, pull() -> rows, resolve(id, text), close()}; rows are {id, slug, subject, body,
+// A source is {name, pull() -> rows, resolve(id, text), reply(id, text), close()}; rows are {id, slug, subject, body,
 // severity, status, created_at, updated_at}, status open|answered|closed. Tests pass fakes.
 // One source failing never stops the other; the job throws after both ran so the run is logged
 // ok:false and the ops:job:tickets alert fires.
@@ -27,12 +28,14 @@ const SOURCES = [
     env: "PLATFORM_TICKETS_URL",
     pull: "select * from ops.hq_tickets_pull()",
     resolve: "select ops.hq_ticket_resolve($1::uuid, $2)",
+    reply: "select ops.hq_ticket_reply($1::uuid, $2)",
   },
   {
     name: "ta",
     env: "TA_TICKETS_URL",
     pull: "select * from public.hq_tickets_pull()",
     resolve: "select public.hq_ticket_resolve($1::int, $2)",
+    reply: "select public.hq_ticket_reply($1::int, $2)",
     slug: "technology-associates",
   },
 ];
@@ -53,6 +56,7 @@ export async function ticketsDeps(env, { connect, log = console.log } = {}) {
       pull: async () =>
         (await pg.unsafe(s.pull)).map((r) => ({ ...r, slug: r.slug ?? s.slug ?? null })),
       resolve: (id, text) => pg.unsafe(s.resolve, [id, text]),
+      reply: (id, text) => pg.unsafe(s.reply, [id, text]),
       close: () => pg.end({ timeout: 5 }),
     });
   }
@@ -78,14 +82,14 @@ async function insertTask(sql, src, r) {
   }
 }
 
-async function syncSource(sql, s, out) {
+async function syncSource(sql, s, out, log) {
   const rows = await s.pull();
   out.pulled += rows.length;
   if (!rows.length) return;
   const keys = rows.map((r) => key(s.name, r));
   // newest first, so the first row seen per key is the latest task
   const found = await sql`
-    select id, status, alert_key, resolution, synced_at from tasks
+    select id, status, alert_key, resolution, reply, synced_at from tasks
     where alert_key = any(${keys}) order by created_at desc
   `;
   const latest = new Map();
@@ -102,6 +106,16 @@ async function syncSource(sql, s, out) {
         if (closed) {
           await sql`update tasks set status = 'done', done_at = now(), synced_at = now(), updated_at = now() where id = ${t.id}`;
           out.closed++;
+        } else if (t.reply?.trim()) {
+          // a failed reply stays queued for the next run and never fails this one (the RPC may not be pushed yet)
+          try {
+            await s.reply(r.id, t.reply);
+            // only the text just sent: a reply queued meanwhile stays for the next run
+            await sql`update tasks set reply = null, updated_at = now() where id = ${t.id} and reply = ${t.reply}`;
+            out.replied++;
+          } catch (e) {
+            log(`tickets: reply failed ${t.id} ${String(e?.message ?? e)}`);
+          }
         }
       } else if (t.synced_at) {
         // reopened at the source after we closed it: a new task (the old one stays as history)
@@ -110,7 +124,8 @@ async function syncSource(sql, s, out) {
       } else {
         // done in HQ and owes the source its answer; a ticket closed meanwhile needs no push
         if (!closed) {
-          await s.resolve(r.id, t.resolution ?? "");
+          // a reply queued but done before it synced goes out as the closing text, never dropped
+          await s.resolve(r.id, t.resolution?.trim() || t.reply?.trim() || "");
           out.pushed++;
         }
         await sql`update tasks set synced_at = now(), updated_at = now() where id = ${t.id}`;
@@ -123,12 +138,12 @@ async function syncSource(sql, s, out) {
   if (firstErr) throw firstErr;
 }
 
-export async function run({ sql, sources = [] } = {}) {
-  const out = { pulled: 0, created: 0, closed: 0, pushed: 0, failed: [] };
+export async function run({ sql, sources = [], log = console.log } = {}) {
+  const out = { pulled: 0, created: 0, closed: 0, pushed: 0, replied: 0, failed: [] };
   const why = [];
   for (const s of sources) {
     try {
-      await syncSource(sql, s, out);
+      await syncSource(sql, s, out, log);
     } catch (e) {
       out.failed.push(s.name);
       why.push(`${s.name}: ${String(e?.message ?? e)}`);

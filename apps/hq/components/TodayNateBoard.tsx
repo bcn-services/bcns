@@ -267,6 +267,7 @@ export function TodayNateBoard(props: {
         <main className="td-r" aria-label="Board">
           {task ? (
             <WorkTaskDetail
+              key={task.id} // a new task must not inherit the last one's typed resolution/reply
               task={task}
               notes={notes[task.id] ?? []}
               links={links[task.id] ?? []}

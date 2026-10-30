@@ -47,6 +47,7 @@ export function WorkTaskDetail(props: {
   const isTicket = !!task.alert_key?.startsWith("ticket:");
   // send resolution only when this form changed it: a stale open detail must not blank one set elsewhere (MCP)
   const resChanged = (v: string) => v.trim() !== (task.resolution ?? "");
+  const [resText, setResText] = useState(task.resolution ?? ""); // enables Reply
 
   function submit(
     e: FormEvent<HTMLFormElement>,
@@ -190,6 +191,7 @@ export function WorkTaskDetail(props: {
               aria-label="Resolution"
               placeholder="Resolution"
               defaultValue={task.resolution ?? ""}
+              onInput={(e) => setResText(e.currentTarget.value)}
               // saved on leaving the box so the d key (which sends no text) closes with it; not via `start`, which would disable Done mid-click
               onBlur={async (e) => {
                 const v = e.currentTarget.value;
@@ -201,8 +203,9 @@ export function WorkTaskDetail(props: {
             <p className="muted">
               {done
                 ? "Already sent if the ticket has synced; later edits are not pushed."
-                : "Sent to the client's ticket when this task is done. Saved when you leave the box or press Done."}
+                : "Sent to the client's ticket when this task is done. Saved when you leave the box or press Done. Reply sends it now and keeps the ticket open."}
             </p>
+            {task.reply && !done ? <p className="muted">Reply queued</p> : null}
           </>
         ) : null}
         <div className="wk-acts">
@@ -230,6 +233,26 @@ export function WorkTaskDetail(props: {
           >
             {done ? "Reopen" : "✓ Done"}
           </button>
+          {isTicket && !done ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy || !resText.trim()}
+              onClick={(e) => {
+                // send what is on screen, not component state
+                const text = e.currentTarget.form ? s(new FormData(e.currentTarget.form), "resolution").trim() : "";
+                if (!text) return;
+                start(async () => {
+                  // clears resolution in the same patch: the blur just saved this text there, and Done must not close with an interim reply
+                  const r = await updateTaskAction(task.id, { reply: text, resolution: null });
+                  if (r.ok) setResText("");
+                  setMsg(r.ok ? "Reply queued." : r.error);
+                });
+              }}
+            >
+              Reply
+            </button>
+          ) : null}
           <button className="btn" disabled={busy}>
             Save
           </button>
