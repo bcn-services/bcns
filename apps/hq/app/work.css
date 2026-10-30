@@ -366,6 +366,7 @@
 .wk-step {
   --own-nate: var(--ok);
   --own-brandon: #5a3ea6;
+  border-left: 3px solid transparent; /* every row keeps the 3px so columns line up */
 }
 .wk-tr.own-nate,
 .wk-step.own-nate {
