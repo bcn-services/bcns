@@ -339,6 +339,18 @@ test("pitchState: each step opens only when the one before it is done, and never
   assert.equal(can([row({ feedback: DECK_FB, status: "failed" }), row()]).deck, true);
 });
 
+test("pitchState: a failed redo does not hide the last done prototypes or the Redo button", () => {
+  const done = row({ created_at: "2026-10-27T15:00:00Z" });
+  const bad = row({ status: "failed", error: "claude wrote no files", feedback: "Step: redo the 3 pitch prototypes with the feedback below.", created_at: "2026-10-27T16:00:00Z" });
+  const st = D.pitchState([bad, done], REACHED);
+  assert.equal(st.protos, done);
+  assert.equal(st.redoFailed, bad);
+  assert.deepEqual(st.can, { prototypes: false, redo: true, deck: true, quote: false });
+  assert.equal(D.pitchState([done], REACHED).redoFailed, undefined);
+  assert.equal(D.pitchState([bad], REACHED).protos, bad, "no done row: the failure stays the state");
+  assert.equal(D.pitchState([row({ status: "running" }), done], REACHED).protos.status, "running");
+});
+
 test("fileHref / pathFor: only paths under the lead's own folder, defaults only for the demo files", () => {
   assert.equal(D.fileHref("clients/acme/demo/demo-a.html"), "/files/clients/acme/demo/demo-a.html");
   assert.equal(D.fileHref("clients/a b/x#y.html"), "/files/clients/a%20b/x%23y.html");
@@ -415,6 +427,14 @@ test("requestStep: the first prototypes request names the folder and inserts one
   });
 });
 
+test("requestStep: redo with blank feedback is refused and inserts nothing", async () => {
+  const { sb, ops } = fakePitchSb({ lead: { ...LEAD, os_slug: "pelican-point-dental-cayucos" }, rows: [row({ slug: "pelican-point-dental-cayucos" })] });
+  for (const feedback of [undefined, "", "  \n "]) await assert.rejects(() => D.requestStep(sb, ACTOR, { businessId: ID, step: "redo", feedback }), /redo/);
+  assert.equal(inserts(ops).length, 0);
+  await D.requestStep(sb, ACTOR, { businessId: ID, step: "redo", feedback: "warmer colours" });
+  assert.equal(inserts(ops).length, 1);
+});
+
 test("requestStep: a slug another business owns falls back from name + town to name + id prefix, then gives up", async () => {
   const a = fakePitchSb({ lead: LEAD, taken: ["pelican-point-dental-cayucos"] });
   assert.equal((await D.requestStep(a.sb, ACTOR, { businessId: ID, step: "prototypes" })).slug, "pelican-point-dental-111111");
@@ -463,7 +483,7 @@ test("requestStep: a stored os_slug that is not a valid slug is named in the err
   const long = "x".repeat(70);
   for (const step of ["prototypes", "redo", "quote"]) {
     const { sb, ops } = fakePitchSb({ lead: { ...LEAD, os_slug: long }, rows: [row()] });
-    await assert.rejects(() => D.requestStep(sb, ACTOR, { businessId: ID, step }), /folder name "x{70}" is not a valid slug/, step);
+    await assert.rejects(() => D.requestStep(sb, ACTOR, { businessId: ID, step, feedback: "x" }), /folder name "x{70}" is not a valid slug/, step);
     assert.equal(ops.filter((o) => o.kind === "update" || o.kind === "insert").length, 0, step);
   }
   await assert.rejects(
@@ -482,7 +502,7 @@ test("requestStep: a lead that already has a folder keeps it and the rows decide
   assert.equal(inserts(ok.ops)[0].values.kind, "pitch");
   // still running -> refused
   const busy = fakePitchSb({ lead, rows: [row({ status: "running" })] });
-  await assert.rejects(() => D.requestStep(busy.sb, ACTOR, { businessId: ID, step: "redo" }), /not available|running/);
+  await assert.rejects(() => D.requestStep(busy.sb, ACTOR, { businessId: ID, step: "redo", feedback: "x" }), /not available|running/);
   // prototypes again after they are done -> refused
   await assert.rejects(() => D.requestStep(ok.sb, ACTOR, { businessId: ID, step: "prototypes" }), /not available/);
   // quote before a consult -> refused; after one (and a done deck) -> a quote row
@@ -548,7 +568,7 @@ test("loadPitchRows: a missing table is an empty history; every other failure co
   assert.equal(D.isMissingTable("42P01"), false);
   // requestStep does not swallow a load error either
   await assert.rejects(
-    () => D.requestStep(fakePitchSb({ lead: { ...LEAD, os_slug: "acme" }, deliverablesError: { code: "42501", message: "denied" } }).sb, ACTOR, { businessId: ID, step: "redo" }),
+    () => D.requestStep(fakePitchSb({ lead: { ...LEAD, os_slug: "acme" }, deliverablesError: { code: "42501", message: "denied" } }).sb, ACTOR, { businessId: ID, step: "redo", feedback: "x" }),
     /denied/
   );
 });
@@ -586,7 +606,9 @@ test("PitchTab: Consult booked shows only for the 'book' offer, a load error tur
   assert.match(t, /offer === "book" \? \([\s\S]*?Consult booked →/);
   assert.match(t, /offer === "stage" \?[\s\S]*?Stage and owner/);
   assert.equal((t.match(/Consult booked →/g) ?? []).length, 1, "one button, behind the offer");
-  assert.match(t, /disabled=\{pending \|\| !!loadError \|\| !st\.can\[step\]\}/);
+  assert.match(t, /"redo", false, \{ feedback: fb \}, !fb\.trim\(\)\)/);
+  assert.match(t, /redoFailed && review &&/);
+  assert.match(t, /disabled=\{pending \|\| !!loadError \|\| !st\.can\[step\] \|\| off\}/);
   assert.match(t, /Could not load this lead&apos;s pitch history: \{loadError\}/);
   assert.match(t, /const lit = review \? pick : \(st\.picked \?\? pick\)/);
   assert.match(t, /p === lit/);

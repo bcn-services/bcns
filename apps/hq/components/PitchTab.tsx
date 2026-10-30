@@ -147,15 +147,15 @@ export function PitchTab({
       }
     });
   }
-  const btn = (label: string, step: Step, pri = false, extra: { pick?: Proto; feedback?: string } = {}) => (
-    <button className={`btn${pri ? " pri" : ""}`} type="button" disabled={pending || !!loadError || !st.can[step]} onClick={() => go(step, extra)}>
+  const btn = (label: string, step: Step, pri = false, extra: { pick?: Proto; feedback?: string } = {}, off = false) => (
+    <button className={`btn${pri ? " pri" : ""}`} type="button" disabled={pending || !!loadError || !st.can[step] || off} onClick={() => go(step, extra)}>
       {label}
     </button>
   );
   const failed = (r: Deliverable | undefined) =>
     r?.status === "failed" ? <div className="perr">Failed: {r.error || "no reason recorded"}</div> : null;
 
-  const { protos, deck, quote } = st;
+  const { protos, deck, quote, redoFailed } = st;
   const good = !!protos && protos.status !== "failed";
   const review = protos?.status === "done" && (!deck || deck.status === "failed");
   const offer = consultOffer({ stage: lead.stage, consult_at: lead.consultIso });
@@ -210,6 +210,7 @@ export function PitchTab({
           failed(protos)
         ) : (
           <>
+            {redoFailed && review && <div className="perr">Redo failed, showing the last good prototypes: {redoFailed.error || "no reason recorded"}</div>}
             <div className="protos">
               {PROTOS.map((p) => {
                 const path = slug ? pathFor(slug, protos, `demo-${p}.html`, "demo") : null;
@@ -252,7 +253,7 @@ export function PitchTab({
                 />
                 <div className="sact">
                   {btn(`Make final deck from #${PROTOS.indexOf(pick) + 1}`, "deck", true, { pick, feedback: fb })}
-                  {btn("Redo prototypes with feedback", "redo", false, { feedback: fb })}
+                  {btn("Redo prototypes with feedback", "redo", false, { feedback: fb }, !fb.trim())}
                 </div>
               </>
             ) : st.picked ? (

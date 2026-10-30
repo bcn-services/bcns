@@ -71,8 +71,10 @@ export function feedbackFor(step: Step, o: { pick?: Proto; feedback?: string } =
 
 // ---- state ----------------------------------------------------------------------------------
 export interface PitchState {
-  /** Newest row of each step (rows come newest first). */
+  /** Newest row of each step (rows come newest first); protos prefers the newest done row over a newer failed one, so a failed redo never hides the last good demos. */
   protos?: Deliverable;
+  /** A failed prototypes row newer than the done `protos` (a failed redo): shown as one line above the thumbnails. */
+  redoFailed?: Deliverable;
   deck?: Deliverable;
   quote?: Deliverable;
   /** Prototype the deck was asked from. */
@@ -93,7 +95,11 @@ export function pitchState(
   rows: Deliverable[],
   lead: { stage: string; consult_at: string | null }
 ): PitchState {
-  const protos = rows.find((r) => r.kind === "pitch" && !isDeck(r));
+  const protoRows = rows.filter((r) => r.kind === "pitch" && !isDeck(r));
+  const newest = protoRows[0];
+  const doneRow = protoRows.find((r) => r.status === "done");
+  const protos = newest?.status === "failed" && doneRow ? doneRow : newest;
+  const redoFailed = newest?.status === "failed" && doneRow ? newest : undefined;
   const deck = rows.find(isDeck);
   const quote = rows.find((r) => r.kind === "quote");
   const busy = rows.some((r) => r.status === "queued" || r.status === "running");
@@ -101,6 +107,7 @@ export function pitchState(
   const pick = /Chosen prototype: demo-([abc])\.html/.exec(deck?.feedback ?? "")?.[1] as Proto | undefined; // the regex allows only a|b|c
   return {
     protos,
+    redoFailed,
     deck,
     quote,
     picked: pick,
@@ -233,6 +240,7 @@ export async function requestStep(
   if (!isUuid(input.businessId)) throw new Error("bad lead id");
   const fb = input.feedback ?? "";
   if (typeof fb !== "string" || fb.length > FEEDBACK_MAX) throw new Error(`feedback is limited to ${FEEDBACK_MAX} characters`);
+  if (step === "redo" && !fb.trim()) throw new Error("say what to change before asking for a redo");
   if (step === "deck" && !(PROTOS as readonly string[]).includes(String(input.pick))) throw new Error("pick a prototype");
   const kind: Kind = step === "quote" ? "quote" : "pitch";
 
