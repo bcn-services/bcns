@@ -59,8 +59,11 @@ export function TodayNateBoard(props: {
 
   const prop = shown.find((p) => `p:${p.id}` === sel);
   const fire = fires.find((f) => `f:${f.key}` === sel);
-  // a:/m: rows on the left, t: a board step; any of them opens the task on the right
-  const task = tasks.find((t) => sel === `a:${t.id}` || sel === `m:${t.id}` || sel === `t:${t.id}`);
+  // a:/m: rows on the left, t: a board step, f:task: a ticket fire; any of them opens the task on the right
+  const task = tasks.find(
+    (t) =>
+      sel === `a:${t.id}` || sel === `m:${t.id}` || sel === `t:${t.id}` || sel === `f:task:${t.id}`
+  );
 
   const act = (f: () => Promise<{ ok: boolean; error?: string }>, okMsg: string | null) =>
     start(async () => {

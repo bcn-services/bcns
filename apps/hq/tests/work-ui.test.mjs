@@ -146,6 +146,7 @@ test("Today (Nate) matches Work: same 420px split, a selected task or board step
   assert.doesNotMatch(css, /\.td-lay \{\s*grid-template-columns: 340px/); // no narrow override Work lacks
   const b = src("components/TodayNateBoard.tsx");
   assert.match(b, /sel === `t:\$\{t\.id\}`/); // a board step selects its task
+  assert.match(b, /sel === `f:task:\$\{t\.id\}`/); // a Fires ticket row opens its task too
   assert.match(b, /\{task \? \(\s*<WorkTaskDetail/); // which replaces the board
   assert.match(b, /onBack=\{\(\) => setSel\(null\)\}/);
   assert.match(b, /<TrackBoard board=\{board\} onStep=\{\(id\) => setSel\(`t:\$\{id\}`\)\}/);
