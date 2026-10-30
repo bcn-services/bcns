@@ -124,7 +124,8 @@ async function syncSource(sql, s, out, log) {
       } else {
         // done in HQ and owes the source its answer; a ticket closed meanwhile needs no push
         if (!closed) {
-          await s.resolve(r.id, t.resolution ?? "");
+          // a reply queued but done before it synced goes out as the closing text, never dropped
+          await s.resolve(r.id, t.resolution?.trim() || t.reply?.trim() || "");
           out.pushed++;
         }
         await sql`update tasks set synced_at = now(), updated_at = now() where id = ${t.id}`;

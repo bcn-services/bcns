@@ -357,3 +357,13 @@ test("a reply queued while the last one was being pushed stays queued and goes o
   assert.deepEqual(next.replied, [[3, "second"]]);
   assert.equal(tasks[0].reply, null);
 });
+
+test("a reply still queued when the task is marked done closes the ticket with it", async () => {
+  const { sql } = fakeSql([
+    { id: "a", status: "done", alert_key: "ticket:ta:3", resolution: null, reply: "Fixed, try now." },
+  ]);
+  const ta = fakeSource("ta", [ticket(3)]);
+  await run({ sql, sources: [ta] });
+  assert.deepEqual(ta.resolved, [[3, "Fixed, try now."]]);
+  assert.deepEqual(ta.replied, []);
+});
