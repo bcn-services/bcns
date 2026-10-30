@@ -64,7 +64,7 @@ test("New task modal: Title, Description, owner, date, track, client; Esc closes
   assert.match(m, /type="date"/);
   assert.match(m, /e\.key === "Escape"/);
   assert.match(m, /trackId: s\("track"\) \|\| null/);
-  assert.match(m, /clientSlug: s\("client"\) \|\| null/);
+  assert.match(m, /clientSlug: the \? null : client \|\| null/);
   assert.match(m, /createTaskAction\(/);
 });
 
@@ -191,4 +191,45 @@ test("Today (Nate): a Connect ticket fire ops:ticket:<id> is hidden when the job
   const t = src("components/TodayNate.tsx");
   assert.match(t, /key\.replace\(\/\^ops:ticket:\/, "ticket:platform:"\)/);
   assert.match(t, /!isTaken\(f\.key\)/);
+});
+
+// ---- hand-made leads and tasks on leads ------------------------------------------------------------
+
+test("Leads page: + New lead button and c key open NewLeadModal, which creates via createLeadAction and opens the new lead's drawer", () => {
+  const v = src("app/(app)/leads/View.tsx");
+  assert.match(v, /\+ New lead/);
+  assert.match(v, /e\.key === "c"\) \{\s*setNewOpen\(true\)/);
+  assert.match(v, /newOpen: newOpen \|\| taskOpen/); // modals own the keyboard
+  assert.match(v, /onCreated=\{\(id, name\) => \{[^}]*setSel\(id\);[^}]*setOpen\(true\);[^}]*router\.push/s);
+  const m = src("components/NewLeadModal.tsx");
+  assert.match(m, /createLeadAction\(/);
+  for (const f of ["name", "trade", "town", "state", "phone", "domain", "stage", "assigned_to", "note"]) assert.ok(m.includes(`name="${f}"`), f);
+  assert.match(m, /defaultValue="reached"/);
+  assert.match(m, /defaultValue="nate"/);
+  assert.match(m, /list="new-lead-trades"/); // trades come from loadTrades via the page
+  assert.match(src("app/(app)/leads/actions.ts"), /export async function createLeadAction[\s\S]*?await ctx\(\)/); // session re-checked
+});
+
+test("Lead drawer: '+ Task for this lead' opens NewTaskModal with the lead preset and no client field", () => {
+  assert.match(src("components/LeadDrawer.tsx"), /\+ Task for this lead/);
+  assert.match(src("app/(app)/leads/View.tsx"), /<NewTaskModal tracks=\{tracks\} clients=\{\[\]\} lead=\{\{ id: drawer\.id, name: drawer\.name \}\}/);
+  const m = src("components/NewTaskModal.tsx");
+  assert.match(m, /businessId: the\?\.id \?\? null/);
+  assert.match(m, /clientSlug: the \? null : client \|\| null/); // lead and client are exclusive
+  assert.match(m, /\{the \? null : \(\s*<select name="client"/);
+  assert.match(src("app/(app)/work/actions.ts"), /source: t\.businessId \? "lead" : "manual"/);
+});
+
+test("New task modal on Work: optional Lead search (searchLeadsAction), hidden once a client is chosen; rows and step chips show the lead name", () => {
+  const m = src("components/NewTaskModal.tsx");
+  assert.match(m, /searchLeadsAction\(q\)/);
+  assert.match(m, /\) : client \? null : \(\s*<div className="wk-pick">/);
+  assert.match(m, /if \(!q\.trim\(\)\) return setHits\(\[\]\)/); // blank asks nothing
+  assert.match(src("app/(app)/work/actions.ts"), /export async function searchLeadsAction[\s\S]*?await ctx\(\)/);
+  assert.match(src("components/WorkBoard.tsx"), /clientName\.get\(t\.client_slug\) \?\? t\.client_slug\) : t\.lead/);
+  assert.match(src("components/TrackCard.tsx"), /t\.client_slug \?\? t\.lead/);
+});
+
+test("Lead search: Enter picks the first hit instead of submitting the task", () => {
+  assert.match(src("components/NewTaskModal.tsx"), /e\.key !== "Enter"\) return;\s*e\.preventDefault\(\)/);
 });

@@ -1,7 +1,7 @@
 /**
  * mcp-tools.test.mjs — the HQ MCP tool surface (lib/mcp/tools.ts) against a fake Supabase client.
  * The fake records every table + op, so the safety properties are asserted on what was actually issued:
- * Claude proposes, it never writes businesses.stage or finance_inputs, never decides, never deletes.
+ * Claude proposes, it never updates businesses.stage or writes finance_inputs (create_lead only inserts a new lead), never decides, never deletes.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -131,10 +131,11 @@ const withTeam = () => {
 };
 const as = (actor, sb, name, args = {}) => byName[name].run({ sb, actor }, args);
 
-test("exactly the 16 tools, and none is named like an approve / decide / delete", () => {
+test("exactly the 17 tools, and none is named like an approve / decide / delete", () => {
   assert.deepEqual(TOOLS.map((t) => t.name).sort(), [
     "add_link",
     "add_task_note",
+    "create_lead",
     "create_task",
     "get_client",
     "get_lead",
@@ -150,7 +151,7 @@ test("exactly the 16 tools, and none is named like an approve / decide / delete"
     "update_task",
     "update_track",
   ]);
-  assert.equal(TOOLS.length, 16);
+  assert.equal(TOOLS.length, 17);
   assert.equal(TOOLS.filter((t) => /approve|decide|delete/i.test(t.name)).length, 0);
 });
 
@@ -613,6 +614,23 @@ test("writes: create_task, log_lead_note, add_link all carry via=mcp and the con
   for (const e of fake.db.events) assert.equal(e.via, "mcp");
 });
 
+test("create_lead: inserts a manual lead (via=mcp), returns only id+name, refuses a twin and a late stage", async () => {
+  const fake = seed();
+  const out = await call(fake, "create_lead", { name: "JamSpot", town: "Pomona", phone: "909 555 0100", domain: "https://www.JamSpot.com/x", note: "met at the venue" });
+  assert.deepEqual(Object.keys(out).sort(), ["id", "name"]);
+  const row = fake.db.businesses.find((b) => b.id === out.id);
+  assert.equal(row.source_query, "manual");
+  assert.equal(row.stage, "reached");
+  assert.equal(row.assigned_to, "nate");
+  assert.equal(row.domain, "jamspot.com");
+  assert.equal(fake.db.notes.find((n) => n.business_id === out.id).via, "mcp");
+  assert.ok(fake.db.events.some((e) => e.kind === "lead_created" && e.via === "mcp"));
+  await assert.rejects(call(fake, "create_lead", { name: "jamspot", town: "pomona" }), /looks like JamSpot \(Pomona\) already exists/);
+  await assert.rejects(call(fake, "create_lead", { name: "Other", stage: "won" }), /HQ_LATE_STAGES/);
+  await assert.rejects(call(fake, "create_lead", { name: "Other", stage: "nope" }), /unknown stage/);
+  assert.equal(fake.db.businesses.filter((b) => b.name === "JamSpot").length, 1);
+});
+
 test("no tool, with plausible args, ever writes businesses, finance_inputs, profiles or decides a proposal", async () => {
   const fake = withTeam();
   const args = {
@@ -626,6 +644,7 @@ test("no tool, with plausible args, ever writes businesses, finance_inputs, prof
     search_leads: { name: "h" },
     get_lead: { id: BIZ },
     log_lead_note: { business_id: BIZ, body: "n" },
+    create_lead: { name: "JamSpot" },
     add_link: { url: "https://example.test/a", business_id: BIZ },
     get_client: { slug: "acme-demo" },
     today: {},
@@ -641,7 +660,9 @@ test("no tool, with plausible args, ever writes businesses, finance_inputs, prof
   for (const [name, a] of Object.entries(args)) await call(fake, name, a);
   for (const o of writes(fake)) {
     assert.ok(
-      !["businesses", "finance_inputs", "profiles", "clients"].includes(o.table),
+      // create_lead INSERTS a new business; nothing may update one
+      !["businesses", "finance_inputs", "profiles", "clients"].includes(o.table) ||
+        (o.table === "businesses" && o.op === "insert"),
       `${o.op} on ${o.table}`
     );
     if (o.table === "proposals") {

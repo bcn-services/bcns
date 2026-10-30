@@ -369,9 +369,9 @@ test("updateTask: done_at marks the move INTO done; re-saving a done task keeps 
   assert.equal(sb.db.tasks[0].done_at, null);
 });
 
-test("UI guards: manual-only create action, waiting_on-driven status, no fire repeated in Your tasks", () => {
+test("UI guards: create action pins source (manual, or lead with a business), waiting_on-driven status, no fire repeated in Your tasks", () => {
   const read = (p) => readFileSync(fileURLToPath(new URL("../" + p, import.meta.url)), "utf8");
-  assert.match(read("app/(app)/work/actions.ts"), /source: "manual", alertKey: null/);
+  assert.match(read("app/(app)/work/actions.ts"), /source: t\.businessId \? "lead" : "manual", alertKey: null/);
   assert.match(
     read("components/WorkTaskDetail.tsx"),
     /waiting\.trim\(\) !== \(task\.waiting_on \?\? ""\)\.trim\(\)/
@@ -462,7 +462,7 @@ test("createTask / updateTask accept client_slug and track_id (and an unassigned
     fileURLToPath(new URL("../app/(app)/work/actions.ts", import.meta.url)),
     "utf8"
   );
-  assert.match(actions, /\.\.\.t, source: "manual"/);
+  assert.match(actions, /\.\.\.t, source: t\.businessId \? "lead" : "manual"/);
 });
 
 test("workGroups: Unassigned first, then nate / brandon / claude; empty groups are left out", () => {
@@ -606,4 +606,13 @@ test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an o
   assert.equal(sb.db.tasks[0].status, "done");
   await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { resolution: "x".repeat(4001) }, NOW), /resolution/);
   assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
+});
+
+test("a task with a business is source lead; with a business AND a client it is refused", async () => {
+  const sb = fakeSb();
+  const BIZ = "33333333-3333-4333-8333-333333333333";
+  const t = await T.createTask(sb, ACTOR, "ui", { title: "Call John", businessId: BIZ });
+  assert.equal(t.source, "lead");
+  assert.equal(t.business_id, BIZ);
+  await assert.rejects(T.createTask(sb, ACTOR, "ui", { title: "x", businessId: BIZ, clientSlug: "acme" }), /lead or a client/);
 });

@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const L = await import("../lib/leads.ts");
-const { OUTCOMES, ALL_STAGES, canLog, nextBusinessDay, weekStartET, etLocalToDate, parseResearch, logCall, updateLead, callSummary, scanTrades } = L;
+const { createLead, findLeads, cleanDomain, OUTCOMES, ALL_STAGES, canLog, nextBusinessDay, weekStartET, etLocalToDate, parseResearch, logCall, updateLead, callSummary, scanTrades } = L;
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const ACTOR = { id: "22222222-2222-4222-8222-222222222222", handle: "brandon" };
@@ -644,4 +644,54 @@ test("leads table: column widths match the prototype at 1440 (QA column-width fi
   assert.ok(want.reduce((a, b) => a + b) <= 1392, "widths fit the 1440 viewport minus gutters");
   assert.match(css, /\.lx-table td:first-child\s*\{[^}]*max-width:\s*0[^}]*text-overflow:\s*ellipsis/, "Business gives first");
   assert.match(src("../app/(app)/leads/View.tsx"), /<td title=\{l\.name\}>/, "truncated name stays readable");
+});
+
+// ---- createLead: validation, the twin guard, the insert ------------------------------------------------
+
+import { mcpFake } from "./_mcp-fake.mjs";
+
+test("createLead inserts a manual lead, logs the event, and files the note", async () => {
+  const sb = mcpFake({ businesses: [{ id: ID, name: "Acme", town: "Pomona" }] });
+  const id = await createLead(sb, ACTOR, "ui", { name: "  JamSpot ", town: "Pomona", domain: "HTTPS://www.JamSpot.com/about", note: "met John" });
+  const row = sb.db.businesses.find((b) => b.id === id);
+  assert.deepEqual(
+    { name: row.name, stage: row.stage, assigned_to: row.assigned_to, source_query: row.source_query, domain: row.domain },
+    { name: "JamSpot", stage: "reached", assigned_to: "nate", source_query: "manual", domain: "jamspot.com" }
+  );
+  assert.equal(sb.db.notes[0].business_id, id);
+  assert.equal(sb.db.events[0].kind, "lead_created");
+});
+
+test("createLead refuses an empty name, a bad stage / owner / phone, a late stage, and a name+town twin", async () => {
+  const sb = mcpFake({ businesses: [{ id: ID, name: "JamSpot", town: "Pomona" }, { id: "x", name: "NoTown", town: null }] });
+  const bad = (input, re, env) => assert.rejects(createLead(sb, ACTOR, "ui", input, env), re);
+  await bad({ name: "  " }, /name is required/);
+  await bad({ name: "A", stage: "nope" }, /unknown stage/);
+  await bad({ name: "A", stage: "won" }, /HQ_LATE_STAGES/);
+  await bad({ name: "A", assigned_to: "bob" }, /nate or brandon/);
+  await bad({ name: "A", phone: "call me" }, /phone/);
+  await bad({ name: "jamspot", town: "pomona" }, /looks like JamSpot \(Pomona\) already exists/);
+  await bad({ name: "NOTOWN" }, /looks like NoTown already exists/);
+  await createLead(sb, ACTOR, "ui", { name: "A", stage: "won" }, { HQ_LATE_STAGES: "1" }); // allowed when the flag is on
+  await createLead(sb, ACTOR, "ui", { name: "JamSpot", town: "Claremont" }); // same name, other town: not a twin
+  assert.equal(sb.db.businesses.length, 4);
+});
+
+test("createLead turns a unique violation into a message, not a raw DB error", async () => {
+  const dupe = { from: () => ({ select: () => ({ ilike: () => ({ is: () => ({ limit: async () => ({ data: [], error: null }) }) }) }), insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { code: "23505", message: "duplicate key" } }) }) }) }) };
+  await assert.rejects(createLead(dupe, ACTOR, "ui", { name: "A" }), /already exists/);
+});
+
+test("cleanDomain keeps the host only", () => {
+  assert.equal(cleanDomain(" http://WWW.Foo.co/a?b#c "), "foo.co");
+  assert.equal(cleanDomain("foo.co"), "foo.co");
+});
+
+test("findLeads: name contains, any case, at most 10, blank asks nothing", async () => {
+  const sb = mcpFake({ businesses: Array.from({ length: 12 }, (_, i) => ({ id: `b${i}`, name: `Jam ${i}`, town: "X", suppressed_at: null })).concat([{ id: "z", name: "Other", town: null, suppressed_at: null }]) });
+  assert.equal((await findLeads(sb, "jam")).length, 10);
+  assert.deepEqual(await findLeads(sb, "oth"), [{ id: "z", name: "Other", town: null }]);
+  const before = sb.ops.length;
+  assert.deepEqual(await findLeads(sb, "  "), []);
+  assert.equal(sb.ops.length, before, "blank query never reaches the database");
 });

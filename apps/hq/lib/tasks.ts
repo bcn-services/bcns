@@ -325,6 +325,7 @@ export function buildTaskRow(actor: string, via: Via, t: NewTask, now: Date = ne
   const title = t.title?.trim();
   if (!title) throw new Error("title required");
   if (t.area && !AREAS.includes(t.area as Area)) throw new Error(`unknown area ${t.area}`);
+  if (t.businessId && t.clientSlug) throw new Error("a task hangs off a lead or a client, not both");
   if (t.source && !SOURCES.includes(t.source)) throw new Error(`unknown source ${t.source}`);
   const row = {
     title,
@@ -333,7 +334,7 @@ export function buildTaskRow(actor: string, via: Via, t: NewTask, now: Date = ne
     due: t.due ? assertDay(t.due) : null,
     body: t.body?.trim() || null,
     ...statusPatch(t.status ?? "todo", now),
-    source: t.source ?? "manual",
+    source: t.source ?? (t.businessId ? "lead" : "manual"),
     business_id: t.businessId ?? null,
     client_slug: assertSlug(t.clientSlug ?? null),
     track_id: assertTrackId(t.trackId ?? null),

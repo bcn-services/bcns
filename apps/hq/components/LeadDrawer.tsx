@@ -24,6 +24,7 @@ export function LeadDrawer(props: {
   tab: DrawerTab;
   onTab: (t: DrawerTab) => void;
   onClose: () => void;
+  onTask: () => void;
   onLog: (n: 1 | 2 | 3 | 4, consultLocal?: string) => void;
   pending: boolean;
   msg: string;
@@ -37,7 +38,7 @@ export function LeadDrawer(props: {
   detailError?: string;
   onRetry?: () => void;
 }) {
-  const { lead: l, tab, onTab, onClose, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls, detailError, onRetry } = props;
+  const { lead: l, tab, onTab, onClose, onTask, onLog, pending, msg, consultOpen, onConsultOpen, rows, pitchError, details, calls, detailError, onRetry } = props;
   const wait = detailError ? null : <p className="muted" role="status">Loading…</p>;
   const [local, setLocal] = useState("");
   const [copied, setCopied] = useState(false);
@@ -120,6 +121,9 @@ export function LeadDrawer(props: {
               </>
             ) : null}
           </dl>
+          <button className="btn" type="button" onClick={onTask}>
+            + Task for this lead
+          </button>
           <h2>Log a call</h2>
           <div className="outs">
             {([1, 2, 3, 4] as const).map((n) => (

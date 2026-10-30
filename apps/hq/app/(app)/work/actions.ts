@@ -8,6 +8,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { findLeads } from "@/lib/leads";
 import { getSession } from "@/lib/session";
 import { createSupabaseServer } from "@/lib/supabase";
 import {
@@ -51,9 +52,15 @@ async function run(
 }
 
 export async function createTaskAction(t: NewTask): Promise<ActionResult> {
-  // source 'lead'/'alert' and alert_key are set only by createTaskFromLead / createTaskFromFire
-  const manual: NewTask = { ...t, source: "manual", alertKey: null };
+  // source 'alert' and alert_key are set only by createTaskFromFire; a task made for a lead is source 'lead' (as createTaskFromLead's)
+  const manual: NewTask = { ...t, source: t.businessId ? "lead" : "manual", alertKey: null };
   return run(async (c) => (await createTask(c.sb, c.actor, "ui", manual)).id);
+}
+
+/** The New task modal's Lead field: up to 10 leads whose name contains `q`. */
+export async function searchLeadsAction(q: string): Promise<{ id: string; name: string; town: string | null }[]> {
+  const c = await ctx();
+  return findLeads(c.sb, q);
 }
 
 export async function updateTaskAction(id: string, patch: TaskPatch): Promise<ActionResult> {
