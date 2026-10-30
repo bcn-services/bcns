@@ -205,6 +205,21 @@ export function createGit({ osDir, env = process.env, run = exec, stateDir = "/s
   };
 }
 
+const DECK_FILES = ["demo.html", "video-guide.md"];
+
+// Attach the finished deck's files to the lead's task card. Never fails the run (the deliverable is already done).
+async function linkDeck(sql, db, slug, changed, env = process.env) {
+  try {
+    const base = (env.HQ_PUBLIC_URL || "https://hq.bcn-services.com").replace(/\/+$/, "");
+    const files = DECK_FILES.filter((f) => changed.includes(`clients/${slug}/demo/${f}`));
+    if (!files.length) return;
+    const urls = files.map((f) => `${base}/files/clients/${slug}/demo/${f}`);
+    await db.linkDeliverableFiles(sql, slug, urls, files);
+  } catch (err) {
+    console.error(`deliverable: linking deck files failed: ${String(err?.message ?? err).split("\n")[0]}`);
+  }
+}
+
 // deps: claudeFor(handle) -> {ask}, git {changed, ahead, discard, sync, publish}, osDir.
 // All default from env in run.mjs jobDeps.
 export async function run({ sql, db, claudeFor, git, osDir }) {
@@ -269,6 +284,7 @@ export async function run({ sql, db, claudeFor, git, osDir }) {
     await git.publish({ slug: row.slug, kind: row.kind });
     dirty = false;
     await finish("done", changed, null);
+    if (String(row.feedback ?? "").split("\n")[0] === DECK) await linkDeck(sql, db, row.slug, changed);
     return { claimed: 1, id: row.id, status: "done", paths: changed };
   } catch (err) {
     // Short message only: never the env, never a token (claude.mjs messages carry neither).

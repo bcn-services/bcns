@@ -1,0 +1,17 @@
+-- Pitch deck links: jobs/deliverable.mjs (linkDeliverableFiles) inserts a `links` row per finished deck file
+-- (demo.html, video-guide.md) on the lead's open tasks, or on the lead when none is open. No schema change.
+
+-- ---------------------------------------------------------------------------
+-- NATE RUNS THIS BY HAND, after the hq_jobs role from 0032's footer exists (never from a migration).
+-- RLS is on for links, so the role needs a policy per command. Without these lines the link step logs
+-- "permission denied" and skips (the deliverable itself still finishes). Reads tasks (0036 grants select)
+-- and businesses (0032). No update/delete grant.
+--
+--   grant select, insert on links to hq_jobs;
+--   create policy jobs_select on links for select to hq_jobs using (true);
+--   create policy jobs_insert on links for insert to hq_jobs with check (true);
+--
+-- Check afterwards (read-only):
+--   select has_table_privilege('hq_jobs','links','insert') as ins,           -- true
+--          has_table_privilege('hq_jobs','links','delete') as del_should_be_false;  -- false
+-- ---------------------------------------------------------------------------
