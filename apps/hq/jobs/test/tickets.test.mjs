@@ -6,13 +6,7 @@ import { main, JOBS } from "../run.mjs";
 // An in-memory `tasks` table behind a sql tag. It answers only the four statements the job issues;
 // the open-alert unique index is modelled, so a double insert raises 23505 like the real one.
 function fakeSql(seed = []) {
-  const tasks = seed.map((t, i) => ({
-    synced_at: null,
-    resolution: null,
-    reply: null,
-    ...t,
-    n: i,
-  }));
+  const tasks = seed.map((t, i) => ({ synced_at: null, resolution: null, reply: null, ...t, n: i }));
   const calls = [];
   const sql = async (strings, ...v) => {
     const text = strings.join("?").replace(/\s+/g, " ").trim();
@@ -320,17 +314,12 @@ test("a failed reply is logged, stays queued, and does not fail the run", async 
     { id: "a", status: "doing", alert_key: "ticket:ta:3", reply: "On it." },
   ]);
   const logs = [];
-  const out = await run({
-    sql,
-    sources: [fakeSource("ta", [ticket(3)], { failReply: true })],
-    log: (m) => logs.push(m),
-  });
+  const ta = fakeSource("ta", [ticket(3)], { failReply: true });
+  const out = await run({ sql, sources: [ta], log: (m) => logs.push(m) });
   assert.equal(out.replied, 0);
   assert.deepEqual(out.failed, []);
   assert.equal(tasks[0].reply, "On it.");
-  assert.deepEqual(logs, [
-    "tickets: reply failed a function public.hq_ticket_reply does not exist",
-  ]);
+  assert.deepEqual(logs, ["tickets: reply failed a function public.hq_ticket_reply does not exist"]);
 });
 
 test("a closed ticket gets no reply (its task closes instead); a done task's reply is never sent", async () => {

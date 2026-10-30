@@ -51,10 +51,7 @@ test("buildTaskPatch: done sets done_at, leaving done clears it, other keys leav
 
 test("buildTaskPatch: owners must be nate|brandon|claude; empty patch, bad status and bad due throw", () => {
   assert.deepEqual(T.buildTaskPatch({ owners: ["claude"] }, NOW).owners, ["claude"]);
-  assert.deepEqual(T.buildTaskPatch({ owners: ["nate", "brandon", "nate"] }, NOW).owners, [
-    "nate",
-    "brandon",
-  ]);
+  assert.deepEqual(T.buildTaskPatch({ owners: ["nate", "brandon", "nate"] }, NOW).owners, ["nate", "brandon"]);
   assert.deepEqual(T.buildTaskPatch({ owners: [] }, NOW).owners, []);
   assert.throws(() => T.buildTaskPatch({ owners: ["mallory"] }, NOW), /owner/);
   assert.throws(() => T.buildTaskPatch({ owners: ["nate", "mallory"] }, NOW), /owner/);
@@ -73,10 +70,7 @@ test("owner cycle, waiting status, list status cycle, grouping and filters", () 
   assert.deepEqual(T.nextOwner(["nate", "claude"]), ["brandon", "claude"]);
   assert.deepEqual(T.nextOwner(["nate", "brandon"]), ["brandon"]);
   assert.deepEqual(T.assertOwners("brandon"), ["brandon"]); // the old single-owner shape
-  assert.deepEqual(
-    [T.assertOwners(""), T.assertOwners(null), T.assertOwners(undefined)],
-    [[], [], []]
-  );
+  assert.deepEqual([T.assertOwners(""), T.assertOwners(null), T.assertOwners(undefined)], [[], [], []]);
   assert.equal(T.waitingStatus("nate", "todo"), "waiting");
   assert.equal(T.waitingStatus("", "waiting"), "todo");
   assert.equal(T.waitingStatus("", "doing"), undefined);
@@ -85,13 +79,7 @@ test("owner cycle, waiting status, list status cycle, grouping and filters", () 
     ["todo", "reached", "scheduled", "done", "no"].map((s) => T.nextListStatus(s)),
     ["reached", "scheduled", "done", "no", "todo"]
   );
-  const t = (id, owner, status, due, area = "ops") => ({
-    id,
-    owners: [].concat(owner),
-    status,
-    due,
-    area,
-  });
+  const t = (id, owner, status, due, area = "ops") => ({ id, owners: [].concat(owner), status, due, area });
   const all = [
     t(1, "nate", "todo", "2026-11-01"),
     t(2, "nate", "doing", null),
@@ -108,10 +96,7 @@ test("owner cycle, waiting status, list status cycle, grouping and filters", () 
     g[0].tasks.map((x) => x.id),
     [2, 3, 1]
   ); // doing first, then todo by due; task 5 sits under its first owner (brandon) only
-  assert.deepEqual(
-    g[1].tasks.map((x) => x.id),
-    [5]
-  );
+  assert.deepEqual(g[1].tasks.map((x) => x.id), [5]);
   assert.deepEqual(
     T.filterTasks(all, { owner: "nate" }).map((x) => x.id),
     [1, 2, 3, 5]
@@ -388,10 +373,7 @@ test("updateTask: done_at marks the move INTO done; re-saving a done task keeps 
 
 test("UI guards: create action pins source (manual, or lead with a business), waiting_on-driven status, no fire repeated in Your tasks", () => {
   const read = (p) => readFileSync(fileURLToPath(new URL("../" + p, import.meta.url)), "utf8");
-  assert.match(
-    read("app/(app)/work/actions.ts"),
-    /source: t\.businessId \? "lead" : "manual", alertKey: null/
-  );
+  assert.match(read("app/(app)/work/actions.ts"), /source: t\.businessId \? "lead" : "manual", alertKey: null/);
   assert.match(
     read("components/WorkTaskDetail.tsx"),
     /waiting\.trim\(\) !== \(task\.waiting_on \?\? ""\)\.trim\(\)/
@@ -534,23 +516,11 @@ test("tracks: create / update write the row and an events row; fixed names only;
       ["track.updated", "ui"],
     ]
   );
-  await assert.rejects(
-    () => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", column: "later" }),
-    /column/
-  );
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", column: "later" }), /column/);
   await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: " " }), /name/);
-  await assert.rejects(
-    () => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", area: "bogus" }),
-    /area/
-  );
-  await assert.rejects(
-    () => TR.createTrack(sb, ACTOR, "ui", { name: "Pilot" }),
-    /tracks are fixed/
-  );
-  await assert.rejects(
-    () => TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot" }),
-    /tracks are fixed/
-  );
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Ops", area: "bogus" }), /area/);
+  await assert.rejects(() => TR.createTrack(sb, ACTOR, "ui", { name: "Pilot" }), /tracks are fixed/);
+  await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, { name: "Pilot" }), /tracks are fixed/);
   await assert.rejects(() => TR.updateTrack(sb, ACTOR, "ui", t.id, {}), /nothing to update/);
 });
 
@@ -591,12 +561,7 @@ test("todayQueue: mine only; queue = doing first, then due within 7d soonest fir
     t({ id: "brandons", owners: ["brandon"], due: "2026-10-28" }),
     t({ id: "unowned", owners: [], due: "2026-10-28" }),
     t({ id: "shared", owners: ["brandon", "nate"], due: "2026-10-28" }),
-    t({
-      id: "shared-done",
-      owners: ["brandon", "nate"],
-      status: "done",
-      done_at: "2026-10-27T14:00:00Z",
-    }),
+    t({ id: "shared-done", owners: ["brandon", "nate"], status: "done", done_at: "2026-10-27T14:00:00Z" }),
   ];
   const r = T.todayQueue(tasks, "nate", "2026-10-28");
   assert.deepEqual(ids(r.queue), [
@@ -617,20 +582,12 @@ test("todayQueue: mine only; queue = doing first, then due within 7d soonest fir
   const many = Array.from({ length: 12 }, (_, i) =>
     t({ id: `u${i}`, created_at: `2026-10-${String(i + 1).padStart(2, "0")}T00:00:00Z` })
   );
-  const capped = T.todayQueue(
-    [...many, t({ id: "soon", due: "2026-10-30" })],
-    "nate",
-    "2026-10-28"
-  ).queue;
+  const capped = T.todayQueue([...many, t({ id: "soon", due: "2026-10-30" })], "nate", "2026-10-28").queue;
   assert.equal(capped.length, 8);
   assert.deepEqual(ids(capped).slice(0, 3), ["soon", "u0", "u1"]);
   assert.equal(ids(capped).at(-1), "u6");
   // an undated doing task (Now on the board) never falls past the cap
-  const withDoing = T.todayQueue(
-    [...many, t({ id: "doing-new", status: "doing", created_at: "2026-10-27T00:00:00Z" })],
-    "nate",
-    "2026-10-28"
-  ).queue;
+  const withDoing = T.todayQueue([...many, t({ id: "doing-new", status: "doing", created_at: "2026-10-27T00:00:00Z" })], "nate", "2026-10-28").queue;
   assert.equal(ids(withDoing)[0], "doing-new");
   // waiting is uncapped
   const w = Array.from({ length: 12 }, (_, i) => t({ id: `w${i}`, status: "waiting" }));
@@ -655,20 +612,10 @@ test("updateTask resolution: trimmed, capped at 4000, null or blank clears; an o
   assert.equal("resolution" in T.buildTaskPatch({ owners: ["nate"] }, NOW), false);
   const sb = fakeSb();
   const t = await T.createTask(sb, ACTOR, "ui", { title: "ticket", owners: ["nate"] }, NOW);
-  await T.updateTask(
-    sb,
-    ACTOR,
-    "ui",
-    t.id,
-    { status: "done", resolution: " Reset your password. " },
-    NOW
-  );
+  await T.updateTask(sb, ACTOR, "ui", t.id, { status: "done", resolution: " Reset your password. " }, NOW);
   assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
   assert.equal(sb.db.tasks[0].status, "done");
-  await assert.rejects(
-    () => T.updateTask(sb, ACTOR, "ui", t.id, { resolution: "x".repeat(4001) }, NOW),
-    /resolution/
-  );
+  await assert.rejects(() => T.updateTask(sb, ACTOR, "ui", t.id, { resolution: "x".repeat(4001) }, NOW), /resolution/);
   assert.equal(sb.db.tasks[0].resolution, "Reset your password.");
 });
 
@@ -678,8 +625,5 @@ test("a task with a business is source lead; with a business AND a client it is 
   const t = await T.createTask(sb, ACTOR, "ui", { title: "Call John", businessId: BIZ });
   assert.equal(t.source, "lead");
   assert.equal(t.business_id, BIZ);
-  await assert.rejects(
-    T.createTask(sb, ACTOR, "ui", { title: "x", businessId: BIZ, clientSlug: "acme" }),
-    /lead or a client/
-  );
+  await assert.rejects(T.createTask(sb, ACTOR, "ui", { title: "x", businessId: BIZ, clientSlug: "acme" }), /lead or a client/);
 });
