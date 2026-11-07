@@ -39,7 +39,8 @@ export function buildCatalog(connectedSources: readonly string[], inputs: StatIn
   const out: Stat[] = [];
   for (const source of connectedSources) {
     for (const v of viewsFor(source)) {
-      const n = inputs.counts[`${source}/${v.id}`];
+      // Shopify Orders = daily_summary_v1 orders (non-cancelled, reporting currency), like native Analytics; the row count includes cancelled and old-currency orders.
+      const n = source === "shopify" && v.id === "orders" && inputs.last30 ? inputs.last30.orders : inputs.counts[`${source}/${v.id}`];
       out.push({ id: `${source}/${v.id}`, source, label: `${v.label}, 30 days`, value: n == null ? "—" : n.toLocaleString("en-US") });
     }
     if (source === "shopify")

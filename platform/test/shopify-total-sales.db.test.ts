@@ -48,4 +48,13 @@ describe('daily_summary_v1 = Shopify Total sales', () => {
     await put(c, { id: 'b', kind: 'order', day: '2026-11-01', amount: 800, cur: 'USD' })
     expect((await summary(c))[0]).toMatchObject({ revenue_minor: 5000, orders: 2, currency: 'USD' })
   })
+
+  it('AOV is order totals / orders, refunds not deducted', async () => {
+    const c = await client()
+    await put(c, { id: 'a', kind: 'order', day: '2026-11-01', amount: 4200, cur: 'USD' })
+    await put(c, { id: 'b', kind: 'order', day: '2026-11-01', amount: 800, cur: 'USD' })
+    await put(c, { id: 'r', kind: 'refund', day: '2026-11-01', amount: -1000, cur: 'USD', parent: 'a' })
+    const aov = (await sql(`select revenue_minor::int, aov_minor::int from api.daily_summary_v1 where client_id = $1`, [c])).rows[0]
+    expect(aov).toMatchObject({ revenue_minor: 4000, aov_minor: 2500 })
+  })
 })

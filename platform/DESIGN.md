@@ -575,7 +575,10 @@ url, attributes, source_updated_at, updated_at`.
 currency, updated_at`.
 
 **`api.daily_summary_v1`** — one row per `(client_id, day)`; the Overview / Shopify panel / DFR
-source. `source = 'platform'`.
+source. `source = 'platform'`. **Definition since migration `20261107120000`:** `revenue_minor` =
+order totals + refunds (negative), `orders` = non-cancelled orders, both in the tenant's newest-order
+currency, cancelled orders and their refunds excluded; `aov_minor` = order totals / orders. The SQL
+below is the original body; the migration is authoritative.
 ```sql
 with days as (select client_id, day from data.money union select client_id, day from data.daily_metrics),
 m as (select client_id, day,

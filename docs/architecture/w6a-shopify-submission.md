@@ -405,8 +405,13 @@ Don't include the Access page unless §2's AI-tools check passes.
   `revenue_minor` = order totals (net of discounts, incl. tax and shipping) + refunds on the refund
   day, cancelled orders and their refunds excluded; `orders` = non-cancelled orders. Test orders are
   skipped in the connector (`test` is now fetched). Everything is in one reporting currency, the
-  currency of the tenant's newest order.
-  **Known limits:** (1) orders in an older store currency are left out, where Shopify Analytics
+  currency of the tenant's newest order. `aov_minor` = order totals / orders (refunds not deducted,
+  as native AOV). The hub "Orders, 30 days" stat reads the view's `orders`, not a row count of
+  `money_v1` (which includes cancelled and old-currency orders).
+  **Rollout:** the test-order skip only applies to rows ingested after the deploy, so a tenant that
+  already holds test orders (shopify-review) must be reset and re-backfilled (section 9 reset) or its
+  numbers still include them.
+  **Known limits:** (0) payouts are not currency-filtered; (1) orders in an older store currency are left out, where Shopify Analytics
   converts them at historical rates bcns does not hold, so a date range spanning a currency change
   still differs; (2) days bucket in `clients.timezone` (DESIGN S5/U2 warn on a mismatch with the
   store's timezone), so set it to the store's timezone or day edges differ; (3) `minor()` assumes two

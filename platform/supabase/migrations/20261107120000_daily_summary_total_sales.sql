@@ -10,7 +10,8 @@
 --                        the refund day), cancelled orders and their refunds excluded.
 --   orders             = non-cancelled orders in the reporting currency (test orders never reach data.money).
 --   refunds_minor      = the refund half of revenue_minor, unchanged meaning, same exclusions.
---   payouts_minor      = unchanged.
+--   payouts_minor      = unchanged (not currency-filtered).
+--   aov_minor          = order totals / orders, refunds not deducted (Shopify's AOV excludes returns).
 create or replace view api.daily_summary_v1 with (security_invoker = true) as
 with rc as (
   select distinct on (client_id) client_id, currency from data.money where kind = 'order' order by client_id, occurred_at desc),
@@ -29,6 +30,7 @@ days as (select client_id, day from data.money union select client_id, day from 
 m as (select client_id, day,
         sum(amount_minor) filter (where kind in ('order', 'refund')) as revenue_minor,
         count(*)          filter (where kind = 'order')              as orders,
+        sum(amount_minor) filter (where kind = 'order')              as orders_minor,
         sum(amount_minor) filter (where kind = 'refund')             as refunds_minor,
         sum(amount_minor) filter (where kind = 'payout')             as payouts_minor,
         coalesce(max(currency) filter (where kind in ('order', 'refund')), max(currency)) as currency,
@@ -50,7 +52,7 @@ select days.client_id, 'platform'::data.source as source, days.day,
        coalesce(m.revenue_minor,0) as revenue_minor, coalesce(m.orders,0) as orders,
        coalesce(m.refunds_minor,0) as refunds_minor, coalesce(m.payouts_minor,0) as payouts_minor,
        m.currency,
-       case when coalesce(m.orders,0) > 0 then round(m.revenue_minor::numeric / m.orders) end as aov_minor,
+       case when coalesce(m.orders,0) > 0 then round(m.orders_minor::numeric / m.orders) end as aov_minor,
        d.sessions, d.inventory_units,
        coalesce(d.conversion_rate_src,
                 case when d.sessions > 0 then m.orders::numeric / d.sessions end) as conversion_rate,
