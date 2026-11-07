@@ -397,6 +397,20 @@ Don't include the Access page unless §2's AI-tools check passes.
   token row, so the token is refreshed. `/finish` also re-checks the subscription
   on every open (§1): a client with an ACTIVE subscription passes straight through,
   and one with none (and no paid period left) lands on Shopify's plan page.
+- **Sales numbers vs native Shopify Analytics (rule 2.1.4, round 3).** Cause, read off the
+  `shopify-review` tenant: its store changed currency over time, so `data.money` held orders in six
+  currencies (EGP, EUR, KWD, MYR, PHP, USD) and `api.daily_summary_v1` summed the raw minor units
+  into one number labelled with `max(currency)`. It also counted cancelled orders and ignored
+  refunds. Migration `20261107120000` redefines the view to Shopify's "Total sales" / "Orders":
+  `revenue_minor` = order totals (net of discounts, incl. tax and shipping) + refunds on the refund
+  day, cancelled orders and their refunds excluded; `orders` = non-cancelled orders. Test orders are
+  skipped in the connector (`test` is now fetched). Everything is in one reporting currency, the
+  currency of the tenant's newest order.
+  **Known limits:** (1) orders in an older store currency are left out, where Shopify Analytics
+  converts them at historical rates bcns does not hold, so a date range spanning a currency change
+  still differs; (2) days bucket in `clients.timezone` (DESIGN S5/U2 warn on a mismatch with the
+  store's timezone), so set it to the store's timezone or day edges differ; (3) `minor()` assumes two
+  decimals, so a three-decimal currency (KWD) is off by 10x and a zero-decimal one (JPY) by 100x.
 
 ---
 

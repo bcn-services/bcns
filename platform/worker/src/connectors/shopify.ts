@@ -49,7 +49,7 @@ async function gql(ctx: RunContext, query: string, variables: Json = {}): Promis
   return body.data
 }
 
-const ORDER_FIELDS = `id name createdAt updatedAt processedAt cancelledAt displayFinancialStatus
+const ORDER_FIELDS = `id name test createdAt updatedAt processedAt cancelledAt displayFinancialStatus
   displayFulfillmentStatus currencyCode totalPriceSet{shopMoney{amount currencyCode}}
   currentTotalPriceSet{shopMoney{amount currencyCode}} customer{id email displayName}
   lineItems(first:25){nodes{id title sku quantity discountedTotalSet{shopMoney{amount}}}}
@@ -250,6 +250,8 @@ export const shopify: Connector = {
     const base = adminUrl(ctx)
     for (const r of rows) {
       const p = r.payload
+      // Shopify Analytics leaves test orders (Bogus Gateway, dev-store seed data) out of every report; so do we.
+      if (r.entity === 'order' && p.test === true) continue
       if (r.entity === 'order') {
         const occurred = new Date(p.processedAt ?? p.createdAt)
         const cur = p.totalPriceSet?.shopMoney?.currencyCode ?? p.currencyCode
