@@ -510,7 +510,8 @@ const byId = (cat) => Object.fromEntries(cat.map((s) => [s.id, s]));
 
 test("stats catalog: money per currency, null count is a dash, counts get thousands separators", () => {
   const cat = byId(buildCatalog(["shopify", "meta"], inputs()));
-  assert.equal(cat["shopify/orders"].value, "1,234");
+  assert.equal(cat["shopify/orders"].value, "5"); // from daily_summary (non-cancelled, one currency), not the 1,234 row count
+  assert.equal(byId(buildCatalog(["shopify"], inputs({ last30: null })))["shopify/orders"].value, "1,234"); // summary failed: fall back to the row count
   assert.equal(cat["shopify/orders"].label, "Orders, 30 days");
   assert.equal(cat["shopify/refunds"].value, "—"); // a failed count
   assert.equal(cat["shopify/payouts"].value, "—"); // never fetched
