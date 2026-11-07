@@ -403,11 +403,13 @@ Don't include the Access page unless §2's AI-tools check passes.
   into one number labelled with `max(currency)`. It also counted cancelled orders and ignored
   refunds. Migration `20261107120000` redefines the view to Shopify's "Total sales" / "Orders":
   `revenue_minor` = order totals (net of discounts, incl. tax and shipping) + refunds on the refund
-  day, cancelled orders and their refunds excluded; `orders` = non-cancelled orders. Test orders are
+  day; `orders` = all orders. **Cancelled orders stay in** (migration `20261107140000`): the bcns-data-dev
+  check showed native Analytics keeps a cancelled order in Gross sales and Orders and only an actual
+  refund (Sales reversals) lowers Total sales, so a cancel with no refund still counts. Test orders are
   skipped in the connector (`test` is now fetched). Everything is in one reporting currency, the
   currency of the tenant's newest order. `aov_minor` = order totals / orders (refunds not deducted,
   as native AOV). The hub "Orders, 30 days" stat reads the view's `orders`, not a row count of
-  `money_v1` (which includes cancelled and old-currency orders).
+  `money_v1` (which includes old-currency orders).
   **Rollout:** the test-order skip only applies to rows ingested after the deploy, so a tenant that
   already holds test orders (shopify-review) must be reset and re-backfilled (section 9 reset) or its
   numbers still include them.
