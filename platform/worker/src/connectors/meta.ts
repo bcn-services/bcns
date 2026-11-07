@@ -10,7 +10,7 @@ import { z } from 'zod'
 import {
   type CanonicalWrites, type Connector, type Json, type MediaRow, type MetricRow, type Page,
   type RawRow, type RecordRow, type RunContext,
-  SourceError, reason, minor, sleep,
+  SourceError, reason, minor, sleep, localDay,
 } from './index.js'
 import { envStr } from '../db.js'
 
@@ -26,6 +26,14 @@ const configSchema = z.object({
 }).passthrough()
 
 const day = (d: Date) => d.toISOString().slice(0, 10)
+
+/** Meta's date_start/time_range are in the AD ACCOUNT's timezone, so "today" must be too, not UTC. */
+function acctDay(ctx: RunContext, d: Date): string {
+  try { return localDay(d, ctx.config.account_timezone ?? ctx.timezone) } catch { return localDay(d, ctx.timezone) }
+}
+
+/** Ads Manager's default attribution is 7-day click + 1-day view, so purchases land on a day for a week. */
+const REFRESH_DAYS = 7
 
 async function graph(ctx: RunContext, path: string, params: Record<string, string> = {}, init?: RequestInit): Promise<Json> {
   const url = new URL(`${GRAPH}/${path}`)
@@ -107,7 +115,7 @@ async function* insightsIncremental(ctx: RunContext, entity: string, since: Date
   for (;;) {
     const p: Record<string, string> = {
       level: LEVEL[entity], time_increment: '1', limit: '500', fields: LEVEL_FIELDS[entity],
-      time_range: JSON.stringify({ since: day(since), until: day(new Date()) }),
+      time_range: JSON.stringify({ since: acctDay(ctx, since), until: acctDay(ctx, new Date()) }),
     }
     if (after) p.after = after
     const b: Json = await graph(ctx, `${ctx.config.act_id}/insights`, p)
@@ -168,10 +176,10 @@ export const meta: Connector = {
         yield { raw: p.raw, entity, cursor: { listed_at: new Date().toISOString() }, entityDone: !p.hasNext, done: false }
       }
     }
-    const since = new Date(Date.now() - 3 * 864e5) // late attribution window (§4.3)
+    const since = new Date(Date.now() - REFRESH_DAYS * 864e5) // late attribution window (§4.3)
     for (const entity of ['insight_campaign_day', 'insight_ad_day'] as const) {
       for await (const p of insightsIncremental(ctx, entity, since)) {
-        yield { raw: p.raw, entity, cursor: { until: day(new Date()) }, entityDone: !p.hasNext, done: false }
+        yield { raw: p.raw, entity, cursor: { until: acctDay(ctx, new Date()) }, entityDone: !p.hasNext, done: false }
       }
     }
     const images = await adImages(ctx, ads)
@@ -195,7 +203,7 @@ export const meta: Connector = {
 
     for (const entity of ['insight_campaign_day', 'insight_ad_day'] as const) {
       if (order.indexOf(entity) < start) continue
-      let windowUntil: string = (resumeAt === entity && cursor?.window_until) || day(new Date())
+      let windowUntil: string = (resumeAt === entity && cursor?.window_until) || acctDay(ctx, new Date())
       let runId: string | undefined = resumeAt === entity ? cursor?.report_run_id : undefined
       let after: string | undefined = resumeAt === entity ? cursor?.after : undefined
       for (;;) {
