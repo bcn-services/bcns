@@ -99,6 +99,8 @@ dig +short hq.bcn-services.com        # must print 104.236.20.89 before step 6
 
 ### 2. HQ database (project `fdlbtkftnhmatjxbjyjf`) — done
 
+Steps 2-5 were first done on the us-west-2 project `knmgyxlrhjxaydliucbs`. The 2026-11 move carried their database state (migrations, users, `profiles`, roles) by `supabase db dump` + psql restore, and the dashboard settings (signups off, URL config, SMTP, Reset template) were set again on the new project.
+
 ```bash
 supabase link --workdir apps/hq --project-ref fdlbtkftnhmatjxbjyjf
 supabase migration list --workdir apps/hq          # READ THIS BEFORE PUSHING
