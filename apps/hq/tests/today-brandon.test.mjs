@@ -221,63 +221,70 @@ test("Leads list: slim columns, estimated count, no eager details; detail is a s
 });
 
 // ---- the progress rail's numbers (components/TodayBrandonStats.ts) ----
-const { railStats, GOAL } = await import("../components/TodayBrandonStats.ts");
+const { railStats, GOAL, DAY_CALLS } = await import("../components/TodayBrandonStats.ts");
 
 // Wed Oct 28 2026, 14:00 ET. n calls on an ET day, at 10:00 ET + i minutes (EDT = UTC-4).
 const NOW_R = new Date("2026-10-28T18:00:00Z");
 const day = (d, n, outcome = "no_answer") =>
   Array.from({ length: n }, (_, i) => ({ at: `${d}T${String(14 + Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}:00Z`, outcome, name: `${d}#${i}` }));
 
-test("rail goals are the pinned daily targets", () => {
-  assert.deepEqual(GOAL, { calls: 20, reached: 5, consults: 1 });
+test("rail goals are the pinned weekly targets; the daily pace is derived", () => {
+  assert.deepEqual(GOAL, { calls: 140, reached: 25, consults: 5 });
+  assert.equal(DAY_CALLS, 28);
 });
 
-test("rail: today's counts use ET days, reached includes consult_booked, imported rows are ignored", () => {
+test("rail: week total spans Mon-Fri in ET, reached includes consult_booked, imported rows are ignored", () => {
   const calls = [
-    ...day("2026-10-28", 3),
+    ...day("2026-10-26", 3),
+    ...day("2026-10-27", 2),
+    ...day("2026-10-28", 1),
     { at: "2026-10-28T15:00:00Z", outcome: "reached", name: "A" },
-    { at: "2026-10-28T16:00:00Z", outcome: "consult_booked", name: "B" },
+    { at: "2026-10-30T16:00:00Z", outcome: "consult_booked", name: "B" },
     { at: "2026-10-28T13:00:00Z", outcome: "imported", name: "X" },
-    { at: "2026-10-29T02:00:00Z", outcome: "reached", name: "late last night ET is still the 28th" },
-    { at: "2026-10-28T03:00:00Z", outcome: "reached", name: "before midnight ET: the 27th" },
+    ...day("2026-10-21", 4), // last week
   ];
-  const s = railStats(calls, NOW_R);
-  assert.deepEqual(s.today, { calls: 6, reached: 3, consults: 1 });
+  assert.deepEqual(railStats(calls, NOW_R).total, { calls: 8, reached: 2, consults: 1 });
 });
 
-test("rail: best day is the best EARLIER day; beaten flips only when today passes it", () => {
-  const calls = [...day("2026-10-26", 18), ...day("2026-10-27", 9), ...day("2026-10-28", 18)];
+test("rail: week boundary is Monday 00:00 ET — Sunday night is last week, Monday morning is this week", () => {
+  const calls = [
+    { at: "2026-10-26T03:59:00Z", outcome: "no_answer" }, // Sun Oct 25 23:59 EDT: last week
+    { at: "2026-10-26T04:00:00Z", outcome: "no_answer" }, // Mon Oct 26 00:00 EDT: this week
+    { at: "2026-11-02T04:59:00Z", outcome: "no_answer" }, // Sun Nov 1 23:59 EST (DST ended Nov 1): still this week
+    { at: "2026-11-02T05:00:00Z", outcome: "no_answer" }, // Mon Nov 2 00:00 EST: next week
+  ];
+  assert.equal(railStats(calls, NOW_R).total.calls, 2);
+  assert.equal(railStats(calls, new Date("2026-11-02T05:30:00Z")).total.calls, 1); // Mon 00:30 ET: only the 05:00Z call
+});
+
+test("rail: best week is the best EARLIER week; beaten flips only when this week passes it", () => {
+  const calls = [...day("2026-10-12", 60), ...day("2026-10-13", 40), ...day("2026-10-19", 50), ...day("2026-10-26", 100)];
   let s = railStats(calls, NOW_R);
-  assert.equal(s.best, 18);
+  assert.equal(s.best, 100); // Oct 12 week = 100, this week = 100 is not "earlier"
   assert.equal(s.beaten, false);
   assert.equal(s.toBeat, 1);
-  s = railStats([...calls, ...day("2026-10-28", 1).map((c) => ({ ...c, at: "2026-10-28T17:30:00Z" }))], NOW_R);
+  s = railStats([...calls, ...day("2026-10-28", 1)], NOW_R);
   assert.equal(s.beaten, true);
   assert.equal(railStats([], NOW_R).best, 0);
 });
 
-test("rail: streak counts consecutive business days at the goal, skips weekends, an unfinished today does not break it", () => {
-  // Fri 23, Mon 26, Tue 27 hit; Wed 28 (today) at 3 so far; the weekend 24-25 in between has calls too
-  const calls = [...day("2026-10-23", 20), ...day("2026-10-24", 30), ...day("2026-10-26", 25), ...day("2026-10-27", 20), ...day("2026-10-28", 3)];
-  let s = railStats(calls, NOW_R);
-  assert.equal(s.streak, 3);
-  // today hitting the goal adds it
-  assert.equal(railStats([...calls, ...day("2026-10-28", 17).map((c, i) => ({ ...c, at: `2026-10-28T20:${String(i).padStart(2, "0")}:00Z` }))], NOW_R).streak, 4);
-  // a missed business day (Mon 26 at 19) ends the run at Tue
-  s = railStats([...day("2026-10-23", 20), ...day("2026-10-26", 19), ...day("2026-10-27", 20)], NOW_R);
-  assert.equal(s.streak, 1);
+test("rail: streak counts consecutive weeks at the goal; an unfinished week does not break it, a hit week adds", () => {
+  const calls = [...day("2026-10-12", 140), ...day("2026-10-19", 150), ...day("2026-10-26", 30)];
+  assert.equal(railStats(calls, NOW_R).streak, 2);
+  assert.equal(railStats([...calls, ...day("2026-10-28", 110)], NOW_R).streak, 3);
+  // a missed week (139) ends the run
+  assert.equal(railStats([...day("2026-10-12", 140), ...day("2026-10-19", 139), ...day("2026-10-26", 140)], NOW_R).streak, 1);
   assert.equal(railStats([], NOW_R).streak, 0);
 });
 
-test("rail: streak boxes are the last 7 business days oldest first with today marked; weekend now reads from Friday", () => {
-  const s = railStats(day("2026-10-27", 20), NOW_R);
-  assert.equal(s.days.map((d) => d.label).join(""), "TWTFMTW"); // Tue20 Wed21 Thu22 Fri23 Mon26 Tue27 Wed28
-  assert.equal(s.days.length, 7);
-  assert.equal(s.days[6].today, true);
-  assert.deepEqual(s.days.map((d) => d.hit), [false, false, false, false, false, true, false]);
-  const sat = railStats(day("2026-10-30", 20), new Date("2026-10-31T16:00:00Z")); // Sat Oct 31
-  assert.equal(sat.days[6].today, false, "Saturday is not a business day");
-  assert.equal(sat.days[6].hit, true, "Friday's goal still shows");
+test("rail: streak boxes are the last 7 weeks oldest first with this week marked; a weekend still reads the Mon-Fri week just ended", () => {
+  const s = railStats(day("2026-10-19", 140), NOW_R);
+  assert.equal(s.weeks.length, 7);
+  assert.deepEqual(s.weeks.map((w) => w.label), ["14", "21", "28", "5", "12", "19", "26"]);
+  assert.deepEqual(s.weeks.map((w) => w.hit), [false, false, false, false, false, true, false]);
+  assert.equal(s.weeks[6].current, true);
+  const sat = railStats(day("2026-10-30", 5), new Date("2026-10-31T16:00:00Z")); // Sat Oct 31
+  assert.equal(sat.total.calls, 5);
   assert.equal(sat.week.hi, -1);
 });
 

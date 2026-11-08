@@ -1,4 +1,4 @@
-import { GOAL, type RailStats } from "./TodayBrandonStats";
+import { DAY_CALLS, GOAL, type RailStats } from "./TodayBrandonStats";
 
 /** Progress ring: `done` of `goal`, the arc stops at a full circle. */
 function Ring({ done, goal }: { done: number; goal: number }) {
@@ -29,7 +29,7 @@ function Ring({ done, goal }: { done: number; goal: number }) {
   );
 }
 
-/** Mon-Fri column chart with the daily-goal line; today's bar is the accent one. */
+/** Mon-Fri column chart with the per-day pace line (weekly goal / 5); today's bar is the accent one. */
 function WeekChart({ week, goal }: { week: RailStats["week"]; goal: number }) {
   const W = 260;
   const H = 110;
@@ -43,7 +43,7 @@ function WeekChart({ week, goal }: { week: RailStats["week"]; goal: number }) {
     <svg className="wc" viewBox={`0 0 ${W} ${H + 18}`} role="img" aria-label="Calls this week">
       <line x1="0" x2={W} y1={y(goal)} y2={y(goal)} stroke="var(--mute)" strokeDasharray="4 4" />
       <text x={W} y={y(goal) - 4} textAnchor="end" fontSize="12" fill="var(--mute)">
-        goal {goal}
+        {goal}/day
       </text>
       {week.vals.map((v, i) => {
         const x = i * step + (step - bw) / 2;
@@ -79,46 +79,46 @@ function WeekChart({ week, goal }: { week: RailStats["week"]; goal: number }) {
   );
 }
 
-/** Brandon's narrow progress rail: today vs goals, best day, streak, calendar, week chart, recent wins. */
+/** Brandon's narrow progress rail: this week vs goals, best week, streak, calendar, week chart, recent wins. */
 export function TodayBrandonRail({ s, calendar }: { s: RailStats; calendar: React.ReactNode }) {
   return (
     <aside className="tb-rail" aria-label="Your progress">
-      <h2>Today</h2>
-      <Ring done={s.today.calls} goal={GOAL.calls} />
+      <h2>This week</h2>
+      <Ring done={s.total.calls} goal={DAY_CALLS} />
       <div className="rs">
         <span>
-          <b>{s.today.reached}</b>/{GOAL.reached} reached
+          <b>{s.total.reached}</b>/{GOAL.reached} reached
         </span>
         <span>
-          <b>{s.today.consults}</b>/{GOAL.consults} consult
+          <b>{s.total.consults}</b>/{GOAL.consults} consults
         </span>
       </div>
       <p className="rbest">
         {s.best === 0 ? (
-          "Best day: no history yet"
+          "Best week: no history yet"
         ) : s.beaten ? (
           <>
-            Best day: {s.best} calls · <b>beaten!</b>
+            Best week: {s.best} calls · <b>beaten!</b>
           </>
         ) : (
           <>
-            Best day: {s.best} calls · <b>{s.toBeat}</b> to beat it
+            Best week: {s.best} calls · <b>{s.toBeat}</b> to beat it
           </>
         )}
       </p>
       <h3>
-        Streak · {s.streak} day{s.streak === 1 ? "" : "s"}
+        Streak · {s.streak} week{s.streak === 1 ? "" : "s"}
       </h3>
-      <div className="streak" aria-label={`${s.streak} day streak`}>
-        {s.days.map((d, i) => (
-          <i key={i} className={`${d.hit ? "on" : ""}${d.today ? " today" : ""}`}>
+      <div className="streak" aria-label={`${s.streak} week streak`}>
+        {s.weeks.map((d, i) => (
+          <i key={i} className={`${d.hit ? "on" : ""}${d.current ? " today" : ""}`}>
             {d.label}
           </i>
         ))}
       </div>
       {calendar}
-      <h3>This week</h3>
-      <WeekChart week={s.week} goal={GOAL.calls} />
+      <h3>By day</h3>
+      <WeekChart week={s.week} goal={DAY_CALLS} />
       <h3>Recent wins</h3>
       {s.wins.length ? (
         <ul className="wins">
