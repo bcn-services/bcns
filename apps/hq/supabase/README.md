@@ -10,10 +10,10 @@ supabase db reset --workdir apps/hq     # applies 0001-0027
 psql 'postgresql://postgres:postgres@127.0.0.1:55322/postgres' -v ON_ERROR_STOP=1 -f apps/hq/supabase/tests/rls.sql
 ```
 
-Production (Nate's step, never run by an agent; project `knmgyxlrhjxaydliucbs`):
+Production (Nate's step, never run by an agent; project `fdlbtkftnhmatjxbjyjf`):
 
 ```bash
-supabase link    --workdir apps/hq --project-ref knmgyxlrhjxaydliucbs
+supabase link    --workdir apps/hq --project-ref fdlbtkftnhmatjxbjyjf
 supabase migration list --workdir apps/hq   # read this first
 supabase db push --workdir apps/hq
 ```

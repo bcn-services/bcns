@@ -46,7 +46,8 @@ if (process.env.DATABASE_URL?.trim()) {
 
 // The anon key and cookie session must point at HQ's own project, never the client platform's.
 // Unset passes (keyless CI build); a local stack passes (development).
-const HQ_SUPABASE_HOST = "knmgyxlrhjxaydliucbs.supabase.co";
+// Moved to us-east-1 in 2026-11; the old us-west-2 project (knmgyxlrhjxaydliucbs) is refused like any other.
+const HQ_SUPABASE_HOST = "fdlbtkftnhmatjxbjyjf.supabase.co";
 if (config.supabaseUrl) {
   let host = "";
   let protocol = "";

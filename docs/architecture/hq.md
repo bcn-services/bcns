@@ -15,7 +15,7 @@ laptop launchd pull). Tasks lived in three places and Claude had no safe way to 
 | Decision                                                                                                                                                                                                                                                                                                                                                                                                        | Why                                                                                                                                                |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | One new app, `apps/hq`, in this monorepo (Q8, Q11, Q18). Not a Connect tenant: single tenant, no `EXPECTED_CLIENT_ID`, no `@bcn-services/{tenant,data-client,app-core,ui}`.                                                                                                                                                                                                                                     | Same model as Technology Associates: custom build, own login, roles admin/staff.                                                                   |
-| Own Supabase auth and DB (Q8, Q9): project `knmgyxlrhjxaydliucbs`, the former `bcns-internal` database. Pipeline tables (`businesses`, `events`, ...) are the starting schema; migrations 0001-0026 are copied byte-for-byte, `0027_hq.sql` and `0030_stage_times.sql` are v1, `0031`-`0035` are v2.                                                                                                            | Keeps the lead history; keeps HQ out of the client platform's blast radius.                                                                        |
+| Own Supabase auth and DB (Q8, Q9): project `fdlbtkftnhmatjxbjyjf` (`bcns-hq`, us-east-1). It started as `knmgyxlrhjxaydliucbs`, the former `bcns-internal` database in us-west-2, and moved 2026-11. Pipeline tables (`businesses`, `events`, ...) are the starting schema; migrations 0001-0026 are copied byte-for-byte, `0027_hq.sql` and `0030_stage_times.sql` are v1, `0031`-`0035` are v2.                                                                                                            | Keeps the lead history; keeps HQ out of the client platform's blast radius.                                                                        |
 | Access = a `profiles` row (`is_hq()`), anon key only. No service-role key and no platform `DATABASE_URL` in HQ (`scripts/check-env.ts` fails the build on `SUPABASE_SERVICE_ROLE_KEY`, on any `DATABASE_URL`, and on a `NEXT_PUBLIC_SUPABASE_URL` that is not the HQ project or a local stack). Admin-only actions use `is_admin()` (v2).                                                                       | A leaked HQ key cannot reach client data; staff cannot approve money or stage changes.                                                             |
 | Claude works HQ through an MCP server inside the app at `/mcp` (Q14a-e), second connector "bcns HQ". Claude acts as the connecting user, never deletes, and can only _propose_ lead-stage, finance and client-field changes; an admin approves in the UI (keys a / r). Approve is not an MCP tool.                                                                                                              | Stage moves, finance numbers and billing fields are the writes that must not come from an LLM unattended.                                          |
 | Jobs run as systemd units on the shared droplet (Q10, Q16): `source` and `qualify` timers (v1), plus `deliverable` (every minute) and `uptime` (every 5 minutes) in v2. HQ itself never runs an LLM: pitch and quote are queued `deliverables` rows that a job turns into files with the requester's `claude` token. Onboard stays dropped; digest, touch, personalize, poll, notify and heartbeat are dropped. | Kills Cloud Scheduler, GH Actions clock, the PAT and launchd. `qualify` keeps one `claude -p` call per lead on Nate's subscription token ($0 API). |
@@ -28,7 +28,7 @@ laptop launchd pull). Tasks lived in three places and Claude had no safe way to 
 - **Leads load.** The `/leads` grid is one slim `businesses` query (`LIST_COLS`: no `research` jsonb, `count: estimated`, so "of about N" when the page is full) plus one small `calls` select for the Last-call column (`loadLastCalls`). It builds no per-lead detail. Selecting a lead (debounced 120ms for j/k) calls the `loadDetail` server action (`app/(app)/leads/detail.tsx`), which reads that lead's full row, calls, notes and links as the session user and returns the Details and Calls bodies; the drawer shows "Loading…" until they arrive and refetches whenever the page re-renders (a logged call, note or save). Today (Brandon) still builds its few details eagerly.
 - **Round trips.** Middleware validates the user (`getUser()`) and `profiles` row once and forwards both in the `x-hq-session` request header (overwritten on every admitted request, stripped on public paths); `getSession()` uses it and only asks Supabase itself when it is absent. The Leads Trade list is cached per server process for an hour (`loadTrades`), so a new trade shows up within the hour or on restart. Extras and Pitch-row chunks run in parallel.
 - **Auth.** Supabase Auth email + password, host-only cookies (separate from Connect), 30-day max-age, hardened by `lib/cookie-options.ts`. Signups are off in the dashboard; a session without a `profiles` row is denied. "Forgot password" calls `resetPasswordForEmail`; the mail lands on the public `/reset` page, which needs the redirect allow-list and SMTP in step 12. Login errors name the email ("no HQ account for ...", "wrong password for ...", "HQ is not configured"). Anon-key clients with RLS gated by `is_hq()`; the admin gate is `is_admin()` (`profiles.role = 'admin'`). Deletes are revoked at the grant level; `decide_proposal()` is the only update path for `proposals` and `finance_inputs`.
-- **Database region.** HQ project is us-west-2, droplet is nyc3 (about 70 ms round trip). Accepted.
+- **Database region.** HQ project is us-east-1, the closest region to the nyc3 droplet and the same as bcns-data (moved from us-west-2 `knmgyxlrhjxaydliucbs` on 2026-11-07: ~110 ms per round trip from nyc3 cost ~0.5 s per page). Warm TTFB before → after, ms (Chrome `fetch`, signed in, median of 3): Today 921 → 396, `/work` 781 → 275, `/clients` 686 → 521, `/numbers` 641 → 393, ops 992 → 244, unit 1282 → 265, `/leads` 3723 → 450; `/api/health` (no DB) 105 → 88.
 - **Work and board.** Migration 0035: `tracks` (`name` unique, `area`, `client_slug`, `column` now/next/wait/done, `done_at` required when done) and `tasks.track_id`; RLS by `is_hq()`, select/insert/update only. **Tracks are fixed:** Software, Outreach, Marketing, Clients, Ops (`FIXED_TRACKS` in `lib/tracks.ts`). No create or delete: `createTrack` and a rename in `updateTrack` refuse any other name, and there is no `create_track` tool; new work is a task under one of the five (no `track_id` still lands on Miscellaneous). `pnpm --filter @bcn-services/hq seed-tracks` (dry run; `--apply` with `HQ_SEED_EMAIL`/`HQ_SEED_PASSWORD`) inserts any missing fixed track in Now, idempotent by name. Pre-existing tracks (the eight `seed-gtm` GTM tracks, anything else) are folded into the five by hand-run SQL and parked in Done (the board skips any name outside the five); do not rerun `seed-gtm` after that, it re-inserts the GTM tracks by name. **Columns are task phases**, derived in `buildBoard` (`lib/tracks.ts`); the stored `tracks.column` is ignored. `phase(task, today)`: done within 7 days = Done (older drops off), status `waiting` or a non-empty `waiting_on` = Waiting, status `doing` or `due` within 7 days (overdue too) = Now, any other todo = Next. Each column holds one card per track with steps in that phase, so a track can show in several columns; cards run in `FIXED_TRACKS` order, then a synthetic, never-stored "Miscellaneous" card (id `unassigned`) for tasks with no `track_id`, under the same rules. Steps sort by due; Done keeps the newest 5 per track (`DONE_CAP`). Tracks named outside `FIXED_TRACKS` are skipped. A step shows its `client_slug` as a small tag; internal sub-projects use a title prefix ("HQ: …"). The Work task detail has a Status select (todo / doing / waiting; Done stays on its toggle); `doing` puts a task in Now; changing the select away from waiting clears `waiting_on`. Today (Nate)'s board is a derived queue, `todayQueue(tasks, me, today)` in `lib/tasks.ts` (nothing is pulled in per day): his open tasks split into queue (no `waiting` status and empty `waiting_on`; `doing` first, then due within 7 days soonest first, then oldest `created_at`; cap 8), waiting (status `waiting` or a `waiting_on`; uncapped) and done in the last 7 days. All three go to `buildBoard`, so each lands on its track's card (or Miscellaneous) in its phase column; the queue cap is 8 and Done's per-track cap of 5 still applies. Header: `n up · n waiting · n done`; empty board shows "Nothing up. Add a task or assign yourself one on Work." `TrackBoard`/`TrackCard` are shared by Work and Today (Nate). Work: left list (420px) grouped Unassigned / Nate / Brandon / Claude with Search, Any track and Any client filters; `n` opens New task; the right side is the board, and opening a task replaces it with "← Board" (Esc closes). The Lists tab UI is gone (`?tab=lists` still resolves). Tasks carry `client_slug` and `track_id`.
 - **Task delete.** Admin only, Work drawer: a two-click Delete ("Really delete?"), shown when `loadWorkData().admin`. `deleteTask` (`lib/tasks.ts`) re-checks `is_admin()` server-side, then deletes the task's notes, links and the task (no ON DELETE on `task_id`) and logs `task.deleted`. Migration 0038 grants DELETE on tasks/notes/links to `authenticated` (0027 revoked it) with admin-only delete policies on all three (the one exception to "deletes are revoked"); push it before merging. MCP still has no delete tool.
 - **Task owners.** Migration 0037: `tasks.owners text[]` (not null, default `{}`, every element nate|brandon|claude, GIN index) replaces `tasks.owner`; `{}` is unassigned. 0037 keeps `owner` and a trigger (`tasks_sync_owner`) that mirrors it both ways (`owner` = `owners[1]`), so the deployed code keeps working until the new code is live; a follow-up migration drops the trigger and column. In code a task has `owners: Owner[]`: Today's queue, the Work owner filter, `list_tasks` and the Brandon page match any co-owner; Work's list and `groupByOwner` put a task under its first owner only (one row, one key); the `o` key steps the first owner and keeps the rest. UI selects are checkboxes (`OwnerChecks`), none ticked = unassigned. `seed-gtm.json` keeps `owner` (a name or a list).
@@ -97,10 +97,12 @@ Squarespace -> Domains -> `bcn-services.com` -> DNS Settings -> Add record: type
 dig +short hq.bcn-services.com        # must print 104.236.20.89 before step 6
 ```
 
-### 2. HQ database (project `knmgyxlrhjxaydliucbs`) — done
+### 2. HQ database (project `fdlbtkftnhmatjxbjyjf`) — done
+
+Steps 2-5 were first done on the us-west-2 project `knmgyxlrhjxaydliucbs`. The 2026-11 move carried their database state (migrations, users, `profiles`, roles) by `supabase db dump` + psql restore, and the dashboard settings (signups off, URL config, SMTP, Reset template) were set again on the new project.
 
 ```bash
-supabase link --workdir apps/hq --project-ref knmgyxlrhjxaydliucbs
+supabase link --workdir apps/hq --project-ref fdlbtkftnhmatjxbjyjf
 supabase migration list --workdir apps/hq          # READ THIS BEFORE PUSHING
 ```
 
@@ -145,7 +147,7 @@ postgresql://hq_ops_ro:<password>@db.cnsxbglhredokjbvudfd.supabase.co:5432/postg
 
 ### 4. HQ dashboard: signups off, two users, two profiles — done
 
-HQ project `knmgyxlrhjxaydliucbs` in the Supabase dashboard:
+HQ project `fdlbtkftnhmatjxbjyjf` in the Supabase dashboard:
 
 1. Authentication -> Sign In / Providers -> Email: enabled, password sign-in on (confirm this; the local stack cannot test it). Turn **off** "Allow new users to sign up". `is_hq()` requiring a `profiles` row is only the backstop.
 2. Authentication -> Users -> Add user -> Create new user, "Auto Confirm User" ticked: Nate (`nseluga@bcn-services.com`) and Brandon (his bcns business email). Type the passwords there.
@@ -167,7 +169,7 @@ select handle, role from profiles order by handle;   -- expect exactly two rows
 - **Stripe:** Dashboard -> Developers -> API keys -> Create restricted key; permissions Subscriptions: Read, Charges: Read, everything else None. Becomes `STRIPE_KEY`.
 - **Mercury:** Settings -> API Tokens -> new token, **Read Only**. Becomes `MERCURY_KEY`. The Transactions API is free. Leave `MERCURY_INVOICING` unset: Invoicing needs a paid Mercury plan, Nate decides whether to pay.
 - **Sentry (optional):** a Sentry project for HQ (or reuse sb/mcp's) -> Settings -> Client Keys (DSN). Becomes `SENTRY_DSN`. Errors only; unset = off.
-- **HQ database URL for jobs:** HQ dashboard -> Connect -> Session pooler, user `postgres.knmgyxlrhjxaydliucbs`, with the database password (Project Settings -> Database -> Reset database password if unknown). Becomes `DATABASE_URL` in `jobs.env` only. Use the session pooler (port 5432), not the transaction pooler (6543): the jobs use prepared statements.
+- **HQ database URL for jobs:** HQ dashboard -> Connect -> Session pooler, user `postgres.fdlbtkftnhmatjxbjyjf`, with the database password (Project Settings -> Database -> Reset database password if unknown). Becomes `DATABASE_URL` in `jobs.env` only. Use the session pooler (port 5432), not the transaction pooler (6543): the jobs use prepared statements.
 
 ### 6. Droplet: onboard HQ — done
 
@@ -256,7 +258,7 @@ claude.ai -> Settings -> Connectors -> Add custom connector -> name `bcns HQ`, U
 
 **Claude Code.** No separate setup: claude.ai connectors load into Claude Code on the same account. After connecting in claude.ai, `claude mcp list` shows `claude.ai bcns HQ - Connected`, and the 17 tools (12 before v2; `create_track` removed with the fixed track set, `move_track` with phase columns) appear as `mcp__claude_ai_bcns_HQ__*` (verified 2026-10-28: `today`, `list_tasks`, `create_task`, `update_task`). Signed out shows `! Needs authentication`; in Claude Code run `/mcp`, pick `claude.ai bcns HQ`, Authenticate, sign in at `/authorize`. Do not also add a user-scope `claude mcp add ... hq`: it is a second, redundant sign-in for the same server.
 
-### 10. Pre-merge checks (read-only; HQ SQL Editor, project `knmgyxlrhjxaydliucbs`)
+### 10. Pre-merge checks (read-only; HQ SQL Editor, project `fdlbtkftnhmatjxbjyjf`)
 
 ```sql
 select handle, role from profiles order by handle;   -- nate must be 'admin', brandon 'staff'
@@ -268,7 +270,7 @@ If nate is not `admin`, set it once: `update profiles set role = 'admin' where h
 ### 11. HQ database: push 0031-0035 (before the merge)
 
 ```bash
-supabase link --workdir apps/hq --project-ref knmgyxlrhjxaydliucbs     # only on a fresh checkout
+supabase link --workdir apps/hq --project-ref fdlbtkftnhmatjxbjyjf     # only on a fresh checkout
 supabase migration list --workdir apps/hq          # 0001-0030 in both columns; 0031-0035 Local only
 supabase db push --workdir apps/hq --dry-run       # must list exactly 0031, 0032, 0033, 0034, 0035
 supabase db push --workdir apps/hq
@@ -381,7 +383,7 @@ select has_table_privilege('hq_jobs','businesses','select')      as biz_select, 
 The jobs `DATABASE_URL` for step 19 is the session pooler with the project-ref suffix on the user, otherwise "Tenant or user not found":
 
 ```
-postgresql://hq_jobs.knmgyxlrhjxaydliucbs:<password>@<pooler-host>:5432/postgres?sslmode=verify-full
+postgresql://hq_jobs.fdlbtkftnhmatjxbjyjf:<password>@<pooler-host>:5432/postgres?sslmode=verify-full
 ```
 
 ### 17. Clients refresh (HQ SQL Editor)
@@ -467,7 +469,7 @@ The v1 go-live log did not confirm the first seed. Check in the HQ SQL Editor: `
 
 ```bash
 pnpm --filter @bcn-services/hq seed-gtm
-export NEXT_PUBLIC_SUPABASE_URL=https://knmgyxlrhjxaydliucbs.supabase.co
+export NEXT_PUBLIC_SUPABASE_URL=https://fdlbtkftnhmatjxbjyjf.supabase.co
 read -rs "NEXT_PUBLIC_SUPABASE_ANON_KEY?anon key: "; export NEXT_PUBLIC_SUPABASE_ANON_KEY
 export HQ_SEED_EMAIL=nseluga@bcn-services.com
 read -rs "HQ_SEED_PASSWORD?password: "; export HQ_SEED_PASSWORD

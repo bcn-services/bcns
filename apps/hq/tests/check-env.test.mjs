@@ -10,7 +10,7 @@ const run = (env) =>
     env: { PATH: process.env.PATH, ...env },
     encoding: "utf8",
   });
-const HQ = "https://knmgyxlrhjxaydliucbs.supabase.co";
+const HQ = "https://fdlbtkftnhmatjxbjyjf.supabase.co";
 
 test("check-env exits 1 when SUPABASE_SERVICE_ROLE_KEY is set alongside a Supabase URL", () => {
   const r = run({ SUPABASE_SERVICE_ROLE_KEY: "x", NEXT_PUBLIC_SUPABASE_URL: HQ });
@@ -42,9 +42,10 @@ test("check-env exits 1 when DATABASE_URL is set, with or without a Supabase URL
 test("check-env exits 1 when NEXT_PUBLIC_SUPABASE_URL is not HQ's project host", () => {
   for (const url of [
     "https://cnsxbglhredokjbvudfd.supabase.co", // the client platform
-    "https://knmgyxlrhjxaydliucbs.supabase.co.evil.test",
-    "https://evil.test/knmgyxlrhjxaydliucbs.supabase.co",
-    "http://knmgyxlrhjxaydliucbs.supabase.co", // http
+    "https://knmgyxlrhjxaydliucbs.supabase.co", // the old us-west-2 project
+    "https://fdlbtkftnhmatjxbjyjf.supabase.co.evil.test",
+    "https://evil.test/fdlbtkftnhmatjxbjyjf.supabase.co",
+    "http://fdlbtkftnhmatjxbjyjf.supabase.co", // http
     "http://x",
     "not a url",
   ]) {
