@@ -576,9 +576,10 @@ currency, updated_at`.
 
 **`api.daily_summary_v1`** — one row per `(client_id, day)`; the Overview / Shopify panel / DFR
 source. `source = 'platform'`. **Definition since migration `20261107120000`:** `revenue_minor` =
-order totals + refunds (negative), `orders` = non-cancelled orders, both in the tenant's newest-order
-currency, cancelled orders and their refunds excluded; `aov_minor` = order totals / orders. The SQL
-below is the original body; the migration is authoritative.
+order totals + refunds (negative), `orders` = all orders, both in the tenant's newest-order currency;
+cancelled orders stay in (as native Analytics, migration `20261107140000`), so a cancel with its refund
+nets to zero and one without still counts; `aov_minor` = order totals / orders. The SQL below is the
+original body; the migrations are authoritative.
 ```sql
 with days as (select client_id, day from data.money union select client_id, day from data.daily_metrics),
 m as (select client_id, day,
