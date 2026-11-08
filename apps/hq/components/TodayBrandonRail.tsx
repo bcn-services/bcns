@@ -84,7 +84,7 @@ export function TodayBrandonRail({ s, calendar }: { s: RailStats; calendar: Reac
   return (
     <aside className="tb-rail" aria-label="Your progress">
       <h2>This week</h2>
-      <Ring done={s.total.calls} goal={DAY_CALLS} />
+      <Ring done={s.total.calls} goal={GOAL.calls} />
       <div className="rs">
         <span>
           <b>{s.total.reached}</b>/{GOAL.reached} reached

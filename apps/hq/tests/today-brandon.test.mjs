@@ -323,6 +323,9 @@ test("Brandon's Today mounts the rail beside the board with his calendar, and ne
   const page = readFileSync(new URL("../components/TodayBrandon.tsx", import.meta.url), "utf8");
   assert.match(page, /<TodayBrandonRail s=\{rail\} calendar=\{<TodayCalendar cal=\{cal\} now=\{now\} \/>\} \/>/);
   assert.match(page, /\.eq\("by", "brandon"\)/);
+  const rail = readFileSync(new URL("../components/TodayBrandonRail.tsx", import.meta.url), "utf8");
+  assert.match(rail, /<Ring done=\{s\.total\.calls\} goal=\{GOAL\.calls\} \/>/); // weekly total vs the weekly goal, not the per-day pace
+  assert.match(rail, /<WeekChart week=\{s\.week\} goal=\{DAY_CALLS\} \/>/);
   // font-size: and the font: shorthand ("600 11px/16px ...") alike, in every stylesheet under app/
   const { readdirSync } = await import("node:fs");
   const dir = new URL("../app/", import.meta.url);

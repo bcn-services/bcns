@@ -17,10 +17,11 @@ import { TodayBrandonRail } from "./TodayBrandonRail";
 import { railStats, type CallLite } from "./TodayBrandonStats";
 import { TodayCalendar } from "./TodayCalendar";
 
-// The rail reads his last 45 days of calls (best day, streak, wins), newest first.
-// ponytail: PostgREST caps a response at max_rows = 1000 (supabase/config.toml), ~50 business days at his 20-call goal;
-// past that the oldest rows drop (today stays right, best day/streak read low). Aggregate per ET day in SQL if he gets there.
-const RAIL_DAYS = 45;
+// The rail reads his last 49 days of calls (best week, week streak, wins), newest first: covers the 7 streak-box weeks whole.
+// ponytail: PostgREST caps a response at max_rows = 1000 (supabase/config.toml), ~7 weeks at the 140/week goal; above that pace
+// the oldest rows drop (this week stays right, best week/streak read low), and best week never looks past 7 weeks.
+// Read call_weeks (already used for his week row) for per-week history if he gets there.
+const RAIL_DAYS = 49;
 
 const taskDue = (t: TaskRow) =>
   t.status === "waiting" && t.waiting_on
