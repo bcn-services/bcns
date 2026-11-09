@@ -1254,7 +1254,7 @@ h1 {
 }
 .row.done:hover,
 .row.done.f {
-  opacity: 0.85;
+  opacity: 1;
 }
 .row:hover :focus-visible,
 .row.f :focus-visible {
