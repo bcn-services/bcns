@@ -290,3 +290,14 @@ test("Work owner filter: Anyone select narrows the list AND the board; owner row
     /\.wk-tr\.own-brandon,[\s\S]*?border-left: 3px solid var\(--own-brandon\)/
   );
 });
+
+test("task lead link opens that lead's drawer via ?open=<id>, falling back to ?q=<name>", () => {
+  const d = src("components/WorkTaskDetail.tsx");
+  assert.match(d, /`\/leads\?open=\$\{task\.business_id\}`/);
+  assert.match(d, /`\/leads\?q=\$\{encodeURIComponent\(task\.lead\)\}`/);
+  const p = src("app/(app)/leads/page.tsx");
+  assert.match(p, /searchParams\.open/);
+  assert.match(p, /openId=\{openId\}/);
+  const v = src("app/(app)/leads/View.tsx");
+  assert.match(v, /setSel\(openId\);\s*setOpen\(true\)/);
+});

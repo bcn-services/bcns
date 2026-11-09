@@ -36,14 +36,17 @@ function StatusChip({ row }: { row: Deliverable | undefined }) {
  * and loaded into a hidden sandboxed iframe (scripts + modals only, no allow-same-origin), so it stays an
  * opaque origin that cannot read HQ's cookies; withPrint() adds the print CSS and the print() call.
  */
-async function printDeck(href: string): Promise<void> {
+async function printDeck(href: string, asText = false): Promise<void> {
   const res = await fetch(href, { credentials: "same-origin" });
   if (!res.ok) throw new Error("deck not found");
   const f = document.createElement("iframe");
   f.setAttribute("sandbox", "allow-scripts allow-modals");
   f.setAttribute("aria-hidden", "true");
   f.style.cssText = "position:fixed;left:-9999px;top:0;width:1100px;height:800px;border:0";
-  f.srcdoc = withPrint(await res.text());
+  const body = await res.text();
+  // a .md script is plain text: show it as readable pre-wrapped text, escaped
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  f.srcdoc = withPrint(asText ? `<pre style="white-space:pre-wrap;font:14px/1.5 system-ui;margin:0">${esc(body)}</pre>` : body);
   const done = () => {
     removeEventListener("message", onMsg);
     f.remove();
@@ -60,7 +63,7 @@ function Files({
   rows,
   dir,
 }: {
-  rows: { label: string; view: string | null; pdf?: { href: string; print: boolean } | null }[];
+  rows: { label: string; view: string | null; pdf?: { href: string; print: boolean; label?: string; text?: boolean } | null }[];
   dir: string;
 }) {
   const [err, setErr] = useState("");
@@ -81,9 +84,9 @@ function Files({
               <button
                 className="btn"
                 type="button"
-                onClick={() => printDeck(f.pdf!.href).catch(() => setErr("Could not open the file to print."))}
+                onClick={() => printDeck(f.pdf!.href, f.pdf!.text).catch(() => setErr("Could not open the file to print."))}
               >
-                PDF ↓
+                {f.pdf.label ?? "PDF ↓"}
               </button>
             ) : (
               <a className="btn" href={f.pdf.href} target="_blank" rel="noopener noreferrer">
@@ -167,6 +170,7 @@ export function PitchTab({
     return p && slug ? p : null;
   };
   const deckHtml = deckHref("demo.html");
+  const guide = deckHref("video-guide.md");
   const quoteHtml = pathExt(slug, quote, ".html");
   const quotePdf = pathExt(slug, quote, ".pdf");
 
@@ -280,9 +284,12 @@ export function PitchTab({
                 {
                   label: "Pitch deck",
                   view: deckHtml,
-                  pdf: deckHtml ? { href: fileHref(deckHtml), print: true } : null,
                 },
-                { label: "Video guide", view: deckHref("video-guide.md") },
+                {
+                  label: "Video guide (script)",
+                  view: guide,
+                  pdf: guide ? { href: fileHref(guide), print: true, text: true, label: "Script PDF ↓" } : null,
+                },
               ]}
             />
             {offer === "book" ? (

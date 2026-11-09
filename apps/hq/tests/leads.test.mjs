@@ -597,6 +597,10 @@ test("PitchTab: prototype links open a new tab safely, step buttons call the one
   assert.match(t, /demo-\$\{p\}\.html/);
   assert.match(t, /"demo\.html"/);
   assert.match(t, /withPrint\(/);
+  assert.match(t, /Script PDF ↓/, "the PDF button prints the video-guide script");
+  assert.match(t, /pdf: guide \?/);
+  assert.doesNotMatch(t, /pdf: deckHtml/, "demo.html is a plain link, not the PDF");
+  assert.match(t, /printDeck\(f\.pdf!\.href, f\.pdf!\.text\)/);
   for (const label of ["Call went well", "Pitch prototypes", "Final pitch deck", "Quote", "Consult booked", "PDF ↓", "View ↗"]) assert.ok(t.includes(label), label);
   assert.match(t, /sandbox", "allow-scripts allow-modals"/, "the printed deck never gets allow-same-origin");
 });
