@@ -46,15 +46,24 @@ export function LeadsView(props: {
   sort: string;
   dir: string;
   rows: Record<string, Deliverable[]>;
+  /** From ?open=<id>: the lead whose drawer opens on mount. */
+  openId?: string;
   /** Why the Pitch rows did not load ("" = fine) and why the trade list is short ("" = fine). */
   pitchError: string;
   tradesError: string;
 }) {
-  const { items, cols, filters, stages, trades, newStages, tracks, sub, sort, dir, rows, pitchError, tradesError } = props;
+  const { items, cols, filters, stages, trades, newStages, tracks, sub, sort, dir, rows, pitchError, tradesError, openId } = props;
   const router = useRouter();
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DrawerTab>("details");
+  useEffect(() => {
+    if (openId && items.some((l) => l.id === openId)) {
+      setSel(openId);
+      setOpen(true);
+    }
+    // mount only: later `items` refreshes must not reopen a drawer the user closed
+  }, [openId]);
   const [consultOpen, setConsultOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();

@@ -39,6 +39,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
     trade: one(searchParams.trade).slice(0, 60),
   };
 
+  const openId = /^[0-9a-f-]{36}$/i.test(one(searchParams.open)) ? one(searchParams.open) : "";
+
   let q = sb.from("businesses").select(LIST_COLS, { count: "estimated" }).is("suppressed_at", null);
   // "" hides lost and unworked leads; "any" shows everything
   if (f.stage === "any") {
@@ -60,6 +62,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
 
   // untyped client: LIST_COLS is the shape (no research; the drawer fetches that on select)
   const leads = (res.data ?? []) as Lead[];
+  // ?open=<id> may name a lead the filters/page hide: fetch it and put it first so its drawer can open
+  if (openId && !leads.some((l) => l.id === openId)) {
+    const one1 = await sb.from("businesses").select(LIST_COLS).eq("id", openId).is("suppressed_at", null).maybeSingle();
+    if (one1.data) leads.unshift(one1.data as unknown as Lead);
+  }
   const trades = tradeRes.trades;
   if (f.trade && !trades.includes(f.trade)) trades.unshift(f.trade);
   const extras = await loadLastCalls(sb, leads.map((l) => l.id));
@@ -102,6 +109,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
       sort={sortKey[0]}
       dir={dir}
       rows={rows}
+      openId={openId}
       pitchError={pitchError}
       tradesError={tradeRes.error}
     />

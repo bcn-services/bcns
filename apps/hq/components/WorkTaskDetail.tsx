@@ -76,7 +76,8 @@ export function WorkTaskDetail(props: {
         <p className="sub2">
           {task.lead ? (
             <>
-              Lead: <a href="/leads">{task.lead}</a>{" "}
+              Lead:{" "}
+              <a href={task.business_id ? `/leads?open=${task.business_id}` : `/leads?q=${encodeURIComponent(task.lead)}`}>{task.lead}</a>{" "}
             </>
           ) : null}
           {task.alert_key ? <span className="chip warn">alert {task.alert_key}</span> : null}
