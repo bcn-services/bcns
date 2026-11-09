@@ -23,7 +23,7 @@
 }
 .cx .srch {
   width: 100%;
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 6px 10px;
   margin-top: 12px;
@@ -196,7 +196,7 @@
 .cx input:not([type="hidden"]),
 .cx select,
 .cx textarea {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   background: #fff;
   padding: 5px 8px;
