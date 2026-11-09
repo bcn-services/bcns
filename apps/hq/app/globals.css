@@ -1241,8 +1241,27 @@ h1 {
   border-left-color: var(--navy);
 }
 .row:hover .r2,
-.row.f .r2 {
-  color: var(--navy);
+.row.f .r2,
+.row:hover .rt,
+.row.f .rt,
+.row:hover .rm,
+.row.f .rm {
+  color: var(--navy); /* mute and ink2 on the flood are under 4.5:1 */
+}
+.row:hover .rm.bad,
+.row.f .rm.bad {
+  color: #74150f; /* --bad on the flood is 3.0:1; this is 5.2:1 */
+}
+.row.done:hover,
+.row.done.f {
+  opacity: 0.85;
+}
+.row:hover :focus-visible,
+.row.f :focus-visible {
+  outline-color: var(--navy);
+}
+.top :focus-visible {
+  outline-color: var(--flood); /* accent on navy is 2.36:1; flood is 5.96:1 */
 }
 .btn.pri {
   background: var(--navy);

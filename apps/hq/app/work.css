@@ -429,12 +429,26 @@
   background: var(--flood);
   color: var(--navy);
 }
+.wk-tr:hover,
+.wk-step:hover {
+  box-shadow: inset 3px 0 0 #fff; /* keeps the owner stripe on white, as at rest (orange on flood is 1.35:1) */
+}
 .wk-tr.f {
-  box-shadow: none;
+  box-shadow:
+    inset 3px 0 0 #fff,
+    inset 6px 0 0 var(--navy); /* keyboard cursor, distinct from hover */
 }
 .wk-tr:hover .wk-s,
-.wk-tr.f .wk-s {
-  color: var(--navy);
+.wk-tr.f .wk-s,
+.wk-tr:hover .muted,
+.wk-tr.f .muted,
+.wk-step:hover .wk-step-t.done {
+  color: var(--navy); /* mute on the flood is 2.89:1 */
+}
+.wk-tr:hover :focus-visible,
+.wk-tr.f :focus-visible,
+.wk-step:hover :focus-visible {
+  outline-color: var(--navy);
 }
 .wk-tr:hover .wk-od,
 .wk-tr.f .wk-od {
