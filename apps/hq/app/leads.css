@@ -37,7 +37,7 @@
 }
 .lx-filters select,
 .lx-filters input {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 6px 10px;
   background: #fff;
@@ -117,7 +117,7 @@
   cursor: pointer;
 }
 .lx-table tbody tr:hover {
-  background: #f7f8fc;
+  background: var(--tint2);
 }
 .lx-table tbody tr.f,
 .lx-table tbody tr.f:hover {
@@ -223,7 +223,7 @@
   color: var(--ink2);
 }
 .lx-drawer .consultform input {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 5px 8px;
   background: #fff;
@@ -326,7 +326,7 @@
 .pitch textarea {
   width: 100%;
   min-height: 70px;
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 8px 10px;
   margin-top: 10px;

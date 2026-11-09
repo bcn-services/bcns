@@ -1,16 +1,20 @@
 /* globals.css — HQ design system, ported from the <style> of the variant-g prototype (light, crisp, blue accent). Plain CSS, no Tailwind. */
 :root {
-  --bg: #f3f4f7;
+  /* bcns brand palette (apps/web/app/globals.css), tuned for an app surface */
+  --bg: #fbfcfe;
   --panel: #fff;
-  --ink: #2f333a;
-  --ink2: #4b515a;
-  --mute: #6a707b;
-  --line: #e0e3e9;
-  --line2: #eceef2;
-  --accent: #2f5bea;
-  --accent-d: #2447c2;
-  --tint: #dce6ff;
-  --tint2: #eef2ff;
+  --ink: #2f3440;
+  --ink2: #464b57;
+  --mute: #5b6070;
+  --line: #dde4ee;
+  --line2: #eaeff6;
+  --edge: #c6cfdd; /* field and button borders, a step darker than --line */
+  --accent: #3669b4; /* site --primary-ink: 5.5:1 on white */
+  --accent-d: #2c5797;
+  --tint: #dce9fa;
+  --tint2: #f1f6fd; /* site tint panel */
+  --navy: #14315c; /* site --accent-foreground: top bar */
+  --flood: #7eb3f7; /* site flood blue: active tab, row hover/focus */
   --ok: #1d7a4d;
   --okbg: #e4f3ea;
   --warn: #8f5b00;
@@ -31,9 +35,9 @@ body {
   background: var(--bg);
   color: var(--ink);
   font:
-    14px/1.45 ui-sans-serif,
+    14px/1.45 var(--font-sans),
+    ui-sans-serif,
     -apple-system,
-    "Inter",
     "Segoe UI",
     Roboto,
     sans-serif;
@@ -68,7 +72,7 @@ a {
   gap: 4px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--line);
-  background: #eceef3;
+  background: var(--tint2);
 }
 .logo {
   display: flex;
@@ -132,7 +136,7 @@ a {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #f6f7fa;
+  background: var(--bg);
   overflow: auto;
 }
 .cols {
@@ -279,7 +283,7 @@ section.sx {
   border-bottom: 0;
 }
 .row:hover {
-  background: #f7f8fc;
+  background: var(--tint2);
 }
 .row.f {
   background: var(--tint);
@@ -303,7 +307,7 @@ section.sx {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: #eceef3;
+  background: var(--tint2);
   color: var(--ink2);
   display: grid;
   place-items: center;
@@ -433,7 +437,7 @@ section.sx {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #eceef3;
+  background: var(--tint2);
   color: var(--ink2);
   white-space: nowrap;
   border: 0;
@@ -456,7 +460,7 @@ section.sx {
 }
 button.own {
   cursor: pointer;
-  background: #eceef3;
+  background: var(--tint2);
   color: var(--ink2);
 }
 button.own:hover {
@@ -474,7 +478,7 @@ button.own.brandon {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   background: #fff;
   border-radius: 8px;
   padding: 6px 12px;
@@ -482,7 +486,7 @@ button.own.brandon {
   font-weight: 500;
 }
 .btn:hover {
-  background: #f1f3f8;
+  background: var(--tint2);
 }
 .btn.sm {
   padding: 2px 9px;
@@ -509,7 +513,7 @@ button.own.brandon {
   min-width: 18px;
   text-align: center;
   padding: 0 5px;
-  border: 1px solid #c5cad3;
+  border: 1px solid var(--edge);
   border-bottom-width: 2px;
   border-radius: 5px;
   background: #fff;
@@ -595,7 +599,7 @@ button.own.brandon {
 }
 textarea,
 select {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   background: #fff;
   padding: 5px 8px;
@@ -711,7 +715,7 @@ dd {
   align-items: center;
   padding: 6px 16px;
   border-top: 1px solid var(--line);
-  background: #eceef3;
+  background: var(--tint2);
   font-size: 13px;
   color: var(--mute);
 }
@@ -745,7 +749,7 @@ dd {
   font-size: 12.5px;
 }
 .loginform input {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   background: #fff;
   padding: 7px 10px;
@@ -773,7 +777,7 @@ dd {
   cursor: default;
 }
 .diff.prop tbody tr:hover {
-  background: #f7f8fc;
+  background: var(--tint2);
 }
 .diff.prop tbody tr.f {
   background: var(--tint);
@@ -804,7 +808,7 @@ dd {
 .tform input,
 .addrow input,
 .sec form input {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   background: #fff;
   padding: 5px 8px;
@@ -875,7 +879,7 @@ table.grid td select {
 }
 .filters input {
   width: 110px;
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 5px 8px;
   background: #fff;
@@ -985,13 +989,13 @@ table.grid td select {
   min-width: 0;
   padding: 20px 16px 90px;
   border-right: 1px solid var(--line);
-  background: var(--bg);
+  background: var(--panel);
 }
 .td-r {
   overflow: auto;
   min-width: 0;
   padding: 20px 20px 90px;
-  background: #f6f7fa;
+  background: var(--bg);
 }
 .td-rh {
   display: flex;
@@ -1011,7 +1015,7 @@ table.grid td select {
   gap: 4px;
 }
 .td-l .as {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 3px 6px;
   background: #fff;
@@ -1057,7 +1061,7 @@ table.grid td select {
   min-height: 0;
   padding: 22px 18px 40px;
   border-left: 1px solid var(--line);
-  background: #f6f7fa;
+  background: var(--bg);
 }
 .tb-rail h2,
 .tb-rail h3,
@@ -1147,5 +1151,123 @@ table.grid td select {
 @media (max-width: 1100px) {
   .tb {
     grid-template-columns: minmax(0, 1fr) 260px;
+  }
+}
+
+/* bcns brand layer (direction 4, 2026-11-09): navy chrome with the logo cube, Space
+   Grotesk headings and blue eyebrows, rounded cards, rows that flood the site's
+   #7eb3f7 on hover/focus. Contrast (AA): navy on flood 6.0, #c9d8ee on navy 9.0,
+   ink on flood 5.7, #74150f on flood 5.2, accent on white 5.5. */
+.top {
+  background: var(--navy);
+  border-bottom: 0;
+  padding: 10px 20px;
+  color: #fff;
+}
+.logo {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.logo i {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg stroke='%231c2330' stroke-width='1.2' stroke-linejoin='round'%3E%3Cpath d='M13 3l9 5-9 5-9-5z' fill='%23C7DDFA'/%3E%3Cpath d='M4 8l9 5v10l-9-5z' fill='%237EB3F7'/%3E%3Cpath d='M22 8l-9 5v10l9-5z' fill='%234A86D7'/%3E%3C/g%3E%3C/svg%3E")
+    center/26px no-repeat;
+  color: transparent;
+  border-radius: 0;
+}
+.tabs a.nv {
+  color: #c9d8ee;
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: 0.02em;
+}
+.tabs a.nv:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.tabs a.nv.on {
+  background: var(--flood);
+  color: var(--navy);
+  box-shadow: none;
+}
+.me {
+  color: #fff;
+}
+.me .lnkb {
+  color: #c9d8ee;
+}
+.av {
+  background: var(--navy);
+  border-color: var(--flood);
+  color: #fff;
+}
+h1 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 300;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.td-rh h2 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.sh h2 {
+  font-family: var(--font-display), sans-serif;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+.cnt {
+  background: var(--tint);
+  color: var(--accent-d);
+}
+.cnt.hot {
+  color: #fff;
+}
+.row {
+  transition:
+    background-color 0.3s ease-out,
+    color 0.3s;
+}
+.row:hover,
+.row.f {
+  background: var(--flood);
+  color: var(--navy);
+}
+.row.f {
+  box-shadow: none;
+  border-left-color: var(--navy);
+}
+.row:hover .r2,
+.row.f .r2 {
+  color: var(--navy);
+}
+.btn.pri {
+  background: var(--navy);
+  border-color: var(--navy);
+  border-radius: 999px;
+  padding: 7px 16px;
+  transition:
+    transform 0.25s,
+    box-shadow 0.25s,
+    background-color 0.25s;
+}
+.btn.pri:hover {
+  background: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(74, 134, 215, 0.3);
+}
+.keys {
+  background: var(--panel);
+}
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .btn.pri {
+    transition: none;
+  }
+  .btn.pri:hover {
+    transform: none;
   }
 }

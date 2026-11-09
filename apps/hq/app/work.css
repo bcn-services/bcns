@@ -17,7 +17,7 @@
   padding: 20px 16px 90px;
 }
 .wk-r {
-  background: #f6f7fa;
+  background: var(--bg);
   padding: 20px 20px 90px;
 }
 .wk-r:focus {
@@ -50,7 +50,7 @@
 .wk-modal input,
 .wk-modal select,
 .wk-modal textarea {
-  border: 1px solid #cdd1d9;
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 6px 9px;
   background: #fff;
@@ -98,7 +98,7 @@
   cursor: pointer;
 }
 .wk-tr:hover {
-  background: #f4f6fa;
+  background: var(--tint2);
 }
 .wk-tr.f {
   background: var(--tint);
@@ -172,7 +172,7 @@
   min-height: 60px;
   padding: 6px;
   border-radius: 12px;
-  background: #eceef3;
+  background: var(--tint2);
 }
 .wk-card {
   background: var(--panel);
@@ -381,4 +381,72 @@
 .wk-tr.own-claude,
 .wk-step.own-claude {
   border-left: 3px solid var(--own-claude);
+}
+
+/* bcns brand layer (direction 4): see the matching block at the end of globals.css */
+.wk-sh h2,
+.wk-bh h2 {
+  font-family: var(--font-display), sans-serif;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+}
+.wk-colh {
+  font-family: var(--font-display), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.wk-ct {
+  font-family: var(--font-display), sans-serif;
+}
+.cnt.wk-warn {
+  color: #fff;
+}
+.wk-card {
+  border-radius: 12px;
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s,
+    border-color 0.35s;
+}
+.wk-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--flood);
+  box-shadow: 0 10px 26px rgba(74, 134, 215, 0.14);
+}
+.wk-tr,
+.wk-step {
+  transition:
+    background-color 0.3s ease-out,
+    color 0.3s;
+}
+.wk-tr:hover,
+.wk-tr.f,
+.wk-step:hover {
+  background: var(--flood);
+  color: var(--navy);
+}
+.wk-tr.f {
+  box-shadow: none;
+}
+.wk-tr:hover .wk-s,
+.wk-tr.f .wk-s {
+  color: var(--navy);
+}
+.wk-tr:hover .wk-od,
+.wk-tr.f .wk-od {
+  color: #74150f; /* --bad on the flood is 3.3:1; this is 5.2:1 */
+}
+@media (prefers-reduced-motion: reduce) {
+  .wk-card,
+  .wk-tr,
+  .wk-step {
+    transition: none;
+  }
+  .wk-card:hover {
+    transform: none;
+  }
 }
