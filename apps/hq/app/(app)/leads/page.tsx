@@ -39,7 +39,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Params
     trade: one(searchParams.trade).slice(0, 60),
   };
 
-  const openId = /^[0-9a-f-]{36}$/i.test(one(searchParams.open)) ? one(searchParams.open) : "";
+  const openRaw = one(searchParams.open).toLowerCase();
+  const openId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(openRaw) ? openRaw : "";
 
   let q = sb.from("businesses").select(LIST_COLS, { count: "estimated" }).is("suppressed_at", null);
   // "" hides lost and unworked leads; "any" shows everything
