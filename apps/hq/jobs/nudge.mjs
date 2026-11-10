@@ -38,7 +38,7 @@ export async function run({ sql, db, apiKey, to, dryRun = false, fetch: fetchImp
   const [{ count: fresh }] = await db.promotedToday(sql);
   const { subject, text } = message({ waiting, fresh });
   if (dryRun) {
-    console.log(`${subject}\n${text}`);
+    console.log(text);
     return { sent: false, dryRun: true, waiting, fresh };
   }
 
@@ -46,7 +46,13 @@ export async function run({ sql, db, apiKey, to, dryRun = false, fetch: fetchImp
   try {
     res = await fetchImpl(RESEND_ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        // Resend dedupes a repeated key for 24 h: a re-run after a send whose `sent` event
+        // failed to write (or whose response timed out) cannot mail the same day twice.
+        "Idempotency-Key": `nudge-${new Date().toISOString().slice(0, 10)}`,
+      },
       body: JSON.stringify({ from: FROM, to: [to], subject, text }),
       signal: AbortSignal.timeout(10_000),
     });

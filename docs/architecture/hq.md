@@ -757,7 +757,7 @@ systemd-run --wait --pipe -p EnvironmentFile=/srv/hq/jobs.env -p WorkingDirector
 systemctl start hq-job@nudge                        # sends one real email
 journalctl -u hq-job@nudge -n 20 --no-pager         # {"sent":true,"waiting":N,"fresh":M}
 systemctl enable --now hq-nudge.timer
-systemctl list-timers 'hq-*'                        # six timers now
+systemctl list-timers 'hq-*'                        # hq-nudge.timer now listed (six with tickets, step 29)
 ```
 
 ### Rollback

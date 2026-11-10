@@ -8,8 +8,10 @@ const PII = ["Acme Plumbing", "555-867-5309", "owner@acme.example"];
 // Answers by statement text. The business rows carry PII to prove it never reaches the mail.
 function setup({ waiting = 7, fresh = 3, already = false } = {}) {
   const events = [];
+  const seen = [];
   const sql = async (strings) => {
     const t = strings.join("?").replace(/\s+/g, " ");
+    seen.push(t);
     if (t.includes("from events")) return already ? [{ "?column?": 1 }] : [];
     if (t.includes("from businesses"))
       return Object.assign([{ count: waiting }], { name: PII[0], phone: PII[1], email: PII[2] });
@@ -21,7 +23,7 @@ function setup({ waiting = 7, fresh = 3, already = false } = {}) {
   };
   const calls = [];
   const ok = async (url, opts) => (calls.push({ url, opts }), { status: 200 });
-  return { sql, db, events, calls, ok };
+  return { sql, db, events, calls, ok, seen };
 }
 const base = { apiKey: "key-123", to: "someone@example.test" };
 
@@ -50,6 +52,28 @@ test("sends once: Resend payload is counts + link only, event holds counts only"
     !JSON.stringify([out, s.events]).includes(base.to),
     "recipient never returned or logged"
   );
+});
+
+// The fake never runs a WHERE clause, so the filters are pinned as text.
+test("queries: Brandon's unsuppressed call_due rows; a sent event since UTC midnight", async () => {
+  const s = setup();
+  await run({ sql: s.sql, db: s.db, ...base, fetch: s.ok });
+  const [sentQ, countQ] = s.seen;
+  for (const part of [
+    "from events",
+    "job = 'nudge'",
+    "kind = 'sent'",
+    "created_at >= date_trunc('day', now() at time zone 'UTC') at time zone 'UTC'",
+  ])
+    assert.ok(sentQ.includes(part), `already-sent query lost: ${part}`);
+  for (const part of [
+    "from businesses",
+    "stage = 'call_due'",
+    "suppressed_at is null",
+    "assigned_to = 'brandon'",
+  ])
+    assert.ok(countQ.includes(part), `count query lost: ${part}`);
+  assert.match(s.calls[0].opts.headers["Idempotency-Key"], /^nudge-\d{4}-\d{2}-\d{2}$/);
 });
 
 test("nothing waiting: no fetch, no event", async () => {
