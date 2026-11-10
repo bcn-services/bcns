@@ -243,6 +243,10 @@ check "hq-uptime.timer: installs into timers.target" "$(unitval "$upt" WantedBy)
 tkt="$here/hq-tickets.timer"
 unitcheck "$tkt" Unit Timer Install && ok "hq-tickets.timer parses" || bad "hq-tickets.timer has a malformed line or section"
 check "hq-tickets.timer: every 15 minutes, starts hq-job@tickets" "$(unitval "$tkt" OnCalendar) $(unitval "$tkt" Unit)" "*:0/15 hq-job@tickets.service"
+ndg="$here/hq-nudge.timer"
+unitcheck "$ndg" Unit Timer Install && ok "hq-nudge.timer parses" || bad "hq-nudge.timer has a malformed line or section"
+check "hq-nudge.timer: weekdays 12:30 UTC, starts hq-job@nudge" "$(unitval "$ndg" OnCalendar) $(unitval "$ndg" Unit)" "Mon..Fri *-*-* 12:30:00 UTC hq-job@nudge.service"
+check "hq-nudge.timer: not Persistent (a missed day must not nudge late)" "$(grep -c '^Persistent=' "$ndg" | tr -d ' ')" "0"
 
 echo "syntax"
 for f in "$here"/*.sh; do

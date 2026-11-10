@@ -39,7 +39,7 @@ laptop launchd pull). Tasks lived in three places and Claude had no safe way to 
 - **Per-user MCP tokens.** `POST /mcp`, OAuth in the app (`lib/mcp/oauth.ts`), copied from `apps/mcp` but against HQ's Supabase. HQ issues its **own opaque bearer tokens** and never hands the Supabase JWT to the client. v2 persists them in `mcp_tokens` (0031): the key is an HMAC-SHA256 of the token under the server-only `MCP_TOKEN_KEY` (at least 32 characters; unset = `/mcp` answers 503, fail closed), kinds access and refresh, `payload` holds the Supabase session, RLS on with no policy and `revoke all`. Access goes only through security-definer functions: `mcp_token_store` (authenticated, `is_hq()`, own user, expiry at most 90 days, payload at most 8 KB, prunes, keeps the newest 100 rows per user), `mcp_token_lookup` and `mcp_token_revoke` (anon + authenticated), `mcp_token_revoke_user` (authenticated). Refresh TTL is 30 days; an access token expires 30 s before its Supabase JWT. PKCE S256 and stateless dynamic client registration are kept. Only auth codes (60 s) and the known-IP set stay in process memory, so a restart costs an in-flight sign-in at most and **tokens survive deploys**; "one HQ process" now matters only for codes and rate buckets. Allowed redirects: exactly `https://claude.ai/api/mcp/auth_callback` and `https://claude.com/api/mcp/auth_callback`, plus loopback `http://localhost` / `127.0.0.1` on any port. Sign-out revokes the user's MCP tokens.
 - **MCP tools (17).** `list_tasks get_task create_task update_task add_task_note list_board update_track search_leads get_lead create_lead log_lead_note add_link get_client propose_client today propose_lead_stage propose_finance`. No approve, decide or delete tool. `create_lead` inserts a hand-made lead (`source_query='manual'`, stage default `reached`, owner default `nate`) and refuses a name+town already on file; its id goes to `create_task` as `business_id`. It never updates a lead. `get_lead` strips phone, email and person-name keys (including `owner_name`). `create_task` takes `client_slug` and `track_id`; `update_task` takes `owner`, `client_slug` and `track_id`. `owner` is one name or an array of names (`[]` unassigns on update); `list_tasks` `owner` matches any co-owner. **Done rule:** an admin (`profiles.role`) may close or reassign any task; staff may close or reassign a task only when they are one of its owners, when claude is its only owner, or when it has none, otherwise the call is refused naming the owners (reassigning is gated like closing). **Actor** is the OAuth profile: writes carry `via='mcp'` and the audit shows "Claude (<handle>)". `propose_client` files a pending proposal of kind `client` limited to the seven Clients fields above; an admin approves it through `decide_proposal`.
 - **Proposals.** `propose_*` writes a pending row; Today shows before -> after; a/r call `decide_proposal`, which raises 42501 for non-admins (the UI hides a/r for staff). A stale proposal (lead already moved) leaves the lead unchanged. A trigger sets `proposals.old` and `via` server-side (`via='mcp'` only when the request carries `X-HQ-Via: mcp`).
-- **Jobs.** `apps/hq/jobs/` (plain Node 22 ESM, only dependency `postgres`; not a pnpm workspace member, outside turbo and CI). `source` Mon-Fri 11:00 UTC walks the trade x town grid on Places API (New); `qualify` hourly 08-20 UTC at :15 fetches sites, scores fit (code signals, then the `claude` CLI), promotes to `call_due` up to 50 per day; `deliverable` and `uptime` are above. Every run writes `events(job, kind='run')` (uptime logs failures only). Places budget is counted from `places_call` events against `BCNS_PLACES_MONTHLY_CAP` (default 950); an unreadable count stops the run. Units in `infra/`: `hq-job@.service` (template for source, qualify, deliverable), `hq-source.timer`, `hq-qualify.timer`, `hq-deliverable.timer`, `hq-uptime.service`, `hq-uptime.timer`. The template runs `DynamicUser=yes` with `SupplementaryGroups=hq`, `MemoryMax=384M`, `CPUQuota=50%`, `HOME=/srv/hq/jobs-state/claude-home` and `LoadCredential` for `claude-nate`, `claude-brandon`, `os-deploy-key` (see M2). Jobs connect as the `hq_jobs` Postgres role once Nate switches `jobs.env`.
+- **Jobs.** `apps/hq/jobs/` (plain Node 22 ESM, only dependency `postgres`; not a pnpm workspace member, outside turbo and CI). `source` Mon-Fri 11:00 UTC walks the trade x town grid on Places API (New); `qualify` hourly 08-20 UTC at :15 fetches sites, scores fit (code signals, then the `claude` CLI), promotes to `call_due` up to 50 per day; `deliverable` and `uptime` are above; `nudge` Mon-Fri 12:30 UTC emails (Resend, plain fetch) "N calls waiting, M new today" plus the Today link, counts only, at most once per UTC day (step 33). Every run writes `events(job, kind='run')` (uptime logs failures only). Places budget is counted from `places_call` events against `BCNS_PLACES_MONTHLY_CAP` (default 950); an unreadable count stops the run. Units in `infra/`: `hq-job@.service` (template for source, qualify, deliverable, tickets, nudge), `hq-source.timer`, `hq-qualify.timer`, `hq-deliverable.timer`, `hq-nudge.timer`, `hq-uptime.service`, `hq-uptime.timer`. The template runs `DynamicUser=yes` with `SupplementaryGroups=hq`, `MemoryMax=384M`, `CPUQuota=50%`, `HOME=/srv/hq/jobs-state/claude-home` and `LoadCredential` for `claude-nate`, `claude-brandon`, `os-deploy-key` (see M2). Jobs connect as the `hq_jobs` Postgres role once Nate switches `jobs.env`.
 - **Platform ops.** Migration `platform/supabase/migrations/20261027000100_hq_ops_ro.sql`: login role `hq_ops_ro` (3 connections, 5 s statements) with SELECT on `ops.connector_health`, `ops.connector_runs_7d`, `ops.tickets_open`, `ops.clients` (names, slugs, status, timestamps; no error text, no tokens, no record data). HQ connects through `PLATFORM_OPS_URL` and forces `sslmode=verify-full` whatever the URL says (L6); every read fails soft to "unavailable".
 - **Fires seam.** `lib/fires.ts` merges `lib/fires-tasks.ts` (due and waiting tasks) and `lib/fires-ops.ts` (connector status, job failures in 24 h, urgent tickets, ops tasks due in 7 days). A fire's stable `key` becomes `tasks.alert_key`, so `c` on Today creates one Claude task per alert; a unique partial index on open `alert_key` (0031) makes `createOpsTask` return the winner on a race. `today` over MCP omits connector and job fires (they need a cookie session).
 - **Money.** `lib/money.ts`, Stripe (restricted read-only key) and Mercury (read-only token), plain fetch, memoised 10 minutes (a failure retries after 1), fail soft. MRR = Mercury clients (`clients.billing_source = 'mercury'`, `monthly_rate_cents`, no `churn_date`) plus active Stripe subscriptions that are not cancelling (`cancel_at_period_end` or `cancel_at` excluded and listed as "cancels <date>"). A client's paid state is matched by `clients.mercury_customer_id`, falling back to an exact-name entry in `aliases` (0033; the fuzzy `nameMatches` is gone). Mercury's Accounts and Transactions API is free on every plan; the Invoicing API needs a **paid Mercury plan**, so invoices stay behind `MERCURY_INVOICING=1` (off by default) and a 403 shows as an error chip with the message. Mercury has no recurring-series API (its invoice object has no series field), so with a rate set only a payment of exactly `monthly_rate_cents` counts as the month's payment; one-time invoices still count toward lifetime revenue. Numbers tabs: Money, Sales funnel, Ops, Unit economics; the `ASSUMPTIONS` constants live in `lib/finance.ts`.
@@ -563,7 +563,7 @@ Do in this order, same day.
   gcloud scheduler jobs list --project bcns-leads --location us-central1
   gcloud scheduler jobs pause <name> --project bcns-leads --location us-central1
   ```
-- [ ] Digest stopped: it ran from `clock-personalize` via `clock.yml`; confirm no email arrives the next weekday at 12:30 UTC. The digest was Brandon's only daily prompt; HQ sends none, so tell him the list is now Today in HQ.
+- [ ] Digest stopped: it ran from `clock-personalize` via `clock.yml`; confirm no email arrives from the old pipeline the next weekday at 12:30 UTC. The digest was Brandon's only daily prompt; HQ's own nudge replaces it once step 33 is done, and the list itself is Today in HQ, so tell him.
 - [ ] HQ took over the daily promotion (the old `qualify` did it until now). The next weekday after 08:15 UTC, in the HQ SQL Editor:
   ```sql
   select via, count(*) from events
@@ -730,6 +730,36 @@ supabase db push --workdir apps/hq
 
 Check (HQ SQL Editor): `select owner, owners from tasks limit 5;` shows `owners = {owner}` for each assigned task. After the merge deploys and Today/Work load, drop the old column in a follow-up migration (the 0037 footer lists the four statements).
 
+### 33. Daily call nudge: the `nudge` timer
+
+One email each weekday at 12:30 UTC: "N calls waiting, M new today" plus the Today link. Counts only. A second start the same day is a no-op, and the timer has no `Persistent=`, so a missed day does not nudge late. Merging deploys the job code but never installs units.
+
+1. In Resend, create a send-only API key named `bcns-hq`. Resend's free tier should cover ~22 mails a month; confirm the limit in the Resend dashboard.
+2. Install the timer:
+
+```bash
+scp infra/hq-nudge.timer root@104.236.20.89:/root/
+ssh root@104.236.20.89
+cp /root/hq-nudge.timer /etc/systemd/system/
+```
+
+3. Add two names to `/srv/hq/jobs.env` by typing them in an editor (`nano /srv/hq/jobs.env`; names only here, values never in a transcript): `RESEND_API_KEY=` and `NUDGE_TO=`. The file stays `600` owned by root.
+4. Dry run first (prints the text, sends nothing). This is the form the job unit uses (`EnvironmentFile`, `WorkingDirectory`) run by hand with the dry-run flag:
+
+```bash
+systemctl daemon-reload
+systemd-run --wait --pipe -p EnvironmentFile=/srv/hq/jobs.env -p WorkingDirectory=/srv/hq/current -E NUDGE_DRY_RUN=1 /usr/bin/node jobs/run.mjs nudge
+```
+
+5. Send the real mail once, then enable the timer:
+
+```bash
+systemctl start hq-job@nudge                        # sends one real email
+journalctl -u hq-job@nudge -n 20 --no-pager         # {"sent":true,"waiting":N,"fresh":M}
+systemctl enable --now hq-nudge.timer
+systemctl list-timers 'hq-*'                        # six timers now
+```
+
 ### Rollback
 
 HQ is additive on the DB, so the old pipeline can resume against it. Pause is reversible, delete is not, which is why step 24 pauses first.
@@ -746,7 +776,7 @@ If the repo was already archived: `GITHUB_TOKEN= gh repo unarchive bcn-services/
 
 ## After each HQ deploy
 
-Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemctl restart bcns-app@hq` or a droplet reboot no longer signs "bcns HQ" out (reconnect only when a call returns 401, e.g. after rotating `MCP_TOKEN_KEY` or signing out of HQ). A password reset, or signing out of HQ, revokes every GoTrue session, so each MCP connector (claude.ai, Claude Code) must authenticate once afterwards; this is expected, not a bug. Re-check `curl -s https://hq.bcn-services.com/api/health` and that `systemctl list-timers 'hq-*'` still shows all the timers (source, qualify, deliverable, uptime, plus tickets once step 29 is done). A deploy never installs or changes systemd units; copy changed `infra/hq-*` files and `daemon-reload` by hand.
+Connectors stay signed in: tokens persist in `mcp_tokens`, so a deploy, `systemctl restart bcns-app@hq` or a droplet reboot no longer signs "bcns HQ" out (reconnect only when a call returns 401, e.g. after rotating `MCP_TOKEN_KEY` or signing out of HQ). A password reset, or signing out of HQ, revokes every GoTrue session, so each MCP connector (claude.ai, Claude Code) must authenticate once afterwards; this is expected, not a bug. Re-check `curl -s https://hq.bcn-services.com/api/health` and that `systemctl list-timers 'hq-*'` still shows all the timers (source, qualify, deliverable, uptime, plus tickets once step 29 is done and nudge once step 33 is done). A deploy never installs or changes systemd units; copy changed `infra/hq-*` files and `daemon-reload` by hand.
 
 ## Follow-ups and decisions left for Nate
 
