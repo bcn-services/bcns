@@ -558,7 +558,7 @@ Do in this order, same day.
   ```bash
   ssh root@104.236.20.89 "echo 'HQ_LATE_STAGES=1' >> /srv/hq/env && systemctl restart bcns-app@hq"
   ```
-- [x] (Done 2026-11-10 UTC by Nate: `gcloud scheduler jobs pause` on every `clock-*` job, 5 jobs, each answered "Job has been paused.") Pause Cloud Scheduler in GCP project `bcns-leads`, region `us-central1` (console: https://console.cloud.google.com/cloudscheduler?project=bcns-leads -> select every `clock-*` job -> Pause). The jobs are `clock-poll` (hourly tick: poll, pitch, quote, onboard, notify, qualify), `clock-source` (source + heartbeat), `clock-personalize` (the 12:30 UTC digest) and possibly `clock-touch`; list first, then pause each name that appears:
+- [x] (Done 2026-11-10 UTC by Nate: `gcloud scheduler jobs pause` on every `clock-*` job, 5 jobs. `gcloud scheduler jobs list` then showed all `PAUSED`: `clock-poll`, `clock-source`, `clock-personalize`, `clock-verify-today`, `clock-verify-tomorrow`.) Pause Cloud Scheduler in GCP project `bcns-leads`, region `us-central1` (console: https://console.cloud.google.com/cloudscheduler?project=bcns-leads -> select every `clock-*` job -> Pause). The jobs are `clock-poll` (hourly tick: poll, pitch, quote, onboard, notify, qualify), `clock-source` (source + heartbeat), `clock-personalize` (the 12:30 UTC digest) and possibly `clock-touch`; list first, then pause each name that appears:
   ```bash
   gcloud scheduler jobs list --project bcns-leads --location us-central1
   gcloud scheduler jobs pause <name> --project bcns-leads --location us-central1
