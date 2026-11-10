@@ -1,0 +1,27 @@
+# Weekly dependency updates, grouped so a week is one PR and one deploy:
+# merging a pnpm-lock.yaml change redeploys sb, connect, mcp and the worker
+# (see CLAUDE.md, "What a merge to main deploys").
+# Majors are skipped here; security fixes still arrive through Dependabot
+# security updates regardless of this ignore rule.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
