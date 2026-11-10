@@ -254,7 +254,7 @@ If a fire exits 1 with no run row, check `cd /srv/hq/current/jobs && ls node_mod
 
 ### 9. Connect Claude to HQ — done; reconnect once after v2 (step 19)
 
-claude.ai -> Settings -> Connectors -> Add custom connector -> name `bcns HQ`, URL `https://hq.bcn-services.com/mcp`. Sign in with your HQ email and password when it redirects to `/authorize`. The os skill `/hq` drives it (`~/os/skills/hq/SKILL.md`).
+claude.ai -> Settings -> Connectors -> Add custom connector -> name `bcns HQ`, URL `https://hq.bcn-services.com/mcp`. Sign in with your HQ email and password when it redirects to `/authorize`. In Claude Code the window-orchestrator's HQ mode drives it (`~/os/agents/window-orchestrator.md`, which folded in the old `/hq` skill; bcns-os #17), and the HQ section of `~/os/CLAUDE.md` makes every bcns session use it (bcns-os #18).
 
 **Claude Code.** No separate setup: claude.ai connectors load into Claude Code on the same account. After connecting in claude.ai, `claude mcp list` shows `claude.ai bcns HQ - Connected`, and the 17 tools (12 before v2; `create_track` removed with the fixed track set, `move_track` with phase columns) appear as `mcp__claude_ai_bcns_HQ__*` (verified 2026-10-28: `today`, `list_tasks`, `create_task`, `update_task`). Signed out shows `! Needs authentication`; in Claude Code run `/mcp`, pick `claude.ai bcns HQ`, Authenticate, sign in at `/authorize`. Do not also add a user-scope `claude mcp add ... hq`: it is a second, redundant sign-in for the same server.
 
@@ -461,6 +461,8 @@ Sign in at `https://hq.bcn-services.com/login` as Nate and as Brandon, and try "
 
 ### 20. os: the `/hq` skill (an os edit; Nate-run)
 
+**Superseded (checked 2026-11-09):** `~/os/skills/hq/SKILL.md` no longer exists. The `/hq` skill was folded into `~/os/agents/window-orchestrator.md` (HQ mode, bcns-os #17), which already says tokens persist and lists the current tools. Nothing left to do here; the original text is kept for history.
+
 In `~/os/skills/hq/SKILL.md`, replace the line-14 note that every HQ deploy or restart drops the tokens with "tokens persist across deploys; reconnect only on a 401", and list the new tools (`add_task_note`, `list_board`, `update_track`, `propose_client`). Also replace the done rule at line 18 ("only on tasks owned by claude; HQ refuses done on a human's task"), which is stale: an admin may close any task, staff only their own and claude's. Add no `claude mcp add` line: step 9 says claude.ai connectors already load into Claude Code. The orchestrator rule change in `~/os/agents/window-orchestrator.md` stays out of v2.
 
 ### 21. Seed the GTM tracks (optional; idempotent)
@@ -485,17 +487,26 @@ The v1 "Freeze <month>" button went with the Numbers rebuild (#182); nothing rea
 
 ### 23. Parallel week with Brandon
 
-Old pipeline stays on (Cloud Scheduler, launchd, digest); `HQ_LATE_STAGES` stays unset. Checklist:
+Old pipeline stays on (Cloud Scheduler, digest; the laptop launchd pull was removed 2026-11-09); `HQ_LATE_STAGES` stays unset. Checklist:
 
 - [ ] Brandon signs in to HQ and works the call pool from Today (no Sheet, no digest) for a full week, 5 working days.
 - [ ] Every outcome he logs shows in Leads; the done-count moves.
 - [ ] Nate approves at least one proposal with `a` and rejects one with `r`; a stage change from Claude arrives only as a proposal, and Brandon (staff) cannot approve.
-- [ ] `hq-source.timer` and `hq-qualify.timer` fired each weekday: Numbers -> Ops shows the runs, no failures; `hq-uptime.timer` shows no red target.
-- [ ] Places calls this month are under the cap (Numbers -> Ops).
+- [x] `hq-source.timer` and `hq-qualify.timer` fired each weekday: Numbers -> Ops shows the runs, no failures; `hq-uptime.timer` shows no red target. (2026-11-09, `events` and `uptime_checks`: `source` ran every weekday 2026-10-28 to 2026-11-09, `qualify` 13 runs a day, 0 failed runs in 7 days; 0 failed uptime checks of 10,085.)
+- [x] Places calls this month are under the cap (Numbers -> Ops). (2026-11-09: 35 `places_call` events in November against a cap of 950. This counts HQ's calls only; see the note below.)
 - [ ] `/srv/hq/env` still `600` owned by `hq`; `/srv/hq/jobs.env` still `600` owned by `root`.
 - [ ] Weekly finance computes itself; spot-check one week against the old numbers.
-- [ ] D2 check run (below) and every row is `ok`, or the exceptions are understood.
+- [ ] D2 check run (below) and every row is `ok`, or the exceptions are understood. **Skipped by Nate 2026-11-09.**
 - [ ] Brandon agrees to switch off.
+
+**Checked 2026-11-09 (read-only counts on the HQ database).** Nate's call: the gate is met; these are the facts behind the boxes still open.
+
+- Calls: the `calls` table has 0 rows and `proposals` has 0 rows, so the first three boxes have no evidence in HQ yet. Brandon last signed in 2026-11-08. `call_due` holds 1,345 leads, all assigned to Brandon; Today shows the top 5 by fit with "show all".
+- The old pipeline writes this same database. Its `qualify` promotes 50 leads to `call_due` at 08:01 UTC each weekday, so HQ's own promotion (08:15 UTC, same daily count) has never fired. After step 24 pauses the old clock, HQ `qualify` takes over the promotion: check for it the next weekday (query in step 24).
+- The old `source` job also calls Places (12 grid cells a weekday, up to 3 pages each) and does not write `places_call` events, so the count in Numbers -> Ops is lower than the real monthly total until the old clock is paused.
+- 663 of the `call_due` leads (created 2026-08 and 2026-09, before scoring) have no `fit_score`; they sort last.
+- The old `poll` job (on `clock-poll`) still does two things HQ does not: alert triage on the alerts inbox (last tick 2026-11-09 17:00 UTC; one alert opened and resolved 2026-10-28) and forwarding of mail that reaches the bot mailbox (15 forwards in 14 days, last 2026-11-05). `poll` is listed as dropped above; alert triage is not named anywhere in this doc. Both stop at the pause in step 24. HQ task 4e4c6321 holds the decision.
+- Not checked: env file modes on the droplet, weekly finance.
 
 **D2: Sheet vs HQ (handed, not run).** Export the Sheet's Leads tab as CSV, import it into a scratch table `sheet_import` (HQ dashboard -> Table editor -> New table -> Import CSV, every column text), run the two queries below in the SQL Editor, then `drop table sheet_import;`.
 
@@ -552,18 +563,19 @@ Do in this order, same day.
   gcloud scheduler jobs list --project bcns-leads --location us-central1
   gcloud scheduler jobs pause <name> --project bcns-leads --location us-central1
   ```
-- [ ] Digest stopped: it ran from `clock-personalize` via `clock.yml`; confirm no email arrives the next weekday at 12:30 UTC.
+- [ ] Digest stopped: it ran from `clock-personalize` via `clock.yml`; confirm no email arrives the next weekday at 12:30 UTC. The digest was Brandon's only daily prompt; HQ sends none, so tell him the list is now Today in HQ.
+- [ ] HQ took over the daily promotion (the old `qualify` did it until now). The next weekday after 08:15 UTC, in the HQ SQL Editor:
+  ```sql
+  select via, count(*) from events
+  where job = 'qualify' and kind = 'promoted' and created_at >= current_date
+  group by via;   -- expect one row: via = 'job'
+  ```
 - [ ] Disable the GitHub Actions clock (which also carries the heartbeat job):
   ```bash
   GITHUB_TOKEN= gh workflow disable clock.yml -R bcn-services/bcns-internal
   ```
-- [ ] Unload the laptop pull and stop it returning at next login:
-  ```bash
-  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.bcns.leads-pull.plist
-  mv ~/Library/LaunchAgents/com.bcns.leads-pull.plist ~/Library/LaunchAgents/com.bcns.leads-pull.plist.disabled
-  launchctl print gui/$(id -u)/com.bcns.leads-pull     # must fail with "Could not find service"
-  ```
-- [ ] Sheet and tracker artifact: leave read-only, stop opening them. `/leads` (os skill) is retired or shrunk to a CLI over HQ, Nate's call.
+- [x] Unload the laptop pull and stop it returning at next login. Done 2026-11-09: Nate unloaded `com.bcns.leads-pull` and deleted the plist (not renamed to `.disabled`); `launchctl list` no longer shows it.
+- [ ] Sheet and tracker artifact: leave read-only, stop opening them. `/leads` (os skill): Nate's call 2026-11-09 was to delete it; bcns-os #20 removes `skills/leads/` and points `/demo` at HQ.
 - [ ] After one quiet week: delete the paused Cloud Scheduler jobs (`gcloud scheduler jobs delete <name> --project bcns-leads --location us-central1`), revoke the GitHub PAT (GitHub -> Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens -> the token with resource owner `bcn-services` and Actions read/write on `bcns-internal` -> Delete), then archive:
   ```bash
   GITHUB_TOKEN= gh repo archive bcn-services/bcns-internal --yes
@@ -725,10 +737,10 @@ HQ is additive on the DB, so the old pipeline can resume against it. Pause is re
 ```bash
 GITHUB_TOKEN= gh workflow enable clock.yml -R bcn-services/bcns-internal
 gcloud scheduler jobs resume <name> --project bcns-leads --location us-central1      # each paused job
-mv ~/Library/LaunchAgents/com.bcns.leads-pull.plist.disabled ~/Library/LaunchAgents/com.bcns.leads-pull.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.bcns.leads-pull.plist
 ssh root@104.236.20.89 "sed -i '/^HQ_LATE_STAGES=/d' /srv/hq/env && systemctl restart bcns-app@hq && systemctl disable --now hq-source.timer hq-qualify.timer hq-deliverable.timer hq-uptime.timer"
 ```
+
+The laptop pull does not come back: its plist was deleted 2026-11-09 and the `/leads` skill it ran is removed (bcns-os #20). A rollback restores the old jobs and the digest email, not the Sheet append.
 
 If the repo was already archived: `GITHUB_TOKEN= gh repo unarchive bcn-services/bcns-internal --yes`. If the scheduler jobs were deleted, recreate them with `scripts/scheduler-setup.sh` in `bcns-internal`.
 
