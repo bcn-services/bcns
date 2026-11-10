@@ -16,8 +16,8 @@
     "@bcn-services/ui": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "framer-motion": "^13.1.1",
-    "lucide-react": "^0.454.0",
+    "framer-motion": "^13.5.1",
+    "lucide-react": "^0.577.0",
     "next": "14.2.35",
     "next-themes": "^0.4.3",
     "react": "^18.3.1",
@@ -27,12 +27,12 @@
   },
   "devDependencies": {
     "@bcn-services/config": "workspace:*",
-    "@types/node": "^22.9.0",
+    "@types/node": "^22.20.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.6.2",
     "eslint": "^9.15.0",
-    "postcss": "^8.5.28",
+    "postcss": "^8.5.32",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3"
   }
