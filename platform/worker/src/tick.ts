@@ -12,16 +12,8 @@ import { revokeDisconnected } from './disconnect.js'
 import { paidPeriods } from './paid-period.js'
 import { sourceCommands } from './commands.js'
 
-export interface TickOpts {
-  taskIndex?: number
-  taskCount?: number
-  fetch?: typeof globalThis.fetch
-  now?: () => Date
-  log?: (event: string, data?: Record<string, unknown>) => void
-  budgetMs?: number
-  claimLimit?: number
-  owner?: string
-}
+/** Every Tick field is optional here; tick() fills the rest from env. `stubbed` is derived from `fetch`. */
+export type TickOpts = Partial<Omit<Tick, 'stubbed'>>
 
 export interface TickResult {
   owner: string
@@ -30,7 +22,7 @@ export interface TickResult {
   steps: Record<string, number>
 }
 
-async function reap(t: Tick): Promise<number> {
+async function reap(): Promise<number> {
   const r = await sql(`update data.connector_runs set status = 'error', error = 'lease expired', finished_at = now()
                        where status = 'running' and started_at < now() - interval '20 minutes'`)
   await sql(`update data.connector_schedule set lease_until = null where lease_until < now()`)
@@ -41,13 +33,13 @@ async function reap(t: Tick): Promise<number> {
  * Billing grace expiry (item 1). Stripe sends nothing when a lapsed client's 30 days run out, so
  * the tick does it: active + paid before + grace_until passed -> paused. Never churns.
  */
-async function pauseLapsed(_t: Tick): Promise<number> {
+async function pauseLapsed(): Promise<number> {
   const r = await sql<{ n: number }>(`select data.pause_lapsed_clients() as n`)
   return r.rows[0]?.n ?? 0
 }
 
 /** Once per day: month+2's partition already existing means today's call would be a no-op. */
-async function ensurePartitions(_t: Tick): Promise<number> {
+async function ensurePartitions(): Promise<number> {
   const have = await sql(
     `select 1 from pg_tables where schemaname = 'data'
      and tablename = 'raw_' || to_char(date_trunc('month', now()) + interval '2 months', 'YYYY_MM')`)
@@ -71,46 +63,46 @@ export async function tick(opts: TickOpts = {}): Promise<TickResult> {
   }
 
   const steps: Record<string, number> = {}
-  const step = async (name: string, fn: () => Promise<number>) => {
+  const step = async (name: string, fn: (t: Tick) => Promise<number>) => {
     try {
-      steps[name] = await fn()
+      steps[name] = await fn(t)
       log('step', { step: name, n: steps[name] })
     } catch (e) {
       log('step_failed', { step: name, error: e instanceof Error ? e.message : String(e) })
     }
   }
 
-  await step('reap', () => reap(t))
+  await step('reap', reap)
 
   const housekeeping = taskIndex === 0 && await acquireLease('housekeeping', owner)
   if (housekeeping) {
-    await step('ensurePartitions', () => ensurePartitions(t))
-    await step('refreshTokens', () => refreshTokens(t))
-    await step('probeAuthFailed', () => probeAuthFailed(t))
-    await step('revokeDisconnected', () => revokeDisconnected(t))
+    await step('ensurePartitions', ensurePartitions)
+    await step('refreshTokens', refreshTokens)
+    await step('probeAuthFailed', probeAuthFailed)
+    await step('revokeDisconnected', revokeDisconnected)
     // Before claimAndRun, so a client whose grace ran out is not synced one more time.
-    await step('pauseLapsed', () => pauseLapsed(t))
+    await step('pauseLapsed', pauseLapsed)
   }
 
   // Before claimAndRun: a done command makes its schedule due now, and the sync below then picks it up.
-  await step('sourceCommands', () => sourceCommands(t))
-  await step('claimAndRun', () => claimAndRun(t))
+  await step('sourceCommands', sourceCommands)
+  await step('claimAndRun', claimAndRun)
 
   if (housekeeping) {
     // After claimAndRun: up to 50 Shopify calls (10 s timeout each) must not eat the run budget.
-    await step('paidPeriods', () => paidPeriods(t))
-    await step('computeHealth', () => computeHealth(t))
+    await step('paidPeriods', paidPeriods)
+    await step('computeHealth', computeHealth)
     // Before alerts: alerts() ends its own call with sendPending(), which flushes every unsent
     // data.notifications row (not just the ones alerts() itself just raised) — so an escalation
     // shopRedact() writes here goes out over email in this same tick instead of waiting one more.
-    await step('shopRedact', () => shopRedact(t))
+    await step('shopRedact', shopRedact)
     // Before alerts, same reason: alerts() ends with sendPending(), which flushes the digest this step raises.
-    await step('weeklyDigests', () => raiseWeeklyDigests(t))
-    await step('alerts', () => alerts(t))
-    await step('thumbnails', () => thumbnails(t))
-    await step('renormalize', () => renormalize(t))
-    await step('purge', () => purge(t))
-    await step('egressPooled', () => egressPooled(t))
+    await step('weeklyDigests', raiseWeeklyDigests)
+    await step('alerts', alerts)
+    await step('thumbnails', thumbnails)
+    await step('renormalize', renormalize)
+    await step('purge', purge)
+    await step('egressPooled', egressPooled)
     await releaseLease('housekeeping', owner)
   }
 

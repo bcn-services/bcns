@@ -55,8 +55,7 @@ export const drive: Connector = {
   configSchema,
   tokenKind: 'google_oauth_refresh',
 
-  backfill(ctx) { return pull(ctx) },
-  incremental(ctx) { return pull(ctx) },
+  backfill: pull, incremental: pull,
 
   refreshToken(ctx) { return refreshGoogleToken(ctx, 'drive') },
 

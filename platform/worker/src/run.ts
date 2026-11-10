@@ -175,15 +175,11 @@ export async function loadToken(clientId: string, source: Source): Promise<Token
   return r.rows[0]
 }
 
-export function makeContext(t: Tick, row: ScheduleRow, conn: Connector, token: TokenRow, config: Json, timezone: string): RunContext {
+export function makeContext(t: Tick, clientId: string, source: Source, conn: Connector, token: TokenRow, config: Json, timezone: string): RunContext {
   return {
-    clientId: row.client_id,
-    source: row.source,
-    token,
-    config,
-    timezone,
-    fetch: rateLimited(t, `${row.source}:${row.client_id}`, conn.defaults.rateLimit),
-    log: (event, data) => t.log(event, { client: row.client_id, source: row.source, ...data }),
+    clientId, source, token, config, timezone,
+    fetch: rateLimited(t, `${source}:${clientId}`, conn.defaults.rateLimit),
+    log: (event, data) => t.log(event, { client: clientId, source, ...data }),
     async putObject(path, bytes, mime) {
       const { error } = await storage().upload(path, bytes, { contentType: mime, upsert: true })
       if (error) throw new Error(`putObject ${path}: ${error.message}`)
@@ -192,27 +188,27 @@ export function makeContext(t: Tick, row: ScheduleRow, conn: Connector, token: T
       const r = await sql(`select 1 from data.daily_metrics where client_id = $1 and source = $2 and metric = $3
                            and entity_kind = 'store' and entity_id = 'store'
                            and day = (now() at time zone (select timezone from data.clients where id = $1))::date`,
-        [row.client_id, row.source, metric])
+        [clientId, source, metric])
       return (r.rowCount ?? 0) > 0
     },
     // Known = a row whose bytes or thumbnail landed; one left without either is retried next run (Drive thumb, Meta download).
     async knownMedia(ids) {
       if (!ids.length) return new Set()
-      const r = await sql<{ external_id: string }>(`select external_id from data.media where client_id = $1 and source = $2 and external_id = any($3::text[]) and coalesce(storage_path, thumb_path) is not null`, [row.client_id, row.source, ids])
+      const r = await sql<{ external_id: string }>(`select external_id from data.media where client_id = $1 and source = $2 and external_id = any($3::text[]) and coalesce(storage_path, thumb_path) is not null`, [clientId, source, ids])
       return new Set(r.rows.map(x => x.external_id))
     },
     // Monday write-back (set_status_done / set_status_undone): the status text the synced row holds, the
     // `previous` the newest succeeded set_status_done recorded for the item (a recorded null, an empty label,
     // is returned as null: undo clears), and whether the newest already-run set_status_done failed.
     async jobStatus(externalId) {
-      const r = await sql<{ status: string | null }>(`select status from data.jobs where client_id = $1 and source = $2 and external_id = $3 limit 1`, [row.client_id, row.source, externalId])
+      const r = await sql<{ status: string | null }>(`select status from data.jobs where client_id = $1 and source = $2 and external_id = $3 limit 1`, [clientId, source, externalId])
       return r.rows[0]?.status ?? null
     },
     async previousStatus(externalId) {
       const r = await sql<{ previous: string | null }>(
         `select result->>'previous' as previous from data.source_commands
          where client_id = $1 and source = $2 and kind = 'set_status_done' and status = 'done' and payload->>'item_id' = $3 and result ? 'previous'
-         order by created_at desc limit 1`, [row.client_id, row.source, externalId])
+         order by created_at desc limit 1`, [clientId, source, externalId])
       return r.rows[0]?.previous ?? null
     },
     // Commands run oldest first, so a set_status_done that has run (status <> 'queued') is older than the undo asking.
@@ -220,12 +216,12 @@ export function makeContext(t: Tick, row: ScheduleRow, conn: Connector, token: T
       const r = await sql<{ status: string }>(
         `select status from data.source_commands
          where client_id = $1 and source = $2 and kind = 'set_status_done' and status <> 'queued' and payload->>'item_id' = $3
-         order by created_at desc limit 1`, [row.client_id, row.source, externalId])
+         order by created_at desc limit 1`, [clientId, source, externalId])
       return r.rows[0]?.status === 'failed'
     },
     async mergeConfig(patch) {
       Object.assign(config, patch)
-      await sql(`update data.connector_schedule set config = config || $3::jsonb where client_id = $1 and source = $2`, [row.client_id, row.source, JSON.stringify(patch)])
+      await sql(`update data.connector_schedule set config = config || $3::jsonb where client_id = $1 and source = $2`, [clientId, source, JSON.stringify(patch)])
     },
   }
 }
@@ -236,8 +232,7 @@ export async function contextFor(t: Tick, clientId: string, source: Source): Pro
   const r = await sql<{ config: Json; timezone: string }>(
     `select s.config, c.timezone from data.connector_schedule s join data.clients c on c.id = s.client_id
      where s.client_id = $1 and s.source = $2`, [clientId, source])
-  const row = { client_id: clientId, source } as ScheduleRow
-  return makeContext(t, row, conn, await loadToken(clientId, source), conn.configSchema.parse(r.rows[0]?.config ?? {}), r.rows[0]?.timezone ?? 'UTC')
+  return makeContext(t, clientId, source, conn, await loadToken(clientId, source), conn.configSchema.parse(r.rows[0]?.config ?? {}), r.rows[0]?.timezone ?? 'UTC')
 }
 
 export async function runOne(t: Tick, row: ScheduleRow): Promise<void> {
@@ -253,7 +248,7 @@ export async function runOne(t: Tick, row: ScheduleRow): Promise<void> {
     const token = await loadToken(row.client_id, row.source)
     const config = conn.configSchema.parse(row.config ?? {})
     const tzq = await sql<{ timezone: string }>(`select timezone from data.clients where id = $1`, [row.client_id])
-    const ctx = makeContext(t, row, conn, token, config, tzq.rows[0].timezone)
+    const ctx = makeContext(t, row.client_id, row.source, conn, token, config, tzq.rows[0].timezone)
 
     // §5.4: a run whose token is already expired refreshes it under the same row lock first.
     if (token.expires_at && token.expires_at.getTime() <= Date.now() && conn.refreshToken) {
@@ -296,12 +291,9 @@ export async function runOne(t: Tick, row: ScheduleRow): Promise<void> {
       })
 
       for (const fl of conn.defaults.fullList ?? []) {
-        const ids = page.raw.filter(r => r.entity === fl.entity).map(r => r.externalId)
-        if (ids.length || page.entity === fl.entity) {
-          const s = seen.get(fl.table) ?? new Set<string>()
-          for (const id of ids) s.add(id)
-          seen.set(fl.table, s)
-        }
+        const s = seen.get(fl.table) ?? new Set<string>()
+        seen.set(fl.table, s)
+        for (const r of page.raw) if (r.entity === fl.entity) s.add(r.externalId)
         if (page.entity === fl.entity && page.entityDone) finished.add(fl.entity)
       }
 
@@ -362,16 +354,11 @@ export function emptyFullListTables(
 }
 
 async function applyTombstones(conn: Connector, row: ScheduleRow, seen: Map<string, Set<string>>, finished: Set<string>): Promise<void> {
-  const byTable = new Map<string, { entities: string[]; ids: string[] }>()
-  for (const fl of conn.defaults.fullList ?? []) {
-    const e = byTable.get(fl.table) ?? { entities: [], ids: [] }
-    e.entities.push(fl.entity)
-    e.ids.push(...(seen.get(fl.table) ?? []))
-    byTable.set(fl.table, e)
-  }
-  for (const [table, e] of byTable) {
-    if (!e.entities.every(x => finished.has(x))) continue
-    const ids = [...new Set(e.ids)]
+  const fullList = conn.defaults.fullList ?? []
+  for (const table of new Set(fullList.map(f => f.table))) {
+    // A table two entities feed is tombstoned only once every one of their listings finished.
+    if (!fullList.filter(f => f.table === table).every(f => finished.has(f.entity))) continue
+    const ids = [...(seen.get(table) ?? [])]
     // media rows own storage objects: schedule the same 30-day purge as api.delete_media, cancel it if the id returns.
     const purge = table === 'media' ? `, purge_after = now() + interval '30 days'` : ''
     const unpurge = table === 'media' ? ', purge_after = null' : ''

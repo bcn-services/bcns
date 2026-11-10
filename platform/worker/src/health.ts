@@ -129,6 +129,15 @@ export function clientBreakNotices(rows: BreakRow[], now: Date): BreakNotice[] {
   return out
 }
 
+/** Inserts one client notice; the unique dedupe_key makes a repeat a no-op. Returns 1 when the row is new. */
+async function raise(n: BreakNotice | DigestNotice): Promise<number> {
+  const r = await sql(
+    `insert into data.notifications (client_id, kind, dedupe_key, payload) values ($1, $2, $3, $4::jsonb)
+     on conflict (dedupe_key) do nothing`,
+    [n.client_id, n.kind, n.dedupe_key, JSON.stringify(n.payload)])
+  return r.rowCount ?? 0
+}
+
 /** Reads the broken sources of active clients, inserts the notices; the unique dedupe_key makes every tick after the first a no-op. */
 async function raiseClientBreaks(t: Tick): Promise<number> {
   const h = await sql<Omit<BreakRow, 'initial_sent_at'>>(
@@ -144,13 +153,7 @@ async function raiseClientBreaks(t: Tick): Promise<number> {
   const notices = clientBreakNotices(
     h.rows.map(r => ({ ...r, initial_sent_at: createdAt.get(breakKey('client_break', r)) ?? null })), t.now())
   let raised = 0
-  for (const n of notices) {
-    const r = await sql(
-      `insert into data.notifications (client_id, kind, dedupe_key, payload) values ($1, $2, $3, $4::jsonb)
-       on conflict (dedupe_key) do nothing`,
-      [n.client_id, n.kind, n.dedupe_key, JSON.stringify(n.payload)])
-    raised += r.rowCount ?? 0
-  }
+  for (const n of notices) raised += await raise(n)
   return raised
 }
 
@@ -275,14 +278,14 @@ export async function raiseWeeklyDigests(t: Tick): Promise<number> {
   for (const c of all.rows) {
     try { weeks.set(c.id, lastWeek(t.now(), c.timezone)) } catch { t.log('digest_bad_timezone', { client_id: c.id }) }   // one bad tz must not stop everyone else's digest
   }
-  const cs = { rows: all.rows.filter(c => weeks.has(c.id)) }
+  const cs = all.rows.filter(c => weeks.has(c.id))
   const have = await sql<{ dedupe_key: string }>(
     `select dedupe_key from data.notifications where dedupe_key = any($1::text[])`,
-    [cs.rows.map(c => `weekly_digest:${c.id}:${weeks.get(c.id)!.week}`)])
+    [cs.map(c => `weekly_digest:${c.id}:${weeks.get(c.id)!.week}`)])
   const done = new Set(have.rows.map(r => r.dedupe_key))
   let raised = 0
   // ponytail: one range query per not-yet-digested client per tick — batch by (week) if clients reach the hundreds
-  for (const c of cs.rows) {
+  for (const c of cs) {
     const w = weeks.get(c.id)!
     if (done.has(`weekly_digest:${c.id}:${w.week}`)) continue
     const d = await sql<DigestRow>(
@@ -291,11 +294,7 @@ export async function raiseWeeklyDigests(t: Tick): Promise<number> {
        from api.daily_summary_v1 where client_id = $1 and day between $2::date and $3::date`, [c.id, w.start, w.end])
     const n = weeklyDigest(c.id, d.rows, w)
     if (!n) continue
-    const r = await sql(
-      `insert into data.notifications (client_id, kind, dedupe_key, payload) values ($1, $2, $3, $4::jsonb)
-       on conflict (dedupe_key) do nothing`,
-      [n.client_id, n.kind, n.dedupe_key, JSON.stringify(n.payload)])
-    raised += r.rowCount ?? 0
+    raised += await raise(n)
   }
   return raised
 }

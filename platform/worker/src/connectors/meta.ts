@@ -54,6 +54,20 @@ const LEVEL_FIELDS: Record<string, string> = {
   insight_ad_day: `ad_id,ad_name,adset_id,campaign_id,${INSIGHT_FIELDS}`,
 }
 const LEVEL: Record<string, string> = { insight_campaign_day: 'campaign', insight_ad_day: 'ad' }
+const insightParams = (entity: string, since: string, until: string): Record<string, string> => ({
+  level: LEVEL[entity], time_increment: '1', limit: '500', fields: LEVEL_FIELDS[entity],
+  time_range: JSON.stringify({ since, until }),
+})
+
+/** Every page of one Graph edge. `params` is called per page; `after` is the next page's cursor, unset on the last one. */
+async function* paged(ctx: RunContext, path: string, params: () => Record<string, string>, after?: string): AsyncGenerator<{ data: Json[]; after?: string }> {
+  for (;;) {
+    const b: Json = await graph(ctx, path, after ? { ...params(), after } : params())
+    after = b.paging?.next ? b.paging?.cursors?.after : undefined
+    yield { data: b.data ?? [], after }
+    if (!after) return
+  }
+}
 
 /** Run-start: the ad account's own timezone + currency (§4.3). */
 async function accountMeta(ctx: RunContext): Promise<void> {
@@ -67,17 +81,11 @@ async function* listEntity(ctx: RunContext, entity: 'campaign' | 'ad'): AsyncGen
   const fields = entity === 'campaign'
     ? 'id,name,status,effective_status,objective,updated_time'
     : 'id,name,adset_id,campaign_id,status,effective_status,updated_time,creative{id,name,image_hash,thumbnail_url,object_story_spec}'
-  let after: string | undefined
-  for (;;) {
-    const p: Record<string, string> = { fields, limit: '200' }
-    if (after) p.after = after
-    const b: Json = await graph(ctx, `${ctx.config.act_id}/${entity}s`, p)
-    const raw: RawRow[] = (b.data ?? []).map((n: Json) => ({
+  for await (const p of paged(ctx, `${ctx.config.act_id}/${entity}s`, () => ({ fields, limit: '200' }))) {
+    const raw: RawRow[] = p.data.map((n: Json) => ({
       entity, externalId: String(n.id), sourceUpdatedAt: n.updated_time ? new Date(n.updated_time) : undefined, payload: n,
     }))
-    after = b.paging?.cursors?.after && b.paging?.next ? b.paging.cursors.after : undefined
-    yield { raw, hasNext: !!after }
-    if (!after) return
+    yield { raw, hasNext: !!p.after }
   }
 }
 
@@ -108,21 +116,6 @@ async function adImages(ctx: RunContext, ads: RawRow[]): Promise<RawRow[]> {
     })
   }
   return out
-}
-
-async function* insightsIncremental(ctx: RunContext, entity: string, since: Date): AsyncGenerator<{ raw: RawRow[]; hasNext: boolean }> {
-  let after: string | undefined
-  for (;;) {
-    const p: Record<string, string> = {
-      level: LEVEL[entity], time_increment: '1', limit: '500', fields: LEVEL_FIELDS[entity],
-      time_range: JSON.stringify({ since: acctDay(ctx, since), until: acctDay(ctx, new Date()) }),
-    }
-    if (after) p.after = after
-    const b: Json = await graph(ctx, `${ctx.config.act_id}/insights`, p)
-    yield { raw: insightRows(entity, b.data ?? []), hasNext: !!(b.paging?.next && b.paging?.cursors?.after) }
-    after = b.paging?.next ? b.paging?.cursors?.after : undefined
-    if (!after) return
-  }
 }
 
 const insightRows = (entity: string, rows: Json[]): RawRow[] => rows.map((n: Json) => ({
@@ -178,8 +171,10 @@ export const meta: Connector = {
     }
     const since = new Date(Date.now() - REFRESH_DAYS * 864e5) // late attribution window (§4.3)
     for (const entity of ['insight_campaign_day', 'insight_ad_day'] as const) {
-      for await (const p of insightsIncremental(ctx, entity, since)) {
-        yield { raw: p.raw, entity, cursor: { until: acctDay(ctx, new Date()) }, entityDone: !p.hasNext, done: false }
+      // The range is rebuilt per page, as it always was: "today" can roll over mid-listing.
+      const params = () => insightParams(entity, acctDay(ctx, since), acctDay(ctx, new Date()))
+      for await (const p of paged(ctx, `${ctx.config.act_id}/insights`, params)) {
+        yield { raw: insightRows(entity, p.data), entity, cursor: { until: acctDay(ctx, new Date()) }, entityDone: !p.after, done: false }
       }
     }
     const images = await adImages(ctx, ads)
@@ -211,10 +206,7 @@ export const meta: Connector = {
         const sinceD = new Date(Math.max(from.getTime(), untilD.getTime() - (WINDOW_DAYS - 1) * 864e5))
         if (untilD < from) break
         if (!runId) {
-          const sub: Json = await graph(ctx, `${ctx.config.act_id}/insights`, {
-            level: LEVEL[entity], time_increment: '1', limit: '500', fields: LEVEL_FIELDS[entity],
-            time_range: JSON.stringify({ since: day(sinceD), until: windowUntil }),
-          }, { method: 'POST' })
+          const sub: Json = await graph(ctx, `${ctx.config.act_id}/insights`, insightParams(entity, day(sinceD), windowUntil), { method: 'POST' })
           runId = String(sub.report_run_id)
           yield { raw: [], entity, cursor: { entity, window_until: windowUntil, report_run_id: runId }, entityDone: false, done: false }
         }
@@ -229,18 +221,14 @@ export const meta: Connector = {
         }
         // Still running: keep the report_run_id and let the next tick resume the poll (§4.3).
         if (!ready) { yield { raw: [], entity, cursor: { entity, window_until: windowUntil, report_run_id: runId }, entityDone: false, done: false }; return }
-        for (;;) {
-          const p: Record<string, string> = { limit: '500' }
-          if (after) p.after = after
-          const b: Json = await graph(ctx, `${runId}/insights`, p)
-          after = b.paging?.next ? b.paging?.cursors?.after : undefined
+        // `after` is set only on a resume into this report; each page's own cursor goes back out so the next tick can.
+        for await (const p of paged(ctx, `${runId}/insights`, () => ({ limit: '500' }), after)) {
           yield {
-            raw: insightRows(entity, b.data ?? []), entity,
-            cursor: { entity, window_until: windowUntil, report_run_id: runId, after }, entityDone: false, done: false,
+            raw: insightRows(entity, p.data), entity,
+            cursor: { entity, window_until: windowUntil, report_run_id: runId, after: p.after }, entityDone: false, done: false,
           }
-          if (!after) break
         }
-        runId = undefined
+        runId = after = undefined
         windowUntil = day(new Date(sinceD.getTime() - 864e5))
         if (new Date(windowUntil) < from) break
       }
@@ -256,21 +244,15 @@ export const meta: Connector = {
     const currency = ctx.config.currency ?? 'USD'
     for (const r of rows) {
       const p = r.payload
-      if (r.entity === 'campaign') {
+      if (r.entity === 'campaign' || r.entity === 'ad') {
         records.push({
-          externalId: String(p.id), kind: 'campaign', title: p.name ?? null,
-          occurred_at: new Date(p.updated_time ?? Date.now()).toISOString(),
-          attributes: { status: p.status ?? null, effective_status: p.effective_status ?? null, objective: p.objective ?? null },
-          source_updated_at: p.updated_time ?? null,
-        })
-      } else if (r.entity === 'ad') {
-        records.push({
-          externalId: String(p.id), kind: 'ad', title: p.name ?? null,
+          externalId: String(p.id), kind: r.entity, title: p.name ?? null,
           occurred_at: new Date(p.updated_time ?? Date.now()).toISOString(),
           attributes: {
             status: p.status ?? null, effective_status: p.effective_status ?? null,
-            adset_id: p.adset_id ?? null, campaign_id: p.campaign_id ?? null,
-            image_hash: p.creative?.image_hash ?? null,
+            ...(r.entity === 'campaign'
+              ? { objective: p.objective ?? null }
+              : { adset_id: p.adset_id ?? null, campaign_id: p.campaign_id ?? null, image_hash: p.creative?.image_hash ?? null }),
           },
           source_updated_at: p.updated_time ?? null,
         })
