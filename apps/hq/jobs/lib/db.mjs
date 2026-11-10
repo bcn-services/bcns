@@ -22,6 +22,18 @@ export function sourcedBacklog(sql, { limit = 25 } = {}) {
   `;
 }
 
+// call_due rows with no fit_score (a generated column: never write it), minus
+// ones qualify's backfill pass already gave up on.
+export function unscoredCallDue(sql, { limit = 100 } = {}) {
+  return sql`
+    select * from businesses
+    where stage = 'call_due' and suppressed_at is null and fit_score is null
+      and not (jsonb_typeof(research) = 'object' and research ? 'backfill_skip')
+    order by updated_at asc
+    limit ${limit}
+  `;
+}
+
 // Sourcing inserts in bulk and re-runs the same grid cell, so a repeat hit on
 // place_id is expected, not an error.
 export function insertBusinesses(sql, rows) {
