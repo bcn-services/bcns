@@ -122,8 +122,7 @@ export const monday: Connector = {
   tokenKind: 'monday_personal',
   commands: { set_status_done: setStatusDone, set_status_undone: setStatusUndone },
 
-  backfill(ctx) { return pull(ctx) },
-  incremental(ctx) { return pull(ctx) },
+  backfill: pull, incremental: pull,
 
   normalize(ctx: RunContext, rows: RawRow[]): CanonicalWrites {
     const cols = ctx.config.columns ?? {}
