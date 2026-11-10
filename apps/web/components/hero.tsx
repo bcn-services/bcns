@@ -14,8 +14,8 @@ export function Hero() {
           <i className="size-2 flex-none rounded-full bg-primary" />
           {hero.badge}
         </p>
-        <h1 className="mt-[22px] max-w-[12ch] text-balance text-[clamp(2.4rem,6vw,4rem)] font-light leading-[1.06] tracking-[-0.025em]">
-          {emphasize(hero.headline, "ready for the future")}
+        <h1 className="mt-[22px] max-w-[13ch] text-balance text-[clamp(2.4rem,6vw,4rem)] font-light leading-[1.06] tracking-[-0.025em]">
+          {emphasize(hero.headline, hero.emphasis)}
         </h1>
         <p className="mt-[22px] max-w-[34rem] text-pretty text-[1.1875rem] leading-[1.6] text-muted-foreground">{hero.subheadline}</p>
         <div className="mt-8 flex flex-wrap gap-3.5">
@@ -26,7 +26,7 @@ export function Hero() {
             {hero.ctaPrimary}
           </Link>
           <Link
-            href="#how"
+            href="/services/deluxe"
             className="rounded-lg border border-input px-7 py-3.5 text-center text-[0.9375rem] font-medium transition-colors duration-200 hover:border-primary hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {hero.ctaSecondary}

@@ -47,14 +47,14 @@ export function DeluxeBuild() {
   );
 }
 
-/** Past work: two case cards linking to their case studies. */
+/** Past work: one case card per `pastWork.items` entry, linking to its case study. */
 export function DeluxeWork() {
   const { workEyebrow, workTitle, workEmphasis, workCta, workLabels } = siteContent.deluxeDemo;
   const { items, caseStudy } = siteContent.pastWork;
   return (
     <>
       <SectionHeading eyebrow={workEyebrow} title={workTitle} emphasis={workEmphasis} />
-      <div className="grid gap-4 min-[800px]:grid-cols-2 min-[800px]:gap-6">
+      <div className="grid gap-4 min-[800px]:grid-cols-2 min-[800px]:gap-6 min-[1200px]:grid-cols-3">
         {items.map((item, i) => (
           <Reveal key={item.slug} delay={i * 100}>
             <Link

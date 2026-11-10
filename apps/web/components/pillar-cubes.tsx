@@ -18,7 +18,7 @@ export function PillarCubes() {
       <p className="font-display text-[0.8125rem] font-medium uppercase tracking-[0.16em] text-primary-ink">
         {p.n} &middot; {p.label}
       </p>
-      <h3 className="mt-2.5 font-display text-2xl font-semibold leading-tight tracking-[-0.01em]">{p.name}</h3>
+      <h2 className="mt-2.5 font-display text-2xl font-semibold leading-tight tracking-[-0.01em]">{p.name}</h2>
       <p className="mt-2.5 flex-1 text-[0.9375rem] leading-[1.65] text-muted-foreground">{p.line}</p>
       <div className="mt-[1.125rem] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 border-t border-border pt-3.5">
         <span className="font-display text-[0.9375rem] font-medium">{p.price}</span>

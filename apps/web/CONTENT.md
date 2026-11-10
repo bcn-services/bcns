@@ -45,7 +45,7 @@ interface and the component.
 
 | Page | URL | Content keys used |
 |------|-----|-------------------|
-| Home | `/` | `hero`, `buildingBlocks`, `navCards`, `contactSection`, `pageMeta.home` |
+| Home | `/` | `hero`, `askHero`, `story`, `tools`, `pillars`, `contactSection`, `pageMeta.home` |
 | Services | `/services` | `useCases` (page head + Deluxe grid), `connect`, `aiConsult`, `howItWorks`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
@@ -70,15 +70,19 @@ be ruthless about length.
 
 ### headline
 - **Field:** `hero.headline`
-- **Purpose:** Primary value proposition — the single most important thing to communicate
+- **Purpose:** Primary value proposition — the single most important thing to communicate. It names what the owner gets (time back), not how the product works.
 - **Tone:** Direct, outcome-focused, no jargon
 - **Length:** ≤70 chars; ideally one line on desktop (~8-12 words)
 
+### emphasis
+- **Field:** `hero.emphasis`
+- **Purpose:** The phrase of `headline` set in the accent style. Must stay an exact substring of `headline`.
+
 ### subheadline
 - **Field:** `hero.subheadline`
-- **Purpose:** Expands on the headline with a concrete benefit or mechanism
+- **Purpose:** Says what bcns sells (software and AI tools) and what it does for the owner
 - **Tone:** Plain language, credible; reads like a sentence from a trusted colleague
-- **Length:** 1-2 sentences, ≤120 chars
+- **Length:** 1-2 sentences, ≤160 chars
 
 ### ctaPrimary
 - **Field:** `hero.ctaPrimary`
@@ -88,9 +92,9 @@ be ruthless about length.
 
 ### ctaSecondary
 - **Field:** `hero.ctaSecondary`
-- **Purpose:** Text for the secondary CTA button (links to `#how`, the pinned "How it works" stage on the home page)
+- **Purpose:** Text for the secondary CTA button (links to `/services/deluxe`, the page that shows the jobs a build takes on)
 - **Tone:** Softer than primary; invites exploration rather than conversion
-- **Length:** 2-5 words, ≤30 chars
+- **Length:** 2-7 words, ≤32 chars
 
 ### proofPoints[0]
 - **Field:** `hero.proofPoints[0]`
@@ -246,15 +250,15 @@ tuple.
 
 ### title
 - **Field:** `useCases.title`
-- **Purpose:** /services headline framing the three products as building blocks
+- **Purpose:** Headline framing the three products as ways to get time back
 - **Tone:** Direct
 - **Length:** ≤80 chars
 
 ### description
 - **Field:** `useCases.description`
-- **Purpose:** 1-2 sentences: Connect is the foundation, the others add to it
+- **Purpose:** The /services lede: what each of the three products takes off the owner
 - **Tone:** Plain
-- **Length:** 1-2 sentences, ≤140 chars
+- **Length:** 1-3 sentences, ≤160 chars
 
 ### blockEyebrow
 - **Field:** `useCases.blockEyebrow`
@@ -264,16 +268,16 @@ tuple.
 
 ### blockTitle
 - **Field:** `useCases.blockTitle`
-- **Purpose:** One-line headline for the Deluxe grid: anything custom, built on Connect
+- **Purpose:** The /services/deluxe H1: what a Deluxe build does for the owner (it does the busywork). Keep "custom" out of headlines; it belongs in body copy.
 - **Tone:** Direct
 - **Length:** ≤70 chars, 1 sentence
 
 ### blockDescription
 - **Field:** `useCases.blockDescription`
-- **Purpose:** Starting price plus an invitation to bring a pain point
+- **Purpose:** What a Deluxe build is, then the starting price
 - **Tone:** Plain
 - **Note:** The price must match `pricing.tiers[1]` (setup and monthly).
-- **Length:** 1-2 sentences, ≤130 chars
+- **Length:** 1-2 sentences, ≤140 chars
 
 ### items[0] — use case 1 (fixed)
 
@@ -716,7 +720,8 @@ every case study — not per-item.
 Social proof via client quotes. `items` is an open-ended array.
 
 **How to flip reviews live:** Add an entry to `reviews.items` — the holding
-state disappears automatically. No code change needed.
+state disappears automatically. No code change needed. While `items` is empty,
+`/work` leaves the whole section out.
 
 ### eyebrow
 - **Field:** `reviews.eyebrow`
@@ -874,8 +879,8 @@ on top of Connect; the copy should never present them as bigger versions of it.
 
 #### tiers[1].description
 - **Field:** `pricing.tiers[1].description`
-- **Purpose:** 1 sentence: anything custom, built on the client's Connect data
-- **Length:** 1 sentence, ≤100 chars
+- **Purpose:** What a Deluxe build takes off the client, built on their Connect data
+- **Length:** 1-2 sentences, ≤130 chars
 
 #### tiers[1].features[n] (open-ended array)
 - **Field:** `pricing.tiers[1].features`
@@ -956,7 +961,7 @@ The eleven pre-seeded entries, in order, are:
 5. **What is bcns Connect?** — Plain-words definition: one organized place that the team, AI tools and custom builds all work from.
 6. **Do I have to stop using my current software?** — No; Connect works alongside it.
 7. **Can I use my data with other tools?** — Yes; the data is the client's, and they can plug in the third-party AI tools and apps they like.
-8. **What does a Deluxe build add?** — Something custom on top of Connect, scoped and quoted as a fixed price before work starts.
+8. **What does a Deluxe build add?** — A tool on top of Connect that takes repeat work off the client, scoped and quoted as a fixed price before work starts.
 9. **Is my data private?** — Only the client's team sees it, and a full export is handed over any time, free.
 10. **How do I pay?** — By card through Stripe, $50 a month, workspace opens right away; a failed payment keeps the workspace open a month while the card is updated; Shopify App Store installs are billed by Shopify, never twice.
 
@@ -1088,9 +1093,9 @@ Every sentence in these two objects must trace to a fact or a Nate decision in `
 
 ---
 
-## Nav Cards (`siteContent.navCards`) — Home
+## Nav Cards (`siteContent.navCards`) — not rendered
 
-Navigation card grid linking to the main pages. Fixed tuple of 4.
+Navigation card grid linking to the main pages. Fixed tuple of 4. No page renders it today.
 
 ### items[0]
 - **Field:** `navCards.items[0].title` — Display title of card 0
@@ -1254,10 +1259,11 @@ Extras for the Deluxe page. Head copy is `useCases.blockEyebrow/blockTitle/
 blockDescription` (`titleEmphasis` styles part of the title; `audience` is the
 "who it's for" line under the description); the four cards are
 `useCases.items`; past work is `pastWork.items` (`workLabels` is the price-slot
-label per item); pricing is `pricing.tiers[1]`. `ctaSecondary`, `howEyebrow`,
+label per item, one per case study, same order); pricing is `pricing.tiers[1]`. `ctaSecondary`, `howEyebrow`,
 `askTitle`, `askEmphasis`, `askLede`, `groupLabel`, `dashboardTitle`, `agentLabel`,
 `agentPlaceholder` and `dayLetters` label the interactive demo. `chips` is three
-`{ question, tiles, listHeading, bars | rows, answer, source }`: `tiles` are three
+jobs the build does on its own, not questions the owner asks,
+`{ job, tiles, listHeading, bars | rows, answer, source }` (`answer` is the agent's report of what it did): `tiles` are three
 `{ name, value, prefix?, suffix?, sub, toolIds }` (prefix/suffix omitted when none) that count up; `bars` are percent
 heights, `rows` are `{ title, detail, tag }`; `answer` marks bold with `**`.
 `steps` is four `{ label, title, emphasis, description }`. `buildEyebrow`,
@@ -1300,6 +1306,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `hero.subheadline` | Hero — subheadline |
 | `hero.ctaPrimary` | Hero — ctaPrimary |
 | `hero.ctaSecondary` | Hero — ctaSecondary |
+| `hero.emphasis` | Hero — emphasis |
 | `hero.proofPoints[0..2]` | Hero — proofPoints |
 | `buildingBlocks.eyebrow` | Building Blocks — eyebrow |
 | `buildingBlocks.title` | Building Blocks — title |
@@ -1448,7 +1455,7 @@ Registry keys in `siteContent` and their CONTENT.md coverage:
 | `pageMeta.connectSetup.title` | Page Meta — connect, deluxe, aiConsulting |
 | `pageMeta.connectSetup.description` | Page Meta — connect, deluxe, aiConsulting |
 
-Total registry fields: 152 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`, `legal.*.sections[n].list[m]`) and container fields (`screenshots`) included. The mcp-directory pass added 30 rows for `connectSetup` and `pageMeta.connectSetup` (§ Connect Setup above). The chunk5-legal-pages pass added 13 rows for the new `legal.privacy`/`legal.terms` sections (§ Legal above). This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
+Total registry fields: 153 — counted as one row per field path in the table above, optional fields (`setup`, `monthly`, `seats`, `link`, `legal.*.sections[n].list[m]`) and container fields (`screenshots`) included. The mcp-directory pass added 30 rows for `connectSetup` and `pageMeta.connectSetup` (§ Connect Setup above). The chunk5-legal-pages pass added 13 rows for the new `legal.privacy`/`legal.terms` sections (§ Legal above). This count is re-derived by script from the table above each time it changes, never hand-incremented (`node -e` counting Cross-check table rows). All have a CONTENT.md entry. No orphans in either direction.
 
 The FAQ entries appended in the bcns Connect pass live in the open-ended `faq.items` array and are covered by the generic `faq.items[n].question` / `faq.items[n].answer` rows above — they add entries, not new field paths.
 

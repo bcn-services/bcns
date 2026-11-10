@@ -7,9 +7,9 @@ import { useInView, useReducedMotion } from "@/components/motion";
 import type { DeluxeChip, DeluxeDemoContent, ToolId, ToolItem } from "@/lib/content";
 
 /**
- * "Ask your business a question": three question chips over a dashboard + AI
- * agent mock. Picking a chip re-renders the mock (tiles, a bar chart or list
- * rows, the agent's question / answer / source) with a short stagger, and the
+ * "Jobs a build does on its own": three job chips over a dashboard + AI agent
+ * mock. Picking a chip re-renders the mock (tiles, a bar chart or list rows,
+ * the agent's report of what it did and its source) with a short stagger, and the
  * tile numbers count up. Reduced motion switches instantly with no count-up.
  */
 
@@ -60,7 +60,7 @@ function Mock({ chip, progress, deluxeDemo, tools }: { chip: DeluxeChip; progres
 
       <div className="grid gap-3.5 p-3.5 min-[900px]:grid-cols-[3fr_2fr] min-[900px]:gap-5 min-[900px]:p-5">
         {/* key: a new chip remounts the dashboard so its entrance animations restart. */}
-        <div key={chip.question} className="grid min-w-0 content-start gap-3">
+        <div key={chip.job} className="grid min-w-0 content-start gap-3">
           <div className="grid grid-cols-3 gap-2 min-[600px]:gap-3">
             {chip.tiles.map((tile, k) => (
               <div
@@ -134,13 +134,7 @@ function Mock({ chip, progress, deluxeDemo, tools }: { chip: DeluxeChip; progres
             <i className="block size-[9px] rounded-full bg-primary" />
             {agentLabel}
           </div>
-          <div key={chip.question} className="flex flex-1 flex-col gap-2.5">
-            <div
-              data-rise={2}
-              className="max-w-[92%] self-end rounded-xl rounded-br-[3px] border border-border bg-secondary px-3 py-2 text-sm leading-[1.4]"
-            >
-              {chip.question}
-            </div>
+          <div key={chip.job} className="flex flex-1 flex-col gap-2.5">
             <div
               data-rise={6}
               className="max-w-[96%] self-start rounded-xl rounded-bl-[3px] bg-primary-ink px-3 py-[0.5625rem] text-sm leading-[1.45] text-primary-foreground"
@@ -224,13 +218,13 @@ export function DeluxeAsk({ deluxeDemo, tools }: { deluxeDemo: DeluxeDemoContent
       <div role="group" aria-label={groupLabel} className="mb-[1.125rem] mt-7 flex flex-wrap gap-2.5">
         {chips.map((chip, i) => (
           <button
-            key={chip.question}
+            key={chip.job}
             type="button"
             aria-pressed={i === cur}
             onClick={() => pick(i)}
             className="min-h-12 rounded-full border border-input bg-card px-5 py-2.5 text-left font-display text-[0.9375rem] font-medium leading-[1.3] text-foreground transition-[border-color,background-color,color,box-shadow] duration-200 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-pressed:border-primary-ink aria-pressed:bg-primary-ink aria-pressed:text-primary-foreground aria-pressed:shadow-[0_8px_20px_hsl(var(--primary)/0.16)] motion-reduce:transition-none"
           >
-            {chip.question}
+            {chip.job}
           </button>
         ))}
       </div>

@@ -18,7 +18,7 @@ export default function WorkPage() {
       <SiteHeader />
       <main className="flex-1">
         <PastWork />
-        <Reviews />
+        {siteContent.reviews.items.length > 0 && <Reviews />}
         <CtaBand title={contactSection.title} description={contactSection.description} tone="plate" highlights={[]} />
       </main>
       <SiteFooter />

@@ -171,8 +171,8 @@ console.log("\n[4] Spot-checks: verbatim values from appendix");
 
 // Hero headline
 assert(
-  'hero.headline === "Get your business ready for the future"',
-  siteContent.hero.headline === "Get your business ready for the future",
+  'hero.headline === "Get hours of your day back."',
+  siteContent.hero.headline === "Get hours of your day back.",
   `got: "${siteContent.hero.headline}"`
 );
 
@@ -249,7 +249,7 @@ if (!buildExists) {
     const indexText = stripTags(indexHtml);
     assert(
       'index.html contains hero headline verbatim',
-      indexText.includes("Get your business ready for the future")
+      indexText.includes("Get hours of your day back.")
     );
     // The redesigned home no longer renders the nav cards (approved 2026-10-01);
     // "Pricing" below still has to appear via the header nav.
