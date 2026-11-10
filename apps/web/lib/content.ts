@@ -25,7 +25,20 @@ export interface HeroContent {
   subheadline: string;
   ctaPrimary: string;
   ctaSecondary: string;
+  /** Phrase of `headline` set in the display weight. */
+  emphasis: string;
   proofPoints: [string, string, string];
+}
+
+/** Home proof section: the real builds from `pastWork.items`, framed as work taken off the owner. */
+export interface OffYourPlateContent {
+  eyebrow: string;
+  title: string;
+  /** Phrase of `title` set in the display weight. */
+  emphasis: string;
+  description: string;
+  /** Label of the link to /work under the cards. */
+  allLabel: string;
 }
 
 export interface StepItem {
@@ -457,7 +470,7 @@ export interface DeluxeDemoContent {
   workEmphasis: string;
   workCta: string;
   /** Price-slot label per `pastWork.items`, in order. */
-  workLabels: [string, string];
+  workLabels: [string, string, string];
   pricingEyebrow: string;
 }
 
@@ -514,6 +527,7 @@ export interface AboutPageContent {
 
 export interface SiteContent {
   hero: HeroContent;
+  offYourPlate: OffYourPlateContent;
   buildingBlocks: HowItWorksContent;
   howItWorks: HowItWorksContent;
   connect: AiConsultContent;
@@ -547,68 +561,77 @@ export interface SiteContent {
 
 export const siteContent: SiteContent = {
   hero: {
-    badge: "bcns Connect: your whole business in one place",
-    headline: "Get your business ready for the future",
+    badge: "Software and AI tools for small businesses",
+    headline: "Get hours of your day back.",
+    emphasis: "hours of your day",
     subheadline:
-      "bcns Connect brings the tools you already use into one place, so AI and software can finally work from your real business",
+      "We build software and AI tools around how your business already runs. The busywork gets done without you, and you stay on the work that actually needs you.",
     ctaPrimary: "Book a free consult",
-    ctaSecondary: "See how it works",
+    ctaSecondary: "See what it takes off your plate",
     proofPoints: [
-      "Keep the tools you already use",
-      "$50 a month, no setup fee",
-      "Build on top whenever you're ready",
+      "bcns Connect is $50 a month, no setup fee",
+      "Deluxe builds starting at $2,000 setup plus $150 a month",
+      "Free consult and a fixed quote before any work",
     ],
   },
 
+  offYourPlate: {
+    eyebrow: "What it takes off your plate",
+    title: "Three tools we built, and the work each one took on",
+    emphasis: "the work each one took on",
+    description: "Clients have reported up to 70% of time saved on the tasks we built tools for.",
+    allLabel: "See all past work",
+  },
+
   buildingBlocks: {
-    eyebrow: "What we offer",
-    title: "Three building blocks for a business that's ready for AI.",
+    eyebrow: "How it works",
+    title: "How the busywork gets done without you",
     description:
-      "Everyone starts with bcns Connect. Add a custom build or a day of AI consulting whenever you're ready.",
+      "You keep the tools you already use. We connect them, build on top and keep it all running.",
     items: [
       {
         step: "01",
-        title: "bcns Connect",
+        title: "Connect your tools",
         description:
-          "Every tool your business runs on, connected in one organized place. Ready for your team, the AI tools you choose, or anything you build next.",
+          "bcns Connect links the tools you already use and keeps your orders, money, customers and files current in one place. It costs $50 a month with no setup fee.",
       },
       {
         step: "02",
-        title: "Deluxe builds",
+        title: "We build on top",
         description:
-          "An AI agent, an app, a dashboard, anything really. Custom built on top of Connect around how your business already works.",
+          "A Deluxe build is an AI agent, an app or a dashboard made for the repeat work in your day. It works from your real data, the way your business already runs.",
       },
       {
         step: "03",
-        title: "AI consulting",
+        title: "We run it",
         description:
-          "One day spent on your business. We find where AI actually helps, build it with you, and get your team using it.",
+          "We host it, maintain it and fix what breaks, so you can stay on the work that needs you.",
       },
     ],
   },
 
   howItWorks: {
     eyebrow: "Our process",
-    title: "From first call to your personalized product. We're here to assist at every step.",
-    description: "You communicate your needs, we build you a tool that accommodates them.",
+    title: "From first call to a working tool, we handle every step.",
+    description: "You tell us where your time goes, and we build a tool that takes that work on.",
     items: [
       {
         step: "01",
         title: "The call",
         description:
-          "A 30-minute conversation about how your business runs and where the friction is at no cost to you. We ask questions to help you figure out exactly what you need.",
+          "A free 30-minute conversation about how your business runs and where your time goes. We ask questions to help you figure out exactly what you need.",
       },
       {
         step: "02",
         title: "The plan",
         description:
-          "We write up exactly what we'll build, what it costs, and when it lands. You get the chance to review it and make sure it's tailored to your exact needs.",
+          "We write up exactly what we'll build, what it costs, and when it lands. You review it and make sure it fits before any work starts.",
       },
       {
         step: "03",
         title: "The build",
         description:
-          "We connect your tools and build anything you asked for on top, then let you test it and refine it until it's right. Once launched, we host it, maintain it and support your needs so you can focus on your business.",
+          "We connect your tools and build what we agreed on top, then you test it and we refine it until it's right. Once it's live, we host it, maintain it and support it so you can focus on your business.",
       },
     ],
   },
@@ -616,7 +639,7 @@ export const siteContent: SiteContent = {
   connect: {
     eyebrow: "bcns Connect",
     title: "How bcns Connect works",
-    description: "One connection for your whole business.",
+    description: "One connection for your whole business, so you stop hunting across apps.",
     rate: "$50 / month",
     steps: [
       {
@@ -642,13 +665,13 @@ export const siteContent: SiteContent = {
 
   useCases: {
     eyebrow: "Our services",
-    title: "The building blocks of a business ready for what's next",
+    title: "Three ways to get time back",
     description:
-      "bcns Connect is the foundation every business starts on. Deluxe builds and AI consulting add to it when you're ready.",
+      "bcns Connect puts every tool you use in one place. Deluxe builds do the busywork on top of it. AI consulting shows your team where AI saves time.",
     blockEyebrow: "Deluxe builds",
-    blockTitle: "Anything you need, custom built on top of Connect.",
+    blockTitle: "Tools that do your busywork, built on top of Connect.",
     blockDescription:
-      "Starting at $2,000 setup and $150/month on top of Connect. If you have a pain point, we can build a tool to alleviate it.",
+      "An AI agent, an app or a dashboard, built around the jobs that eat your day. Starting at $2,000 setup and $150/month on top of Connect.",
     items: [
       {
         tag: "Agents",
@@ -658,7 +681,7 @@ export const siteContent: SiteContent = {
       },
       {
         tag: "Apps",
-        title: "Custom Apps",
+        title: "Apps & Portals",
         description:
           "Booking systems, back-office tools, customer portals. Built around how you already work, and reading from the same data as everything else.",
       },
@@ -672,7 +695,7 @@ export const siteContent: SiteContent = {
         tag: "Other",
         title: "Something Else",
         description:
-          "Your options aren't limited to what we've done before. If you have a pain point, we can build a tool to alleviate it.",
+          "Your options aren't limited to what we've done before. If a job keeps eating your time, tell us about it and we'll scope a tool for it.",
       },
     ],
   },
@@ -680,7 +703,7 @@ export const siteContent: SiteContent = {
   aiConsult: {
     eyebrow: "AI consulting",
     title: "How an AI consult works",
-    description: "One day, spent on your business.",
+    description: "One day on your business to find where AI saves you time.",
     rate: "$1,000 / day",
     steps: [
       {
@@ -708,7 +731,7 @@ export const siteContent: SiteContent = {
     eyebrow: "Get in touch",
     title: "Tell us what's slowing you down",
     description:
-      "Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to get you connected.",
+      "Send a few sentences about your business and where your time goes. We'll reply within one business day with next steps to get you connected.",
     highlights: [
       {
         title: "Free consult",
@@ -730,7 +753,8 @@ export const siteContent: SiteContent = {
   pastWork: {
     eyebrow: "Past work",
     title: "Past work",
-    description: "What we've built, and what it changed for the businesses using it.",
+    description:
+      "What we've built, and the work it took off each owner's day. Clients have reported up to 70% of time saved on the tasks we built tools for.",
     items: [
       {
         slug: "sb",
@@ -830,7 +854,7 @@ export const siteContent: SiteContent = {
     eyebrow: "Pricing",
     title: "We charge you for what you actually need and no more.",
     description:
-      "Every business starts on bcns Connect for a flat monthly rate with no setup fee. Deluxe builds and AI consulting are added on top when you need them.",
+      "Every business starts on bcns Connect for a flat monthly rate with no setup fee. Add a Deluxe build or a day of AI consulting when you want more of your day back.",
     tiers: [
       {
         id: "connect",
@@ -853,7 +877,7 @@ export const siteContent: SiteContent = {
         setup: "$2,000+ setup",
         monthly: "+ from $150/mo on top of Connect",
         description:
-          "Anything custom built on top of your Connect data: an agent, an app, a dashboard.",
+          "A tool built on top of your Connect data that takes repeat work off your hands. It can be an agent, an app or a dashboard.",
         features: [
           "Scoped and quoted after our consult",
           "Built around how you already work",
@@ -924,7 +948,7 @@ export const siteContent: SiteContent = {
       {
         question: "What does a Deluxe build add?",
         answer:
-          "Something custom built for you on top of Connect: an AI agent, an app, a dashboard, anything really. We scope it with you and give you a fixed quote before any work starts.",
+          "A tool built for your business on top of Connect, like an AI agent, an app or a dashboard, that takes repeat work off your hands. We scope it with you and give you a fixed quote before any work starts.",
       },
       {
         question: "Is my data private?",
@@ -942,7 +966,7 @@ export const siteContent: SiteContent = {
   about: {
     eyebrow: "About",
     title: "The people behind bcns",
-    description: "Two founders. One builds, one makes sure it's worth building.",
+    description: "Two founders who build tools that give small business owners their time back. One builds, one makes sure it's worth building.",
     founders: [
       {
         name: "Nate Seluga",
@@ -1307,7 +1331,7 @@ export const siteContent: SiteContent = {
       {
         title: "Our Service",
         description:
-          "bcns Connect, custom Deluxe builds and AI consulting. The three building blocks and how they fit together.",
+          "bcns Connect, Deluxe builds and AI consulting. Three ways to get time back and how they fit together.",
         href: "/services",
       },
       {
@@ -1333,19 +1357,19 @@ export const siteContent: SiteContent = {
 
   pageMeta: {
     home: {
-      title: "bcns: Get Your Small Business Ready for AI",
+      title: "bcns: Software and AI Tools That Save Small Businesses Time",
       description:
-        "bcns Connect brings your small business's tools into one organized place, ready for AI and custom software. $50/month, no setup fee.",
+        "bcns builds software and AI tools around how your small business already runs, so the busywork gets done without you. bcns Connect is $50/month.",
     },
     services: {
       title: "What We Offer",
       description:
-        "bcns Connect, custom Deluxe builds and AI consulting for small businesses. Three building blocks for a business that's ready for AI.",
+        "bcns Connect, Deluxe builds and AI consulting for small businesses. Three ways to take busywork off your plate and get hours of your day back.",
     },
     work: {
       title: "Past Work",
       description:
-        "Case studies from bcns client builds: a restaurant revenue dashboard and an auto detailer's booking site. The problem, what we built, what changed.",
+        "Case studies from bcns client builds: a retailer's operations dashboard, an auto detailer's booking site and a restaurant revenue dashboard.",
     },
     pricing: {
       title: "Pricing",
@@ -1353,14 +1377,14 @@ export const siteContent: SiteContent = {
         "bcns Connect is $50/month, no setup fee. Deluxe builds from $2,000 setup plus $150/month. AI consulting at $1,000 a day. Fixed quotes.",
     },
     about: {
-      title: "About bcns | Two Founders, Custom Software",
+      title: "About bcns | Two Founders, Tools That Save Time",
       description:
-        "Nate builds. Brandon makes sure it's worth building. Two founders who left generic tools behind to build custom software that fits small businesses.",
+        "Nate builds. Brandon makes sure it's worth building. Two founders who build software and AI tools that give small business owners their time back.",
     },
     connect: {
       title: "bcns Connect | Every Tool in One Place",
       description:
-        "bcns Connect plugs into the tools your small business already uses and keeps everything organized in one place. $50/month, no setup fee.",
+        "bcns Connect plugs into the tools your small business already uses and keeps it all in one place, so you stop hunting across apps. $50/month, no setup fee.",
     },
     connectSetup: {
       title: "Use bcns Connect with Claude or ChatGPT",
@@ -1370,12 +1394,12 @@ export const siteContent: SiteContent = {
     deluxe: {
       title: "Deluxe Builds",
       description:
-        "Custom AI agents, apps and dashboards built on top of your bcns Connect data. From $2,000 setup plus $150/month, with a fixed quote before work starts.",
+        "AI agents, apps and dashboards that do your busywork, built on your bcns Connect data. From $2,000 setup plus $150/month, with a fixed quote first.",
     },
     aiConsulting: {
       title: "AI Consulting",
       description:
-        "One day on your business: we find where AI actually helps, build a workflow with you watching, and get your team using it. $1,000 a day.",
+        "One day on your business: we find where AI saves you time, build a workflow with you watching, and get your team using it. $1,000 a day.",
     },
   },
 
@@ -1396,7 +1420,7 @@ export const siteContent: SiteContent = {
       n: "01",
       label: "Get organized",
       name: "bcns Connect",
-      line: "Every tool you use, connected in one organized place.",
+      line: "Every tool you use in one organized place, so you stop hunting across apps.",
       price: "$50 a month",
       href: "/services/connect",
     },
@@ -1404,7 +1428,7 @@ export const siteContent: SiteContent = {
       n: "02",
       label: "Put it to work",
       name: "Deluxe builds",
-      line: "An AI agent, an app or a dashboard, built on top of Connect around how you work.",
+      line: "An AI agent, an app or a dashboard that does the busywork, built on top of Connect.",
       price: "From $2,000 setup",
       href: "/services/deluxe",
     },
@@ -1412,7 +1436,7 @@ export const siteContent: SiteContent = {
       n: "03",
       label: "Learn to optimize",
       name: "AI consulting",
-      line: "One day on your business: where AI actually helps, built with you, and your team using it.",
+      line: "One day on your business: where AI saves you time, built with you, and your team using it.",
       price: "$1,000 a day",
       href: "/services/ai-consulting",
     },
@@ -1448,7 +1472,7 @@ export const siteContent: SiteContent = {
     railLabel: "Jump to a step",
     diagramLabel:
       "Five tool cards start jumbled, settle into an arc, and send colored dots into one building block.",
-    proofAriaLabel: "Why bcns Connect",
+    proofAriaLabel: "What it costs",
     steps: [
       {
         label: "How it works | 01 / 05",
@@ -1496,8 +1520,8 @@ export const siteContent: SiteContent = {
 
   servicesOverview: {
     eyebrow: "Our services",
-    title: "Three ways bcns can help your business",
-    emphasis: "help your business",
+    title: "Three ways bcns gives you time back",
+    emphasis: "time back",
     cubeLabel: "The three pillars of bcns",
     cubeAriaLabel: "The three bcns cubes. Open to see our three services.",
     cardMore: "Learn more",
@@ -1609,8 +1633,8 @@ export const siteContent: SiteContent = {
   },
 
   deluxeDemo: {
-    audience: "For small businesses with a specific pain point that off-the-shelf software doesn't fix.",
-    titleEmphasis: "custom built",
+    audience: "For small businesses losing hours to work that off-the-shelf software doesn't cover.",
+    titleEmphasis: "do your busywork",
     ctaSecondary: "See how a build comes together",
     howEyebrow: "How a build works",
     askTitle: "Ask your business a question.",
@@ -1698,13 +1722,13 @@ export const siteContent: SiteContent = {
       },
     ],
     buildEyebrow: "What we build",
-    buildTitle: "If you have a pain point, we can build a tool to alleviate it.",
+    buildTitle: "If a job keeps eating your time, we can build a tool for it.",
     buildEmphasis: "we can build a tool",
     workEyebrow: "Past work",
     workTitle: "What we've built, and what it changed.",
     workEmphasis: "what it changed.",
     workCta: "Read the case study",
-    workLabels: ["Dashboard", "Custom app"],
+    workLabels: ["Dashboard", "Booking app", "Dashboard"],
     pricingEyebrow: "Deluxe build pricing",
   },
 

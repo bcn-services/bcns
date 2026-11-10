@@ -45,7 +45,7 @@ interface and the component.
 
 | Page | URL | Content keys used |
 |------|-----|-------------------|
-| Home | `/` | `hero`, `buildingBlocks`, `navCards`, `contactSection`, `pageMeta.home` |
+| Home | `/` | `hero`, `askHero`, `offYourPlate` (cards from `pastWork.items`), `buildingBlocks`, `contactSection`, `pageMeta.home` |
 | Services | `/services` | `useCases` (page head + Deluxe grid), `connect`, `aiConsult`, `howItWorks`, `contactSection`, `pageMeta.services` |
 | Work | `/work` | `pastWork`, `reviews`, `pageMeta.work` |
 | Work detail | `/work/[slug]` | `pastWork.items[n]` (title/problem/approach/outcome), `pastWork.eyebrow`, `pastWork.caseStudy` |
@@ -70,15 +70,19 @@ be ruthless about length.
 
 ### headline
 - **Field:** `hero.headline`
-- **Purpose:** Primary value proposition — the single most important thing to communicate
+- **Purpose:** Primary value proposition — the single most important thing to communicate. It names what the owner gets (time back), not how the product works.
 - **Tone:** Direct, outcome-focused, no jargon
 - **Length:** ≤70 chars; ideally one line on desktop (~8-12 words)
 
+### emphasis
+- **Field:** `hero.emphasis`
+- **Purpose:** The phrase of `headline` set in the accent style. Must stay an exact substring of `headline`.
+
 ### subheadline
 - **Field:** `hero.subheadline`
-- **Purpose:** Expands on the headline with a concrete benefit or mechanism
+- **Purpose:** Says what bcns sells (software and AI tools) and what it does for the owner
 - **Tone:** Plain language, credible; reads like a sentence from a trusted colleague
-- **Length:** 1-2 sentences, ≤120 chars
+- **Length:** 1-2 sentences, ≤160 chars
 
 ### ctaPrimary
 - **Field:** `hero.ctaPrimary`
@@ -88,28 +92,28 @@ be ruthless about length.
 
 ### ctaSecondary
 - **Field:** `hero.ctaSecondary`
-- **Purpose:** Text for the secondary CTA button (links to `#how`, the pinned "How it works" stage on the home page)
+- **Purpose:** Text for the secondary CTA button (links to `#off-your-plate`, the real builds section on the home page)
 - **Tone:** Softer than primary; invites exploration rather than conversion
 - **Length:** 2-5 words, ≤30 chars
 
 ### proofPoints[0]
 - **Field:** `hero.proofPoints[0]`
-- **Purpose:** First social-proof stat or trust signal displayed below the CTAs
-- **Note:** The three currently cover what Connect changes (nothing about your tools), what it costs, and what comes next. Keep the Connect price in sync with `pricing.tiers[0]` and `connect.rate`.
+- **Purpose:** First line of the price row above the contact section on home
+- **Note:** The three currently cover the Connect price, the Deluxe starting price, and the free consult with a fixed quote. Keep the prices in sync with `pricing.tiers`, and keep "starting at" on Deluxe.
 - **Tone:** Factual, specific; a number or short claim works best
-- **Length:** ≤35 chars (e.g. "12 clients served", "48-hour turnaround")
+- **Length:** ≤55 chars
 
 ### proofPoints[1]
 - **Field:** `hero.proofPoints[1]`
-- **Purpose:** Second trust signal; distinct from proofPoints[0] in what it proves
+- **Purpose:** Second line of the price row
 - **Tone:** Same as proofPoints[0]
-- **Length:** ≤35 chars
+- **Length:** ≤55 chars
 
 ### proofPoints[2]
 - **Field:** `hero.proofPoints[2]`
-- **Purpose:** Third trust signal; rounds out the triptych of credibility cues
+- **Purpose:** Third line of the price row
 - **Tone:** Same as proofPoints[0]
-- **Length:** ≤35 chars
+- **Length:** ≤55 chars
 
 > `proofPoints` is a fixed tuple of exactly 3 strings — do not add or remove entries.
 
@@ -117,45 +121,58 @@ be ruthless about length.
 
 ## Building Blocks (`siteContent.buildingBlocks`) — Home
 
-The three products as the three building blocks of a business ready for AI:
-bcns Connect, Deluxe builds, AI consulting, in that order. Same shape as
-`howItWorks` (`HowItWorksContent`) and rendered by the same component in its
-cards variant, so the field rules below mirror that section. Describe the
-end vision of each product, not what is built today.
+The short "how it works" on home, in three steps: connect your tools, we build
+on top, we run it. Same shape as `howItWorks` (`HowItWorksContent`) and rendered
+by the same component in its cards variant, so the field rules below mirror that
+section. Describe the end vision, not what is built today.
 
 ### eyebrow
 - **Field:** `buildingBlocks.eyebrow`
 - **Purpose:** Section label above the title
-- **Tone:** Neutral (e.g. "What we offer")
+- **Tone:** Neutral (e.g. "How it works")
 - **Length:** 1-4 words, ≤30 chars
 
 ### title
 - **Field:** `buildingBlocks.title`
-- **Purpose:** Frames the three products as one system, not a menu
-- **Tone:** Confident, forward-looking; "building blocks" is the anchor phrase
+- **Purpose:** Frames the three steps around what the owner gets: the busywork done without them
+- **Tone:** Plain
 - **Length:** ≤80 chars, 1 sentence
 
 ### description
 - **Field:** `buildingBlocks.description`
-- **Purpose:** States the order: everyone starts on Connect, the other two are added on top
+- **Purpose:** One or two sentences: the owner keeps their tools, bcns does the rest
 - **Tone:** Plain, brief
 - **Length:** 1-2 sentences, ≤120 chars
 
-### items[0..2] — one per product (fixed tuple)
+### items[0..2] — one per step (fixed tuple)
 
 #### items[n].title
 - **Field:** `buildingBlocks.items[n].title`
-- **Purpose:** Product name. Keep in the fixed order Connect, Deluxe builds, AI consulting, and match the names in `pricing.tiers`.
-- **Length:** 1-3 words, ≤25 chars
+- **Purpose:** Step name, in the fixed order: connect your tools, we build on top, we run it.
+- **Length:** 2-4 words, ≤25 chars
 
 #### items[n].description
 - **Field:** `buildingBlocks.items[n].description`
-- **Purpose:** What the product does for the business, benefit first
+- **Purpose:** What happens in the step and what it does for the owner
 - **Tone:** Plain words, no technical terms; the owner should picture it in their own business
 - **Length:** 1-2 sentences, ≤160 chars
 
 > `items` is a fixed tuple of exactly 3. The `step` field ("01"/"02"/"03") is
-> structural — do not change it. No prices here; prices live on /pricing.
+> structural — do not change it. The Connect price in step 1 must match `pricing.tiers[0]`.
+
+---
+
+## Off Your Plate (`siteContent.offYourPlate`) — Home
+
+The proof section under the hero: one card per `pastWork.items` entry (tag,
+title, outcome, first screenshot, link to its case study). The fields here are
+only the section head and the link under the cards.
+
+- **Field:** `offYourPlate.eyebrow` — section label, and the target of the hero's secondary button
+- **Field:** `offYourPlate.title` — one line naming the builds as work taken off the owner
+- **Field:** `offYourPlate.emphasis` — exact substring of `title` set in the accent style
+- **Field:** `offYourPlate.description` — the client-reported time saving. This is one of the two places the 70% line may appear site-wide (the other is `pastWork.description`). Word it as a client report on the tasks we built tools for. Never put it in a headline.
+- **Field:** `offYourPlate.allLabel` — label of the link to `/work`
 
 ---
 
@@ -246,15 +263,15 @@ tuple.
 
 ### title
 - **Field:** `useCases.title`
-- **Purpose:** /services headline framing the three products as building blocks
+- **Purpose:** Headline framing the three products as ways to get time back
 - **Tone:** Direct
 - **Length:** ≤80 chars
 
 ### description
 - **Field:** `useCases.description`
-- **Purpose:** 1-2 sentences: Connect is the foundation, the others add to it
+- **Purpose:** The /services lede: what each of the three products takes off the owner
 - **Tone:** Plain
-- **Length:** 1-2 sentences, ≤140 chars
+- **Length:** 1-3 sentences, ≤160 chars
 
 ### blockEyebrow
 - **Field:** `useCases.blockEyebrow`
@@ -264,13 +281,13 @@ tuple.
 
 ### blockTitle
 - **Field:** `useCases.blockTitle`
-- **Purpose:** One-line headline for the Deluxe grid: anything custom, built on Connect
+- **Purpose:** The /services/deluxe H1: what a Deluxe build does for the owner (it does the busywork). Keep "custom" out of headlines; it belongs in body copy.
 - **Tone:** Direct
 - **Length:** ≤70 chars, 1 sentence
 
 ### blockDescription
 - **Field:** `useCases.blockDescription`
-- **Purpose:** Starting price plus an invitation to bring a pain point
+- **Purpose:** What a Deluxe build is, then the starting price
 - **Tone:** Plain
 - **Note:** The price must match `pricing.tiers[1]` (setup and monthly).
 - **Length:** 1-2 sentences, ≤130 chars
@@ -716,7 +733,8 @@ every case study — not per-item.
 Social proof via client quotes. `items` is an open-ended array.
 
 **How to flip reviews live:** Add an entry to `reviews.items` — the holding
-state disappears automatically. No code change needed.
+state disappears automatically. No code change needed. While `items` is empty,
+`/work` leaves the whole section out.
 
 ### eyebrow
 - **Field:** `reviews.eyebrow`
@@ -874,8 +892,8 @@ on top of Connect; the copy should never present them as bigger versions of it.
 
 #### tiers[1].description
 - **Field:** `pricing.tiers[1].description`
-- **Purpose:** 1 sentence: anything custom, built on the client's Connect data
-- **Length:** 1 sentence, ≤100 chars
+- **Purpose:** What a Deluxe build takes off the client, built on their Connect data
+- **Length:** 1-2 sentences, ≤130 chars
 
 #### tiers[1].features[n] (open-ended array)
 - **Field:** `pricing.tiers[1].features`
@@ -956,7 +974,7 @@ The eleven pre-seeded entries, in order, are:
 5. **What is bcns Connect?** — Plain-words definition: one organized place that the team, AI tools and custom builds all work from.
 6. **Do I have to stop using my current software?** — No; Connect works alongside it.
 7. **Can I use my data with other tools?** — Yes; the data is the client's, and they can plug in the third-party AI tools and apps they like.
-8. **What does a Deluxe build add?** — Something custom on top of Connect, scoped and quoted as a fixed price before work starts.
+8. **What does a Deluxe build add?** — A tool on top of Connect that takes repeat work off the client, scoped and quoted as a fixed price before work starts.
 9. **Is my data private?** — Only the client's team sees it, and a full export is handed over any time, free.
 10. **How do I pay?** — By card through Stripe, $50 a month, workspace opens right away; a failed payment keeps the workspace open a month while the card is updated; Shopify App Store installs are billed by Shopify, never twice.
 
@@ -1088,9 +1106,9 @@ Every sentence in these two objects must trace to a fact or a Nate decision in `
 
 ---
 
-## Nav Cards (`siteContent.navCards`) — Home
+## Nav Cards (`siteContent.navCards`) — not rendered
 
-Navigation card grid linking to the main pages. Fixed tuple of 4.
+Navigation card grid linking to the main pages. Fixed tuple of 4. No page renders it today.
 
 ### items[0]
 - **Field:** `navCards.items[0].title` — Display title of card 0
@@ -1201,13 +1219,13 @@ is exactly three `{ question, toolIds, answerLead, answerRest }`. `toolIds` list
 the tools that light up; `answerLead` is the bold opening, `answerRest` the rest.
 Answers are invented demo numbers; keep them small and believable.
 
-## Story (`siteContent.story`) — Home
+## Story (`siteContent.story`) — not on a page
 
-The five-step pinned "How it works" stage. `steps` is five
+The five-step pinned "How it works" stage (`components/home/connect-story.tsx`). Home no longer renders it; the content stays so it can be put back. `steps` is five
 `{ label, title, emphasis, description }`; `title` is the whole heading and
 `emphasis` is the substring to style as the accent. `ariaLabel`, `railLabel` and
-`diagramLabel` are accessibility strings; `proofAriaLabel` labels the proof row
-under it (its three lines are `hero.proofPoints`). `chart` holds the last step's
+`diagramLabel` are accessibility strings; `proofAriaLabel` labels the price row
+on home (its three lines are `hero.proofPoints`). `chart` holds the last step's
 `question`, `answerLead` (bold), `answerRest`, `days` and `values` (7 bars, Mon to Sun).
 
 ## Services Overview (`siteContent.servicesOverview`) — /services
@@ -1254,7 +1272,7 @@ Extras for the Deluxe page. Head copy is `useCases.blockEyebrow/blockTitle/
 blockDescription` (`titleEmphasis` styles part of the title; `audience` is the
 "who it's for" line under the description); the four cards are
 `useCases.items`; past work is `pastWork.items` (`workLabels` is the price-slot
-label per item); pricing is `pricing.tiers[1]`. `ctaSecondary`, `howEyebrow`,
+label per item, one per case study, same order); pricing is `pricing.tiers[1]`. `ctaSecondary`, `howEyebrow`,
 `askTitle`, `askEmphasis`, `askLede`, `groupLabel`, `dashboardTitle`, `agentLabel`,
 `agentPlaceholder` and `dayLetters` label the interactive demo. `chips` is three
 `{ question, tiles, listHeading, bars | rows, answer, source }`: `tiles` are three
