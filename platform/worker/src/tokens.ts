@@ -31,10 +31,9 @@ export async function refreshTokens(t: Tick): Promise<number> {
     [refreshable.map(c => c.source), refreshable.map(c => c.refreshLead ?? '10 minutes')])
   let n = 0
   for (const row of due.rows) {
-    const conn = connectors[row.source]
-    if (!conn?.refreshToken) continue
     try {
-      if (await refreshOne(await contextFor(t, row.client_id, row.source), conn)) n++
+      // The join above only returns refreshable sources; refreshOne re-checks anyway.
+      if (await refreshOne(await contextFor(t, row.client_id, row.source), connectors[row.source])) n++
     } catch (e) {
       t.log('token_refresh_failed', { client: row.client_id, source: row.source, error: redact(String(e)) })
     }

@@ -218,11 +218,6 @@ import { quickbooks } from './quickbooks.js'
 
 export const connectors: Record<Source, Connector> = { shopify, meta, monday, meet, drive, quickbooks }
 
-/** Sources whose connector declares a fullList entity — the only ones the §5.5 zero-row rule applies to. */
-export const fullListSources: Source[] = (Object.keys(connectors) as Source[]).filter(
-  s => (connectors[s].defaults.fullList?.length ?? 0) > 0,
-)
-
-/** source -> its fullList entity names; §5.5's zero-row rule is judged per entity. */
+/** source -> its fullList entity names, for the sources that declare any; §5.5's zero-row rule applies only to those and is judged per entity. */
 export const fullListEntities: Partial<Record<Source, string[]>> = Object.fromEntries(
-  fullListSources.map(s => [s, connectors[s].defaults.fullList!.map(f => f.entity)]))
+  Object.entries(connectors).flatMap(([s, c]) => c.defaults.fullList?.length ? [[s, c.defaults.fullList.map(f => f.entity)]] : []))

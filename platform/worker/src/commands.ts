@@ -3,7 +3,7 @@
 // transaction, run with the client's stored token exactly like a sync run (contextFor), then marked
 // done/failed with a result. A crash mid-command rolls the claim back, so it is retried; every executor
 // must therefore be idempotent (set_status_done and set_status_undone are).
-import { sql, tx, type Tick } from './db.js'
+import { tx, type Tick } from './db.js'
 import { type Json, type Source, connectors, redact } from './connectors/index.js'
 import { contextFor } from './run.js'
 
