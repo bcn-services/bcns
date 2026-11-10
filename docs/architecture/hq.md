@@ -505,7 +505,7 @@ Old pipeline stays on (Cloud Scheduler, digest; the laptop launchd pull was remo
 - The old pipeline writes this same database. Its `qualify` promotes 50 leads to `call_due` at 08:01 UTC each weekday, so HQ's own promotion (08:15 UTC, same daily count) has never fired. After step 24 pauses the old clock, HQ `qualify` takes over the promotion: check for it the next weekday (query in step 24).
 - The old `source` job also calls Places (12 grid cells a weekday, up to 3 pages each) and does not write `places_call` events, so the count in Numbers -> Ops is lower than the real monthly total until the old clock is paused.
 - 663 of the `call_due` leads (created 2026-08 and 2026-09, before scoring) have no `fit_score`; they sort last.
-- The old `poll` job (on `clock-poll`) still does two things HQ does not: alert triage on the alerts inbox (last tick 2026-11-09 17:00 UTC; one alert opened and resolved 2026-10-28) and forwarding of mail that reaches the bot mailbox (15 forwards in 14 days, last 2026-11-05). `poll` is listed as dropped above; alert triage is not named anywhere in this doc. Both stop at the pause in step 24. HQ task 4e4c6321 holds the decision.
+- The old `poll` job (on `clock-poll`) still does two things HQ does not: alert triage on the alerts inbox (last tick 2026-11-09 17:00 UTC; one alert opened and resolved 2026-10-28) and forwarding of mail that reaches the bot mailbox (15 forwards in 14 days, last 2026-11-05). `poll` is listed as dropped above; alert triage is not named anywhere in this doc. Both stopped at the pause in step 24. Decided by Nate 2026-11-09 (HQ task 4e4c6321, closed): no replacement. Over its whole life alert triage opened 5 fix PRs, all against `bcns-internal`. HQ `uptime` records failures (Fires) but sends no mail, so a mail forward on the alerts inbox is the only push signal for a monitor's "down" mail.
 - Not checked: env file modes on the droplet, weekly finance.
 
 **D2: Sheet vs HQ (handed, not run).** Export the Sheet's Leads tab as CSV, import it into a scratch table `sheet_import` (HQ dashboard -> Table editor -> New table -> Import CSV, every column text), run the two queries below in the SQL Editor, then `drop table sheet_import;`.
@@ -554,11 +554,11 @@ order by (case when b.id is null or c.at is null or nullif(s.last_contact, '')::
 
 Do in this order, same day.
 
-- [ ] Allow late stages and restart (tokens persist, so connectors stay signed in):
+- [x] Allow late stages and restart (tokens persist, so connectors stay signed in). Done 2026-11-10 UTC by Nate; HQ answered after the restart:
   ```bash
   ssh root@104.236.20.89 "echo 'HQ_LATE_STAGES=1' >> /srv/hq/env && systemctl restart bcns-app@hq"
   ```
-- [ ] Pause Cloud Scheduler in GCP project `bcns-leads`, region `us-central1` (console: https://console.cloud.google.com/cloudscheduler?project=bcns-leads -> select every `clock-*` job -> Pause). The jobs are `clock-poll` (hourly tick: poll, pitch, quote, onboard, notify, qualify), `clock-source` (source + heartbeat), `clock-personalize` (the 12:30 UTC digest) and possibly `clock-touch`; list first, then pause each name that appears:
+- [x] (Done 2026-11-10 UTC by Nate: `gcloud scheduler jobs pause` on every `clock-*` job, 5 jobs. `gcloud scheduler jobs list` then showed all `PAUSED`: `clock-poll`, `clock-source`, `clock-personalize`, `clock-verify-today`, `clock-verify-tomorrow`.) Pause Cloud Scheduler in GCP project `bcns-leads`, region `us-central1` (console: https://console.cloud.google.com/cloudscheduler?project=bcns-leads -> select every `clock-*` job -> Pause). The jobs are `clock-poll` (hourly tick: poll, pitch, quote, onboard, notify, qualify), `clock-source` (source + heartbeat), `clock-personalize` (the 12:30 UTC digest) and possibly `clock-touch`; list first, then pause each name that appears:
   ```bash
   gcloud scheduler jobs list --project bcns-leads --location us-central1
   gcloud scheduler jobs pause <name> --project bcns-leads --location us-central1
@@ -570,12 +570,12 @@ Do in this order, same day.
   where job = 'qualify' and kind = 'promoted' and created_at >= current_date
   group by via;   -- expect one row: via = 'job'
   ```
-- [ ] Disable the GitHub Actions clock (which also carries the heartbeat job):
+- [x] Disable the GitHub Actions clock (which also carries the heartbeat job). Done 2026-11-10 UTC by Nate: `gh workflow list -a` shows `clock  disabled_manually`; its last run was 2026-11-09 20:00 UTC:
   ```bash
   GITHUB_TOKEN= gh workflow disable clock.yml -R bcn-services/bcns-internal
   ```
 - [x] Unload the laptop pull and stop it returning at next login. Done 2026-11-09: Nate unloaded `com.bcns.leads-pull` and deleted the plist (not renamed to `.disabled`); `launchctl list` no longer shows it.
-- [ ] Sheet and tracker artifact: leave read-only, stop opening them. `/leads` (os skill): Nate's call 2026-11-09 was to delete it; bcns-os #20 removes `skills/leads/` and points `/demo` at HQ.
+- [x] Sheet and tracker artifact: leave read-only, stop opening them. `/leads` (os skill): Nate's call 2026-11-09 was to delete it; bcns-os #20 (merged 2026-11-10 UTC) removed `skills/leads/` and pointed `/demo` at HQ.
 - [ ] After one quiet week: delete the paused Cloud Scheduler jobs (`gcloud scheduler jobs delete <name> --project bcns-leads --location us-central1`), revoke the GitHub PAT (GitHub -> Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens -> the token with resource owner `bcn-services` and Actions read/write on `bcns-internal` -> Delete), then archive:
   ```bash
   GITHUB_TOKEN= gh repo archive bcn-services/bcns-internal --yes
