@@ -151,6 +151,13 @@ assert(
   `found "${siteConfig.email}" literal in content.ts`,
 );
 
+// emphasize() falls back to plain text without warning when the phrase is not in the title.
+assert(
+  "hero.emphasis is a substring of hero.headline",
+  siteContent.hero.headline.includes(siteContent.hero.emphasis),
+  `"${siteContent.hero.emphasis}" not in "${siteContent.hero.headline}"`,
+);
+
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------

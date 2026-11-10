@@ -26,7 +26,7 @@ export function Hero() {
             {hero.ctaPrimary}
           </Link>
           <Link
-            href="#off-your-plate"
+            href="/services/deluxe"
             className="rounded-lg border border-input px-7 py-3.5 text-center text-[0.9375rem] font-medium transition-colors duration-200 hover:border-primary hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {hero.ctaSecondary}

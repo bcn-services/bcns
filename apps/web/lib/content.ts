@@ -30,17 +30,6 @@ export interface HeroContent {
   proofPoints: [string, string, string];
 }
 
-/** Home proof section: the real builds from `pastWork.items`, framed as work taken off the owner. */
-export interface OffYourPlateContent {
-  eyebrow: string;
-  title: string;
-  /** Phrase of `title` set in the display weight. */
-  emphasis: string;
-  description: string;
-  /** Label of the link to /work under the cards. */
-  allLabel: string;
-}
-
 export interface StepItem {
   step: string;
   title: string;
@@ -426,13 +415,14 @@ export interface DeluxeRow {
 }
 
 export interface DeluxeChip {
-  question: string;
+  /** A job the build does on its own. Chip label. */
+  job: string;
   tiles: [DeluxeTile, DeluxeTile, DeluxeTile];
   listHeading: string;
   /** Either bars (percent heights, Mon to Sun) or rows, never both. */
   bars?: number[];
   rows?: DeluxeRow[];
-  /** Agent answer; `**text**` marks bold. */
+  /** The agent's report of what it did; `**text**` marks bold. */
   answer: string;
   source: string;
 }
@@ -527,7 +517,6 @@ export interface AboutPageContent {
 
 export interface SiteContent {
   hero: HeroContent;
-  offYourPlate: OffYourPlateContent;
   buildingBlocks: HowItWorksContent;
   howItWorks: HowItWorksContent;
   connect: AiConsultContent;
@@ -569,43 +558,35 @@ export const siteContent: SiteContent = {
     ctaPrimary: "Book a free consult",
     ctaSecondary: "See what it takes off your plate",
     proofPoints: [
-      "bcns Connect is $50 a month, no setup fee",
-      "Deluxe builds starting at $2,000 setup plus $150 a month",
-      "Free consult and a fixed quote before any work",
+      "Keep the tools you already use",
+      "$50 a month, no setup fee",
+      "Build on top whenever you're ready",
     ],
   },
 
-  offYourPlate: {
-    eyebrow: "What it takes off your plate",
-    title: "Three tools we built, and the work each one took on",
-    emphasis: "the work each one took on",
-    description: "Clients have reported up to 70% of time saved on the tasks we built tools for.",
-    allLabel: "See all past work",
-  },
-
   buildingBlocks: {
-    eyebrow: "How it works",
-    title: "How the busywork gets done without you",
+    eyebrow: "What we offer",
+    title: "Three building blocks for a business that's ready for AI.",
     description:
-      "You keep the tools you already use. We connect them, build on top and keep it all running.",
+      "Everyone starts with bcns Connect. Add a custom build or a day of AI consulting whenever you're ready.",
     items: [
       {
         step: "01",
-        title: "Connect your tools",
+        title: "bcns Connect",
         description:
-          "bcns Connect links the tools you already use and keeps your orders, money, customers and files current in one place. It costs $50 a month with no setup fee.",
+          "Every tool your business runs on, connected in one organized place. Ready for your team, the AI tools you choose, or anything you build next.",
       },
       {
         step: "02",
-        title: "We build on top",
+        title: "Deluxe builds",
         description:
-          "A Deluxe build is an AI agent, an app or a dashboard made for the repeat work in your day. It works from your real data, the way your business already runs.",
+          "An AI agent, an app, a dashboard, anything really. Custom built on top of Connect around how your business already works.",
       },
       {
         step: "03",
-        title: "We run it",
+        title: "AI consulting",
         description:
-          "We host it, maintain it and fix what breaks, so you can stay on the work that needs you.",
+          "One day spent on your business. We find where AI actually helps, build it with you, and get your team using it.",
       },
     ],
   },
@@ -677,7 +658,7 @@ export const siteContent: SiteContent = {
         tag: "Agents",
         title: "AI Agents",
         description:
-          "An assistant that already knows your business. It answers questions about your customers, orders and money, drafts replies, and flags what needs you, working from your real data.",
+          "An assistant that already knows your business. It drafts replies, sends reminders and flags what needs you, working from your real data. You can also ask it about your customers, orders and money.",
       },
       {
         tag: "Apps",
@@ -695,7 +676,7 @@ export const siteContent: SiteContent = {
         tag: "Other",
         title: "Something Else",
         description:
-          "Your options aren't limited to what we've done before. If a job keeps eating your time, tell us about it and we'll scope a tool for it.",
+          "Your options aren't limited to what we've done before. Tell us which job takes the most of your time and we'll scope a tool for it.",
       },
     ],
   },
@@ -1472,7 +1453,7 @@ export const siteContent: SiteContent = {
     railLabel: "Jump to a step",
     diagramLabel:
       "Five tool cards start jumbled, settle into an arc, and send colored dots into one building block.",
-    proofAriaLabel: "What it costs",
+    proofAriaLabel: "Why bcns Connect",
     steps: [
       {
         label: "How it works | 01 / 05",
@@ -1637,46 +1618,18 @@ export const siteContent: SiteContent = {
     titleEmphasis: "do your busywork",
     ctaSecondary: "See how a build comes together",
     howEyebrow: "How a build works",
-    askTitle: "Ask your business a question.",
-    askEmphasis: "a question.",
+    askTitle: "Jobs a build does on its own.",
+    askEmphasis: "on its own.",
     askLede:
-      "Pick one below. This is how a dashboard and an AI agent answer it, using data that is already organized in Connect.",
-    groupLabel: "Pick a question",
+      "Pick a job below. Each one runs from data that is already organized in Connect, then tells you what it did.",
+    groupLabel: "Pick a job",
     dashboardTitle: "Your dashboard",
     agentLabel: "AI agent",
     agentPlaceholder: "Ask about your business",
     dayLetters: "MTWTFSS",
     chips: [
       {
-        question: "What did we sell last week?",
-        tiles: [
-          { name: "Orders", value: 63, sub: "last week", toolIds: ["shopify", "square"] },
-          { name: "Money", value: 4280, prefix: "$", sub: "last week", toolIds: ["quickbooks", "square"] },
-          { name: "Customers", value: 214, sub: "in total", toolIds: ["shopify", "square", "gmail"] },
-        ],
-        listHeading: "Sales by day",
-        bars: [46, 54, 62, 58, 88, 80, 52],
-        answer: "**$4,280** from **63** orders. Up 12% on the week before.",
-        source: "From your Orders and Money data",
-      },
-      {
-        question: "What's booked this week?",
-        tiles: [
-          { name: "Booked", value: 9, sub: "this week", toolIds: ["calendar"] },
-          { name: "Today", value: 2, sub: "on the schedule", toolIds: ["calendar"] },
-          { name: "Open", value: 5, sub: "slots left", toolIds: ["calendar", "square"] },
-        ],
-        listHeading: "Coming up",
-        rows: [
-          { title: "Tue 9:00", detail: "Maria R. · Full detail", tag: "Confirmed" },
-          { title: "Wed 1:30", detail: "Sam T. · Interior clean", tag: "Confirmed" },
-          { title: "Fri 10:00", detail: "Jo L. · Paint correction", tag: "Deposit paid" },
-        ],
-        answer: "**9** bookings this week, **2** today. Thursday afternoon is still open.",
-        source: "From your Calendar and Square data",
-      },
-      {
-        question: "Who needs a reply?",
+        job: "Reply to customers",
         tiles: [
           { name: "To answer", value: 5, sub: "messages", toolIds: ["gmail"] },
           { name: "Quotes", value: 3, sub: "no reply yet", toolIds: ["gmail", "quickbooks"] },
@@ -1688,8 +1641,36 @@ export const siteContent: SiteContent = {
           { title: "Pat M.", detail: "Wants to reschedule", tag: "Draft ready" },
           { title: "Lee S.", detail: "Where is my order?", tag: "Draft ready" },
         ],
-        answer: "**5** messages are waiting. I drafted replies for the top **3**.",
+        answer: "**5** new messages came in. I drafted replies for the top **3**. They are waiting for your OK.",
         source: "From your Gmail and Orders data",
+      },
+      {
+        job: "Confirm this week's bookings",
+        tiles: [
+          { name: "Booked", value: 9, sub: "this week", toolIds: ["calendar"] },
+          { name: "Confirmed", value: 7, sub: "after a reminder", toolIds: ["calendar", "gmail"] },
+          { name: "Open", value: 5, sub: "slots left", toolIds: ["calendar", "square"] },
+        ],
+        listHeading: "Coming up",
+        rows: [
+          { title: "Tue 9:00", detail: "Maria R. · Full detail", tag: "Confirmed" },
+          { title: "Wed 1:30", detail: "Sam T. · Interior clean", tag: "Confirmed" },
+          { title: "Fri 10:00", detail: "Jo L. · Paint correction", tag: "Reminder sent" },
+        ],
+        answer: "I sent a reminder for each of this week's **9** bookings. **7** have confirmed so far.",
+        source: "From your Calendar and Square data",
+      },
+      {
+        job: "Send the weekly sales report",
+        tiles: [
+          { name: "Orders", value: 63, sub: "last week", toolIds: ["shopify", "square"] },
+          { name: "Money", value: 4280, prefix: "$", sub: "last week", toolIds: ["quickbooks", "square"] },
+          { name: "Customers", value: 214, sub: "in total", toolIds: ["shopify", "square", "gmail"] },
+        ],
+        listHeading: "Sales by day",
+        bars: [46, 54, 62, 58, 88, 80, 52],
+        answer: "Your weekly report went out Monday morning. **$4,280** from **63** orders, up 12% on the week before.",
+        source: "From your Orders and Money data",
       },
     ],
     steps: [
@@ -1709,9 +1690,10 @@ export const siteContent: SiteContent = {
       },
       {
         label: "03 / 04",
-        title: "An agent that knows your business.",
-        emphasis: "knows your business.",
-        description: "Ask in plain words. It answers from your real data, not guesses.",
+        title: "An agent that does the work.",
+        emphasis: "does the work.",
+        description:
+          "It drafts replies and sends reminders on its own, from your real data. You can still ask it a question in plain words.",
       },
       {
         label: "04 / 04",

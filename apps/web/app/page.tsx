@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { Hero } from "@/components/hero";
-import { OffYourPlate } from "@/components/home/off-your-plate";
-import { HowItWorks } from "@/components/how-it-works";
+import { ConnectStory } from "@/components/home/connect-story";
 import { ProofRow } from "@/components/home/proof-row";
 import { ContactSection } from "@/components/contact-section";
 import { SiteFooter } from "@/components/site-footer";
@@ -19,8 +18,7 @@ export default function HomePage() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <OffYourPlate />
-        <HowItWorks content={siteContent.buildingBlocks} id="how" />
+        <ConnectStory story={siteContent.story} tools={siteContent.tools} pillars={siteContent.pillars} />
         <ProofRow />
         <ContactSection />
       </main>
