@@ -1,0 +1,11 @@
+# Emails Brandon how many calls are waiting. Weekdays only. No Persistent=: a day
+# missed while the droplet was down must not send a nudge late at night.
+[Unit]
+Description=HQ nudge job, weekdays 12:30 UTC
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 12:30:00 UTC
+Unit=hq-job@nudge.service
+
+[Install]
+WantedBy=timers.target

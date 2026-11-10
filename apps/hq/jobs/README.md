@@ -1,10 +1,11 @@
 # HQ jobs
 
-Two scheduled jobs feed the call queue. Plain Node 22 ESM, run by systemd on the droplet
+Scheduled jobs feed and report on the call queue. Plain Node 22 ESM, run by systemd on the droplet
 (`infra/hq-job@.service`, one `hq-*.timer` each). Only dependency: `postgres`.
 
 - `source` (Mon-Fri 11:00 UTC, `hq-source.timer`): walks the trade x town grid, searches Places, inserts new `sourced` businesses. Writes one `places_call` event per search, before the request.
 - `qualify` (hourly 08-20 UTC at :15, `hq-qualify.timer`): fetches each sourced site, scores fit (code signals gate it, the `claude` CLI scores it, code alone if the CLI is absent), then promotes qualified rows to `call_due` until 50 have been promoted today.
+- `nudge` (Mon-Fri 12:30 UTC, `hq-nudge.timer`, no `Persistent`): one Resend email, "N calls waiting, M new today" plus the Today link. Counts only, no lead data. Skips when nothing waits or one already went today (`events` job `nudge`, kind `sent`). Env: `RESEND_API_KEY`, `NUDGE_TO`, optional `NUDGE_DRY_RUN=1` (logs the text, sends nothing).
 - Every run, pass or fail, writes `events(job, kind='run', via='job', detail{ok, ms, error})`. Exit codes: 0 ok, 1 job failed, 2 bad usage.
 - The Places budget is counted from `places_call` events in the current UTC month (all jobs), against the cap. An unreadable count stops the run.
 

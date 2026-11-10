@@ -278,7 +278,7 @@ test("ticketsDeps: verify-full forced, max 1, 5s connect; a missing URL skips wi
 });
 
 test("tickets is on the run.mjs allow-list and a failed run is logged ok:false", async () => {
-  assert.deepEqual(JOBS, ["source", "qualify", "deliverable", "uptime", "tickets"]);
+  assert.deepEqual(JOBS, ["source", "qualify", "deliverable", "uptime", "tickets", "nudge"]);
   const events = [];
   const db = { logEvent: async (_s, job, kind, detail) => events.push({ job, kind, detail }) };
   const load = async () => ({
