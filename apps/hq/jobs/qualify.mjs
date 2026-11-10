@@ -12,6 +12,12 @@
 // answers with something unparseable, the row is scored by code alone
 // (scored_by = 'code'). The gate never depends on the model either way.
 //
+// Backfill: after the sourced loop, a bounded pass (BACKFILL_LIMIT rows, same
+// time guard) scores `call_due` rows that have no fit_score. It runs the same
+// fetch -> gate -> score steps but never touches `stage` and never writes
+// fit_score directly: a pass only adds research.fit_score; a gate or repeated
+// failure sets research.backfill_skip so the row is not picked again.
+//
 // `research` is written as a real jsonb object (lib/db.mjs wraps it in
 // sql.json); reads tolerate the legacy double-encoded string too.
 
@@ -138,6 +144,9 @@ export const DEFAULT_BUDGET_MS = 20 * 60 * 1000;
 // this only has to sit above what one budget can get through.
 export const DEFAULT_LIMIT = 150;
 
+// Per-run cap on the call_due backfill pass.
+export const BACKFILL_LIMIT = 100;
+
 // Target call_due rows promoted per UTC day (the digest-less HQ call queue).
 export const CALL_TASKS_PER_DAY = 50;
 
@@ -153,6 +162,7 @@ export async function run({
   fetchPage,
   claude, // optional: absent -> every row is scored by code alone
   limit = DEFAULT_LIMIT,
+  backfillLimit = BACKFILL_LIMIT,
   contactPaths = CONTACT_PATHS,
   budgetMs = DEFAULT_BUDGET_MS,
   // When the process must be done, set once by main() in jobs/run.mjs. The loop
@@ -174,6 +184,8 @@ export async function run({
       skipped: ["fetchPage"],
       promoted: 0,
       timedOut: false,
+      backfilled: 0,
+      backfillSkipped: 0,
     };
   }
 
@@ -183,6 +195,8 @@ export async function run({
   let lost = 0;
   let skipped = 0;
   let errors = 0;
+  let backfilled = 0;
+  let backfillSkipped = 0;
   let timedOut = false;
   // moved: a stage write for the current row already landed, so a later throw
   // (a log) must not rewrite it. Reset per row.
@@ -224,11 +238,18 @@ export async function run({
     lostReason: "qualify_failed",
     why: "qualify failed",
   };
-  const recordFailure = async (b, { counter, lostReason, why } = FETCH) => {
+  const recordFailure = async (b, { counter, lostReason, why } = FETCH, backfill = false) => {
     try {
       const research = parseResearch(b.research);
       const failures = (research[counter] ?? 0) + 1;
-      if (failures >= MAX_QUALIFY_FAILURES) {
+      if (failures >= MAX_QUALIFY_FAILURES && backfill) {
+        // Backfill never moves a call_due row: park it out of the backfill queue.
+        await db.updateBusiness(sql, b.id, {
+          research: { ...research, [counter]: failures, backfill_skip: lostReason },
+        });
+        backfillSkipped++;
+        await log("backfill_skipped", { business: b.id, reason: lostReason });
+      } else if (failures >= MAX_QUALIFY_FAILURES) {
         await db.updateBusiness(sql, b.id, {
           stage: "lost",
           research: { ...research, [counter]: failures, lost_reason: lostReason },
@@ -245,6 +266,107 @@ export async function run({
     }
   };
 
+  // fetch -> gate -> score for one row, shared by the sourced and backfill
+  // loops. Returns {lose: [reason, detail, extra]} for a gate failure,
+  // {empty: true} for a page with no text, else {fields, signals, found, text}.
+  // `st.fetched` flips once the fetch phase is done, so a later throw is a
+  // qualify error, not the site's fault.
+  const assess = async (b, st) => {
+    // Hard gate 2: a call task with no number to dial is worthless. Checked
+    // before any fetch so a phoneless row costs nothing.
+    if (!String(b.phone ?? "").trim()) return { lose: ["no_phone", {}, {}] };
+    // No website: no signals to detect, so it cannot clear the signal gate.
+    if (!b.domain) return { lose: ["unfit", { detail: "no domain" }, {}] };
+    const home = await fetchPage(homepage(b));
+    let contact = "";
+    for (const path of contactPaths) {
+      try {
+        contact = await fetchPage(homepage(b) + path);
+        if (contact) break;
+      } catch {
+        // A missing contact page is normal, not a failure of the business.
+      }
+    }
+
+    const text = `${trim(home)}\n\n${trim(contact)}`.trim();
+    st.fetched = true;
+
+    // No page text is a fetch that failed (dead site, bot wall, redirect loop).
+    if (!text) return { empty: true };
+
+    // Hard gate 1, by code, on the RAW html (pixels and widgets live in the
+    // tags `trim` strips). Below the gate the row can never pass whatever the
+    // model would say, so the Claude call is not spent.
+    const found = evidence(`${home}\n${contact}`);
+    const signals = Object.fromEntries(SIGNAL_KEYS.map((k) => [k, found[k].length > 0]));
+    if (countSignals(signals) < MIN_SIGNALS) {
+      return {
+        lose: ["unfit", { signals: countSignals(signals) }, { signals, signal_evidence: found }],
+      };
+    }
+
+    // The model read, if there is a model and it answers. Any failure here
+    // (throw, unparseable answer) drops this row to the code-only score.
+    let parsed = null;
+    if (model) {
+      let answer;
+      try {
+        answer = await model.ask(PROMPT + text);
+      } catch (err) {
+        model = null;
+        await log("error", {
+          business: b.id,
+          name: b.name,
+          error: `claude unavailable, scoring by code: ${String(err?.message ?? err).slice(0, 200)}`,
+        });
+      }
+      if (answer !== undefined) {
+        try {
+          parsed = parseAnswer(answer);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) parsed = null;
+        } catch (err) {
+          await log("error", {
+            business: b.id,
+            name: b.name,
+            error: `claude answer unusable, scored by code: ${String(err?.message ?? err).slice(0, 200)}`,
+          });
+        }
+      }
+    }
+
+    const state = b.state;
+    let fields;
+    if (parsed) {
+      const headcountBand =
+        typeof parsed.headcount_band === "string" ? parsed.headcount_band : null;
+      const locations = Number.isFinite(parsed.locations) ? parsed.locations : null;
+      const nicheScore = Number(parsed.fit_score);
+      const ownerName = typeof parsed.owner_name === "string" ? parsed.owner_name.trim() : "";
+      fields = {
+        scored_by: "claude",
+        facts: Array.isArray(parsed.facts) ? parsed.facts : [],
+        fit_score: fitScore({ signals, nicheScore, headcountBand, locations, state }),
+        // What the model claimed, kept to spot regex gaps; it never gates or scores.
+        signals_model: parsed.signals ?? null,
+        niche_score: Number.isFinite(nicheScore) ? nicheScore : null,
+        headcount_band: headcountBand,
+        locations,
+        reason: parsed.reason ?? null,
+        owner_name: ownerName || null,
+      };
+    } else {
+      const nicheScore = TRADES.includes(b.trade) ? CODE_NICHE : 0;
+      fields = {
+        scored_by: "code",
+        facts: [],
+        fit_score: fitScore({ signals, nicheScore, headcountBand: null, locations: null, state }),
+        niche_score: nicheScore,
+      };
+    }
+
+    return { fields, signals, found, text };
+  };
+
   const startedAt = clock();
   const budget = deadline == null ? budgetMs : Math.min(budgetMs, deadline - startedAt);
 
@@ -253,40 +375,15 @@ export async function run({
       timedOut = true;
       break;
     }
-    // fetched: the fetch phase finished, so a later throw (parsing, DB) is not
-    // the site's fault: it counts as a qualify error, not a fetch failure.
-    let fetched = false;
+    const st = { fetched: false };
     moved = false;
     try {
-      // Hard gate 2: a call task with no number to dial is worthless. Checked
-      // before any fetch so a phoneless row costs nothing.
-      if (!String(b.phone ?? "").trim()) {
-        await lose(b, "no_phone");
+      const r = await assess(b, st);
+      if (r.lose) {
+        await lose(b, ...r.lose);
         continue;
       }
-      // No website: no signals to detect, so it cannot clear the signal gate.
-      if (!b.domain) {
-        await lose(b, "unfit", { detail: "no domain" });
-        continue;
-      }
-      const home = await fetchPage(homepage(b));
-      let contact = "";
-      for (const path of contactPaths) {
-        try {
-          contact = await fetchPage(homepage(b) + path);
-          if (contact) break;
-        } catch {
-          // A missing contact page is normal, not a failure of the business.
-        }
-      }
-
-      const text = `${trim(home)}\n\n${trim(contact)}`.trim();
-      fetched = true;
-
-      // No page text is not a business to judge, it is a fetch that failed —
-      // a dead site, a bot wall, a redirect loop. The row stays at `sourced`
-      // until it has failed MAX_QUALIFY_FAILURES times.
-      if (!text) {
+      if (r.empty) {
         skipped++;
         await log("skipped", {
           business: b.id,
@@ -296,80 +393,7 @@ export async function run({
         await recordFailure(b);
         continue;
       }
-
-      // Hard gate 1, by code, on the RAW html (pixels and widgets live in the
-      // tags `trim` strips). Below the gate the row can never pass whatever the
-      // model would say, so the Claude call is not spent.
-      const found = evidence(`${home}\n${contact}`);
-      const signals = Object.fromEntries(SIGNAL_KEYS.map((k) => [k, found[k].length > 0]));
-      if (countSignals(signals) < MIN_SIGNALS) {
-        await lose(
-          b,
-          "unfit",
-          { signals: countSignals(signals) },
-          { signals, signal_evidence: found }
-        );
-        continue;
-      }
-
-      // The model read, if there is a model and it answers. Any failure here
-      // (throw, unparseable answer) drops this row to the code-only score.
-      let parsed = null;
-      if (model) {
-        let answer;
-        try {
-          answer = await model.ask(PROMPT + text);
-        } catch (err) {
-          model = null;
-          await log("error", {
-            business: b.id,
-            name: b.name,
-            error: `claude unavailable, scoring by code: ${String(err?.message ?? err).slice(0, 200)}`,
-          });
-        }
-        if (answer !== undefined) {
-          try {
-            parsed = parseAnswer(answer);
-            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) parsed = null;
-          } catch (err) {
-            await log("error", {
-              business: b.id,
-              name: b.name,
-              error: `claude answer unusable, scored by code: ${String(err?.message ?? err).slice(0, 200)}`,
-            });
-          }
-        }
-      }
-
-      const state = b.state;
-      let fields;
-      if (parsed) {
-        const headcountBand =
-          typeof parsed.headcount_band === "string" ? parsed.headcount_band : null;
-        const locations = Number.isFinite(parsed.locations) ? parsed.locations : null;
-        const nicheScore = Number(parsed.fit_score);
-        const ownerName = typeof parsed.owner_name === "string" ? parsed.owner_name.trim() : "";
-        fields = {
-          scored_by: "claude",
-          facts: Array.isArray(parsed.facts) ? parsed.facts : [],
-          fit_score: fitScore({ signals, nicheScore, headcountBand, locations, state }),
-          // What the model claimed, kept to spot regex gaps; it never gates or scores.
-          signals_model: parsed.signals ?? null,
-          niche_score: Number.isFinite(nicheScore) ? nicheScore : null,
-          headcount_band: headcountBand,
-          locations,
-          reason: parsed.reason ?? null,
-          owner_name: ownerName || null,
-        };
-      } else {
-        const nicheScore = TRADES.includes(b.trade) ? CODE_NICHE : 0;
-        fields = {
-          scored_by: "code",
-          facts: [],
-          fit_score: fitScore({ signals, nicheScore, headcountBand: null, locations: null, state }),
-          niche_score: nicheScore,
-        };
-      }
+      const { fields, signals, found, text } = r;
 
       // fit_score is the number the call queue sorts by: from code, a JSON
       // number. businesses.fit_score is generated from it; never write that.
@@ -397,9 +421,75 @@ export async function run({
       try {
         // A post-fetch error must rotate the row too, or it sits at the head of
         // sourcedBacklog and burns a Claude call every run forever.
-        if (!moved) await recordFailure(b, fetched ? QUALIFY_ERRORS : FETCH);
+        if (!moved) await recordFailure(b, st.fetched ? QUALIFY_ERRORS : FETCH);
       } catch {
         // Counting failed; the row stays at sourced and is retried.
+      }
+    }
+  }
+
+  // Backfill: score call_due rows that have no fit_score. Never touches stage.
+  // Skipped when the sourced loop already ran out of time.
+  // An optional pass must not take promotion down: a failed select is logged and skipped.
+  let unscored = [];
+  if (!timedOut && typeof db.unscoredCallDue === "function") {
+    try {
+      unscored = (await db.unscoredCallDue(sql, { limit: backfillLimit })) ?? [];
+    } catch (err) {
+      errors++;
+      await log("error", { error: `backfill select failed: ${String(err?.message ?? err)}` });
+    }
+  }
+  for (const b of unscored) {
+    if (clock() - startedAt >= budget) {
+      timedOut = true;
+      break;
+    }
+    const st = { fetched: false };
+    let done = false;
+    try {
+      const r = await assess(b, st);
+      if (r.empty) {
+        await recordFailure(b, FETCH, true);
+        continue;
+      }
+      let research;
+      let reason;
+      if (r.lose) {
+        let detail;
+        [reason, detail, research] = r.lose;
+        // Keep "no domain" apart from "thin signals" in backfill_skip.
+        if (detail?.detail === "no domain") reason = "no_domain";
+        research = { ...parseResearch(b.research), ...research, backfill_skip: reason };
+      } else {
+        research = {
+          ...parseResearch(b.research),
+          ...r.fields,
+          signals: r.signals,
+          signal_evidence: r.found,
+          page_text: r.text.slice(0, PAGE_TEXT_MAX),
+        };
+      }
+      await db.updateBusiness(sql, b.id, { research });
+      done = true;
+      if (reason) {
+        backfillSkipped++;
+        await log("backfill_skipped", { business: b.id, reason });
+      } else {
+        backfilled++;
+        await log("backfilled", {
+          business: b.id,
+          signals: countSignals(r.signals),
+          scored_by: r.fields.scored_by,
+        });
+      }
+    } catch (err) {
+      errors++;
+      await log("error", { business: b.id, name: b.name, error: String(err?.message ?? err) });
+      try {
+        if (!done) await recordFailure(b, st.fetched ? QUALIFY_ERRORS : FETCH, true);
+      } catch {
+        // Counting failed; the row is picked up again next run.
       }
     }
   }
@@ -407,7 +497,7 @@ export async function run({
   if (timedOut) {
     await log("skipped", {
       reason:
-        "time guard — budgetMs or the process deadline exceeded, remaining rows stay at sourced",
+        "time guard — budgetMs or the process deadline exceeded, remaining rows wait for the next run",
     });
   }
 
@@ -429,7 +519,7 @@ export async function run({
     }
   }
 
-  return { qualified, lost, skipped, errors, promoted, timedOut };
+  return { qualified, lost, skipped, errors, promoted, timedOut, backfilled, backfillSkipped };
 }
 
 function homepage(b) {
