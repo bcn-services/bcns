@@ -712,7 +712,7 @@ export const siteContent: SiteContent = {
     eyebrow: "Get in touch",
     title: "Tell us what's slowing you down",
     description:
-      "Send a few sentences about your business and where your time goes. We'll reply within one business day with next steps to get you connected.",
+      "Send a few sentences about your business and its pain points. We'll reply within one business day with next steps to get you connected.",
     highlights: [
       {
         title: "Free consult",
@@ -1629,7 +1629,7 @@ export const siteContent: SiteContent = {
     dayLetters: "MTWTFSS",
     chips: [
       {
-        job: "Reply to customers",
+        job: "Draft customer replies",
         tiles: [
           { name: "To answer", value: 5, sub: "messages", toolIds: ["gmail"] },
           { name: "Quotes", value: 3, sub: "no reply yet", toolIds: ["gmail", "quickbooks"] },
@@ -1658,7 +1658,7 @@ export const siteContent: SiteContent = {
           { title: "Fri 10:00", detail: "Jo L. · Paint correction", tag: "Reminder sent" },
         ],
         answer: "I sent a reminder for each of this week's **9** bookings. **7** have confirmed so far.",
-        source: "From your Calendar and Square data",
+        source: "From your Calendar, Gmail and Square data",
       },
       {
         job: "Send the weekly sales report",

@@ -154,7 +154,8 @@ assert(
 // emphasize() falls back to plain text without warning when the phrase is not in the title.
 assert(
   "hero.emphasis is a substring of hero.headline",
-  siteContent.hero.headline.includes(siteContent.hero.emphasis),
+  siteContent.hero.emphasis.length > 0 &&
+    siteContent.hero.headline.includes(siteContent.hero.emphasis),
   `"${siteContent.hero.emphasis}" not in "${siteContent.hero.headline}"`,
 );
 
