@@ -42,9 +42,9 @@ jobs:
       # Held here so the Ship step stays one step for every slug.
       RELEASE_DIR: ${{ matrix.slug == 'mcp' && format('apps/{0}/.release', matrix.slug) || format('apps/{0}/.next/standalone', matrix.slug) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4 # version from root packageManager
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from root packageManager
+      - uses: actions/setup-node@v7
         with:
           node-version: 22 # must match the droplet's Node
           cache: pnpm
