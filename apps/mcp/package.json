@@ -18,13 +18,13 @@
   },
   "dependencies": {
     "@bcn-services/data-client": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.30.0",
-    "@sentry/node": "10.76.2",
-    "@supabase/supabase-js": "^2.116.0"
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@sentry/node": "10.78.0",
+    "@supabase/supabase-js": "^2.119.0"
   },
   "devDependencies": {
     "@bcn-services/config": "workspace:*",
-    "@types/node": "^22.9.0",
+    "@types/node": "^22.20.5",
     "eslint": "^9.15.0",
     "typescript": "^5.6.3"
   }
