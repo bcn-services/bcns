@@ -123,6 +123,14 @@ export async function main({ argv = process.argv.slice(2), env = process.env, de
     console.error(`could not write the run event: ${String(err?.message ?? err)}`);
     code = 1;
   }
+  if (!ok && db?.raiseJobFire && sql) {
+    // best effort: a failed fire never changes the job's exit code
+    await db
+      .raiseJobFire(sql, name, error)
+      .catch((err) =>
+        console.error(`could not raise the job fire: ${String(err?.message ?? err)}`)
+      );
+  }
   if (ownSql) await sql.end({ timeout: 5 }).catch(() => {});
   return code;
 }

@@ -10,13 +10,23 @@ import { main, jobDeps, JOBS, PROCESS_BUDGET_MS } from "../run.mjs";
 
 const RUN = fileURLToPath(new URL("../run.mjs", import.meta.url));
 
-function setup({ run, logFails = false, env = { DATABASE_URL: "unused" } } = {}) {
+function setup({
+  run,
+  logFails = false,
+  raiseFails = false,
+  env = { DATABASE_URL: "unused" },
+} = {}) {
   const events = [];
+  const raised = [];
   const sql = { end: async () => {} };
   const db = {
     logEvent: async (_s, job, kind, detail) => {
       if (logFails) throw new Error("events insert failed");
       events.push({ job, kind, detail });
+    },
+    raiseJobFire: async (_s, job, error) => {
+      raised.push({ job, error });
+      if (raiseFails) throw new Error("tasks insert failed");
     },
   };
   const seen = {};
@@ -28,6 +38,7 @@ function setup({ run, logFails = false, env = { DATABASE_URL: "unused" } } = {})
   });
   return {
     events,
+    raised,
     seen,
     args: (name) => ({ argv: [name], env, deps: { sql, db, load, job: {} } }),
   };
@@ -286,7 +297,11 @@ test("a pass that did work, or a failing job, is still logged (claimed:1, claime
   const w = setup({ run: async () => ({ claimed: 1, status: "failed" }) });
   assert.equal(await main(w.args("deliverable")), 0);
   assert.equal(w.events.length, 1);
-  const t = setup({ run: async () => { throw new Error("boom"); } });
+  const t = setup({
+    run: async () => {
+      throw new Error("boom");
+    },
+  });
   assert.equal(await main(t.args("deliverable")), 1);
   assert.equal(t.events.length, 1);
   assert.equal(t.events[0].detail.ok, false);
@@ -301,12 +316,44 @@ test("a tick that recovered a stale row is logged (not idle); a job-flagged tamp
   assert.equal(rec.events.length, 1);
   assert.equal(rec.events[0].detail.ok, true);
 
-  const t = setup({ run: async () => ({ claimed: 1, id: "r1", status: "failed", error: "git metadata changed", tamper: true }) });
+  const t = setup({
+    run: async () => ({
+      claimed: 1,
+      id: "r1",
+      status: "failed",
+      error: "git metadata changed",
+      tamper: true,
+    }),
+  });
   assert.equal(await main(t.args("deliverable")), 1);
   assert.equal(t.events.length, 1);
   assert.equal(t.events[0].detail.ok, false);
   assert.equal(t.events[0].detail.error, "git metadata changed");
 
-  const plain = setup({ run: async () => ({ claimed: 1, id: "r1", status: "failed", error: "bad slug" }) });
+  const plain = setup({
+    run: async () => ({ claimed: 1, id: "r1", status: "failed", error: "bad slug" }),
+  });
   assert.equal(await main(plain.args("deliverable")), 0, "an ordinary failed row is still ok:true");
+});
+
+test("a failed run asks for a job fire; a passing run does not; a failing fire keeps the exit code", async () => {
+  const bad = setup({
+    run: async () => {
+      throw new Error("boom");
+    },
+  });
+  assert.equal(await main(bad.args("tickets")), 1);
+  assert.deepEqual(bad.raised, [{ job: "tickets", error: "boom" }]);
+
+  const good = setup({ run: async () => ({ ok: 1 }) });
+  assert.equal(await main(good.args("tickets")), 0);
+  assert.equal(good.raised.length, 0);
+
+  const broken = setup({
+    raiseFails: true,
+    run: async () => {
+      throw new Error("boom");
+    },
+  });
+  assert.equal(await main(broken.args("tickets")), 1);
 });
