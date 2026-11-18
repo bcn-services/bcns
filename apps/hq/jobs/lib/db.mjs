@@ -64,6 +64,32 @@ export function logEvent(sql, job, kind, detail = {}) {
   `;
 }
 
+// A job that fails twice in 24h gets one open Ops task keyed `ops:job:<job>` (the key the Fires list
+// uses, so pressing `c` on that fire finds it instead of making a second). Without it the failure is
+// only a computed fire in the web app, invisible to MCP/Today. The open-key unique index dedupes;
+// closing the task while the job still fails raises a fresh one on the next failed run.
+export async function raiseJobFire(sql, job, error) {
+  const [{ n }] = await sql`
+    select count(*)::int as n from events
+    where job = ${job} and kind = 'run' and detail->>'ok' = 'false'
+      and created_at > now() - interval '24 hours'
+  `;
+  if (n < 2) return false;
+  try {
+    await sql`
+      insert into tasks (title, body, owners, area, status, source, alert_key, due, via, track_id)
+      values (${`${job} failed ${n}x in 24h`}, ${String(error ?? "").slice(0, 500)},
+              '{nate}', 'ops', 'todo', 'alert', ${`ops:job:${job}`},
+              (now() at time zone 'America/New_York')::date + 2, 'job',
+              (select id from tracks where name = 'Ops'))
+    `;
+    return true;
+  } catch (e) {
+    if (e?.code === "23505") return false; // tasks_alert_key_open_idx: an open task is already there
+    throw e;
+  }
+}
+
 // --- search grid -----------------------------------------------------------
 // lib/grid.mjs owns which cells exist; this table only holds their run state.
 // Upserting on every run means adding a town there needs no migration.
