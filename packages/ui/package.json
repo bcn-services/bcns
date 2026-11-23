@@ -26,8 +26,8 @@
   "dependencies": {
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "tailwind-merge": "^2.5.4"
+    "lucide-react": "^0.577.0",
+    "tailwind-merge": "^2.6.2"
   },
   "peerDependencies": {
     "react": "^18.3.1",
